@@ -32,6 +32,10 @@ Every 5 seconds one line like this appears:
 | `audio_wait` | Game-thread time blocked waiting for audio space | Large or frequent waits during slowdown point to audio pacing |
 | `audio_rejections` | Audio buffers dropped after a wait timed out | Should be 0; non-zero values can mean crackle |
 
+## The 16.7 ms rule
+
+The game can draw 60 frames per second, but it waits for the renderer to finish each frame before starting the next. If `display_list` takes even slightly more than 16.7 ms, the frame rate drops to 30, and past 33.3 ms to 20. Game speed is kept by applying several logic steps per frame, so this looks choppy rather than slow. See [frame pacing findings](research/blockplanet-frame-pacing.md).
+
 ## A useful test run
 
 1. Pick one scene that feels slow, for example a busy Rescue level or VS mode, and one quiet scene, such as the main menu.
