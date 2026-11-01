@@ -234,6 +234,13 @@ endforeach()
 if(NOT GENERATED_RECOMP_SOURCES)
     message(FATAL_ERROR "No genuine N64Recomp funcs_*.c files found")
 endif()
+# N64Recomp's clang form of RECOMP_FUNC is `extern inline`. Compiled as C++,
+# that lets clang drop every generated function, which fails at link time with
+# hundreds of undefined func_XXXXXXXX symbols. Use GCC or MSVC.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "Generated game code cannot be compiled as C++ with clang; "
+        "configure with -DCMAKE_CXX_COMPILER=g++ (Linux) or MSVC (Windows)")
+endif()
 set_source_files_properties(${GENERATED_RECOMP_SOURCES} PROPERTIES LANGUAGE CXX)
 if(MSVC)
     set_source_files_properties(${GENERATED_RECOMP_SOURCES} PROPERTIES COMPILE_OPTIONS "/W0")
