@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "stats": [
+    { "id": "pieces_placed", "event": "piece_placed" },
+    { "id": "combos", "event": "combo" },
+    { "id": "biggest_combo", "event": "combo", "add_field": "size", "combine": "max" },
+    { "id": "magic_used", "event": "magic_used" },
+    { "id": "levels_completed", "event": "level_completed" },
+    { "id": "chapters_completed", "event": "chapter_completed" },
+    { "id": "vs_wins", "event": "vs_round", "where": { "result": "win" } },
+    { "id": "puzzles_solved", "event": "puzzle_solved" },
+    { "id": "pictures_uncovered", "event": "level_completed", "where": { "mode": "hide_and_seek" } },
+    { "id": "best_score", "event": "game_over", "add_field": "score", "combine": "max" }
+  ],
+  "trophies": [
+    {
+      "id": "first_drop", "name": "First Drop", "tier": "bronze",
+      "description": "Place your first piece.",
+      "trigger": { "stat": "pieces_placed", "at_least": 1 }
+    },
+    {
+      "id": "thousand_pieces", "name": "Block Builder", "tier": "silver",
+      "description": "Place 1,000 pieces.",
+      "trigger": { "stat": "pieces_placed", "at_least": 1000 }
+    },
+    {
+      "id": "first_combo", "name": "Chain Reaction", "tier": "bronze",
+      "description": "Score your first combo.",
+      "trigger": { "event": "combo" }
+    },
+    {
+      "id": "combo_10", "name": "Big Chain", "tier": "silver",
+      "description": "Score a combo of 10 or more pieces.",
+      "trigger": { "event": "combo", "where": { "size": { "at_least": 10 } } }
+    },
+    {
+      "id": "combo_25", "name": "Avalanche", "tier": "gold",
+      "description": "Score a combo of 25 or more pieces.",
+      "trigger": { "event": "combo", "where": { "size": { "at_least": 25 } } }
+    },
+    {
+      "id": "first_magic", "name": "Spellbound", "tier": "bronze",
+      "description": "Use magic for the first time.",
+      "trigger": { "event": "magic_used" }
+    },
+    {
+      "id": "magic_100", "name": "Archmage", "tier": "silver",
+      "description": "Use magic 100 times.",
+      "trigger": { "stat": "magic_used", "at_least": 100 }
+    },
+    {
+      "id": "rescue_level", "name": "Rescuer", "tier": "bronze",
+      "description": "Complete a Rescue level.",
+      "trigger": { "event": "level_completed", "where": { "mode": "rescue" } }
+    },
+    {
+      "id": "chapter_1", "name": "Chapter One", "tier": "silver",
+      "description": "Complete chapter 1 in Rescue.",
+      "trigger": { "event": "chapter_completed", "where": { "mode": "rescue", "chapter": 1 } }
+    },
+    {
+      "id": "all_chapters", "name": "Core Breaker", "tier": "gold",
+      "description": "Complete every Rescue chapter.",
+      "trigger": { "event": "chapter_completed", "where": { "mode": "rescue", "final": 1 } }
+    },
+    {
+      "id": "flawless", "name": "Flawless", "tier": "gold",
+      "description": "Complete a Rescue level without losing a heart.",
+      "trigger": { "event": "level_completed", "where": { "mode": "rescue", "hearts_lost": 0 } }
+    },
+    {
+      "id": "picture_found", "name": "Peekaboo", "tier": "bronze",
+      "description": "Uncover your first Hide & Seek picture.",
+      "trigger": { "stat": "pictures_uncovered", "at_least": 1 }
+    },
+    {
+      "id": "puzzle_solved", "name": "Puzzler", "tier": "bronze",
+      "description": "Solve a puzzle.",
+      "trigger": { "event": "puzzle_solved" }
+    },
+    {
+      "id": "puzzle_one_drop", "name": "One and Done", "tier": "silver",
+      "description": "Solve a puzzle with a single drop.",
+      "trigger": { "event": "puzzle_solved", "where": { "drops": { "at_most": 1 } } }
+    },
+    {
+      "id": "time_trial_100k", "name": "Against the Clock", "tier": "silver",
+      "description": "Score 100,000 points in Time Trial.",
+      "trigger": { "event": "game_over", "where": { "mode": "time_trial", "score": { "at_least": 100000 } } }
+    },
+    {
+      "id": "vs_win", "name": "Challenger", "tier": "bronze",
+      "description": "Win a VS round.",
+      "trigger": { "stat": "vs_wins", "at_least": 1 }
+    },
+    {
+      "id": "vs_50", "name": "Champion", "tier": "gold",
+      "description": "Win 50 VS rounds.",
+      "trigger": { "stat": "vs_wins", "at_least": 50 }
+    },
+    {
+      "id": "lines_found", "name": "Between the Lines", "tier": "bronze", "hidden": true,
+      "description": "Play a game of Lines.",
+      "trigger": { "event": "mode_started", "where": { "mode": "lines" } }
+    },
+    {
+      "id": "million", "name": "Millionaire", "tier": "gold",
+      "description": "Score 1,000,000 points in a single game.",
+      "trigger": { "stat": "best_score", "at_least": 1000000 }
+    },
+    {
+      "id": "platinum", "name": "BlockPlanet Master", "tier": "platinum",
+      "description": "Earn every other trophy.",
+      "trigger": { "all_of": [] }
+    }
+  ]
+}

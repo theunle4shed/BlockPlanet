@@ -9,6 +9,7 @@
 #include "tetrisphere/audio_output.h"
 #include "tetrisphere/diagnostic_log.h"
 #include "tetrisphere/perf_metrics.h"
+#include "tetrisphere/trophy_service.h"
 #include "tetrisphere/close_game_menu.h"
 
 #include "tetrisphere/rt64_context.h"
@@ -463,6 +464,13 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     std::fprintf(stdout, "{\"event\":\"diagnostic_file_ready\",\"run_id\":\"%s\"}\n",
                  run_id());
     std::fflush(stdout);
+    {
+        char* base = SDL_GetBasePath();
+        const auto definitions = base != nullptr
+            ? std::filesystem::u8path(base) / "trophies.json" : std::filesystem::path("trophies.json");
+        if (base != nullptr) SDL_free(base);
+        initialize_trophies(definitions, user_path / "trophies.json");
+    }
     SDL_Rect usable_display{};
     if (SDL_GetDisplayUsableBounds(0, &usable_display) != 0)
         usable_display = SDL_Rect{0, 0, 960, 720};
@@ -584,6 +592,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 }
 
 [[noreturn]] void close_game() {
+    save_trophies();
     exited.store(true);
     graphics_shutdown_ready.signal();
     ultramodern::join_event_threads();
@@ -606,6 +615,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     SDL_Event event{};
     const auto event_loop_start = std::chrono::steady_clock::now();
     auto next_audio_report = event_loop_start + std::chrono::seconds(10);
+    auto next_trophy_save = event_loop_start + std::chrono::seconds(30);
     const char* audio_metrics = std::getenv("TETRISPHERE_AUDIO_METRICS");
     const bool report_audio = audio_metrics != nullptr && std::strcmp(audio_metrics, "1") == 0;
     constexpr auto perf_interval = std::chrono::seconds(5);
@@ -783,6 +793,10 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             perf_last_vis = vis;
             perf_last_rejections = rejections;
             perf_window_start = now;
+        }
+        if (now >= next_trophy_save) {
+            save_trophies();
+            next_trophy_save = now + std::chrono::seconds(30);
         }
         if (report_audio && now >= next_audio_report) {
             const auto pacing = audio_output.pacing_snapshot();

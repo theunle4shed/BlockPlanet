@@ -284,6 +284,11 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/audio_length_pacer.h
     include/tetrisphere/diagnostic_log.h
     include/tetrisphere/perf_metrics.h
+    include/tetrisphere/trophies.h
+    include/tetrisphere/trophy_service.h
+    src/platform/trophies.cpp
+    src/platform/trophy_service.cpp
+    assets/trophies/trophies.json
     include/tetrisphere/rt64_context.h
     include/tetrisphere/dl_ui_tags.h
     include/tetrisphere/f3d_flat_shade.h
@@ -483,6 +488,16 @@ add_test(NAME pc_settings_hook COMMAND pc_settings_hook_test)
 add_executable(run_options_test tests/run_options_test.cpp src/platform/run_options.cpp)
 target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 add_test(NAME run_options COMMAND run_options_test)
+add_executable(trophies_test tests/trophies_test.cpp src/platform/trophies.cpp)
+target_include_directories(trophies_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
+    "${N64MODERN_RUNTIME}/thirdparty/json")
+if(MSVC)
+    target_compile_options(trophies_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(trophies_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME trophies
+    COMMAND trophies_test "${CMAKE_CURRENT_BINARY_DIR}/trophies-test" "${CMAKE_SOURCE_DIR}")
 add_executable(perf_metrics_test tests/perf_metrics_test.cpp)
 target_include_directories(perf_metrics_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)
@@ -873,6 +888,8 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/keyboard_state.cpp
         src/platform/audio_output.cpp
         src/platform/diagnostic_log.cpp
+        src/platform/trophies.cpp
+        src/platform/trophy_service.cpp
         src/platform/input_mapping.cpp
         src/graphics/rt64_context.cpp
         src/graphics/f3d_flat_shade.cpp
@@ -989,7 +1006,10 @@ if(TETRISPHERE_GAME_ENABLED)
     add_custom_command(TARGET tetrisphere-m1 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/assets/controllers/gamecontrollerdb.txt"
-            "$<TARGET_FILE_DIR:tetrisphere-m1>/gamecontrollerdb.txt")
+            "$<TARGET_FILE_DIR:tetrisphere-m1>/gamecontrollerdb.txt"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/assets/trophies/trophies.json"
+            "$<TARGET_FILE_DIR:tetrisphere-m1>/trophies.json")
     add_executable(controller_mappings_test tests/controller_mappings_test.cpp
         src/platform/controller_mappings.cpp src/platform/controller_ports.cpp)
     add_executable(controller_ports_test tests/controller_ports_test.cpp

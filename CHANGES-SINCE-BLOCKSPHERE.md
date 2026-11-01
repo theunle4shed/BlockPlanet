@@ -29,3 +29,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `--framebuffer-readback=on|off` (default on). Off stops RT64 from rendering every frame a second time and waiting for the GPU to copy it into game memory. Known issue when off: the controller buttons in Training are missing.
 - Fixed an RT64 leak in `findTileCopyId` that only appears with readback off: the renderer-thread tile-copy map grew without limit and was scanned on every framebuffer tile load (patch in `tools/build/patch_rt64_probe.py`).
 - Recorded the measurements in [docs/research/blockplanet-frame-pacing.md](docs/research/blockplanet-frame-pacing.md).
+
+## 2026-11-01: Built-in trophies
+
+- Added a data-driven trophy engine (`include/tetrisphere/trophies.h`, `src/platform/trophies.cpp`) and the game's trophy service (`trophy_service.h/.cpp`). Definitions are in `assets/trophies/trophies.json` (copied beside the executable and into packages) and progress is saved to `data/trophies.json`. See [docs/TROPHIES.md](docs/TROPHIES.md).
+- The game loads trophies at startup and saves progress on unlocks, every 30 seconds and on exit. Game events are not reported yet, so nothing unlocks during play until the game hooks are added.

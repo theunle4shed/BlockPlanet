@@ -101,9 +101,12 @@ First document every existing magic: trigger, effect code, animation, sound and 
 
 Let players create characters (name, colors, portrait, look) and keep them in BlockPlanet's own save data rather than the 512-byte N64 EEPROM. Research: how the game stores and draws its characters. Then use texture replacement for the look, and hook the character selection to load custom entries.
 
-### Trophies (M)
+### Trophies (M, engine done)
 
-A BlockPlanet achievements system, stored in BlockPlanet's own save data, with a trophy screen in the new menus. Trophies are earned from game events such as chapters completed, combos, magic used and modes finished, which means hooking those events in the game code. Online rule: playing a host's unlocked stage never awards the guest trophies or progress.
+Built in, and open to launcher integration. See [TROPHIES.md](TROPHIES.md).
+
+- **Done:** the data-driven trophy engine (events, stats, conditions, `all_of` and platinum), progress saved with a backup, guests earning nothing, a connector point for launchers, and a proposed list of 20 trophies.
+- **Next:** game hooks that report the events (combos, level and chapter completion, magic, VS rounds and so on), a trophy screen and unlock notification in the new menus, and the owner's final trophy list.
 
 ### Quiver Launcher integration (S to M, after trophies and automated builds)
 

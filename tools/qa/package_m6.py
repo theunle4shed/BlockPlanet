@@ -107,6 +107,7 @@ def create_package(*, platform: str, binary: Path, configurator: Path,
     controller_provenance = json.loads((controller_root / "licenses/controller-db/provenance.json").read_text())
     for name, source in {
         "gamecontrollerdb.txt": controller_root / "assets/controllers/gamecontrollerdb.txt",
+        "trophies.json": controller_root / "assets/trophies/trophies.json",
         "licenses/controller-db/LICENSE": controller_root / "licenses/controller-db/LICENSE",
         "licenses/controller-db/provenance.json": controller_root / "licenses/controller-db/provenance.json",
     }.items():
