@@ -4,6 +4,10 @@ Copyright (C) 2026 djultra64. Newly authored Blocksphere code is licensed under
 the GNU General Public License, version 3 or (at your option) any later version
 (SPDX: GPL-3.0-or-later). See ../LICENSE for the full terms.
 
+BlockPlanet is a modified version of Blocksphere. Copyright (C) 2026 the
+BlockPlanet contributors for changes made after the fork, under the same
+GPL-3.0-or-later terms. See ../CHANGES-SINCE-BLOCKSPHERE.md.
+
 This grant does not relicense upstream components or original game material.
 Each upstream component retains its own copyright and license.
 The owner-supplied branding images are not original game assets and are not

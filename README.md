@@ -1,36 +1,28 @@
-<p align="center">
-  <img src="assets/branding/blocksphere-banner.png" alt="Blocksphere" width="820">
-</p>
+# BlockPlanet
 
-> This project was created with AI assistance. If that's not your cup of tea, feel free to move along.
+> This project is developed with AI assistance. If that's not your cup of tea, feel free to move along.
 
-# Blocksphere
-
-A Nintendo 64 Tetrisphere recompilation.
-
-A community PC port of **Tetrisphere** for Linux and Windows x86-64, built through static recompilation with N64Recomp, N64ModernRuntime, RSPRecomp, and RT64.
-
-
+A Nintendo 64 Tetrisphere recompilation for Linux and Windows x86-64, built through static recompilation with N64Recomp, N64ModernRuntime, RSPRecomp, and RT64.
 
 This is an independent fan project, with no affiliation with or endorsement from the original developers, publisher, or rights holders.
 
-Project direction, original port work and playtesting: **djultra64**.
+## Based on Blocksphere
 
-## Why I built this
+BlockPlanet is a continuation of **[Blocksphere](https://github.com/djultra64/Blocksphere) by djultra64**, who built the original port: the recompilation setup, the runtime and rendering integration, audio, widescreen, controls, and packaging. BlockPlanet builds on that work, starting from Blocksphere 1.1.0, with a focus on performance.
 
-I started Blocksphere to better understand how video games are developed and to grow my (limited) skills as a programmer. Working with a game I enjoy gives that learning a concrete purpose: understanding how its code was developed, how its rendering, audio, input, and platform services fit together, and what it takes to bring them to a modern PC.
+All of the Blocksphere history is preserved in this repository. Project direction, original port work, and playtesting for Blocksphere up to and including 1.1.0: **djultra64**. Changes made after the fork are BlockPlanet's and are recorded in Git history and in [CHANGES-SINCE-BLOCKSPHERE.md](CHANGES-SINCE-BLOCKSPHERE.md), as GPL-3.0 section 5(a) requires for modified versions.
 
-I set the project's direction, define its requirements, choose priorities, and make the decisions about what is ready and what needs more work. My hands-on playtesting, visual comparisons, listening tests, and feedback have driven repeated fixes to widescreen presentation, audio, controls, and usability. I also contributed code reviews and ideas for implementation.
+Please report BlockPlanet problems here, not to the Blocksphere tracker.
 
-AI is one of the tools I use throughout this process. The goal is to learn through investigation, experimentation, and iteration, and to build something I can understand and keep improving.
+## Status
 
-**Blocksphere 1.1.0 is available for Linux and Windows.** [Download Blocksphere](https://github.com/djultra64/Blocksphere/releases/latest). Share bug reports and suggestions through [GitHub Issues](https://github.com/djultra64/Blocksphere/issues).
+There is no BlockPlanet release yet. The current goals are:
 
-## What's new in 1.1.0
+- **Smoother frame rate.** Add the draw-call tags RT64 needs to generate interpolated frames, so 60 and 120 FPS presentation shows new frames rather than repeats.
+- **Less slowdown in busy scenes.** Measure and reduce time the game thread spends waiting on the renderer and on audio back-pressure.
+- **Measurement first.** Add lightweight timing diagnostics so each change can be checked on real hardware.
 
-Configure Controls and Graphics directly from Options. All seven graphics settings appear together, and the control editor uses the original game's pixel typography with aligned action rows and device-aware button names.
-
-The main menu now follows this order: Single, VS, Practice, Training, Options, Close Game. Options opens with all five entries together, and transitions preserve the background proportions.
+Until a BlockPlanet release exists, the latest playable build is [Blocksphere 1.1.0](https://github.com/djultra64/Blocksphere/releases/latest). The rest of this README describes the game as inherited from Blocksphere 1.1.0.
 
 ## Features
 
@@ -96,9 +88,9 @@ Original ROM data and generated game code remain private. See [release source an
 
 See [the 1.1.0 release notes](docs/RELEASE_NOTES_1.1.0.md) for the latest changes.
 
-## Faced challenges
+## Faced challenges (Blocksphere)
 
-The areas that required the most investigation and repeated validation were:
+These are the challenges djultra64 recorded while building Blocksphere. The areas that required the most investigation and repeated validation were:
 
 - **Recompilation and runtime compatibility.** Establishing the code map, indirect call targets, game overlays, OS services, and graphics/audio microcodes took substantial work before the native prototype could run reliably. Generated code had to remain reproducible rather than being patched by hand.
 - **Audio timing.** Producing PCM was only the first step. Queue feedback and DMA pacing caused dropped audio blocks and crackling, requiring runtime changes, timing models, and listening tests on real systems.
@@ -108,7 +100,9 @@ The areas that required the most investigation and repeated validation were:
 
 ## AI Disclosure
 
-I use **OpenAI Codex** to assist with research, reverse-engineering analysis, code implementation, debugging, tests, builds, packaging, and documentation. I direct that work, contribute code reviews and ideas for implementation, evaluate the game's behavior through hands-on testing, and decide which changes and releases to accept.
+BlockPlanet's changes are developed with **Claude Code** (Anthropic), which assists with code analysis, implementation, tests, and documentation. Its owner directs the work, tests the game, and decides which changes to accept.
+
+Blocksphere's own disclosure, retained from the original project: I use **OpenAI Codex** to assist with research, reverse-engineering analysis, code implementation, debugging, tests, builds, packaging, and documentation. I direct that work, contribute code reviews and ideas for implementation, evaluate the game's behavior through hands-on testing, and decide which changes and releases to accept.
 
 The original game and the upstream tools remain the work of their respective creators, credited below.
 
@@ -158,7 +152,7 @@ Thanks to the broader N64 recompilation, emulation, and preservation communities
 
 ## Licensing and distribution
 
-Each upstream component retains its own license and copyright notices. A credit in this README does not replace the full license text or any corresponding-source obligations. Newly authored Blocksphere code is licensed under **GPL-3.0-or-later**; see [LICENSE](LICENSE). Upstream code remains subject to its existing licenses. The code license does not cover original game material or branding images. The original game material is outside any license granted for the port's original work.
+Each upstream component retains its own license and copyright notices. A credit in this README does not replace the full license text or any corresponding-source obligations. Blocksphere code by djultra64 and newly authored BlockPlanet code are licensed under **GPL-3.0-or-later**; see [LICENSE](LICENSE). Upstream code remains subject to its existing licenses. The code license does not cover original game material or Blocksphere's branding images, which are not included in BlockPlanet. The original game material is outside any license granted for the port's original work.
 
 Release packages include the applicable upstream notices and the port license. Source and pinned dependency materials accompany the release. The Windows package includes the DXC compiler and DXIL signing libraries with their release-specific license terms.
 
