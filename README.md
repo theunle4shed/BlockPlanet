@@ -48,7 +48,7 @@ No ROM, extracted original game assets, save files, or captured audio are distri
 3. Select your supported ROM when prompted. The game can also discover a matching ROM beside the executable or accept its path as the last command-line argument. Supported input formats are `.z64`, `.v64`, `.n64`, and `.zip`.
 4. Keep the `data/` folder beside the game executable when updating; it contains the imported ROM, settings, progress, and diagnostics. Move or copy the whole game folder to carry your data with you. Older versions stored data in your user profile; to keep that progress, copy the old data directory's contents into the new game's `data/` folder before launching.
 
-Open **Options → Graphics** for graphics settings and **Options → Controls** for controller remapping. Use Apply to save control changes. Restart the game when a setting requests it. Run the game's `--help` for options that apply to one launch.
+Open **Options → Graphics** for graphics settings and **Options → Controls** for controller remapping. Use Apply to save control changes. Restart the game when a setting requests it. Run the game's `--help` for options that apply to one launch. To measure performance, see [performance testing](docs/PERFORMANCE_TESTING.md).
 
 | Shortcut | Action |
 | --- | --- |

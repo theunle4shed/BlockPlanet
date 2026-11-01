@@ -85,6 +85,11 @@ void DiagnosticLog::audio(const char* status) {
                                  {"status", status}}.dump());
 }
 
+void DiagnosticLog::perf(const std::string& json_line) {
+    std::lock_guard lock(mutex_);
+    append_locked(json_line);
+}
+
 DiagnosticLog& diagnostic_log() {
     static DiagnosticLog value;
     return value;

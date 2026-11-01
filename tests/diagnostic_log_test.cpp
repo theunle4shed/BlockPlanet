@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
     log.gpu("AMD Radeon RX 7800 XT");
     log.error("audio_unavailable");
     log.audio("reopened");
+    log.perf("{\"event\":\"perf_window\",\"game_fps\":30.0}");
     std::ifstream input(path);
     std::string line;
     int lines = 0;
@@ -39,8 +40,9 @@ int main(int argc, char** argv) {
              document.at("graphics").at("refresh") != "120" ||
              document.at("backend") != "rt64-vulkan")) return 1;
         if (lines == 1 && document.at("gpu") != "AMD Radeon RX 7800 XT") return 1;
+        if (lines == 4 && document.at("event") != "perf_window") return 1;
         if (line.find("secret") != std::string::npos) return 1;
         ++lines;
     }
-    if (lines != 4) return 1;
+    if (lines != 5) return 1;
 }

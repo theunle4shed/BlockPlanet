@@ -1,5 +1,6 @@
 #include "tetrisphere/linux_platform.h"
 #include "tetrisphere/audio_length_pacer.h"
+#include "tetrisphere/perf_metrics.h"
 
 #include "recomp.h"
 #include "tetrisphere/runtime.h"
@@ -94,14 +95,19 @@ void osAiSetNextBuffer_recomp(std::uint8_t* rdram, recomp_context* ctx) {
     }
     if (fifo_action == tetrisphere::AudioFifoDrainAction::Wait) {
         tetrisphere_ai_fifo_wait_events.fetch_add(1, std::memory_order_relaxed);
-        unsigned waited = 0;
         const auto max_waits = tetrisphere::linux_audio_drain_wait_budget_ms();
-        const bool ready = tetrisphere::wait_for_audio_fifo_slot(
+        const auto wait_start = std::chrono::steady_clock::now();
+        const bool ready = tetrisphere::wait_for_audio_fifo_slot_until(
             [] { return tetrisphere::linux_audio_fifo_full(); },
-            [&] {
-                ++waited;
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }, max_waits);
+            [] { return std::chrono::steady_clock::now(); },
+            [] { std::this_thread::sleep_for(std::chrono::milliseconds(1)); },
+            wait_start + std::chrono::milliseconds(max_waits));
+        const auto waited_us = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - wait_start).count());
+        tetrisphere::perf_metrics().audio_wait.record(waited_us);
+        // Real elapsed time, not the number of sleeps.
+        const auto waited = static_cast<unsigned>(waited_us / 1000u);
         tetrisphere_ai_fifo_waits_ms.fetch_add(waited, std::memory_order_relaxed);
         if (!ready) {
             fifo_drain_gate.timed_out();

@@ -39,5 +39,28 @@ int main() {
         const auto options = parse_run_options(3, argv);
         assert(!options.valid && options.error.find("ROM") != std::string::npos);
     }
+    {
+        const char* argv[] = {"tetrisphere-m1", "--present-mode=skip-buffering", "--perf-log"};
+        const auto options = parse_run_options(3, argv);
+        assert(options.valid && options.perf_log);
+        assert(options.present_mode &&
+               *options.present_mode == tetrisphere::PresentMode::SkipBuffering);
+    }
+    {
+        const char* argv[] = {"tetrisphere-m1", "--present-mode", "early"};
+        const auto options = parse_run_options(3, argv);
+        assert(options.valid && !options.perf_log);
+        assert(options.present_mode && *options.present_mode == tetrisphere::PresentMode::Early);
+    }
+    {
+        const char* argv[] = {"tetrisphere-m1", "rom.z64"};
+        const auto options = parse_run_options(2, argv);
+        assert(options.valid && !options.present_mode && !options.perf_log);
+    }
+    {
+        const char* argv[] = {"tetrisphere-m1", "--present-mode=fast"};
+        const auto options = parse_run_options(2, argv);
+        assert(!options.valid && options.error.find("present mode") != std::string::npos);
+    }
     return 0;
 }

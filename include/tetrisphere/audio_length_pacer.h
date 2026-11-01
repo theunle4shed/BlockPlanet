@@ -51,6 +51,20 @@ bool wait_for_audio_fifo_slot(Full&& full, Wait&& wait, unsigned max_waits) {
     }
 }
 
+// Deadline form of the wait above. Counting sleeps assumes each one lasts
+// exactly 1 ms, but a Windows Sleep(1) can last a full timer tick (about
+// 15.6 ms), which would stretch a 100 ms budget to over a second of blocked
+// game thread. This form stops at a real time limit however long sleeps take.
+template <typename Full, typename Now, typename Sleep, typename TimePoint>
+bool wait_for_audio_fifo_slot_until(Full&& full, Now&& now, Sleep&& sleep,
+                                    TimePoint deadline) {
+    for (;;) {
+        if (!full()) return true;
+        if (now() >= deadline) return false;
+        sleep();
+    }
+}
+
 // SDL's queued-audio size falls when the device consumes a whole callback
 // buffer. Permit two callback periods plus scheduler slack, with a hard cap.
 constexpr unsigned audio_drain_wait_budget_ms(std::uint32_t buffer_frames,

@@ -76,6 +76,20 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             else return invalid("texture filter must be three-point or linear");
             continue;
         }
+        if (argument == "--present-mode" || argument.starts_with("--present-mode=")) {
+            const auto value = argument == "--present-mode"
+                ? (index + 1 < argc ? std::string_view(argv[++index]) : std::string_view{})
+                : argument.substr(sizeof("--present-mode=") - 1);
+            if (value == "console") result.present_mode = PresentMode::Console;
+            else if (value == "skip-buffering") result.present_mode = PresentMode::SkipBuffering;
+            else if (value == "early") result.present_mode = PresentMode::Early;
+            else return invalid("present mode must be console, skip-buffering, or early");
+            continue;
+        }
+        if (argument == "--perf-log") {
+            result.perf_log = true;
+            continue;
+        }
         if (argument.starts_with("-")) return invalid("unknown option: " + std::string(argument));
         if (!result.rom_path.empty()) return invalid("provide at most one ROM path");
         result.rom_path = argument;
@@ -92,6 +106,9 @@ const char* run_options_help() {
            "                                   Filter the final presented image\n"
            "  --texture-filter=linear|three-point\n"
            "                                   Filter N64 textures, not only 2D elements\n"
+           "  --present-mode=console|skip-buffering|early\n"
+           "                                   When finished frames are shown (default console)\n"
+           "  --perf-log                       Report frame timings every 5 seconds\n"
            "  --help                           Show this help\n"
            "Examples: tetrisphere --fullscreen --msaa4x\n"
            "          tetrisphere --windowed --presentation-filter=pixel game.zip\n"

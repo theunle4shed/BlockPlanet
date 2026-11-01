@@ -4,6 +4,7 @@
 #include "tetrisphere/f3d_flat_shade.h"
 #include "tetrisphere/menu_medal_trace.h"
 #include "tetrisphere/pause_capture_scene.h"
+#include "tetrisphere/perf_metrics.h"
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/run_options.h"
 #include "tetrisphere/recomp_support.h"
@@ -281,8 +282,20 @@ public:
                                         app_->userConfig, internal_resolution_scale)) {
             diagnostic_log().error("rt64_graphics_config_invalid");
         }
-        app_->enhancementConfig.presentation.mode =
-            RT64::EnhancementConfiguration::Presentation::Mode::Console;
+        // Console is Blocksphere's default. In this mode RT64 cannot interpolate
+        // frames and its present thread takes the workload lock, so BlockPlanet
+        // lets players compare the other modes with --present-mode.
+        switch (run_options.present_mode.value_or(PresentMode::Console)) {
+            case PresentMode::Console:
+                app_->enhancementConfig.presentation.mode =
+                    RT64::EnhancementConfiguration::Presentation::Mode::Console; break;
+            case PresentMode::SkipBuffering:
+                app_->enhancementConfig.presentation.mode =
+                    RT64::EnhancementConfiguration::Presentation::Mode::SkipBuffering; break;
+            case PresentMode::Early:
+                app_->enhancementConfig.presentation.mode =
+                    RT64::EnhancementConfiguration::Presentation::Mode::PresentEarly; break;
+        }
         setup_result = ::tetrisphere::setup_result(app_->setup(0));
         if (setup_result == ultramodern::renderer::SetupResult::Success) {
             const unsigned requested_samples = run_options.msaa_samples
@@ -297,10 +310,12 @@ public:
             }
             std::fprintf(stdout,
                          "{\"event\":\"rt64_effective_filters\",\"msaa_samples\":%u,"
-                         "\"presentation_filter\":%d,\"three_point_texture_filter\":%s}\n",
+                         "\"presentation_filter\":%d,\"three_point_texture_filter\":%s,"
+                         "\"present_mode\":\"%s\"}\n",
                          app_->userConfig.msaaSampleCount(),
                          static_cast<int>(app_->userConfig.filtering),
-                         app_->userConfig.threePointFiltering ? "true" : "false");
+                         app_->userConfig.threePointFiltering ? "true" : "false",
+                         present_mode_name(run_options.present_mode.value_or(PresentMode::Console)));
             std::fflush(stdout);
         }
         chosen_api = ultramodern::renderer::GraphicsApi::Vulkan;
@@ -355,6 +370,7 @@ public:
         app_->updateEnhancementConfig();
     }
     void send_dl(const OSTask* task) override {
+        ScopedPerfTimer frame_timer(perf_metrics().display_list);
         // Only this render thread mutates RT64's configuration.
         std::optional<PresentationFilter> filter;
         std::optional<bool> texture;
@@ -444,8 +460,11 @@ public:
                 }
             }
             ui_current_tag = 0;
-            app_->processDisplayLists(app_->core.RDRAM,
-                                      task->t.data_ptr & 0x3FFFFFFu, 0, true);
+            {
+                ScopedPerfTimer rt64_timer(perf_metrics().display_list_rt64);
+                app_->processDisplayLists(app_->core.RDRAM,
+                                          task->t.data_ptr & 0x3FFFFFFu, 0, true);
+            }
             ui_active_batch = {};
             ui_current_tag = 0;
             rescue_snapshot_source_workload.store(app_->state->workloadId,
@@ -487,7 +506,10 @@ public:
         app_->state->listProcessEnd();
     }
     void update_screen() override {
-        app_->updateScreen();
+        {
+            ScopedPerfTimer screen_timer(perf_metrics().screen_update);
+            app_->updateScreen();
+        }
         if (display_list_count.load() != 0) {
             const auto count = ++present_count;
             if (count <= 3) {

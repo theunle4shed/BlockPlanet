@@ -8,6 +8,7 @@
 #include "tetrisphere/qa_virtual_controllers.h"
 #include "tetrisphere/audio_output.h"
 #include "tetrisphere/diagnostic_log.h"
+#include "tetrisphere/perf_metrics.h"
 #include "tetrisphere/close_game_menu.h"
 
 #include "tetrisphere/rt64_context.h"
@@ -30,6 +31,11 @@
 #include <SDL_vulkan.h>
 #ifdef _WIN32
 #include <SDL_syswm.h>
+#include <windows.h>
+#include <timeapi.h>
+#ifdef _MSC_VER
+#pragma comment(lib, "winmm.lib")
+#endif
 #endif
 
 #include <array>
@@ -71,6 +77,8 @@ std::atomic<std::uint64_t> input_polls{0};
 std::atomic<std::uint64_t> audio_rsp_tasks{0};
 std::atomic<std::uint64_t> audio_rsp_total_us{0};
 std::atomic<std::uint64_t> audio_rsp_max_us{0};
+bool perf_log_enabled = false;
+const char* perf_present_mode = "console";
 
 std::atomic<ControllerFamily> active_family{ControllerFamily::Keyboard};
 std::atomic<ControllerFamily> active_p2_family{ControllerFamily::Keyboard};
@@ -393,6 +401,18 @@ unsigned linux_audio_drain_wait_budget_ms() {
 void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                                const RunOptions& run_options) {
     initialize_controller_mappings();
+#ifdef _WIN32
+    // ultramodern paces VIs and the audio wait with Win32 Sleep. Ask for 1 ms
+    // timer resolution explicitly instead of relying on SDL to have done so.
+    timeBeginPeriod(1);
+#endif
+    {
+        const char* perf_env = std::getenv("TETRISPHERE_PERF_METRICS");
+        perf_log_enabled = run_options.perf_log ||
+            (perf_env != nullptr && std::strcmp(perf_env, "1") == 0);
+        perf_present_mode = present_mode_name(
+            run_options.present_mode.value_or(PresentMode::Console));
+    }
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) {
         show_error(SDL_GetError());
         std::exit(70);
@@ -576,6 +596,9 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     audio_output.close();
     SDL_DestroyWindow(window);
     SDL_Quit();
+#ifdef _WIN32
+    timeEndPeriod(1);
+#endif
     std::exit(0);
 }
 
@@ -585,6 +608,22 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     auto next_audio_report = event_loop_start + std::chrono::seconds(10);
     const char* audio_metrics = std::getenv("TETRISPHERE_AUDIO_METRICS");
     const bool report_audio = audio_metrics != nullptr && std::strcmp(audio_metrics, "1") == 0;
+    constexpr auto perf_interval = std::chrono::seconds(5);
+    auto perf_window_start = event_loop_start;
+    std::uint64_t perf_last_vis = observed_vis.load(std::memory_order_relaxed);
+    std::uint64_t perf_last_rejections =
+        tetrisphere_ai_fifo_rejections.load(std::memory_order_relaxed);
+    if (perf_log_enabled) {
+        // Start the first window now so boot work is not counted.
+        auto& metrics = perf_metrics();
+        metrics.display_list.take(); metrics.display_list_rt64.take();
+        metrics.screen_update.take(); metrics.audio_wait.take();
+        std::fprintf(stdout, "{\"event\":\"perf_log_started\",\"interval_ms\":%lld,"
+                     "\"present_mode\":\"%s\"}\n",
+                     static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                         perf_interval).count()), perf_present_mode);
+        std::fflush(stdout);
+    }
     for (;;) {
         for (;;) {
             auto request=take_pc_settings_change();
@@ -722,6 +761,29 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         controls_editor_release_guard(held);
         pc_settings_release_guard(held);
         const auto now = std::chrono::steady_clock::now();
+        if (perf_log_enabled && now - perf_window_start >= perf_interval) {
+            auto& metrics = perf_metrics();
+            PerfWindow window;
+            window.window_ms = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - perf_window_start).count());
+            const auto vis = observed_vis.load(std::memory_order_relaxed);
+            const auto rejections = tetrisphere_ai_fifo_rejections.load(std::memory_order_relaxed);
+            window.vis = vis - perf_last_vis;
+            window.audio_rejections = rejections - perf_last_rejections;
+            window.display_list = metrics.display_list.take();
+            window.display_list_rt64 = metrics.display_list_rt64.take();
+            window.screen_update = metrics.screen_update.take();
+            window.audio_wait = metrics.audio_wait.take();
+            window.present_mode = perf_present_mode;
+            const auto line = format_perf_report(window);
+            std::fprintf(stdout, "%s\n", line.c_str());
+            std::fflush(stdout);
+            diagnostic_log().perf(line);
+            perf_last_vis = vis;
+            perf_last_rejections = rejections;
+            perf_window_start = now;
+        }
         if (report_audio && now >= next_audio_report) {
             const auto pacing = audio_output.pacing_snapshot();
             if (pacing.submissions != 0) {

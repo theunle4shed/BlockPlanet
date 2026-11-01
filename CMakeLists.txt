@@ -276,6 +276,7 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/audio_output.h
     include/tetrisphere/audio_length_pacer.h
     include/tetrisphere/diagnostic_log.h
+    include/tetrisphere/perf_metrics.h
     include/tetrisphere/rt64_context.h
     include/tetrisphere/dl_ui_tags.h
     include/tetrisphere/f3d_flat_shade.h
@@ -475,6 +476,14 @@ add_test(NAME pc_settings_hook COMMAND pc_settings_hook_test)
 add_executable(run_options_test tests/run_options_test.cpp src/platform/run_options.cpp)
 target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 add_test(NAME run_options COMMAND run_options_test)
+add_executable(perf_metrics_test tests/perf_metrics_test.cpp)
+target_include_directories(perf_metrics_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(perf_metrics_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(perf_metrics_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME perf_metrics COMMAND perf_metrics_test)
 add_executable(window_mode_controller_test tests/window_mode_controller_test.cpp
     src/platform/window_mode_controller.cpp)
 target_include_directories(window_mode_controller_test PRIVATE "${CMAKE_SOURCE_DIR}/include")

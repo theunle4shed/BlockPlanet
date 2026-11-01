@@ -17,6 +17,8 @@ public:
     void gpu(const std::string& name);
     void error(const char* code);
     void audio(const char* status);
+    // Append a pre-formatted JSON line from the frame-timing report.
+    void perf(const std::string& json_line);
 
 private:
     void append_locked(const std::string& line);
