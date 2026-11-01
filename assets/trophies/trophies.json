@@ -99,11 +99,6 @@
       "trigger": { "stat": "vs_wins", "at_least": 50 }
     },
     {
-      "id": "lines_found", "name": "Between the Lines", "tier": "bronze", "hidden": true,
-      "description": "Play a game of Lines.",
-      "trigger": { "event": "mode_started", "where": { "mode": "lines" } }
-    },
-    {
       "id": "million", "name": "Millionaire", "tier": "gold",
       "description": "Score 1,000,000 points in a single game.",
       "trigger": { "stat": "best_score", "at_least": 1000000 }
