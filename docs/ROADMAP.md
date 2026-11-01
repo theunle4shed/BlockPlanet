@@ -57,7 +57,9 @@ Depends on: the screen-size work, and an art direction decision.
 
 Replace the original menus (title, mode select, options, controls, graphics) with new ones on the RmlUi layer. Game menus that change game state (mode select, name entry, save slots) must keep driving the original game logic, so each screen needs a map of which guest functions and memory it uses. Start with the host-only screens (graphics, controls, audio, jukebox), then replace game screens one by one.
 
-**Secret codes become menu items.** The original unlocks extras by typing special names under NEW NAME: LINES (a hidden mode), CREDITS, G + alien icon + MEBOY (special music), and a five-icon sequence (planet, ship, rocket, heart, skull) for level select, as recorded in the 1997 guide cited in [modes-matrix.md](research/modes-matrix.md). The new menus offer these directly: Lines in the Single mode list, Credits as a menu entry, level select as an option, and the special music in the jukebox. Research: find what each name sets in game state, so a menu item can do the same without the code.
+**Secret codes become menu items.** The original unlocks extras by typing special names under NEW NAME: LINES (a hidden mode), CREDITS, G + alien icon + MEBOY (special music), and a five-icon sequence (planet, ship, rocket, heart, skull) for level select, as recorded in the 1997 guide cited in [modes-matrix.md](research/modes-matrix.md). The new menus offer these directly: Lines in the Single mode list, Credits as a menu entry, level select (below), and the special music in the jukebox. Research: find what each name sets in game state, so a menu item can do the same without the code.
+
+**Level select by chapter.** Level select appears once a player has completed a chapter and offers every chapter that player has completed. Research: how the game records each player's progress in its save data (levels are numbered chapter:level, for example 1:1).
 
 Direction: a modern, simple, TV-like menu (large focus states, few items per screen, quick transitions), with no option to keep the original menus.
 
@@ -99,6 +101,10 @@ First document every existing magic: trigger, effect code, animation, sound and 
 
 Let players create characters (name, colors, portrait, look) and keep them in BlockPlanet's own save data rather than the 512-byte N64 EEPROM. Research: how the game stores and draws its characters. Then use texture replacement for the look, and hook the character selection to load custom entries.
 
+### Trophies (M)
+
+A BlockPlanet achievements system, stored in BlockPlanet's own save data, with a trophy screen in the new menus. Trophies are earned from game events such as chapters completed, combos, magic used and modes finished, which means hooking those events in the game code. Online rule: playing a host's unlocked stage never awards the guest trophies or progress.
+
 ## Phase 5: online multiplayer (XL)
 
 Online play for up to 4 players, where each player's actions affect the other players' spheres.
@@ -109,6 +115,8 @@ Online play for up to 4 players, where each player's actions affect the other pl
 - **Other costs:** hosting the server, cheating, NAT traversal, and a lobby UI.
 
 A sensible first milestone is two players online with VS-style attacks, then four.
+
+**Host progress in online games.** Guests can play any stage the host has unlocked. Playing it does not count towards the guest's own completion, unlocks or trophies.
 
 **Lines as a multiplayer mode.** Lines, the hidden mode, is a candidate for local and online VS. Research: how Lines' rules and win conditions differ from the modes VS already supports, and whether VS can run with Lines rules.
 
