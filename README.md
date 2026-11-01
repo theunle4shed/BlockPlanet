@@ -22,6 +22,8 @@ There is no BlockPlanet release yet. The current goals are:
 - **Less slowdown in busy scenes.** Measure and reduce time the game thread spends waiting on the renderer and on audio back-pressure.
 - **Measurement first.** Add lightweight timing diagnostics so each change can be checked on real hardware.
 
+See the [roadmap](docs/ROADMAP.md) for planned features beyond performance.
+
 Until a BlockPlanet release exists, the latest playable build is [Blocksphere 1.1.0](https://github.com/djultra64/Blocksphere/releases/latest). The rest of this README describes the game as inherited from Blocksphere 1.1.0.
 
 ## Features
