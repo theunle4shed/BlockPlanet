@@ -107,9 +107,9 @@ A BlockPlanet achievements system, stored in BlockPlanet's own save data, with a
 
 ### Quiver Launcher integration (S to M, after trophies and automated builds)
 
-Goal: list BlockPlanet in [Quiver Launcher](https://github.com/tgeorgiadis/quiver-launcher), which installs, updates and runs PC ports and recompilations from GitHub and GitLab releases, and tie BlockPlanet's trophies into Quiver's trophy system.
+Goal: list BlockPlanet in [Quiver Launcher](https://github.com/tgeorgiadis/quiver-launcher), which installs, updates and runs PC ports and recompilations from GitHub and GitLab releases, and tie BlockPlanet's trophies into Quiver's achievement (trophy) system.
 
-- **Trophies:** build BlockPlanet's trophies against a small reporting interface, with Quiver as the first implementation (Steam or others could follow). Quiver's public repository does not document a trophy or achievement API as of 2026-11-01. Its website (quiverlauncher.com), where catalog and integration documentation probably lives, has not been reviewed yet.
+- **Trophies:** build BlockPlanet's trophies against a small reporting interface, with Quiver as the first implementation (Steam or others could follow). Quiver's public repository and release notes do not document a trophy or achievement API as of 2026-11-01. Version 4 was still in beta then, so this may be new or planned. Its website (quiverlauncher.com), where catalog and integration documentation probably lives, has not been reviewed yet.
 - **Catalog:** Quiver installs from GitHub releases, so this needs the automated Windows builds and regular GitHub releases. Players still supply their own ROM.
 - **Contact:** Quiver's developer opened Blocksphere's only issue, asking for its Windows build, so they already know the game.
 
