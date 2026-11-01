@@ -57,6 +57,8 @@ Depends on: the screen-size work, and an art direction decision.
 
 Replace the original menus (title, mode select, options, controls, graphics) with new ones on the RmlUi layer. Game menus that change game state (mode select, name entry, save slots) must keep driving the original game logic, so each screen needs a map of which guest functions and memory it uses. Start with the host-only screens (graphics, controls, audio, jukebox), then replace game screens one by one.
 
+**Secret codes become menu items.** The original unlocks extras by typing special names under NEW NAME: LINES (a hidden mode), CREDITS, G + alien icon + MEBOY (special music), and a five-icon sequence (planet, ship, rocket, heart, skull) for level select, as recorded in the 1997 guide cited in [modes-matrix.md](research/modes-matrix.md). The new menus offer these directly: Lines in the Single mode list, Credits as a menu entry, level select as an option, and the special music in the jukebox. Research: find what each name sets in game state, so a menu item can do the same without the code.
+
 Direction: a modern, simple, TV-like menu (large focus states, few items per screen, quick transitions), with no option to keep the original menus.
 
 ## Phase 3: audio and visuals
@@ -107,6 +109,8 @@ Online play for up to 4 players, where each player's actions affect the other pl
 - **Other costs:** hosting the server, cheating, NAT traversal, and a lobby UI.
 
 A sensible first milestone is two players online with VS-style attacks, then four.
+
+**Lines as a multiplayer mode.** Lines, the hidden mode, is a candidate for local and online VS. Research: how Lines' rules and win conditions differ from the modes VS already supports, and whether VS can run with Lines rules.
 
 ## Suggested order
 
