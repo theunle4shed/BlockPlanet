@@ -57,7 +57,7 @@ Depends on: the screen-size work, and an art direction decision.
 
 Replace the original menus (title, mode select, options, controls, graphics) with new ones on the RmlUi layer. Game menus that change game state (mode select, name entry, save slots) must keep driving the original game logic, so each screen needs a map of which guest functions and memory it uses. Start with the host-only screens (graphics, controls, audio, jukebox), then replace game screens one by one.
 
-Note: `AGENTS.md` asks for UI that follows the original 1990s visual language, inherited from Blocksphere. Update that rule once the new art direction is decided.
+Direction: a modern, simple, TV-like menu (large focus states, few items per screen, quick transitions), with no option to keep the original menus.
 
 ## Phase 3: audio and visuals
 
@@ -117,10 +117,15 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 5. Peek camera, magic and custom characters.
 6. Online multiplayer, after its research spike.
 
+## Decisions
+
+- **Platform:** Windows first. The code already builds and runs on Linux, so Linux and Steam Deck releases can follow later as packaging and testing work.
+- **HUD art:** made by the project owner. The current HUD stays until the new art is ready. [HUD_INVENTORY.md](HUD_INVENTORY.md) lists what the HUD shows, where and when.
+- **Look:** modern only, with no "Classic" option. Menus should be simple and TV-like, with quick transitions.
+- **Online:** private rooms joined with a friend code. No public matchmaking.
+
 ## Open questions
 
-- Is Windows the main platform, with Linux second? Any interest in Steam Deck or handhelds?
-- Who makes the art for the HUD, menus, characters and visualizers?
-- Should the original look stay available as an option ("Classic" vs "Modern")?
-- Online: are friends-only rooms enough, or is matchmaking needed? Who hosts the server?
+- Who hosts the online relay server?
 - Should new magic and custom characters be allowed in online play, or only offline?
+- Who makes the art for menus, characters and visualizers?

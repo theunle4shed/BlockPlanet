@@ -19,7 +19,7 @@ Measure before and after. A change that claims a speed-up should say how it was 
 
 ## UI changes
 
-Follow the original game's 1990s visual language and low-resolution menu font. Review native captures of affected screens in 4:3 and widescreen before delivering a UI change. `docs/qa/ui-design-supervision.md` records Blocksphere's design decisions.
+New menus are modern, simple and TV-like: large readable text, clear focus states, few items per screen, quick transitions, and controller-first navigation. They do not imitate the original 1990s menus, and there is no "classic" mode. Keep the existing in-game HUD until its replacement art is ready (see `docs/HUD_INVENTORY.md`). Review captures of affected screens at several aspect ratios before delivering a UI change. `docs/qa/ui-design-supervision.md` records Blocksphere's earlier design decisions for reference.
 
 ## Releases
 
