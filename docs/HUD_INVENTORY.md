@@ -15,8 +15,8 @@ Shown throughout gameplay. Hidden during pause, results, level intros and game o
 
 | Element | Where (4:3) | Anchor | Native texture | When and how it changes |
 | --- | --- | --- | --- | --- |
-| Mode label | (27,18)–(97,40) | Left | 70 px wide panel, drawn in strips | Always. Reads RESCUE, MULTI (Hide & Seek levels), TIME TRIAL, or the core count in Practice ("15 / CORE"). |
-| Level badge (ring) | (27,40)–(97,76) | Left | shares the 70×70 and 65×58 panels | Always. Ring with the level number: "1:1" (chapter:level) in Rescue and Hide & Seek, "1" in Time Trial, core count in Practice. |
+| Mode label | (27,18)–(97,40); Time Trial (27,18)–(92,50) | Left | 70 px wide panel, drawn in strips | Always. Reads RESCUE, MULTI (Hide & Seek levels) or TIME TRIAL (two lines, which pushes the badge and hearts about 10 px lower). Practice shows the core count instead ("15 / CORE"). |
+| Level badge (ring) | (27,40)–(97,76); Time Trial (27,50)–(92,89) | Left | shares the 70×70 and 65×58 panels | Always. Ring with the level number: "1:1" (chapter:level) in Rescue and Hide & Seek, "1" in Time Trial, core count in Practice. |
 | Level digits | (42,42)–(67,59) | Left | 10×16 font glyphs | Updates when the level changes. |
 | Hearts (lives) | (35,79)–(80,94); Time Trial (35,89)–(80,104) | Left | 15×14 heart, 15×15 skull | Three hearts. A lost life turns a heart into a skull, right to left. Not shown in Puzzle. |
 | Heart backing | (27,78)–(87,103) | Left | 60×25 | Behind the hearts. |
