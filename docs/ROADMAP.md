@@ -106,7 +106,8 @@ Let players create characters (name, colors, portrait, look) and keep them in Bl
 Built in, and open to launcher integration. See [TROPHIES.md](TROPHIES.md).
 
 - **Done:** the data-driven trophy engine (events, stats, conditions, `all_of` and platinum), progress saved with a backup, guests earning nothing, a connector point for launchers, and a proposed list of 19 trophies. Lines is available from the start, so there is no trophy for finding it; Lines trophies can follow once its rules are known.
-- **Next:** game hooks that report the events (combos, level and chapter completion, magic, VS rounds and so on), a trophy screen and unlock notification in the new menus, and the owner's final trophy list.
+- **Game hooks, first set done:** games started, pieces dropped, hearts lost, game over and VS CPU rounds. The first trophies unlock in real play.
+- **Next:** combos, level and chapter completion, magic and puzzles solved; a trophy screen and unlock notification in the new menus; and the owner's final trophy list.
 
 ### Quiver Launcher integration (S to M, after trophies and automated builds)
 

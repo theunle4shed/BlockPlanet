@@ -52,22 +52,24 @@ The engine rejects a definitions file with unknown stats, unknown trophies in `a
 
 ## Events
 
-The trophy list depends on these events. **None are reported by the game yet:** each needs a hook into the game code, found through the same kind of research as the HUD inventory. Field names are part of the format, so keep them stable once released.
+The trophy list depends on these events. `GameEventWatcher` (`include/tetrisphere/game_event_watcher.h`) reports them by watching known game memory each pass of the main loop; [blockplanet-game-state.md](research/blockplanet-game-state.md) lists the addresses and how they were found. Field names are part of the format, so keep them stable once released.
 
-| Event | Fields | Reported when |
-| --- | --- | --- |
-| `mode_started` | `mode` | A game of any mode begins. |
-| `piece_placed` | `mode` | A piece lands. |
-| `combo` | `mode`, `size`, `score`, `multiplier` | A combo scores. |
-| `magic_used` | `mode`, `type` | Magic is launched. |
-| `life_lost` | `mode` | A heart is lost. |
-| `level_completed` | `mode`, `chapter`, `level`, `score`, `hearts_lost` | A level is cleared. |
-| `chapter_completed` | `mode`, `chapter`, `final` (1 for the last chapter) | A chapter is cleared. |
-| `puzzle_solved` | `puzzle`, `drops`, `slides`, `seconds` | A puzzle is solved. |
-| `vs_round` | `result` (`win` or `loss`), `opponent` | A VS round ends. |
-| `game_over` | `mode`, `score` | A game ends. |
+| Event | Fields | Reported when | Status |
+| --- | --- | --- | --- |
+| `mode_started` | `mode` | A game of any mode begins. | Working |
+| `piece_placed` | `mode` | A piece is dropped. | Working |
+| `life_lost` | `mode` | A heart is lost. | Working |
+| `game_over` | `mode`, `score` | The last heart is lost (not Puzzle or VS). | Working |
+| `vs_round` | `mode`, `result` (`win` or `loss`) | A VS CPU round ends. | Loss recorded in play; win inferred |
+| `combo` | `mode`, `size`, `score`, `multiplier` | A combo scores. | Not yet |
+| `magic_used` | `mode`, `type` | Magic is launched. | Not yet |
+| `level_completed` | `mode`, `chapter`, `level`, `score`, `hearts_lost` | A level is cleared. | Not yet |
+| `chapter_completed` | `mode`, `chapter`, `final` (1 for the last chapter) | A chapter is cleared. | Not yet |
+| `puzzle_solved` | `puzzle`, `drops`, `slides`, `seconds` | A puzzle is solved. | Not yet |
 
-Mode names: `rescue`, `hide_and_seek`, `puzzle`, `time_trial`, `vs`, `vs_cpu`, `practice`, `training`, `lines`.
+Set `TETRISPHERE_LOG_GAME_EVENTS=1` to print each event as it happens.
+
+Mode names: `rescue`, `hide_and_seek`, `puzzle`, `time_trial`, `vs_cpu` and `training` are reported now. `practice`, `vs` (two players) and `lines` are reserved until their mode numbers are found.
 
 ## Connecting a launcher
 

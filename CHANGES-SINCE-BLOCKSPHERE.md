@@ -34,3 +34,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - Added a data-driven trophy engine (`include/tetrisphere/trophies.h`, `src/platform/trophies.cpp`) and the game's trophy service (`trophy_service.h/.cpp`). Definitions are in `assets/trophies/trophies.json` (copied beside the executable and into packages) and progress is saved to `data/trophies.json`. See [docs/TROPHIES.md](docs/TROPHIES.md).
 - The game loads trophies at startup and saves progress on unlocks, every 30 seconds and on exit. Game events are not reported yet, so nothing unlocks during play until the game hooks are added.
+
+## 2026-11-01: First game hooks for trophies
+
+- Added `GameEventWatcher` (`include/tetrisphere/game_event_watcher.h`, `src/platform/game_event_watcher.cpp`), which reads known game memory each pass of the main loop and reports `mode_started`, `piece_placed`, `life_lost`, `game_over` and `vs_round` to the trophy engine. Set `TETRISPHERE_LOG_GAME_EVENTS=1` to print them.
+- Recorded the addresses and how they were found in [docs/research/blockplanet-game-state.md](docs/research/blockplanet-game-state.md), including the game's mode numbers. Mode 4, which has the catch-up cap, is Puzzle.

@@ -14,7 +14,7 @@ Frame rates are quantized to whole VIs: a graphics task that takes slightly over
 
 ## Catch-up cap
 
-Before each draw, the dispatcher at `0x800CCE7C` copies the pending logic steps (`0x800E4484`) to `0x80160C64`. When the mode value at `0x800E44A8` equals 4, it caps them at 5. Below about 12 drawn frames per second in that mode, game time would genuinely slow down. Observed mode values: 2 on the title and menus, 3 in the first gameplay mode reached from the main menu. Which mode uses 4 has not been identified yet.
+Before each draw, the dispatcher at `0x800CCE7C` copies the pending logic steps (`0x800E4484`) to `0x80160C64`. When the mode value at `0x800E44A8` equals 4 (Puzzle), it caps them at 5. Below about 12 drawn frames per second in Puzzle, game time would genuinely slow down. Mode numbers are listed in [blockplanet-game-state.md](blockplanet-game-state.md).
 
 ## Next questions
 

@@ -10,6 +10,7 @@
 #include "tetrisphere/diagnostic_log.h"
 #include "tetrisphere/perf_metrics.h"
 #include "tetrisphere/trophy_service.h"
+#include "tetrisphere/game_event_watcher.h"
 #include "tetrisphere/close_game_menu.h"
 
 #include "tetrisphere/rt64_context.h"
@@ -79,6 +80,28 @@ std::atomic<std::uint64_t> audio_rsp_tasks{0};
 std::atomic<std::uint64_t> audio_rsp_total_us{0};
 std::atomic<std::uint64_t> audio_rsp_max_us{0};
 bool perf_log_enabled = false;
+const std::uint8_t* guest_rdram = nullptr;
+GameEventWatcher game_event_watcher;
+bool log_game_events = false;
+
+void poll_game_events() {
+    if (guest_rdram == nullptr) return;
+    for (const auto& event : game_event_watcher.update(read_game_state(guest_rdram))) {
+        if (log_game_events) {
+            std::string fields;
+            for (const auto& [key, value] : event.fields) {
+                fields += ",\"" + key + "\":";
+                fields += std::holds_alternative<std::int64_t>(value)
+                    ? std::to_string(std::get<std::int64_t>(value))
+                    : "\"" + std::get<std::string>(value) + "\"";
+            }
+            std::fprintf(stdout, "{\"event\":\"game_event\",\"name\":\"%s\"%s}\n",
+                         event.name.c_str(), fields.c_str());
+            std::fflush(stdout);
+        }
+        post_game_event(event);
+    }
+}
 const char* perf_present_mode = "console";
 
 std::atomic<ControllerFamily> active_family{ControllerFamily::Keyboard};
@@ -401,6 +424,11 @@ unsigned linux_audio_drain_wait_budget_ms() {
 
 void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                                const RunOptions& run_options) {
+    guest_rdram = rdram;
+    {
+        const char* value = std::getenv("TETRISPHERE_LOG_GAME_EVENTS");
+        log_game_events = value != nullptr && std::strcmp(value, "1") == 0;
+    }
     initialize_controller_mappings();
 #ifdef _WIN32
     // ultramodern paces VIs and the audio wait with Win32 Sleep. Ask for 1 ms
@@ -770,6 +798,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         }
         controls_editor_release_guard(held);
         pc_settings_release_guard(held);
+        poll_game_events();
         const auto now = std::chrono::steady_clock::now();
         if (perf_log_enabled && now - perf_window_start >= perf_interval) {
             auto& metrics = perf_metrics();

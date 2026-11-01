@@ -288,6 +288,8 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/trophy_service.h
     src/platform/trophies.cpp
     src/platform/trophy_service.cpp
+    include/tetrisphere/game_event_watcher.h
+    src/platform/game_event_watcher.cpp
     assets/trophies/trophies.json
     include/tetrisphere/rt64_context.h
     include/tetrisphere/dl_ui_tags.h
@@ -498,6 +500,15 @@ else()
 endif()
 add_test(NAME trophies
     COMMAND trophies_test "${CMAKE_CURRENT_BINARY_DIR}/trophies-test" "${CMAKE_SOURCE_DIR}")
+add_executable(game_event_watcher_test tests/game_event_watcher_test.cpp
+    src/platform/game_event_watcher.cpp)
+target_include_directories(game_event_watcher_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(game_event_watcher_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(game_event_watcher_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME game_event_watcher COMMAND game_event_watcher_test)
 add_executable(perf_metrics_test tests/perf_metrics_test.cpp)
 target_include_directories(perf_metrics_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)
@@ -890,6 +901,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/diagnostic_log.cpp
         src/platform/trophies.cpp
         src/platform/trophy_service.cpp
+        src/platform/game_event_watcher.cpp
         src/platform/input_mapping.cpp
         src/graphics/rt64_context.cpp
         src/graphics/f3d_flat_shade.cpp
