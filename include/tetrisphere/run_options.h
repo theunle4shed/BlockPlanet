@@ -31,6 +31,10 @@ struct RunOptions {
     std::optional<PresentationFilter> presentation_filter;
     std::optional<bool> three_point_filter;
     std::optional<PresentMode> present_mode;
+    // RT64 "render to RAM": copy every finished frame back into game memory.
+    // Needed only where the game reads frames with the CPU, and it makes the
+    // game wait for the GPU every frame.
+    std::optional<bool> framebuffer_readback;
     bool perf_log = false;
 };
 

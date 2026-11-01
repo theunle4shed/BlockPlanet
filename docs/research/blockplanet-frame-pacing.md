@@ -21,3 +21,13 @@ Before each draw, the dispatcher at `0x800CCE7C` copies the pending logic steps 
 - On real hardware, how close is `display_list` time to 16.7 ms, and how much of it is `display_list_rt64`?
 - Does `--present-mode=skip-buffering` reduce it? In Console mode, RT64's present thread takes the workload lock.
 - Is there first-time shader compilation stutter in RT64 that a pre-built shader cache would remove?
+
+## Framebuffer readback (RT64 "render to RAM")
+
+Blocksphere leaves RT64's `renderToRAM` at its default, on. At the end of every frame RT64 then renders each framebuffer again at native resolution, waits for the GPU (`waitForCommandFence` in `State::fullSync`), and copies the result into RDRAM, all before `processDisplayLists` returns, so the game waits for it. Gameplay frames draw two full-screen color images: an off-screen layer at `0x000400` (background, later loaded as forty tiles) and the displayed image at `0x3B5000`. Because the second loads tiles from the first, RT64 waits on the GPU twice per frame.
+
+Sampling the renderer thread under the software Vulkan driver found it waiting on the GPU in 19 of 25 samples. Turning readback off cut gameplay renderer time from about 55 ms to about 30 ms per frame on that driver. The saving on real GPUs is unmeasured.
+
+Turning readback off exposed an RT64 leak: the renderer-thread `FramebufferManager` never recorded tile-copy texture sizes, so `findTileCopyId` never reused a copy and grew `tileCopies` by about 700 entries per second, scanned linearly on every framebuffer tile load. BlockPlanet's RT64 patch records the size at allocation; the map now stays at about 80 entries.
+
+Readback cannot simply be turned off: in Training, the colored buttons on the N64 controller graphic disappear. The CPU does not modify the `0x000400` layer between frames (4 changes in 1,320 frames, all at scene changes), so the graphic is most likely rendered once and then read from RDRAM. A deferred readback, which copies each frame to RDRAM while the game builds the next one instead of making it wait, would keep that content with one frame of delay.

@@ -23,3 +23,9 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - `CMakeLists.txt` now builds `tetrisphere-m1` when only `TETRISPHERE_RSP_RECOMP_SOURCE` is set. The RSP source is generated from the ROM. The three private RDRAM captures (`TETRISPHERE_GRAPHICS_SNAPSHOT`, `TETRISPHERE_GRAPHICS_COMMANDS`, `TETRISPHERE_AUDIO_SNAPSHOT`) are now needed only for the optional `microcode_live` diagnostic test. The audio microcode input for RSPRecomp is the 0xDF0 bytes at ROM offset `0xB9B80`.
 - CMake now stops with a clear error if the generated game code would be compiled with clang. N64Recomp's clang form of `RECOMP_FUNC` (`extern inline`) lets clang drop every generated function when compiled as C++, so the link failed with hundreds of undefined `func_XXXXXXXX` symbols. Use GCC on Linux and MSVC on Windows.
 - Added [docs/research/blockplanet-frame-pacing.md](docs/research/blockplanet-frame-pacing.md): the game can draw 60 FPS on PC, a slow renderer lowers the frame rate in whole-VI steps without slowing game speed, and the game caps logic catch-up at 5 steps per frame in one mode.
+
+## 2026-11-01: Framebuffer readback option and RT64 tile-copy leak fix
+
+- Added `--framebuffer-readback=on|off` (default on). Off stops RT64 from rendering every frame a second time and waiting for the GPU to copy it into game memory. Known issue when off: the controller buttons in Training are missing.
+- Fixed an RT64 leak in `findTileCopyId` that only appears with readback off: the renderer-thread tile-copy map grew without limit and was scanned on every framebuffer tile load (patch in `tools/build/patch_rt64_probe.py`).
+- Recorded the measurements in [docs/research/blockplanet-frame-pacing.md](docs/research/blockplanet-frame-pacing.md).

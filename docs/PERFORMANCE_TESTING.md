@@ -41,6 +41,7 @@ The game can draw 60 frames per second, but it waits for the renderer to finish 
 1. Pick one scene that feels slow, for example a busy Rescue level or VS mode, and one quiet scene, such as the main menu.
 2. Play each for about 30 seconds with `--perf-log`.
 3. Repeat with `--present-mode=skip-buffering`, then with `--present-mode=early`.
+   Also try `--framebuffer-readback=off`. It removes a GPU wait from every frame, but some graphics that the game renders once and reuses go missing, for example the buttons on the controller picture in Training.
 4. Note any visual problems with each mode, especially in pause screens, screen transitions and widescreen.
 5. Share the `perf_window` lines with your hardware, OS, resolution, aspect, refresh setting and present mode.
 

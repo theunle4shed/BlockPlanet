@@ -296,6 +296,11 @@ public:
                 app_->enhancementConfig.presentation.mode =
                     RT64::EnhancementConfiguration::Presentation::Mode::PresentEarly; break;
         }
+        // RT64 renders every frame a second time at native resolution and
+        // waits for the GPU to copy it into RDRAM. BlockPlanet lets players
+        // turn that off with --framebuffer-readback=off.
+        app_->emulatorConfig.framebuffer.renderToRAM =
+            run_options.framebuffer_readback.value_or(true);
         setup_result = ::tetrisphere::setup_result(app_->setup(0));
         if (setup_result == ultramodern::renderer::SetupResult::Success) {
             const unsigned requested_samples = run_options.msaa_samples
@@ -311,11 +316,12 @@ public:
             std::fprintf(stdout,
                          "{\"event\":\"rt64_effective_filters\",\"msaa_samples\":%u,"
                          "\"presentation_filter\":%d,\"three_point_texture_filter\":%s,"
-                         "\"present_mode\":\"%s\"}\n",
+                         "\"present_mode\":\"%s\",\"framebuffer_readback\":%s}\n",
                          app_->userConfig.msaaSampleCount(),
                          static_cast<int>(app_->userConfig.filtering),
                          app_->userConfig.threePointFiltering ? "true" : "false",
-                         present_mode_name(run_options.present_mode.value_or(PresentMode::Console)));
+                         present_mode_name(run_options.present_mode.value_or(PresentMode::Console)),
+                         app_->emulatorConfig.framebuffer.renderToRAM ? "true" : "false");
             std::fflush(stdout);
         }
         chosen_api = ultramodern::renderer::GraphicsApi::Vulkan;

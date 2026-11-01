@@ -86,6 +86,16 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             else return invalid("present mode must be console, skip-buffering, or early");
             continue;
         }
+        if (argument == "--framebuffer-readback" ||
+            argument.starts_with("--framebuffer-readback=")) {
+            const auto value = argument == "--framebuffer-readback"
+                ? (index + 1 < argc ? std::string_view(argv[++index]) : std::string_view{})
+                : argument.substr(sizeof("--framebuffer-readback=") - 1);
+            if (value == "on") result.framebuffer_readback = true;
+            else if (value == "off") result.framebuffer_readback = false;
+            else return invalid("framebuffer readback must be on or off");
+            continue;
+        }
         if (argument == "--perf-log") {
             result.perf_log = true;
             continue;
@@ -108,6 +118,7 @@ const char* run_options_help() {
            "                                   Filter N64 textures, not only 2D elements\n"
            "  --present-mode=console|skip-buffering|early\n"
            "                                   When finished frames are shown (default console)\n"
+           "  --framebuffer-readback=on|off    Copy each frame back to game memory (default on)\n"
            "  --perf-log                       Report frame timings every 5 seconds\n"
            "  --help                           Show this help\n"
            "Examples: tetrisphere --fullscreen --msaa4x\n"

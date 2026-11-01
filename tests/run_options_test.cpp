@@ -58,6 +58,16 @@ int main() {
         assert(options.valid && !options.present_mode && !options.perf_log);
     }
     {
+        const char* argv[] = {"tetrisphere-m1", "--framebuffer-readback=off"};
+        const auto options = parse_run_options(2, argv);
+        assert(options.valid && options.framebuffer_readback && !*options.framebuffer_readback);
+    }
+    {
+        const char* argv[] = {"tetrisphere-m1", "--framebuffer-readback", "maybe"};
+        const auto options = parse_run_options(3, argv);
+        assert(!options.valid && options.error.find("readback") != std::string::npos);
+    }
+    {
         const char* argv[] = {"tetrisphere-m1", "--present-mode=fast"};
         const auto options = parse_run_options(2, argv);
         assert(!options.valid && options.error.find("present mode") != std::string::npos);

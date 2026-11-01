@@ -621,6 +621,19 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
                         }
 ''' + anchor)
     elif name == "rt64_framebuffer_manager.cpp":
+        # The renderer-thread manager only allocates tile copy IDs; texture
+        # sizes were recorded only where textures are created. With render to
+        # RAM off, findTileCopyId never matched a free copy and allocated a new
+        # ID for every framebuffer tile load, growing the map without limit and
+        # scanning it linearly each time. Record the size at allocation. The
+        # texture creator overwrites it when it creates a texture.
+        source = replace_once(source,
+            "        TileCopy &tileCopy = tileCopies[++newId];\n"
+            "        tileCopy.id = newId;\n",
+            "        TileCopy &tileCopy = tileCopies[++newId];\n"
+            "        tileCopy.id = newId;\n"
+            "        tileCopy.textureWidth = textureWidth;\n"
+            "        tileCopy.textureHeight = textureHeight;\n")
         source = replace_once(source,
             "            newId = std::max(it.first, newId);\n\n            TileCopy &tileCopy = it.second;",
             "            // High-bit IDs belong to the frozen Rescue pause snapshot.\n"
