@@ -634,8 +634,17 @@ add_test(NAME rt64_m6_inspector_patch
     COMMAND "${Python3_EXECUTABLE}" -m unittest tests.test_rt64_m6_inspector_patch)
 set_tests_properties(rt64_m6_inspector_patch PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
+# The game needs only the RSPRecomp output, which is generated from the ROM.
+# The three private captures feed the optional microcode_live diagnostic.
+set(TETRISPHERE_GAME_ENABLED FALSE)
+if(NOT "${TETRISPHERE_RSP_RECOMP_SOURCE}" STREQUAL "")
+    if(NOT EXISTS "${TETRISPHERE_RSP_RECOMP_SOURCE}")
+        message(FATAL_ERROR "TETRISPHERE_RSP_RECOMP_SOURCE does not exist: "
+            "${TETRISPHERE_RSP_RECOMP_SOURCE}")
+    endif()
+    set(TETRISPHERE_GAME_ENABLED TRUE)
+endif()
 set(MICROCODE_LIVE_INPUTS
-    TETRISPHERE_RSP_RECOMP_SOURCE
     TETRISPHERE_GRAPHICS_SNAPSHOT
     TETRISPHERE_GRAPHICS_COMMANDS
     TETRISPHERE_AUDIO_SNAPSHOT)
@@ -652,9 +661,14 @@ foreach(INPUT_NAME IN LISTS MICROCODE_LIVE_INPUTS)
 endforeach()
 if(MICROCODE_LIVE_INPUT_COUNT GREATER 0 AND NOT MICROCODE_LIVE_ENABLED)
     message(FATAL_ERROR
-        "Live microcode diagnostic requires all four private capture/RSP inputs")
+        "Live microcode diagnostic requires all three private capture inputs")
 endif()
-if(MICROCODE_LIVE_ENABLED)
+if(MICROCODE_LIVE_ENABLED AND NOT TETRISPHERE_GAME_ENABLED)
+    message(FATAL_ERROR
+        "Live microcode diagnostic also requires TETRISPHERE_RSP_RECOMP_SOURCE")
+endif()
+if(TETRISPHERE_GAME_ENABLED)
+  if(MICROCODE_LIVE_ENABLED)
     set(MICROCODE_MANIFEST "${CMAKE_SOURCE_DIR}/config/recomp/microcodes.json")
     set(MICROCODE_RECEIPT "${CMAKE_BINARY_DIR}/microcode-input-verification.json")
     execute_process(
@@ -685,6 +699,7 @@ if(MICROCODE_LIVE_ENABLED)
                 --expected-source-identity "${MICROCODE_SOURCE_ID}"
         COMMENT "Verifying exact private microcode inputs"
         VERBATIM)
+  endif()
     set(RT64_STATIC ON CACHE BOOL "Build locked RT64 statically" FORCE)
     set(RT64_SDL_WINDOW_VULKAN ON CACHE BOOL "Use the host SDL Vulkan window" FORCE)
     set(NFD_PORTAL ON CACHE BOOL "Use xdg-desktop-portal without GTK headers" FORCE)
@@ -769,6 +784,7 @@ if(MICROCODE_LIVE_ENABLED)
             PROPERTY COMPILE_OPTIONS
             "/pathmap:${TETRISPHERE_RSP_SOURCE_DIRECTORY}=generated/rsp")
     endif()
+  if(MICROCODE_LIVE_ENABLED)
     add_executable(microcode_live_test
         tests/microcode_contract_test.cpp
         tests/rt64_host_stubs.cpp
@@ -814,6 +830,7 @@ if(MICROCODE_LIVE_ENABLED)
             "${TETRISPHERE_GRAPHICS_COMMANDS}"
             "${TETRISPHERE_AUDIO_SNAPSHOT}")
     set_tests_properties(microcode_live PROPERTIES TIMEOUT 15)
+  endif()
 
     add_executable(tetrisphere-m1
         src/diagnostic/main.cpp
@@ -1031,8 +1048,10 @@ if(MICROCODE_LIVE_ENABLED)
     add_test(NAME guest_trace_hooks COMMAND guest_trace_hooks_test)
     add_test(NAME rt64_graphics_config COMMAND rt64_graphics_config_test)
     add_test(NAME keyboard_focus_loss COMMAND keyboard_state_test)
-    add_dependencies(tetrisphere-m1 verify_n64modernruntime verify_rt64
-                     verify_microcode_inputs)
+    add_dependencies(tetrisphere-m1 verify_n64modernruntime verify_rt64)
+    if(MICROCODE_LIVE_ENABLED)
+        add_dependencies(tetrisphere-m1 verify_microcode_inputs)
+    endif()
     if(NOT MSVC)
         target_compile_options(tetrisphere-m1 PRIVATE -Wall -Wextra -Wpedantic -msse4.1)
         set_source_files_properties("${TETRISPHERE_RSP_RECOMP_SOURCE}"
@@ -1068,8 +1087,10 @@ if(MICROCODE_LIVE_ENABLED)
     if(WIN32)
         # RT64's Windows target also exports the legacy bare SDL2 library
         # names. Make their pinned vendored directory visible to consumers.
-        target_link_directories(microcode_live_test PRIVATE
-            "${RT64_ROOT}/src/contrib/mupen64plus-win32-deps/SDL2-2.26.3/lib/x64")
+        if(MICROCODE_LIVE_ENABLED)
+            target_link_directories(microcode_live_test PRIVATE
+                "${RT64_ROOT}/src/contrib/mupen64plus-win32-deps/SDL2-2.26.3/lib/x64")
+        endif()
         target_link_directories(tetrisphere-m1 PRIVATE
             "${RT64_ROOT}/src/contrib/mupen64plus-win32-deps/SDL2-2.26.3/lib/x64")
         add_custom_command(TARGET tetrisphere-m1 POST_BUILD
