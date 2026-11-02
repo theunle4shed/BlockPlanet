@@ -178,9 +178,11 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 - **HUD art:** made by the project owner. The current HUD stays until the new art is ready. [HUD_INVENTORY.md](HUD_INVENTORY.md) lists what the HUD shows, where and when.
 - **Look:** modern only, with no "Classic" option. Menus should be simple and TV-like, with quick transitions.
 - **Online:** private rooms joined with a friend code. No public matchmaking.
+- **Board:** the board stays 32 × 32 cells with 9 layers, as in the game. Its limits are built into about 70 game functions (see [blockplanet-game-state.md](research/blockplanet-game-state.md#layers-core-size-and-stacking-2026-11-02)). Sphere changes are visual only: drawing more of it, and possibly a different core size.
 
 ## Open questions
 
 - Who hosts the online relay server?
 - Should new magic and custom characters be allowed in online play, or only offline?
 - Who makes the art for menus, characters and visualizers?
+- Core size: keep the game's, or make it bigger? If bigger, which stays fixed: the top of the tallest possible stack (thinner layers), each level's surface, or the layer thickness (a bigger sphere)? `BLOCKPLANET_SPHERE_CORE_SCALE` is the experiment.
