@@ -1,16 +1,22 @@
 #include "ui_system.h"
 
+#include "ui_navigator.h"
 #include "ui_renderer.h"
 
 #include "rhi/rt64_render_hooks.h"
 
 #include <RmlUi/Core.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <atomic>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <variant>
 
 namespace blockplanet::ui {
 namespace {
@@ -34,15 +40,27 @@ private:
 };
 
 std::filesystem::path assets_path;
-bool test_screen = false;
 std::unique_ptr<Renderer> renderer;
 std::unique_ptr<System> system_interface;
 Rml::Context* context = nullptr;
+std::unique_ptr<Navigator> navigator;
 bool started = false;
+bool start_failed = false;
+
+// Requests from other threads, applied on the presentation thread.
+struct OpenRequest {
+    std::string screen;
+};
+struct CloseRequest {};
+using Request = std::variant<OpenRequest, CloseRequest, Action>;
+std::mutex requests_mutex;
+std::deque<Request> requests;
+std::deque<std::string> commands;
+std::atomic<bool> open_flag{false};
 
 std::string asset(const char* name) { return (assets_path / name).string(); }
 
-// Starts RmlUi on the presentation thread, at the first frame.
+// Starts RmlUi on the presentation thread, when a menu first opens.
 bool start(std::uint32_t width, std::uint32_t height) {
     started = true;
     system_interface = std::make_unique<System>();
@@ -55,12 +73,35 @@ bool start(std::uint32_t width, std::uint32_t height) {
     context = Rml::CreateContext("main", Rml::Vector2i(int(width), int(height)));
     if (context == nullptr) return false;
     context->SetDensityIndependentPixelRatio(float(height) / design_height);
-    if (test_screen) {
-        if (Rml::ElementDocument* document = context->LoadDocument(asset("test.rml"))) document->Show();
-    }
+    navigator = std::make_unique<Navigator>(context, assets_path / "screens");
     std::fprintf(stdout, "{\"event\":\"ui_started\",\"width\":%u,\"height\":%u}\n", width, height);
     std::fflush(stdout);
     return true;
+}
+
+// Applies queued requests to the navigator.
+void apply_requests() {
+    std::deque<Request> pending;
+    {
+        std::lock_guard lock(requests_mutex);
+        pending.swap(requests);
+    }
+    for (auto& request : pending) {
+        if (auto* open = std::get_if<OpenRequest>(&request)) {
+            if (!navigator->open(open->screen))
+                std::fprintf(stderr, "{\"event\":\"ui_screen_missing\",\"screen\":\"%s\"}\n", open->screen.c_str());
+        } else if (std::holds_alternative<CloseRequest>(request)) {
+            navigator->close();
+        } else {
+            navigator->handle(std::get<Action>(request));
+        }
+    }
+    std::lock_guard lock(requests_mutex);
+    while (auto command = navigator->take_command()) commands.push_back(*command);
+    // Keep the flag set while requests are still waiting.
+    open_flag.store(navigator->is_open() || std::any_of(requests.begin(), requests.end(), [](const Request& r) {
+                        return std::holds_alternative<OpenRequest>(r);
+                    }));
 }
 
 void hook_init(plume::RenderInterface* render_interface, plume::RenderDevice* device) {
@@ -68,12 +109,23 @@ void hook_init(plume::RenderInterface* render_interface, plume::RenderDevice* de
 }
 
 void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebuffer) {
-    if (!renderer || !test_screen) return;  // nothing to show yet
+    if (!renderer || start_failed) return;
+    if (!started) {
+        // Start RmlUi only once a menu is wanted.
+        std::lock_guard lock(requests_mutex);
+        if (requests.empty()) return;
+    }
     const std::uint32_t width = framebuffer->getWidth();
     const std::uint32_t height = framebuffer->getHeight();
     renderer->begin_frame(list, framebuffer);
-    if (!started && !start(width, height)) context = nullptr;
-    if (context != nullptr) {
+    if (!started && !start(width, height)) {
+        start_failed = true;
+        open_flag.store(false);
+        renderer->end_frame();
+        return;
+    }
+    apply_requests();
+    if (navigator->is_open()) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
             context->SetDensityIndependentPixelRatio(float(height) / design_height);
@@ -85,6 +137,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
 }
 
 void hook_deinit() {
+    navigator.reset();
     if (started) {
         if (context != nullptr) Rml::RemoveContext("main");
         context = nullptr;
@@ -97,9 +150,35 @@ void hook_deinit() {
 
 void install(const std::filesystem::path& assets) {
     assets_path = assets;
-    const char* test = std::getenv("BLOCKPLANET_UI_TEST");
-    test_screen = test != nullptr && std::string(test) == "1";
     RT64::SetRenderHooks(hook_init, hook_draw, hook_deinit);
+    const char* test = std::getenv("BLOCKPLANET_UI_TEST");
+    if (test != nullptr && std::string(test) == "1") request_open("main");
+}
+
+void request_open(const std::string& screen) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(OpenRequest{screen});
+    open_flag.store(true);
+}
+
+void request_close() {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(CloseRequest{});
+}
+
+void queue_action(Action action) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(action);
+}
+
+bool menus_open() { return open_flag.load(); }
+
+std::optional<std::string> take_command() {
+    std::lock_guard lock(requests_mutex);
+    if (commands.empty()) return std::nullopt;
+    auto command = std::move(commands.front());
+    commands.pop_front();
+    return command;
 }
 
 } // namespace blockplanet::ui

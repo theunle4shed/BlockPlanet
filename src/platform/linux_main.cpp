@@ -20,6 +20,8 @@
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/settings_store.h"
 #include "tetrisphere/profiles.h"
+#include "tetrisphere/menu_input.h"
+#include "ui_system.h"
 #include "tetrisphere/profile_save.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/wav_capture.h"
@@ -293,9 +295,13 @@ void count_vi() {
     observed_vis.fetch_add(1, std::memory_order_relaxed);
 }
 
+// BlockPlanet's menus take the input while open, and until every button is
+// released after they close (so the closing press does not reach the game).
+std::atomic<bool> menus_block_game{false};
+
 bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (port < 0 || port >= 2) return false;
-    if (controls_editor_blocks_game() || pc_settings_blocks_game()) {*buttons=0;*x=0;*y=0;return true;}
+    if (controls_editor_blocks_game() || pc_settings_blocks_game() || menus_block_game.load()) {*buttons=0;*x=0;*y=0;return true;}
     // The runtime asks for ports in order. Freeze both readings together so
     // an SDL event between get_input(0) and get_input(1) cannot mix cycles.
     struct ReadCycle {
@@ -909,6 +915,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             const auto detected=event_port>=0
                 ? detect_controller_family(controller_ports.snapshot()[event_port].name.c_str())
                 : ControllerFamily::Keyboard;
+            if (handle_menu_event(event, event_port>=0, active_settings.bindings)) continue;
             handle_controls_event(event,event_port>=0 || removed_assigned,detected);
         }
         bool held=keyboard_state.buttons()!=0;
@@ -928,6 +935,19 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             input_snapshot=current;keyboard_snapshot=keyboard_state.buttons();
         }
         controls_editor_release_guard(held);
+        if (blockplanet::ui::menus_open()) menus_block_game.store(true);
+        else if (menus_block_game.load() && !held) {
+            // As above: refresh the snapshot before letting input through.
+            const auto current=controller_ports.snapshot();
+            std::lock_guard lock(input_snapshot_mutex);
+            input_snapshot=current;keyboard_snapshot=keyboard_state.buttons();
+            menus_block_game.store(false);
+        }
+        while (auto command = blockplanet::ui::take_command()) {
+            std::fprintf(stdout, "{\"event\":\"ui_command\",\"command\":\"%s\"}\n", command->c_str());
+            std::fflush(stdout);
+            if (*command == "exit") close_game();
+        }
         pc_settings_release_guard(held);
         poll_game_events();
         const auto now = std::chrono::steady_clock::now();

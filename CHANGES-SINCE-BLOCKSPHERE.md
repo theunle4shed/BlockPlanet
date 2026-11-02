@@ -97,3 +97,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - Added BlockPlanet's menu layer (`docs/UI.md`): RmlUi 6.2 with FreeType 2.13.3, drawn over the game through RT64's render hooks by a renderer written for BlockPlanet (`src/ui/`). RecompFrontend was not used because it has no licence. `BLOCKPLANET_UI_TEST=1` shows a test screen.
 - Bundled the Lato font (SIL Open Font License) in `assets/ui/fonts`, added the RmlUi and FreeType notices, and the release package now includes `ui/`.
+- Added menu navigation: a screen stack with controller-friendly focus (`src/ui/ui_navigator.cpp`, unit-tested), keyboard and controller input that blocks the game while menus are open (`src/platform/menu_input.cpp`), and placeholder Main, Solo and Multiplayer screens with a shared style sheet. F1 opens the menus for now; `exit` closes the game and other choices are logged as commands.

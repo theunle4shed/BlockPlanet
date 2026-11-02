@@ -1,0 +1,87 @@
+#include "tetrisphere/menu_input.h"
+
+#include "ui_system.h"
+
+#include <map>
+#include <utility>
+
+namespace tetrisphere {
+namespace {
+
+using blockplanet::ui::Action;
+
+SDL_GameControllerButton sdl_button(PhysicalButton button) {
+    switch (button) {
+    case PhysicalButton::South: return SDL_CONTROLLER_BUTTON_A;
+    case PhysicalButton::East: return SDL_CONTROLLER_BUTTON_B;
+    case PhysicalButton::West: return SDL_CONTROLLER_BUTTON_X;
+    case PhysicalButton::North: return SDL_CONTROLLER_BUTTON_Y;
+    }
+    return SDL_CONTROLLER_BUTTON_INVALID;
+}
+
+// Left stick direction per controller and axis, so a push counts once.
+std::map<std::pair<SDL_JoystickID, int>, int> stick;
+
+} // namespace
+
+bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBindings& bindings) {
+    if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_F1) {
+        if (blockplanet::ui::menus_open()) blockplanet::ui::request_close();
+        else blockplanet::ui::request_open("main");
+        return true;
+    }
+    if (!blockplanet::ui::menus_open()) return false;
+    auto send = [](Action action) {
+        blockplanet::ui::queue_action(action);
+        return true;
+    };
+    if (event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.scancode) {
+        case SDL_SCANCODE_UP: return send(Action::Up);
+        case SDL_SCANCODE_DOWN: return send(Action::Down);
+        case SDL_SCANCODE_LEFT: return send(Action::Left);
+        case SDL_SCANCODE_RIGHT: return send(Action::Right);
+        case SDL_SCANCODE_RETURN:
+        case SDL_SCANCODE_KP_ENTER:
+        case SDL_SCANCODE_SPACE:
+            return event.key.repeat ? true : send(Action::Confirm);
+        case SDL_SCANCODE_ESCAPE:
+        case SDL_SCANCODE_BACKSPACE:
+            return event.key.repeat ? true : send(Action::Back);
+        default: return true;  // other keys do nothing while the menus are open
+        }
+    }
+    if (event.type == SDL_KEYUP) return true;
+    if (!assigned) return false;
+    if (event.type == SDL_CONTROLLERBUTTONDOWN) {
+        const auto button = static_cast<SDL_GameControllerButton>(event.cbutton.button);
+        if (button == sdl_button(bindings.confirm)) return send(Action::Confirm);
+        if (button == sdl_button(bindings.cancel)) return send(Action::Back);
+        switch (button) {
+        case SDL_CONTROLLER_BUTTON_DPAD_UP: return send(Action::Up);
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN: return send(Action::Down);
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT: return send(Action::Left);
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: return send(Action::Right);
+        case SDL_CONTROLLER_BUTTON_START: return send(Action::Confirm);
+        case SDL_CONTROLLER_BUTTON_BACK: return send(Action::Back);
+        default: return true;
+        }
+    }
+    if (event.type == SDL_CONTROLLERBUTTONUP) return true;
+    if (event.type == SDL_CONTROLLERAXISMOTION &&
+        (event.caxis.axis == SDL_CONTROLLER_AXIS_LEFTX || event.caxis.axis == SDL_CONTROLLER_AXIS_LEFTY)) {
+        const int direction = event.caxis.value > 16000 ? 1 : event.caxis.value < -16000 ? -1 : 0;
+        int& previous = stick[{event.caxis.which, event.caxis.axis}];
+        const bool pushed = direction != 0 && direction != previous;
+        previous = direction;
+        if (pushed) {
+            if (event.caxis.axis == SDL_CONTROLLER_AXIS_LEFTX) send(direction > 0 ? Action::Right : Action::Left);
+            else send(direction > 0 ? Action::Down : Action::Up);
+        }
+        return true;
+    }
+    return false;
+}
+
+} // namespace tetrisphere

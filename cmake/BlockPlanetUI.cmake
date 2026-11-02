@@ -65,8 +65,10 @@ endfunction()
 
 function(blockplanet_add_ui TARGET)
     target_sources(${TARGET} PRIVATE
+        "${CMAKE_SOURCE_DIR}/src/ui/ui_navigator.cpp"
         "${CMAKE_SOURCE_DIR}/src/ui/ui_renderer.cpp"
-        "${CMAKE_SOURCE_DIR}/src/ui/ui_system.cpp")
+        "${CMAKE_SOURCE_DIR}/src/ui/ui_system.cpp"
+        "${CMAKE_SOURCE_DIR}/src/platform/menu_input.cpp")
     blockplanet_ui_shader(${TARGET} UiVS vs_6_3 VSMain)
     blockplanet_ui_shader(${TARGET} UiPS ps_6_3 PSMain)
     target_include_directories(${TARGET} PRIVATE
@@ -82,3 +84,15 @@ function(blockplanet_add_ui TARGET)
         COMMENT "Copying menu documents and fonts")
     add_dependencies(${TARGET} ${TARGET}_ui_assets)
 endfunction()
+
+# Navigator logic test (RmlUi with a renderer that draws nothing).
+add_executable(ui_navigator_test "${CMAKE_SOURCE_DIR}/tests/ui_navigator_test.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/ui_navigator.cpp")
+target_include_directories(ui_navigator_test PRIVATE "${CMAKE_SOURCE_DIR}/src/ui")
+target_link_libraries(ui_navigator_test PRIVATE RmlUi::RmlUi)
+if(MSVC)
+    target_compile_options(ui_navigator_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(ui_navigator_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME ui_navigator COMMAND ui_navigator_test "${CMAKE_CURRENT_BINARY_DIR}/ui-navigator-test")

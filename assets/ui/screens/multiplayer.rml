@@ -1,0 +1,16 @@
+<rml>
+<head>
+    <title>Multiplayer</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Multiplayer</div>
+        <div class="subtitle">Local or online</div>
+        <div class="item" id="versus" data-action="command:versus">Versus</div>
+        <div class="item" id="collaborate" data-action="command:collaborate">Collaborate<span class="note">coming later</span></div>
+        <div class="item" id="custom" data-action="command:multiplayer_custom">Custom<span class="note">coming later</span></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>
