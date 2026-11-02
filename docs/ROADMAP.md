@@ -163,6 +163,28 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 
 **Lines as a multiplayer mode.** Lines, the hidden mode, is a candidate for local and online VS. Research: how Lines' rules and win conditions differ from the modes VS already supports, and whether VS can run with Lines rules.
 
+## Single player first
+
+Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, magic, scoring, camera, HUD, renderer, audio, controls, saves); the modes differ mainly in their rules. So the modernisation is finished once, through single player, with Rescue (Story) as the reference mode because it uses the most systems. The other solo modes, then multiplayer, are built on the result rather than updated one by one from their originals.
+
+**Single player is finished when:**
+
+1. Performance is measured on Windows, with quality and performance presets (the extended sphere is done).
+2. Camera and screen sizes work, including ultrawide, as the base for the rear and peek camera.
+3. The new menu layer exists, with the main menu, chapter select and profile screen.
+4. The HUD has the new art and a layout that adapts to the screen.
+5. The Story structure is in place: chapter map, unlocks, casual play.
+6. The see-through core and the rear and peek camera work.
+7. Options and accessibility are complete.
+8. The other solo modes (Time Trial, Puzzle, Lines, Custom, Training) are built on the result.
+
+**Multiplayer checklist,** reviewed whenever a shared piece is finished, so nothing is designed into a corner:
+
+- Two spheres at once (Versus): the extended sphere and the performance budget must cover both; the extended patch currently switches itself off with two players.
+- Split-screen camera, aspect ratios and HUD space for two to four players.
+- Controls and profiles per player (designed for this already).
+- One sphere with several cursors (Collaborate): outlines, highlights, the see-through core and the peek camera must allow more than one player.
+
 ## Suggested order
 
 1. Phase 0 measurements, then deferred readback.
