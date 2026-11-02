@@ -50,10 +50,24 @@ struct MeshInputs {
 // Fill `out` (rows x columns entries) exactly as func_800ADD6C does.
 void build_mesh(const MeshInputs& inputs, std::vector<MeshEntry>& out);
 
-// Hook entry points, called from the generated game code (see
-// config/recomp/tetrisphere.us.rev0.toml). Mode is BLOCKPLANET_SPHERE:
-// original (default), verify, or replace.
+// How much of the sphere to draw (the SPHERE graphics setting).
+// Original: the game's own drawing code. Extended: BlockPlanet's renderer
+// with extended_detail_ring extra cells on every side.
+enum class Detail { Original, Extended };
+constexpr int extended_detail_ring = 2;
+void set_detail(Detail detail);
+
+// Which code draws the sphere this frame. Hook entry points are called from
+// the generated game code (see config/recomp/tetrisphere.us.rev0.toml).
+// BLOCKPLANET_SPHERE (original, verify or replace) overrides the setting for
+// testing; otherwise Extended means Replace. The setting is read once per
+// frame (latch_frame_mode, when the mesh is built), so a change cannot mix
+// the two paths within a frame.
 enum class Mode { Original, Verify, Replace };
 Mode mode();
+void latch_frame_mode();
+// Extra cells on every side this frame: BLOCKPLANET_SPHERE_RING (0 to 4) if
+// set, otherwise extended_detail_ring when the setting is Extended.
+int frame_ring();
 
 } // namespace tetrisphere::sphere

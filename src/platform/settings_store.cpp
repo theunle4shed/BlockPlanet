@@ -37,6 +37,13 @@ bool parse_graphics_presentation_filter(std::string_view name, PresentationFilte
     return false;
 }
 
+bool parse_graphics_sphere(std::string_view name, GraphicsSphere& value) {
+    if (name == "original") value = GraphicsSphere::Original;
+    else if (name == "extended") value = GraphicsSphere::Extended;
+    else return false;
+    return true;
+}
+
 bool parse_graphics_texture_filter(std::string_view name, bool& three_point) {
     if (name == "three-point") three_point = true;
     else if (name == "linear") three_point = false;
@@ -48,6 +55,7 @@ RunOptions resolve_graphics_run_options(const GraphicsSettings& saved, RunOption
     if (!options.msaa_samples) options.msaa_samples = saved.msaa_samples;
     if (!options.presentation_filter) options.presentation_filter = saved.presentation_filter;
     if (!options.three_point_filter) options.three_point_filter = saved.three_point_filter;
+    if (!options.sphere_extended) options.sphere_extended = saved.sphere == GraphicsSphere::Extended;
     return options;
 }
 
@@ -136,7 +144,7 @@ bool SettingsStore::load(Settings& settings, std::string& error) const {
         const auto document = nlohmann::json::parse(
             std::string(record.begin(), end));
         const auto version = document.at("schema_version").get<int>();
-        if (version < 1 || version > 6) {
+        if (version < 1 || version > 7) {
             error = "unsupported settings version";
             return false;
         }
@@ -202,6 +210,12 @@ bool SettingsStore::load(Settings& settings, std::string& error) const {
                 return false;
             }
         }
+        if (version >= 7 &&
+            !parse_graphics_sphere(document.at("graphics").at("sphere").get<std::string>(),
+                                   candidate.graphics.sphere)) {
+            error = "invalid graphics settings";
+            return false;
+        }
         // Versions through 5 used LT as the default. Move that default to the
         // west face button once, retaining other saved Magic assignments.
         if (version <= 5 && candidate.magic == MagicControl::TriggerLeft)
@@ -246,7 +260,7 @@ bool SettingsStore::save(const Settings& settings, std::string& error) const {
         return false;
     }
     const auto serialized = nlohmann::json{
-        {"schema_version", 6},
+        {"schema_version", 7},
         {"family_override", settings.family_override},
         {"bindings", buttons},
         {"magic", static_cast<int>(settings.magic)},
@@ -255,7 +269,8 @@ bool SettingsStore::save(const Settings& settings, std::string& error) const {
                       {"msaa_samples", settings.graphics.msaa_samples},
                       {"presentation_filter", presentation_filter},
                       {"texture_filter", graphics_texture_filter_name(
-                          settings.graphics.three_point_filter)}}}}.dump();
+                          settings.graphics.three_point_filter)},
+                      {"sphere", graphics_sphere_name(settings.graphics.sphere)}}}}.dump();
     if (serialized.size() >= 512) {
         error = "settings exceed storage limit";
         return false;

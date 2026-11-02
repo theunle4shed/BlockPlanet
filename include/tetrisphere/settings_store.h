@@ -15,6 +15,8 @@ enum class GraphicsResolution { Auto, P240, P720, P1080, P1440, P2160 };
 enum class GraphicsAspect { Original4x3, Expand16x9 };
 enum class GraphicsRefresh { Original, Fps30, Fps60, Fps120 };
 enum class GraphicsWindowMode { Windowed, Fullscreen };
+// How much of the sphere is drawn (see include/tetrisphere/sphere_mesh.h).
+enum class GraphicsSphere { Original, Extended };
 
 struct GraphicsSettings {
     GraphicsResolution resolution = GraphicsResolution::Auto;
@@ -24,6 +26,7 @@ struct GraphicsSettings {
     int msaa_samples = 0;
     PresentationFilter presentation_filter = PresentationFilter::Pixel;
     bool three_point_filter = true;
+    GraphicsSphere sphere = GraphicsSphere::Original;
 };
 
 constexpr const char* graphics_resolution_name(GraphicsResolution value) {
@@ -80,6 +83,14 @@ constexpr const char* graphics_presentation_filter_name(PresentationFilter value
 constexpr const char* graphics_texture_filter_name(bool three_point) {
     return three_point ? "three-point" : "linear";
 }
+constexpr const char* graphics_sphere_name(GraphicsSphere value) {
+    switch (value) {
+        case GraphicsSphere::Original: return "original";
+        case GraphicsSphere::Extended: return "extended";
+    }
+    return nullptr;
+}
+bool parse_graphics_sphere(std::string_view name, GraphicsSphere& value);
 bool parse_graphics_msaa(std::string_view name, int& samples);
 bool parse_graphics_presentation_filter(std::string_view name, PresentationFilter& value);
 bool parse_graphics_texture_filter(std::string_view name, bool& three_point);

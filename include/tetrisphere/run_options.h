@@ -35,6 +35,9 @@ struct RunOptions {
     // Needed only where the game reads frames with the CPU, and it makes the
     // game wait for the GPU every frame.
     std::optional<bool> framebuffer_readback;
+    // How much of the sphere to draw: true for Extended (overrides the
+    // saved SPHERE setting for this run).
+    std::optional<bool> sphere_extended;
     bool perf_log = false;
     // Casual play: no game over. Trophies are paused.
     bool casual = false;

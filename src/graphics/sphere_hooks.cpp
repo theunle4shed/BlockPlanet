@@ -430,16 +430,6 @@ std::array<SnapshotCheck, 4> quadrant_checks{SnapshotCheck{"sphere_quadrant0_ver
 
 // ---- extended patch (BLOCKPLANET_SPHERE_RING, replace mode) --------------
 
-// Extra cells on every side of the game's patch, 0 to 4.
-int extended_ring() {
-    static const int ring = [] {
-        const char* value = std::getenv("BLOCKPLANET_SPHERE_RING");
-        const int n = value != nullptr ? std::atoi(value) : 0;
-        return n < 0 ? 0 : (n > 4 ? 4 : n);
-    }();
-    return mode() == Mode::Replace ? ring : 0;
-}
-
 ExtendedSphere extended_sphere;
 bool extended_ready = false;  // built this frame, single player
 
@@ -487,8 +477,9 @@ void end_extended_vertices(std::uint8_t* rdram) {
 } // namespace
 
 extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_context* ctx) {
+    latch_frame_mode();
     extended_ready = false;
-    if (const int ring = extended_ring(); ring > 0 && load16(rdram, player_count) < 2) {
+    if (const int ring = frame_ring(); ring > 0 && load16(rdram, player_count) < 2) {
         static const ExtendedBaseGrid grid(base_table(rdram), ring);
         extended_sphere.build(ring, gather(rdram, ctx, false), grid);
         extended_ready = true;

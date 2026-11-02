@@ -49,7 +49,7 @@ int main() {
   assert(t.font==0 && t.scale_milli==500);
   graphics_labels.insert(t.text);
  }
- for(auto label:{"RESOLUTION","ASPECT","REFRESH","WINDOW","MSAA","PRESENT FILTER","TEXTURE FILTER"})assert(graphics_labels.contains(label));
+ for(auto label:{"RESOLUTION","ASPECT","REFRESH","WINDOW","MSAA","PRESENT FILTER","TEXTURE FILTER","SPHERE"})assert(graphics_labels.contains(label));
  assert(!graphics_labels.contains("MORE"));
  Settings automatic;ControlsEditor p2(automatic,ControllerFamily::Keyboard);
  p2.set_device(ControllerFamily::NintendoSwitch);

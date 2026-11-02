@@ -136,8 +136,9 @@ ControlsScene compose_graphics_view(const PCSettingsMenu& menu,ControllerFamily 
  ControlsScene s;
  page_frame(s,"GRAPHICS");
  const auto rows=menu.rows(family);
- for(int row=0;row<7;++row) {
-  const int y=51+row*19;
+ // Eight settings rows, 17 apart, end above the status line at 183.
+ for(int row=0;row<8;++row) {
+  const int y=51+row*17;
   const bool selected=menu.focused()==row;
   text(s,35,y,rows[row],selected ? white:ivory,0,136);
   text(s,188,y,menu.value(row),selected ? white:yellow,0,102);
@@ -148,7 +149,7 @@ ControlsScene compose_graphics_view(const PCSettingsMenu& menu,ControllerFamily 
    polygon(s,{{290,y},{295,y+4},{290,y+8}},yellow);
   }
  }
- footer_action(s,249,36,"BACK",menu.focused()==7);
+ footer_action(s,249,36,"BACK",menu.focused()==8);
  std::string status=menu.status();
  if(status.empty())status=menu.restart_required(menu.focused()) ? "APPLIES AFTER RESTART":"APPLIES NOW";
  const auto status_color=status.find("FAILED")!=std::string::npos ? orange

@@ -7,12 +7,12 @@ int main() {
  original.magic=MagicControl::RightShoulder;original.graphics.msaa_samples=4;
  PCSettingsMenu expanded(original,true);
  const auto rows=expanded.rows(ControllerFamily::Keyboard);
- assert(rows.size()==8);
+ assert(rows.size()==9);
  for(const auto& row:rows)assert(row!="MORE" && row!="DISPLAY" && row!="QUALITY");
  // Every field is editable without entering another page. Values cycle fully
  // in both directions; unrelated remaps and settings survive each save.
- constexpr int counts[]{6,2,4,2,4,3,2};
- for(int field=0;field<7;++field) {
+ constexpr int counts[]{6,2,4,2,4,3,2,2};
+ for(int field=0;field<8;++field) {
   PCSettingsMenu menu(original,true);
   for(int row=0;row<field;++row)menu.move(1);
   const auto initial=menu.value(field);
@@ -33,8 +33,8 @@ int main() {
   menu.adjust(-1);auto change=menu.take_change();assert(change);
   menu.update_settings(original);assert(menu.value(field)==initial && menu.status()=="SAVE FAILED TRY AGAIN");
  }
- PCSettingsMenu navigation(original,true);navigation.move(-1);assert(navigation.focused()==7);
- navigation.select(7);assert(navigation.closed() && !navigation.take_change());
+ PCSettingsMenu navigation(original,true);navigation.move(-1);assert(navigation.focused()==8);
+ navigation.select(8);assert(navigation.closed() && !navigation.take_change());
  PCSettingsMenu cancel(original,true);cancel.back();assert(cancel.closed() && !cancel.take_change());
  PCSettingsMenu controls(original);controls.select(1);
  assert(controls.take_controls_request() && !controls.take_controls_request());

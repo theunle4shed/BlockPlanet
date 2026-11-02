@@ -25,8 +25,26 @@ int main(int argc, char** argv) {
         loaded.graphics.resolution != tetrisphere::GraphicsResolution::Auto ||
         loaded.graphics.aspect != tetrisphere::GraphicsAspect::Expand16x9 ||
         loaded.graphics.refresh != tetrisphere::GraphicsRefresh::Original ||
-        loaded.graphics.window_mode != tetrisphere::GraphicsWindowMode::Windowed) {
+        loaded.graphics.window_mode != tetrisphere::GraphicsWindowMode::Windowed ||
+        loaded.graphics.sphere != tetrisphere::GraphicsSphere::Original) {
         return fail("new settings did not load defaults");
+    }
+    // The SPHERE setting round-trips (schema 7).
+    {
+        tetrisphere::Settings extended;
+        extended.graphics.sphere = tetrisphere::GraphicsSphere::Extended;
+        tetrisphere::SettingsStore sphere_store(dir / "sphere.dat");
+        tetrisphere::Settings reread;
+        if (!sphere_store.save(extended, error) || !sphere_store.load(reread, error) ||
+            reread.graphics.sphere != tetrisphere::GraphicsSphere::Extended) {
+            return fail("sphere setting did not round-trip");
+        }
+        tetrisphere::RunOptions options;
+        if (tetrisphere::resolve_graphics_run_options(extended.graphics, options).sphere_extended != true)
+            return fail("saved sphere setting did not reach the run options");
+        options.sphere_extended = false;
+        if (tetrisphere::resolve_graphics_run_options(extended.graphics, options).sphere_extended != false)
+            return fail("--sphere did not override the saved setting");
     }
     std::array<std::uint8_t, 512> quality_record{};
     const std::string quality_json = R"({"schema_version":5,"family_override":"auto","bindings":[0,1,2,3],"magic":0,"graphics":{"resolution":"auto","aspect":"4:3","refresh":"original","window_mode":"windowed","msaa_samples":8,"presentation_filter":"nearest","texture_filter":"linear"}})";
@@ -198,7 +216,7 @@ int main(int argc, char** argv) {
         tetrisphere::graphics_internal_scale(tetrisphere::GraphicsResolution::P2160) != 9.0)
         return fail("internal resolution scales are incorrect");
     std::array<std::uint8_t, 512> unsupported{};
-    const std::string future = "{\"schema_version\":7,\"family_override\":\"auto\",\"bindings\":[0,1,2,3],\"magic\":0}";
+    const std::string future = "{\"schema_version\":8,\"family_override\":\"auto\",\"bindings\":[0,1,2,3],\"magic\":0}";
     std::copy(future.begin(), future.end(), unsupported.begin());
     if (!tetrisphere::EepromStore(dir / "future.dat").save(unsupported, error)) {
         return fail("could not create future-version fixture");

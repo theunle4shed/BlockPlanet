@@ -73,6 +73,16 @@ int main() {
         assert(options.valid && options.casual && options.start_chapter && *options.start_chapter == 12);
     }
     {
+        const char* argv[] = {"tetrisphere-m1", "--sphere=extended"};
+        const auto options = parse_run_options(2, argv);
+        assert(options.valid && options.sphere_extended && *options.sphere_extended);
+        const char* argv2[] = {"tetrisphere-m1", "--sphere=original"};
+        const auto original = parse_run_options(2, argv2);
+        assert(original.valid && original.sphere_extended && !*original.sphere_extended);
+        const char* argv3[] = {"tetrisphere-m1", "--sphere=huge"};
+        assert(!parse_run_options(2, argv3).valid);
+    }
+    {
         const char* argv[] = {"tetrisphere-m1", "--start-chapter", "0"};
         assert(!parse_run_options(3, argv).valid);
         const char* argv2[] = {"tetrisphere-m1", "--start-chapter=x"};

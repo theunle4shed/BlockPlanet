@@ -12,6 +12,7 @@ Settings merge_pc_settings_change(const Settings& persisted,const Settings& requ
  case 4:result.graphics.msaa_samples=requested.graphics.msaa_samples;break;
  case 5:result.graphics.presentation_filter=requested.graphics.presentation_filter;break;
  case 6:result.graphics.three_point_filter=requested.graphics.three_point_filter;break;
+ case 7:result.graphics.sphere=requested.graphics.sphere;break;
  case 13:result.family_override=requested.family_override;result.bindings=requested.bindings;result.magic=requested.magic;break;
  }
  return result;
@@ -26,6 +27,7 @@ std::vector<std::string> PCSettingsMenu::choices(ControllerFamily) const {
  case 4:return {"OFF","2X","4X","8X"};
  case 5:return {"NEAREST","LINEAR","PIXEL"};
  case 6:return {"LINEAR","3-POINT"};
+ case 7:return {"ORIGINAL","EXTENDED"};
  default:return {};
  }
 }
@@ -33,7 +35,7 @@ bool PCSettingsMenu::restart_required(int field) const {return field==0 || field
 std::vector<std::string> PCSettingsMenu::rows(ControllerFamily) const {
  if(page_==Page::Root)return {"GRAPHICS","CONTROLS","BACK"};
  if(page_==Page::Closed)return {};
- return {"RESOLUTION","ASPECT","REFRESH","WINDOW","MSAA","PRESENT FILTER","TEXTURE FILTER","BACK"};
+ return {"RESOLUTION","ASPECT","REFRESH","WINDOW","MSAA","PRESENT FILTER","TEXTURE FILTER","SPHERE","BACK"};
 }
 std::string PCSettingsMenu::value(int field) const {
  switch(field) {
@@ -44,6 +46,7 @@ std::string PCSettingsMenu::value(int field) const {
  case 4:return settings_.graphics.msaa_samples ? std::to_string(settings_.graphics.msaa_samples)+"X":"OFF";
  case 5:{constexpr const char* values[]{"NEAREST","LINEAR","PIXEL"};return values[int(settings_.graphics.presentation_filter)];}
  case 6:return settings_.graphics.three_point_filter ? "3-POINT":"LINEAR";
+ case 7:return settings_.graphics.sphere==GraphicsSphere::Extended ? "EXTENDED":"ORIGINAL";
  default:return {};
  }
 }
@@ -52,7 +55,7 @@ void PCSettingsMenu::move(int direction) {
  if(count && !saving_)focused_=(focused_+(direction<0 ? -1:1)+count)%count;
 }
 void PCSettingsMenu::adjust(int direction) {
- if(page_!=Page::Graphics || saving_ || focused_>=7 || direction==0)return;
+ if(page_!=Page::Graphics || saving_ || focused_>=8 || direction==0)return;
  field_=focused_;
  const int count=choices(ControllerFamily::Keyboard).size();
  int index=0;
@@ -64,6 +67,7 @@ void PCSettingsMenu::adjust(int direction) {
  case 4:index=settings_.graphics.msaa_samples==8 ? 3:settings_.graphics.msaa_samples==4 ? 2:settings_.graphics.msaa_samples==2 ? 1:0;break;
  case 5:index=int(settings_.graphics.presentation_filter);break;
  case 6:index=settings_.graphics.three_point_filter ? 1:0;break;
+ case 7:index=int(settings_.graphics.sphere);break;
  }
  index=(index+(direction<0 ? -1:1)+count)%count;
  switch(field_) {
@@ -74,6 +78,7 @@ void PCSettingsMenu::adjust(int direction) {
  case 4:{constexpr int samples[]{0,2,4,8};settings_.graphics.msaa_samples=samples[index];break;}
  case 5:settings_.graphics.presentation_filter=static_cast<PresentationFilter>(index);break;
  case 6:settings_.graphics.three_point_filter=index==1;break;
+ case 7:settings_.graphics.sphere=static_cast<GraphicsSphere>(index);break;
  }
  change_=settings_;saving_=true;status_="SAVING";
 }

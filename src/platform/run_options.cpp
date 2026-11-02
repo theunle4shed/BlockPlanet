@@ -96,6 +96,13 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             else return invalid("framebuffer readback must be on or off");
             continue;
         }
+        if (argument.starts_with("--sphere=")) {
+            const auto value = argument.substr(sizeof("--sphere=") - 1);
+            if (value == "original") result.sphere_extended = false;
+            else if (value == "extended") result.sphere_extended = true;
+            else return invalid("sphere must be original or extended");
+            continue;
+        }
         if (argument == "--casual") {
             result.casual = true;
             continue;
@@ -136,6 +143,8 @@ const char* run_options_help() {
            "  --present-mode=console|skip-buffering|early\n"
            "                                   When finished frames are shown (default console)\n"
            "  --framebuffer-readback=on|off    Copy each frame back to game memory (default on)\n"
+           "  --sphere=original|extended       Draw the game's sphere patch, or more of it\n"
+           "                                   (overrides the saved SPHERE setting)\n"
            "  --casual                         No game over: hearts refill, Time Trial clock\n"
            "                                   stops at 30 s. Trophies are paused\n"
            "  --start-chapter=N                Start Rescue at chapter N (testing). Trophies are paused\n"

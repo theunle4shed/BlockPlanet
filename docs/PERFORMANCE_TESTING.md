@@ -52,7 +52,7 @@ On the software renderer used for development, chapter 20 cost about a third mor
 
 ## Trying the extended sphere
 
-`BLOCKPLANET_SPHERE=replace BLOCKPLANET_SPHERE_RING=2` draws two extra cells on every side of the sphere patch (19 × 19 instead of 15 × 15), to stop blocks going missing at the edge of the view. Values 1 to 4 are accepted. It is a test setting for now; compare the frame time with `--perf-log` against the same stage without it.
+Set Options > Graphics > SPHERE to EXTENDED (or start with `--sphere=extended`) to draw two extra cells on every side of the sphere patch (19 × 19 instead of 15 × 15), so blocks near the edge of the view are not missing. Compare the frame time with `--perf-log` against the same stage with ORIGINAL. For testing other sizes, `BLOCKPLANET_SPHERE=replace BLOCKPLANET_SPHERE_RING=n` (1 to 4) overrides the setting. The log shows a `sphere_mode` line whenever the drawing mode changes.
 
 ## A useful test run
 

@@ -19,6 +19,7 @@
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/settings_store.h"
+#include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/wav_capture.h"
 #include "tetrisphere/window_mode_controller.h"
 #include "tetrisphere/pc_settings_hook.h"
@@ -596,6 +597,9 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         : ultramodern::renderer::AspectRatio::Original;
     graphics.msaa_option = ultramodern::renderer::Antialiasing::None;
     set_rt64_run_options(resolve_graphics_run_options(active_settings.graphics, run_options));
+    tetrisphere::sphere::set_detail(
+        resolve_graphics_run_options(active_settings.graphics, run_options).sphere_extended.value_or(false)
+            ? tetrisphere::sphere::Detail::Extended : tetrisphere::sphere::Detail::Original);
     graphics.rr_option = active_settings.graphics.refresh == GraphicsRefresh::Original
         ? ultramodern::renderer::RefreshRate::Original
         : ultramodern::renderer::RefreshRate::Manual;
@@ -701,6 +705,13 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             active_settings.magic=requested->magic;
             if(request->field==5)active_settings.graphics.presentation_filter=requested->graphics.presentation_filter;
             if(request->field==6)active_settings.graphics.three_point_filter=requested->graphics.three_point_filter;
+            if(request->field==7) {
+                active_settings.graphics.sphere=requested->graphics.sphere;
+                // Applies from the next frame. A --sphere option on the
+                // command line only sets the starting value.
+                tetrisphere::sphere::set_detail(requested->graphics.sphere==GraphicsSphere::Extended
+                    ? tetrisphere::sphere::Detail::Extended : tetrisphere::sphere::Detail::Original);
+            }
             set_controller_bindings(requested->bindings);
             set_magic_control(requested->magic);
             const auto ports = controller_ports.snapshot();

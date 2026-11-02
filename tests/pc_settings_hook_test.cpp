@@ -44,7 +44,7 @@ int main() {
  ctx.r16=3;tetrisphere_pc_settings_hook(rdram,&ctx,0x8004F680u);assert(ctx.r16==6);
  assert(MEM_H(0,0xFFFFFFFF800E1220ull)==4);
  ctx.r14=4;tetrisphere_pc_settings_hook(rdram,&ctx,0x8004CC0Cu);assert(ctx.r14==5);
- assert(pc_settings_active() && pc_settings_snapshot()->rows(ControllerFamily::NintendoSwitch).size()==8);
+ assert(pc_settings_active() && pc_settings_snapshot()->rows(ControllerFamily::NintendoSwitch).size()==9);
  assert(pc_settings_navigation_family()==ControllerFamily::NintendoSwitch);
  pc_settings_device(ControllerFamily::PlayStation);
  assert(pc_settings_navigation_family()==ControllerFamily::PlayStation);

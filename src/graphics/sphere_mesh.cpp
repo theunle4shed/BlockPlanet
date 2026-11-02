@@ -1,6 +1,9 @@
 #include "tetrisphere/sphere_mesh.h"
 
+#include <atomic>
 #include <cmath>
+#include <cstdio>
+#include <optional>
 #include <cstdlib>
 #include <cstring>
 
@@ -75,15 +78,63 @@ void build_mesh(const MeshInputs& in, std::vector<MeshEntry>& out) {
     }
 }
 
-Mode mode() {
-    static const Mode value = [] {
+namespace {
+
+std::atomic<Detail> requested_detail{Detail::Original};
+std::atomic<Mode> frame_mode{Mode::Original};
+std::atomic<int> frame_ring_value{0};
+
+// BLOCKPLANET_SPHERE, when set to a known value.
+std::optional<Mode> mode_override() {
+    static const std::optional<Mode> value = []() -> std::optional<Mode> {
         const char* setting = std::getenv("BLOCKPLANET_SPHERE");
-        if (setting == nullptr) return Mode::Original;
+        if (setting == nullptr) return std::nullopt;
+        if (std::strcmp(setting, "original") == 0) return Mode::Original;
         if (std::strcmp(setting, "verify") == 0) return Mode::Verify;
         if (std::strcmp(setting, "replace") == 0) return Mode::Replace;
-        return Mode::Original;
+        return std::nullopt;
     }();
     return value;
 }
+
+std::optional<int> ring_override() {
+    static const std::optional<int> value = []() -> std::optional<int> {
+        const char* setting = std::getenv("BLOCKPLANET_SPHERE_RING");
+        if (setting == nullptr) return std::nullopt;
+        const int n = std::atoi(setting);
+        return n < 0 ? 0 : (n > 4 ? 4 : n);
+    }();
+    return value;
+}
+
+} // namespace
+
+void set_detail(Detail detail) { requested_detail.store(detail); }
+
+void latch_frame_mode() {
+    const Detail detail = requested_detail.load();
+    const Mode m = mode_override().value_or(detail == Detail::Extended ? Mode::Replace : Mode::Original);
+    frame_mode.store(m);
+    const int ring = ring_override().value_or(detail == Detail::Extended ? extended_detail_ring : 0);
+    const int frame = m == Mode::Replace ? ring : 0;
+    frame_ring_value.store(frame);
+    // Log each change of drawing mode.
+    static int last = -1;
+    const int key = static_cast<int>(m) * 16 + frame;
+    if (key != last) {
+        last = key;
+        static constexpr const char* names[]{"original", "verify", "replace"};
+        std::fprintf(stdout, "{\"event\":\"sphere_mode\",\"mode\":\"%s\",\"ring\":%d}\n",
+                     names[static_cast<int>(m)], frame);
+        std::fflush(stdout);
+    }
+}
+
+Mode mode() {
+    // Before the first frame's mesh, follow the override alone.
+    return frame_mode.load();
+}
+
+int frame_ring() { return frame_ring_value.load(); }
 
 } // namespace tetrisphere::sphere
