@@ -36,8 +36,10 @@
 #include "tetrisphere/sphere_quadrants.h"
 
 #include <array>
+#include <chrono>
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -46,6 +48,23 @@ namespace {
 
 using namespace tetrisphere::sphere;
 using namespace tetrisphere::guest;
+
+// Mode for one group of passes. In verify mode, BLOCKPLANET_SPHERE_VERIFY can
+// list the groups to check (comma-separated: mesh, cell, faces, quadrants);
+// the others then run as the original.
+Mode mode_for(const char* group) {
+    const Mode m = mode();
+    if (m != Mode::Verify) return m;
+    static const char* selection = std::getenv("BLOCKPLANET_SPHERE_VERIFY");
+    if (selection == nullptr) return m;
+    const std::size_t length = std::strlen(group);
+    for (const char* p = selection; (p = std::strstr(p, group)) != nullptr; p += length) {
+        const bool starts = p == selection || p[-1] == ',';
+        const bool ends = p[length] == '\0' || p[length] == ',';
+        if (starts && ends) return m;
+    }
+    return Mode::Original;
+}
 
 constexpr std::uint32_t mesh_pointer = 0x800E44E4u;
 constexpr std::uint32_t base_grid = 0x800E3CD8u;
@@ -189,13 +208,13 @@ private:
 // BlockPlanet's version directly in replace mode.
 class OverlayCheck {
 public:
-    explicit OverlayCheck(const char* event, DelaySlotAdd delay_slot = {})
-        : event_(event), delay_slot_(delay_slot), log_(event, "values") {}
+    OverlayCheck(const char* group, const char* event, DelaySlotAdd delay_slot = {})
+        : group_(group), event_(event), delay_slot_(delay_slot), log_(event, "values") {}
 
     // Returns true when BlockPlanet's version replaced the original.
     template <typename Port>
     bool begin(std::uint8_t* rdram, Port&& port) {
-        const Mode m = mode();
+        const Mode m = mode_for(group_);
         if (m == Mode::Original) return false;
         if (m == Mode::Replace) {
             DirectMemory memory(rdram);
@@ -216,6 +235,7 @@ public:
     }
 
 private:
+    const char* group_;
     const char* event_;
     DelaySlotAdd delay_slot_;
     VerifyLog log_;
@@ -224,16 +244,20 @@ private:
 };
 
 // Snapshot check for passes that call other game functions (see the top).
+//
+// The check must stay quick: while it runs the game thread is stalled, and a
+// long stall lets the runtime's message queues (retrace, display list done)
+// overflow, which loses messages and hangs the game. So it copies guest
+// memory once, compares 4 KB pages with memcmp, and the checks are spread
+// out (see SnapshotSchedule).
 class SnapshotCheck {
 public:
     explicit SnapshotCheck(const char* event) : log_(event, "bytes"), event_(event) {}
 
-    // Checking every call would copy 8 MB several times per pass; one call
-    // in `interval` is checked.
-    void begin(const std::uint8_t* rdram, const recomp_context* ctx) {
-        active_ = (calls_++ % interval) == 0;
+    void begin(const std::uint8_t* rdram, const recomp_context* ctx, bool selected) {
+        active_ = selected;
         if (!active_) return;
-        entry_.assign(rdram, rdram + rdram_bytes);
+        snapshot_.assign(rdram, rdram + rdram_bytes);
         entry_ctx_ = *ctx;
     }
 
@@ -241,18 +265,24 @@ public:
     void end(const std::uint8_t* rdram, Port&& port) {
         if (!active_) return;
         active_ = false;
-        original_.assign(rdram, rdram + rdram_bytes);
+        const auto started = std::chrono::steady_clock::now();
 
-        // BlockPlanet's version runs on a private copy of guest memory and
-        // registers; live memory is never touched. (Other host threads post
-        // messages into queues in guest memory, so restoring a snapshot over
-        // live memory could lose one and hang the game.) The game's functions
-        // reach memory only through the rdram pointer they are given, so the
-        // ones the port calls work on the copy too.
-        shadow_ = entry_;
+        // Pages the original changed (it has finished; the snapshot still
+        // holds the starting state).
+        for (std::uint32_t page = 0; page < pages; ++page) {
+            changed_[page] = std::memcmp(rdram + page * page_bytes, snapshot_.data() + page * page_bytes,
+                                         page_bytes) != 0;
+        }
+
+        // BlockPlanet's version runs on the snapshot, a private copy; live
+        // memory is never touched. (Other host threads post messages into
+        // queues in guest memory, so writing a snapshot back over live memory
+        // could lose one.) The game's functions reach memory only through the
+        // rdram pointer they are given, so the ones the port calls work on the
+        // copy too.
         recomp_context shadow_ctx = entry_ctx_;
-        port(shadow_.data(), &shadow_ctx);
-        const std::uint8_t* port_result = shadow_.data();
+        port(snapshot_.data(), &shadow_ctx);
+        const std::uint8_t* result = snapshot_.data();
 
         const std::uint32_t stack_top = static_cast<std::uint32_t>(entry_ctx_.r29) & 0x00FFFFFFu;
         const std::uint32_t stack_bottom = stack_top > stack_scratch ? stack_top - stack_scratch : 0;
@@ -263,76 +293,69 @@ public:
         std::size_t differing = 0;
         std::size_t outside = 0;
         int detailed = 0;
-        for (std::uint32_t offset = 0; offset < rdram_bytes; ++offset) {
-            if (port_result[offset] == original_[offset]) continue;
-            if (offset >= stack_bottom && offset < stack_top) continue;
-            if (!pass_pages_[offset / page_bytes]) {
-                ++outside;
-                continue;
-            }
-            if (differing++ == 0) detail_ = detailed_checks_++ < 3;
-            if (detail_ && detailed++ < 40) {
-                std::fprintf(stdout,
-                             "{\"event\":\"%s_detail\",\"address\":\"0x%08X\",\"blockplanet\":%u,"
-                             "\"original\":%u,\"stack\":\"0x%08X\"}\n",
-                             event_, 0x80000000u | (offset ^ 3u), port_result[offset], original_[offset],
-                             static_cast<std::uint32_t>(entry_ctx_.r29));
+        for (std::uint32_t page = 0; page < pages; ++page) {
+            const std::uint32_t base = page * page_bytes;
+            if (std::memcmp(rdram + base, result + base, page_bytes) == 0) continue;
+            for (std::uint32_t offset = base; offset < base + page_bytes; ++offset) {
+                if (result[offset] == rdram[offset]) continue;
+                if (offset >= stack_bottom && offset < stack_top) continue;
+                if (!pass_pages_[page]) {
+                    ++outside;
+                    continue;
+                }
+                if (differing++ == 0) detail_ = detailed_checks_++ < 3;
+                if (detail_ && detailed++ < 40) {
+                    std::fprintf(stdout,
+                                 "{\"event\":\"%s_detail\",\"address\":\"0x%08X\",\"blockplanet\":%u,"
+                                 "\"original\":%u}\n",
+                                 event_, 0x80000000u | (offset ^ 3u), result[offset], rdram[offset]);
+                }
             }
         }
         outside_bytes_ += outside;
         if (differing == 0 && outside == 0) {
-            for (std::uint32_t offset = 0; offset < rdram_bytes; ++offset) {
-                if (original_[offset] != entry_[offset]) pass_pages_[offset / page_bytes] = true;
-            }
-        }
-        if (differing == 0 && outside == 0 && !ranges_logged_) {
-            ranges_logged_ = true;
-            log_written_ranges();
+            for (std::uint32_t page = 0; page < pages; ++page) pass_pages_[page] = pass_pages_[page] || changed_[page];
         }
         log_.report(differing, static_cast<long long>(outside_bytes_));
+        const double ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+        if (ms > slowest_ms_) {
+            slowest_ms_ = ms;
+            std::fprintf(stdout, "{\"event\":\"%s_slowest\",\"ms\":%.1f}\n", event_, ms);
+        }
     }
 
 private:
-    // Logs where the original wrote (ranges merged across gaps under 256 bytes).
-    void log_written_ranges() const {
-        std::uint32_t first = 0, last = 0;
-        bool open = false;
-        auto flush = [&] {
-            std::fprintf(stdout, "{\"event\":\"%s_writes\",\"from\":\"0x%08X\",\"to\":\"0x%08X\"}\n", event_,
-                         0x80000000u | first, 0x80000000u | last);
-        };
-        for (std::uint32_t offset = 0; offset < rdram_bytes; ++offset) {
-            if (original_[offset] == entry_[offset]) continue;
-            if (open && offset - last < 256) {
-                last = offset;
-                continue;
-            }
-            if (open) flush();
-            first = last = offset;
-            open = true;
-        }
-        if (open) flush();
-        std::fflush(stdout);
-    }
-
     static constexpr std::uint32_t rdram_bytes = 8u * 1024u * 1024u;
-    static constexpr std::uint32_t stack_scratch = 0x10000u;
-    static constexpr std::uint64_t interval = 8;
     static constexpr std::uint32_t page_bytes = 4096;
+    static constexpr std::uint32_t pages = rdram_bytes / page_bytes;
+    static constexpr std::uint32_t stack_scratch = 0x10000u;
 
     VerifyLog log_;
     const char* event_;
-    std::vector<std::uint8_t> entry_;
-    std::vector<std::uint8_t> original_;
-    std::vector<std::uint8_t> shadow_;
+    std::vector<std::uint8_t> snapshot_;
     recomp_context entry_ctx_{};
-    std::uint64_t calls_ = 0;
     bool active_ = false;
     bool detail_ = false;
-    bool ranges_logged_ = false;
-    std::vector<bool> pass_pages_ = std::vector<bool>(rdram_bytes / page_bytes, false);
-    std::uint64_t outside_bytes_ = 0;
     int detailed_checks_ = 0;
+    std::vector<bool> changed_ = std::vector<bool>(pages, false);
+    std::vector<bool> pass_pages_ = std::vector<bool>(pages, false);
+    std::uint64_t outside_bytes_ = 0;
+    double slowest_ms_ = 0;
+};
+
+// Picks which calls of a group of snapshot-checked passes are checked: one
+// call in `interval`, counted across the group, so that a group of four
+// passes run once per frame gets one check every few frames and each pass in
+// turn (with an interval not divisible by four).
+class SnapshotSchedule {
+public:
+    explicit SnapshotSchedule(std::uint64_t interval) : interval_(interval) {}
+    bool next() { return calls_++ % interval_ == 0; }
+
+private:
+    std::uint64_t interval_;
+    std::uint64_t calls_ = 0;
 };
 
 // ---- mesh table builder -------------------------------------------------
@@ -378,22 +401,23 @@ VerifyLog mesh_log{"sphere_mesh_verify", "entries"};
 
 // ---- cell setup ---------------------------------------------------------
 
-OverlayCheck cell_check{"sphere_cell_verify"};
+OverlayCheck cell_check{"cell", "sphere_cell_verify"};
 
 // ---- face functions -----------------------------------------------------
 
 // Every face function adds 4 to the vertex count at 0x800E44F0 in its return's
 // delay slot.
 constexpr DelaySlotAdd face_vertex_count{0x800E44F0u, 4};
-std::array<OverlayCheck, 6> face_checks{OverlayCheck{"sphere_face_outer_verify", face_vertex_count},
-                                        OverlayCheck{"sphere_face_inner_verify", face_vertex_count},
-                                        OverlayCheck{"sphere_face_row_start_verify", face_vertex_count},
-                                        OverlayCheck{"sphere_face_row_end_verify", face_vertex_count},
-                                        OverlayCheck{"sphere_face_column_start_verify", face_vertex_count},
-                                        OverlayCheck{"sphere_face_column_end_verify", face_vertex_count}};
+std::array<OverlayCheck, 6> face_checks{OverlayCheck{"faces", "sphere_face_outer_verify", face_vertex_count},
+                                        OverlayCheck{"faces", "sphere_face_inner_verify", face_vertex_count},
+                                        OverlayCheck{"faces", "sphere_face_row_start_verify", face_vertex_count},
+                                        OverlayCheck{"faces", "sphere_face_row_end_verify", face_vertex_count},
+                                        OverlayCheck{"faces", "sphere_face_column_start_verify", face_vertex_count},
+                                        OverlayCheck{"faces", "sphere_face_column_end_verify", face_vertex_count}};
 
 // ---- quadrant passes ----------------------------------------------------
 
+SnapshotSchedule quadrant_schedule{9};
 std::array<SnapshotCheck, 4> quadrant_checks{SnapshotCheck{"sphere_quadrant0_verify"},
                                              SnapshotCheck{"sphere_quadrant1_verify"},
                                              SnapshotCheck{"sphere_quadrant2_verify"},
@@ -402,7 +426,7 @@ std::array<SnapshotCheck, 4> quadrant_checks{SnapshotCheck{"sphere_quadrant0_ver
 } // namespace
 
 extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_context* ctx) {
-    const Mode m = mode();
+    const Mode m = mode_for("mesh");
     if (m == Mode::Original) return false;
     if (m == Mode::Verify) {
         // Inputs are read before the original caps the scale values, so read
@@ -418,7 +442,7 @@ extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_contex
 
 extern "C" void blockplanet_sphere_mesh_end(std::uint8_t* rdram, recomp_context* ctx) {
     (void)ctx;
-    if (mode() != Mode::Verify || expected_mesh.empty()) return;
+    if (mode_for("mesh") != Mode::Verify || expected_mesh.empty()) return;
     const std::uint32_t table = load32(rdram, mesh_pointer);
     std::size_t differing = 0;
     for (std::size_t i = 0; i < expected_mesh.size(); ++i) {
@@ -455,11 +479,26 @@ extern "C" void blockplanet_sphere_face_end(std::uint8_t* rdram, recomp_context*
     face_checks[static_cast<std::size_t>(face)].end(rdram);
 }
 
+// Game functions for the quadrant self-test (see blockplanet_sphere_quadrant_end).
+extern "C" {
+void func_8009E630(std::uint8_t* rdram, recomp_context* ctx);
+void func_8009EB28(std::uint8_t* rdram, recomp_context* ctx);
+void func_8009F024(std::uint8_t* rdram, recomp_context* ctx);
+void func_8009F520(std::uint8_t* rdram, recomp_context* ctx);
+}
+
+namespace {
+// Set while a snapshot check replays the original itself (self-test), so its
+// own hooks stay out of the way.
+bool replaying_original = false;
+} // namespace
+
 extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
-    const Mode m = mode();
+    if (replaying_original) return false;
+    const Mode m = mode_for("quadrants");
     if (m == Mode::Original) return false;
     if (m == Mode::Verify) {
-        quadrant_checks[static_cast<std::size_t>(quadrant)].begin(rdram, ctx);
+        quadrant_checks[static_cast<std::size_t>(quadrant)].begin(rdram, ctx, quadrant_schedule.next());
         return false;
     }
     draw_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant));
@@ -467,8 +506,18 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
 }
 
 extern "C" void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
-    if (mode() != Mode::Verify) return;
     (void)ctx;
-    quadrant_checks[static_cast<std::size_t>(quadrant)].end(
-        rdram, [quadrant](std::uint8_t* r, recomp_context* c) { draw_quadrant(r, c, static_cast<Quadrant>(quadrant)); });
+    if (replaying_original || mode_for("quadrants") != Mode::Verify) return;
+    // BLOCKPLANET_SPHERE_SELFTEST=1 replays the original instead of
+    // BlockPlanet's version, to measure how often the check itself differs
+    // (for example because of other host threads).
+    static const bool self_test = std::getenv("BLOCKPLANET_SPHERE_SELFTEST") != nullptr;
+    quadrant_checks[static_cast<std::size_t>(quadrant)].end(rdram, [quadrant](std::uint8_t* r, recomp_context* c) {
+        if (!self_test) return draw_quadrant(r, c, static_cast<Quadrant>(quadrant));
+        static constexpr void (*originals[4])(std::uint8_t*, recomp_context*) = {
+            func_8009E630, func_8009EB28, func_8009F024, func_8009F520};
+        replaying_original = true;
+        originals[quadrant](r, c);
+        replaying_original = false;
+    });
 }
