@@ -38,6 +38,16 @@ func = "func_800ADD6C"
 before_vram = 0x800AE1F0
 text = "blockplanet_sphere_mesh_end(rdram, ctx);"
 
+# Stage 1: the cell setup pass, called before each grid cell is drawn.
+[[patches.hook]]
+func = "func_8009D90C"
+text = "if (blockplanet_sphere_cell_begin(rdram, ctx)) return;"
+
+[[patches.hook]]
+func = "func_8009D90C"
+before_vram = 0x8009E20C
+text = "blockplanet_sphere_cell_end(rdram, ctx);"
+
 [[patches.hook]]
 func = "func_8006F894"
 before_vram = 0x8006F914

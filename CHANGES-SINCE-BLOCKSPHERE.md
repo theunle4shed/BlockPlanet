@@ -51,8 +51,12 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `tools/analysis/level_table.py`, which prints the level parameter table from the player's own ROM. The output is derived from game data and stays out of Git.
 - Documented the level data format and how difficulty scales in [docs/research/blockplanet-level-data.md](docs/research/blockplanet-level-data.md). Rescue has 15 chapters of 10 levels; starting chapters above 16 reads into other data.
 
-## 2026-11-02: Sphere renderer, stage 1 (mesh table)
+## 2026-11-02: Sphere renderer, stage 1 (mesh table and cell setup)
 
 - Reimplemented the sphere mesh table builder (`func_800ADD6C`) as `tetrisphere::sphere::build_mesh` (`include/tetrisphere/sphere_mesh.h`, `src/graphics/sphere_mesh.cpp`), with the grid size as a parameter for later stages.
 - Hooked it into the generated code (`config/recomp/tetrisphere.us.rev0.toml`, `src/graphics/sphere_hooks.cpp`). `BLOCKPLANET_SPHERE` selects `original` (default, unchanged), `verify` (run both and compare every table) or `replace` (use BlockPlanet's table).
 - Verified: zero differing entries over more than 1,000 table rebuilds in chapter 1 and 500 in chapter 15 with rotation in all directions; replace mode plays normally.
+- Reimplemented the cell setup pass (`func_8009D90C`), which prepares each grid cell for drawing, as `tetrisphere::sphere::prepare_cell` (`include/tetrisphere/sphere_cell.h`, `src/graphics/sphere_cell.cpp`), with a unit test (`tests/sphere_cell_test.cpp`). It uses the same `BLOCKPLANET_SPHERE` modes.
+- Verified: zero differing values over more than 131,000 calls each in chapter 1 and chapter 15; replace mode draws the sphere correctly in chapter 15 with a hole dug to the core.
+- Added a general verify harness for ported passes: BlockPlanet's version writes to an overlay of guest memory and every value is compared with what the original leaves, logging the first mismatches in detail.
+- Corrected the research notes: each mesh table entry holds a base point and a fixed layer step (not a core point), and `0x8015EDB2`/`0x8015EDAE` are the cell's height and kind (not a column span).
