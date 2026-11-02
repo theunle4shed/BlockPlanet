@@ -36,6 +36,8 @@ void tetrisphere_training_replace(std::uint8_t* rdram, recomp_context* ctx,
 void tetrisphere_training_record(std::uint8_t* rdram, recomp_context* ctx,
                                  uint32_t destination);
 void tetrisphere_training_render(std::uint8_t* rdram, recomp_context* ctx);
+bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_sphere_mesh_end(std::uint8_t* rdram, recomp_context* ctx);
 void tetrisphere_rescue_pause_snapshot_hook(std::uint8_t* rdram,
                                             recomp_context* ctx);
 void tetrisphere_ui_span_begin(std::uint8_t* rdram, recomp_context* ctx,

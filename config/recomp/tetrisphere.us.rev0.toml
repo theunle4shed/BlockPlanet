@@ -28,6 +28,16 @@ ignored = [
 ]
 renamed = []
 
+# BlockPlanet sphere renderer, stage 1: the mesh table builder.
+[[patches.hook]]
+func = "func_800ADD6C"
+text = "if (blockplanet_sphere_mesh_begin(rdram, ctx)) return;"
+
+[[patches.hook]]
+func = "func_800ADD6C"
+before_vram = 0x800AE1F0
+text = "blockplanet_sphere_mesh_end(rdram, ctx);"
+
 [[patches.hook]]
 func = "func_8006F894"
 before_vram = 0x8006F914

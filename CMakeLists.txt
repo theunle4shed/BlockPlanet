@@ -291,6 +291,9 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/game_event_watcher.h
     src/platform/game_event_watcher.cpp
     include/tetrisphere/game_options.h
+    include/tetrisphere/sphere_mesh.h
+    src/graphics/sphere_mesh.cpp
+    src/graphics/sphere_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
     include/tetrisphere/rt64_context.h
@@ -398,6 +401,8 @@ add_executable(tetrisphere_diag
     src/platform/run_options.cpp
     src/diagnostic/indirect_dispatch.cpp
     src/diagnostic/rescue_pause_snapshot_stub.cpp
+    src/graphics/sphere_mesh.cpp
+    src/graphics/sphere_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
     src/platform/pc_settings_menu.cpp
@@ -520,6 +525,14 @@ else()
     target_compile_options(game_options_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME game_options COMMAND game_options_test)
+add_executable(sphere_mesh_test tests/sphere_mesh_test.cpp src/graphics/sphere_mesh.cpp)
+target_include_directories(sphere_mesh_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(sphere_mesh_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(sphere_mesh_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME sphere_mesh COMMAND sphere_mesh_test)
 add_executable(perf_metrics_test tests/perf_metrics_test.cpp)
 target_include_directories(perf_metrics_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)
@@ -916,6 +929,8 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/game_options.cpp
         src/platform/input_mapping.cpp
         src/graphics/rt64_context.cpp
+        src/graphics/sphere_mesh.cpp
+        src/graphics/sphere_hooks.cpp
         src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp
         src/runtime/unsupported.cpp
