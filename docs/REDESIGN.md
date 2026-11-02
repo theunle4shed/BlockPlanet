@@ -83,7 +83,7 @@ This proposal builds on what BlockPlanet has already learned about the original 
 
 ```
 SOLO            Story · Time Trial · Lines · Puzzle · Custom · Training
-MULTIPLAYER     Versus · Co-op · Custom          (local or online)
+MULTIPLAYER     Versus · Collaborate · Custom    (local or online)
 MEDIA PLAYER
 TROPHIES
 OPTIONS
@@ -95,11 +95,10 @@ EXIT
 - Keep **Puzzle**. It is the original's most distinctive mode after Rescue, and it suits short sessions.
 - Fold **Practice** into Custom (choose chapter, depth, speed, no fail), and keep **Training** as the onboarding path rather than a menu destination players must find.
 - **Hide & Seek** becomes a Story level type or a Custom rule set rather than a top-level mode.
-- Name the cooperative mode **Co-op**. "Collaborate" reads like a productivity tool.
 
 **Player benefit.** Every activity is one or two steps from the main menu, and the names say what each mode is.
 
-**Feasibility.** The new menus sit on the planned RmlUi layer and drive the original modes through their mode numbers (1 to 6, already mapped). Co-op needs new game logic (see section 7).
+**Feasibility.** The new menus sit on the planned RmlUi layer and drive the original modes through their mode numbers (1 to 6, already mapped). Collaborate needs new systems on top of the game (see section 8).
 
 ## 5. Time Trial
 
@@ -157,13 +156,71 @@ EXIT
 
 **Feasibility.** This needs the original VS attack mechanics mapped first, then game-side hooks to queue, place and mark junk. The cracked look is texture work.
 
-## 8. Co-op (new)
+## 8. Collaborate (new)
 
-**Proposal.** Two to four players dig the same sphere from different sides, sharing hearts and a score. Combos made together feed a shared magic meter.
+Two players work on one shared sphere at the same time, with no split screen, no minimap and minimal UI. Players should always know where their teammate is, what they are doing, and what they intend next, without voice chat.
 
-**Player benefit.** A friendly multiplayer mode for players who do not enjoy head-to-head competition.
+**Why it fits Tetrisphere.** The original's sphere is a single, readable object with one point of action (the cursor and the falling piece). That focus is what makes a shared screen possible: two players can read the same sphere at a glance, where two flat Tetris wells would compete for attention.
 
-**Feasibility.** The hardest item in this document. The original game has one cursor per sphere, so several players on one sphere needs new game logic, possibly an engine of our own. Recommend prototyping after Versus.
+**Limitations to design around.**
+- The original has one cursor and one falling piece per sphere, and the sphere turns to keep that cursor centred. A second player cannot also rotate the sphere without fighting the first.
+- The original player can only drop pieces, slide blocks and use magic. A support role needs its own meaningful actions, or it becomes a spectator with a pointer.
+- Identity by colour alone fails for colour-blind players and in busy, glowing scenes.
+
+### Roles
+
+| Role | Responsible for | Controls |
+| --- | --- | --- |
+| **Drop player** | Moving and placing the falling piece, sliding blocks, driving progress | The original game controls. The camera follows this player. |
+| **Support player** | Using the team's magic, preparing combos, opening paths, managing resources, pinging | A free cursor anywhere on the sphere, plus support actions |
+
+Roles may become optional later (both players able to drop), but the first version should keep them fixed: it matches the game's single falling piece and keeps the camera calm.
+
+**Support actions (proposed, to make the role meaningful):**
+- **Use magic at the support cursor.** Magic belongs to the team; the support player aims and fires it.
+- **Hold or swap the next piece.** A new mechanic: swap the upcoming piece with a held one, shaping the drop player's next move.
+- **Ping** (below).
+- **Later candidates:** a short "brace" that slows the falling piece, or nudging single blocks.
+
+### Player identity
+
+Each player has a permanent identity colour, cyan for player 1 and orange for player 2 by default, used consistently on cursors, highlights, outlines, pings, magic previews and activity indicators.
+
+**Addition for accessibility:** pair each colour with a **shape and line style** so identity never depends on colour alone. For example, the drop player gets a solid ring and solid outlines, and the support player a segmented ring and dashed outlines. Offer alternative colour pairs in options.
+
+### Awareness system
+
+Ordered by importance, as in the original notes:
+
+1. **Player-coloured cursors.** The drop cursor is larger, brighter, with a stronger glow and the highest priority. The support cursor is softer, with less glow, but always clearly visible.
+2. **Player-coloured block outlines.** The block under a cursor gets a thin outline in that player's colour, a soft glow and mild rim lighting: passive communication of intent.
+3. **Activity zone halos.** Where a player has been working for a while, nearby blocks get a faint tint and a subtle halo that fades after a few seconds, so a teammate can see where work is happening without watching the cursor.
+4. **Falling piece highlighting.** The active piece always has enhanced glow, rim lighting and a subtle pulse, with an optional outline: "this is the important block right now".
+5. **Pings.** Point at a block and press Ping: a neon pulse, an expanding ring and a temporary marker. For suggesting a combo, marking a target, pointing at a power-up or asking for help. Optionally, a second press on the same spot within a moment changes the ping's meaning ("drop here", "danger"), still without text.
+6. **Hidden-side indicators.** When a teammate's cursor is on the far side, a small coloured marker at the sphere's edge and a thin arc along the perimeter show the direction. Subtle, fading with angular distance, never covering play.
+7. **Magic previews.** Preparing magic shows a player-coloured targeting overlay, a brief pulse and the area of effect before activation.
+
+**Rules for all awareness effects:** they must never hide a block's type or colour, must respect the reduced-motion and flash-limit options, and must stay readable on the calm background mode.
+
+### Changes to the original notes
+
+- **Camera ownership is decided:** the camera follows the drop player. The support player's cursor moves freely and relies on the hidden-side indicators when out of view. The peek camera is available to the drop player only, so the view never changes without that player's input.
+- **Support needs real actions:** magic aiming and the hold or swap piece make the role active rather than advisory.
+- **Identity by shape as well as colour.**
+
+### Player benefit
+
+A cooperative mode that keeps the original's single, focused sphere, gives two players distinct and meaningful jobs, and lets them coordinate silently. It suits mixed-skill pairs: the stronger player drops, the newer one supports.
+
+### Feasibility in BlockPlanet
+
+- **Drop player:** the original game's player, unchanged.
+- **Support cursor, outlines, halos, pings and edge indicators:** drawn by BlockPlanet on top of the game. They need the mapping from grid cells to positions on the sphere, the same mapping the culling research is uncovering (the game builds sphere vertices from a precomputed mesh table). Tints on blocks could instead be applied to the vertex colours the game already generates.
+- **Falling piece highlight:** needs the falling piece's draw call identified, then a tint or outline. Medium.
+- **Magic at the support cursor:** needs the magic system mapped (not yet found), then a hook that fires magic at a chosen cell rather than the drop cursor. Research first.
+- **Hold or swap piece:** the piece queue is game state; needs mapping, then a hook. Medium.
+- **Online play:** both players share one simulation. The practical route is host-authoritative: the host runs the game, the remote player's support inputs are sent as small messages (support actions are infrequent, so latency matters less than for the drop player), and the remote player's view is kept in step from the host's state. This is different from Versus, where each player runs their own game, and should come after local Collaborate works.
+- **Order:** local Collaborate with the support cursor, outlines, pings and edge indicators first; then magic aiming and hold or swap; then activity halos and polish; online last.
 
 ## 9. Media Player
 
@@ -224,7 +281,7 @@ Not in the original brief, but essential for a modern release.
 | Sphere always fits, at most 80% of the screen | **Keep** | Essential for all aspect ratios. |
 | Camera push on falling blocks | **Change** | Subtle, optional, and tested for motion sickness. |
 | Chapters persist, resources reset per chapter | **Keep** | Short, fair runs. |
-| Menu structure | **Change** | Add Puzzle, fold Practice into Custom, rename Collaborate to Co-op. |
+| Menu structure | **Change** | Add Puzzle, fold Practice into Custom, make Training the onboarding path. |
 | Time Trial bests, friends and dev times | **Keep** | Add seeds and a daily challenge. |
 | Versus formats, pools, host settings | **Keep** | Add handicaps and shared seeds. |
 | Pause the receiver during junk placement | **Drop** | Breaks flow; queue to the next placement instead. |
@@ -232,14 +289,17 @@ Not in the original brief, but essential for a modern release.
 | Junk counterplay | **Add** | Combos cancel incoming junk. |
 | Media player as a visualiser | **Keep** | Add a presentation mode and earned preset packs. |
 | Mobile-style grids | **Change** | Controller-first grid design. |
-| Co-op on one sphere | **Keep, later** | Highest-risk system; prototype after Versus. |
+| Collaborate: shared sphere, drop and support roles | **Keep** | The drop player is the original game's player, so it does not need two simultaneous droppers. |
+| Collaborate: colour identity | **Change** | Add shape and line style so it never relies on colour alone. |
+| Collaborate: support role | **Add** | Magic aiming and a hold or swap piece, so support is active, not advisory. |
+| Collaborate: camera | **Decide** | The camera follows the drop player; the support player relies on edge indicators. |
 
 ## Risks and constraints
 
 - **Trademarks.** "Tetris" and Tetris trade dress are strictly enforced by The Tetris Company. Keep the BlockPlanet name and avoid Tetris branding in a public release.
 - **Original game material.** BlockPlanet runs the original code and needs the player's own ROM. New art, music support and modes are fine; redistributing original assets is not.
 - **Determinism.** Ghosts, replays and lockstep online play need the game to replay exactly the same way from the same inputs. The current runtime is not proven deterministic. Seeds and attack messages are safer foundations.
-- **Engine limits.** The original game logic has one player per sphere, one cursor, and a fixed draw patch. Co-op and a full free camera may need replacing parts of the game rather than hooking them.
+- **Engine limits.** The original game logic has one player per sphere, one cursor, and a fixed draw patch. Collaborate works around this with fixed roles; letting both players drop, or a full free camera, may need replacing parts of the game rather than hooking them.
 - **Photosensitivity.** Audio-reactive visuals need flash limits and testing before release.
 
 ## Suggested order
@@ -250,7 +310,7 @@ Not in the original brief, but essential for a modern release.
 4. Media Player, from the jukebox and visualiser research.
 5. Time Trial records and seeds, then the daily challenge.
 6. Versus formats and the junk system, local first, then online.
-7. Co-op prototype.
+7. Collaborate: local first, online last.
 
 ## Open questions
 
@@ -258,4 +318,5 @@ Not in the original brief, but essential for a modern release.
 - How many chapters should Story have? The original's real chapter count is still being measured.
 - Should Hide & Seek stay as its own mode or become a Story level type?
 - What reward does finishing Story give: Media Player, Lines, Custom, or all three?
+- Collaborate: which support actions feel best in play (magic aiming, hold or swap piece, others)? Needs a playable prototype.
 - Should online leaderboards be friends-only, matching the friend-code decision?

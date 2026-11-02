@@ -148,6 +148,8 @@ Goal: list BlockPlanet in [Quiver Launcher](https://github.com/tgeorgiadis/quive
 
 ## Phase 5: online multiplayer (XL)
 
+**Collaborate** (two players, one sphere, drop and support roles) is specified in [REDESIGN.md](REDESIGN.md#8-collaborate-new). Local Collaborate can come before online play; it depends on the sphere mapping from the culling research and on the magic research.
+
 Online play for up to 4 players, where each player's actions affect the other players' spheres.
 
 - **The original game supports 2-player split-screen VS only.** Four spheres on one screen would be a large rewrite. The practical design is that **each player runs their own single-player game**, and BlockPlanet sends attacks between games over the network, using the attack mechanics VS already has where possible.
