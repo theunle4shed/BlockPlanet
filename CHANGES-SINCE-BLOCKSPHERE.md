@@ -51,7 +51,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `tools/analysis/level_table.py`, which prints the level parameter table from the player's own ROM. The output is derived from game data and stays out of Git.
 - Documented the level data format and how difficulty scales in [docs/research/blockplanet-level-data.md](docs/research/blockplanet-level-data.md). Rescue has 15 chapters of 10 levels; starting chapters above 16 reads into other data.
 
-## 2026-11-02: Sphere renderer, stage 1 (mesh table and cell setup)
+## 2026-11-02: Sphere renderer, stage 1 (mesh table, cell setup and quadrant passes)
 
 - Reimplemented the sphere mesh table builder (`func_800ADD6C`) as `tetrisphere::sphere::build_mesh` (`include/tetrisphere/sphere_mesh.h`, `src/graphics/sphere_mesh.cpp`), with the grid size as a parameter for later stages.
 - Hooked it into the generated code (`config/recomp/tetrisphere.us.rev0.toml`, `src/graphics/sphere_hooks.cpp`). `BLOCKPLANET_SPHERE` selects `original` (default, unchanged), `verify` (run both and compare every table) or `replace` (use BlockPlanet's table).
@@ -59,4 +59,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Reimplemented the cell setup pass (`func_8009D90C`), which prepares each grid cell for drawing, as `tetrisphere::sphere::prepare_cell` (`include/tetrisphere/sphere_cell.h`, `src/graphics/sphere_cell.cpp`), with a unit test (`tests/sphere_cell_test.cpp`). It uses the same `BLOCKPLANET_SPHERE` modes.
 - Verified: zero differing values over more than 131,000 calls each in chapter 1 and chapter 15; replace mode draws the sphere correctly in chapter 15 with a hole dug to the core.
 - Added a general verify harness for ported passes: BlockPlanet's version writes to an overlay of guest memory and every value is compared with what the original leaves, logging the first mismatches in detail.
+- Reimplemented the four sphere quadrant passes (`func_8009E630`, `func_8009EB28`, `func_8009F024`, `func_8009F520`) as one routine, `tetrisphere::sphere::draw_quadrant` (`include/tetrisphere/sphere_quadrants.h`, `src/graphics/sphere_quadrants.cpp`). The face drawing is still the game's own code.
+- Added a snapshot check for passes that call other game functions: it replays BlockPlanet's version from the original's starting state and compares all of guest memory. Verified: zero differing bytes in at least 64 checks per quarter in chapters 1 and 15; replace mode draws correctly in both.
+- Added `include/tetrisphere/guest_memory.h`, shared guest memory helpers.
+- Documented how the game culls faces: a precomputed face mask per block, with each quarter drawing only the outer face and the two sides that look towards the view centre.
 - Corrected the research notes: each mesh table entry holds a base point and a fixed layer step (not a core point), and `0x8015EDB2`/`0x8015EDAE` are the cell's height and kind (not a column span).

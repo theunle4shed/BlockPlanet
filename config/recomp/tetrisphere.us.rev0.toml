@@ -48,6 +48,43 @@ func = "func_8009D90C"
 before_vram = 0x8009E20C
 text = "blockplanet_sphere_cell_end(rdram, ctx);"
 
+# Stage 1: the four quadrant passes, which walk the cells and draw the faces.
+[[patches.hook]]
+func = "func_8009E630"
+text = "if (blockplanet_sphere_quadrant_begin(rdram, ctx, 0)) return;"
+
+[[patches.hook]]
+func = "func_8009E630"
+before_vram = 0x8009EB20
+text = "blockplanet_sphere_quadrant_end(rdram, ctx, 0);"
+
+[[patches.hook]]
+func = "func_8009EB28"
+text = "if (blockplanet_sphere_quadrant_begin(rdram, ctx, 1)) return;"
+
+[[patches.hook]]
+func = "func_8009EB28"
+before_vram = 0x8009F01C
+text = "blockplanet_sphere_quadrant_end(rdram, ctx, 1);"
+
+[[patches.hook]]
+func = "func_8009F024"
+text = "if (blockplanet_sphere_quadrant_begin(rdram, ctx, 2)) return;"
+
+[[patches.hook]]
+func = "func_8009F024"
+before_vram = 0x8009F518
+text = "blockplanet_sphere_quadrant_end(rdram, ctx, 2);"
+
+[[patches.hook]]
+func = "func_8009F520"
+text = "if (blockplanet_sphere_quadrant_begin(rdram, ctx, 3)) return;"
+
+[[patches.hook]]
+func = "func_8009F520"
+before_vram = 0x8009FA18
+text = "blockplanet_sphere_quadrant_end(rdram, ctx, 3);"
+
 [[patches.hook]]
 func = "func_8006F894"
 before_vram = 0x8006F914

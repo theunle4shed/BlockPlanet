@@ -293,8 +293,11 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/game_options.h
     include/tetrisphere/sphere_mesh.h
     include/tetrisphere/sphere_cell.h
+    include/tetrisphere/sphere_quadrants.h
+    include/tetrisphere/guest_memory.h
     src/graphics/sphere_mesh.cpp
-        src/graphics/sphere_cell.cpp
+    src/graphics/sphere_cell.cpp
+    src/graphics/sphere_quadrants.cpp
     src/graphics/sphere_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
@@ -404,7 +407,8 @@ add_executable(tetrisphere_diag
     src/diagnostic/indirect_dispatch.cpp
     src/diagnostic/rescue_pause_snapshot_stub.cpp
     src/graphics/sphere_mesh.cpp
-        src/graphics/sphere_cell.cpp
+    src/graphics/sphere_cell.cpp
+    src/graphics/sphere_quadrants.cpp
     src/graphics/sphere_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
@@ -943,6 +947,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/rt64_context.cpp
         src/graphics/sphere_mesh.cpp
         src/graphics/sphere_cell.cpp
+        src/graphics/sphere_quadrants.cpp
         src/graphics/sphere_hooks.cpp
         src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp

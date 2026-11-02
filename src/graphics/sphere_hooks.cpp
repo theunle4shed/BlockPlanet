@@ -8,15 +8,30 @@
 // func_8009D90C (cell setup):
 //   start:    blockplanet_sphere_cell_begin — returns true to skip the original
 //   epilogue: blockplanet_sphere_cell_end — compares in verify mode
+// func_8009E630, func_8009EB28, func_8009F024, func_8009F520 (quadrants):
+//   start:    blockplanet_sphere_quadrant_begin
+//   epilogue: blockplanet_sphere_quadrant_end
 //
-// Verify mode runs BlockPlanet's version first on a private overlay of guest
-// memory, lets the original run, then checks every value BlockPlanet would
-// have written against what the original left in memory.
+// Verify mode, for passes that only touch memory (mesh, cell): BlockPlanet's
+// version runs first on a private overlay of guest memory, the original runs,
+// then every value BlockPlanet would have written is checked against what the
+// original left in memory.
+//
+// Verify mode, for passes that call other game functions (quadrants): a
+// snapshot of guest memory and registers is taken when the original starts.
+// When it is about to return, its results are saved, the starting state is
+// restored, BlockPlanet's version runs, and all of guest memory is compared
+// with the original's results (except the stack below the caller's frame,
+// which holds scratch data laid out differently). The original's results are
+// then put back, so the game continues exactly as it would have.
 
 #include "tetrisphere/recomp_support.h"
+#include "tetrisphere/guest_memory.h"
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_mesh.h"
+#include "tetrisphere/sphere_quadrants.h"
 
+#include <array>
 #include <atomic>
 #include <cstdio>
 #include <cstring>
@@ -25,37 +40,13 @@
 namespace {
 
 using namespace tetrisphere::sphere;
+using namespace tetrisphere::guest;
 
 constexpr std::uint32_t mesh_pointer = 0x800E44E4u;
 constexpr std::uint32_t base_grid = 0x800E3CD8u;
 constexpr std::uint32_t base_row_bytes = 0x6C;
 constexpr std::uint32_t active_context = 0x8013DD00u;
 constexpr std::uint32_t player_count = 0x8015D980u;
-
-// RDRAM is held as host-order 32-bit words: bytes at address ^ 3, halfwords at
-// address ^ 2.
-std::uint8_t* host(std::uint8_t* rdram, std::uint32_t address) { return rdram + (address & 0x00FFFFFFu); }
-const std::uint8_t* host(const std::uint8_t* rdram, std::uint32_t address) {
-    return rdram + (address & 0x00FFFFFFu);
-}
-std::uint8_t load8(const std::uint8_t* rdram, std::uint32_t address) { return *host(rdram, address ^ 3u); }
-std::int16_t load16(const std::uint8_t* rdram, std::uint32_t address) {
-    std::int16_t v;
-    std::memcpy(&v, host(rdram, address ^ 2u), 2);
-    return v;
-}
-std::uint32_t load32(const std::uint8_t* rdram, std::uint32_t address) {
-    std::uint32_t v;
-    std::memcpy(&v, host(rdram, address), 4);
-    return v;
-}
-void store8(std::uint8_t* rdram, std::uint32_t address, std::uint8_t v) { *host(rdram, address ^ 3u) = v; }
-void store16(std::uint8_t* rdram, std::uint32_t address, std::int16_t v) {
-    std::memcpy(host(rdram, address ^ 2u), &v, 2);
-}
-void store32(std::uint8_t* rdram, std::uint32_t address, std::uint32_t v) {
-    std::memcpy(host(rdram, address), &v, 4);
-}
 
 // Guest memory read and written in place (replace mode).
 class DirectMemory final : public GuestMemory {
@@ -156,13 +147,17 @@ std::size_t count_differences(const std::uint8_t* rdram, const OverlayMemory& ov
 class VerifyLog {
 public:
     VerifyLog(const char* event, const char* unit) : event_(event), unit_(unit) {}
-    void report(std::size_t differing) {
+    // `outside_total`, when given, is the running count of differences
+    // attributed to other threads (snapshot checks only).
+    void report(std::size_t differing, long long outside_total = -1) {
         const auto n = ++calls_;
         if (differing != 0) ++mismatched_calls_;
         if (differing == 0 && (n & (n - 1)) != 0) return;
-        std::fprintf(stdout, "{\"event\":\"%s\",\"calls\":%llu,\"mismatched_calls\":%llu,\"differing_%s\":%zu}\n",
+        std::fprintf(stdout, "{\"event\":\"%s\",\"calls\":%llu,\"mismatched_calls\":%llu,\"differing_%s\":%zu",
                      event_, static_cast<unsigned long long>(n),
                      static_cast<unsigned long long>(mismatched_calls_.load()), unit_, differing);
+        if (outside_total >= 0) std::fprintf(stdout, ",\"outside_bytes_total\":%lld", outside_total);
+        std::fprintf(stdout, "}\n");
         std::fflush(stdout);
     }
 
@@ -171,6 +166,113 @@ private:
     const char* unit_;
     std::atomic<std::uint64_t> calls_{0};
     std::atomic<std::uint64_t> mismatched_calls_{0};
+};
+
+// Snapshot check for passes that call other game functions (see the top).
+class SnapshotCheck {
+public:
+    explicit SnapshotCheck(const char* event) : log_(event, "bytes"), event_(event) {}
+
+    // Checking every call would copy 8 MB several times per pass; one call
+    // in `interval` is checked.
+    void begin(const std::uint8_t* rdram, const recomp_context* ctx) {
+        active_ = (calls_++ % interval) == 0;
+        if (!active_) return;
+        entry_.assign(rdram, rdram + rdram_bytes);
+        entry_ctx_ = *ctx;
+    }
+
+    template <typename Port>
+    void end(std::uint8_t* rdram, recomp_context* ctx, Port&& port) {
+        if (!active_) return;
+        active_ = false;
+        original_.assign(rdram, rdram + rdram_bytes);
+        const recomp_context original_ctx = *ctx;
+
+        std::memcpy(rdram, entry_.data(), rdram_bytes);
+        *ctx = entry_ctx_;
+        port(rdram, ctx);
+
+        const std::uint32_t stack_top = static_cast<std::uint32_t>(entry_ctx_.r29) & 0x00FFFFFFu;
+        const std::uint32_t stack_bottom = stack_top > stack_scratch ? stack_top - stack_scratch : 0;
+        // Other host threads (the audio task, RT64's framebuffer copies) can
+        // write guest memory while a check runs. Differences in pages the
+        // pass has never written in a clean check are counted separately as
+        // "outside" and do not fail the check.
+        std::size_t differing = 0;
+        std::size_t outside = 0;
+        int detailed = 0;
+        for (std::uint32_t offset = 0; offset < rdram_bytes; ++offset) {
+            if (rdram[offset] == original_[offset]) continue;
+            if (offset >= stack_bottom && offset < stack_top) continue;
+            if (!pass_pages_[offset / page_bytes]) {
+                ++outside;
+                continue;
+            }
+            if (differing++ == 0) detail_ = detailed_checks_++ < 3;
+            if (detail_ && detailed++ < 40) {
+                std::fprintf(stdout,
+                             "{\"event\":\"%s_detail\",\"address\":\"0x%08X\",\"blockplanet\":%u,"
+                             "\"original\":%u,\"stack\":\"0x%08X\"}\n",
+                             event_, 0x80000000u | (offset ^ 3u), rdram[offset], original_[offset],
+                             static_cast<std::uint32_t>(entry_ctx_.r29));
+            }
+        }
+        outside_bytes_ += outside;
+        if (differing == 0 && outside == 0) {
+            for (std::uint32_t offset = 0; offset < rdram_bytes; ++offset) {
+                if (original_[offset] != entry_[offset]) pass_pages_[offset / page_bytes] = true;
+            }
+        }
+        if (differing == 0 && outside == 0 && !ranges_logged_) {
+            ranges_logged_ = true;
+            log_written_ranges();
+        }
+        std::memcpy(rdram, original_.data(), rdram_bytes);
+        *ctx = original_ctx;
+        log_.report(differing, static_cast<long long>(outside_bytes_));
+    }
+
+private:
+    // Logs where the original wrote (ranges merged across gaps under 256 bytes).
+    void log_written_ranges() const {
+        std::uint32_t first = 0, last = 0;
+        bool open = false;
+        auto flush = [&] {
+            std::fprintf(stdout, "{\"event\":\"%s_writes\",\"from\":\"0x%08X\",\"to\":\"0x%08X\"}\n", event_,
+                         0x80000000u | first, 0x80000000u | last);
+        };
+        for (std::uint32_t offset = 0; offset < rdram_bytes; ++offset) {
+            if (original_[offset] == entry_[offset]) continue;
+            if (open && offset - last < 256) {
+                last = offset;
+                continue;
+            }
+            if (open) flush();
+            first = last = offset;
+            open = true;
+        }
+        if (open) flush();
+        std::fflush(stdout);
+    }
+
+    static constexpr std::uint32_t rdram_bytes = 8u * 1024u * 1024u;
+    static constexpr std::uint32_t stack_scratch = 0x10000u;
+    static constexpr std::uint64_t interval = 8;
+    static constexpr std::uint32_t page_bytes = 4096;
+
+    VerifyLog log_;
+    const char* event_;
+    std::vector<std::uint8_t> entry_;
+    std::vector<std::uint8_t> original_;
+    recomp_context entry_ctx_{};
+    std::uint64_t calls_ = 0;
+    bool active_ = false;
+    bool detail_ = false;
+    bool ranges_logged_ = false;
+    std::vector<bool> pass_pages_ = std::vector<bool>(rdram_bytes / page_bytes, false);
+    std::uint64_t outside_bytes_ = 0;
+    int detailed_checks_ = 0;
 };
 
 // ---- mesh table builder -------------------------------------------------
@@ -218,6 +320,13 @@ VerifyLog mesh_log{"sphere_mesh_verify", "entries"};
 
 OverlayMemory* cell_overlay = nullptr;
 VerifyLog cell_log{"sphere_cell_verify", "values"};
+
+// ---- quadrant passes ----------------------------------------------------
+
+std::array<SnapshotCheck, 4> quadrant_checks{SnapshotCheck{"sphere_quadrant0_verify"},
+                                             SnapshotCheck{"sphere_quadrant1_verify"},
+                                             SnapshotCheck{"sphere_quadrant2_verify"},
+                                             SnapshotCheck{"sphere_quadrant3_verify"}};
 
 } // namespace
 
@@ -274,4 +383,21 @@ extern "C" void blockplanet_sphere_cell_end(std::uint8_t* rdram, recomp_context*
     (void)ctx;
     if (mode() != Mode::Verify || cell_overlay == nullptr) return;
     cell_log.report(count_differences(rdram, *cell_overlay, "sphere_cell_verify"));
+}
+
+extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
+    const Mode m = mode();
+    if (m == Mode::Original) return false;
+    if (m == Mode::Verify) {
+        quadrant_checks[static_cast<std::size_t>(quadrant)].begin(rdram, ctx);
+        return false;
+    }
+    draw_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant));
+    return true;
+}
+
+extern "C" void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
+    if (mode() != Mode::Verify) return;
+    quadrant_checks[static_cast<std::size_t>(quadrant)].end(
+        rdram, ctx, [quadrant](std::uint8_t* r, recomp_context* c) { draw_quadrant(r, c, static_cast<Quadrant>(quadrant)); });
 }
