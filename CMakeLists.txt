@@ -296,12 +296,14 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/sphere_quadrants.h
     include/tetrisphere/sphere_faces.h
     include/tetrisphere/sphere_grid.h
+    include/tetrisphere/sphere_extended.h
     include/tetrisphere/guest_memory.h
     src/graphics/sphere_mesh.cpp
     src/graphics/sphere_cell.cpp
     src/graphics/sphere_quadrants.cpp
     src/graphics/sphere_faces.cpp
     src/graphics/sphere_grid.cpp
+    src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
@@ -415,6 +417,7 @@ add_executable(tetrisphere_diag
     src/graphics/sphere_quadrants.cpp
     src/graphics/sphere_faces.cpp
     src/graphics/sphere_grid.cpp
+    src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
@@ -547,7 +550,8 @@ else()
 endif()
 add_test(NAME sphere_mesh COMMAND sphere_mesh_test)
 
-add_executable(sphere_cell_test tests/sphere_cell_test.cpp src/graphics/sphere_cell.cpp)
+add_executable(sphere_cell_test tests/sphere_cell_test.cpp src/graphics/sphere_cell.cpp
+    src/graphics/sphere_extended.cpp src/graphics/sphere_mesh.cpp src/graphics/sphere_grid.cpp)
 target_include_directories(sphere_cell_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)
     target_compile_options(sphere_cell_test PRIVATE /UNDEBUG)
@@ -974,9 +978,13 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/sphere_quadrants.cpp
         src/graphics/sphere_faces.cpp
         src/graphics/sphere_grid.cpp
+        src/graphics/sphere_extended.cpp
+    src/graphics/sphere_extended.cpp
     src/graphics/sphere_grid.cpp
+    src/graphics/sphere_extended.cpp
     src/graphics/sphere_faces.cpp
     src/graphics/sphere_grid.cpp
+    src/graphics/sphere_extended.cpp
         src/graphics/sphere_hooks.cpp
         src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp

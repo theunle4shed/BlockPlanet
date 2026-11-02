@@ -32,6 +32,7 @@
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/sphere_cell.h"
+#include "tetrisphere/sphere_extended.h"
 #include "tetrisphere/sphere_faces.h"
 #include "tetrisphere/sphere_grid.h"
 #include "tetrisphere/sphere_mesh.h"
@@ -427,9 +428,77 @@ std::array<SnapshotCheck, 4> quadrant_checks{SnapshotCheck{"sphere_quadrant0_ver
                                              SnapshotCheck{"sphere_quadrant2_verify"},
                                              SnapshotCheck{"sphere_quadrant3_verify"}};
 
+// ---- extended patch (BLOCKPLANET_SPHERE_RING, replace mode) --------------
+
+// Extra cells on every side of the game's patch, 0 to 4.
+int extended_ring() {
+    static const int ring = [] {
+        const char* value = std::getenv("BLOCKPLANET_SPHERE_RING");
+        const int n = value != nullptr ? std::atoi(value) : 0;
+        return n < 0 ? 0 : (n > 4 ? 4 : n);
+    }();
+    return mode() == Mode::Replace ? ring : 0;
+}
+
+ExtendedSphere extended_sphere;
+bool extended_ready = false;  // built this frame, single player
+
+bool extended_test() {
+    static const bool on = std::getenv("BLOCKPLANET_SPHERE_EXTENDED_TEST") != nullptr;
+    return on;
+}
+
+// The game's base grid table, read from guest memory.
+BaseTable base_table(const std::uint8_t* rdram) {
+    return [rdram](int row, int column) {
+        const std::uint32_t a =
+            base_grid + static_cast<std::uint32_t>(row) * base_row_bytes + static_cast<std::uint32_t>(column) * 6u;
+        return std::array<std::int16_t, 3>{load16(rdram, a), load16(rdram, a + 2), load16(rdram, a + 4)};
+    };
+}
+
+// The extended patch's vertices live above 4 MB, which the game never uses:
+// one buffer per game frame buffer, 2 MB each (131,072 vertices).
+constexpr std::array<std::uint32_t, 2> extended_vertex_buffers{0x80400000u, 0x80600000u};
+constexpr std::uint32_t vertex_pool_frame_start = 0x8013DCFCu;
+constexpr std::uint32_t face_vertex_pointer = 0x8015F848u;
+constexpr std::uint32_t face_batch_count = 0x8015F84Eu;
+constexpr std::uint32_t face_vertex_total = 0x800E44F0u;
+constexpr std::int16_t full_batch = 16;  // makes the next face load a fresh batch
+std::uint32_t game_vertex_pointer = 0;
+
+void begin_extended_vertices(std::uint8_t* rdram) {
+    static std::uint32_t first_pool = 0;
+    const std::uint32_t pool = load32(rdram, vertex_pool_frame_start);
+    if (first_pool == 0) first_pool = pool;
+    game_vertex_pointer = load32(rdram, face_vertex_pointer);
+    store32(rdram, face_vertex_pointer, extended_vertex_buffers[pool == first_pool ? 0 : 1]);
+    store16(rdram, face_batch_count, full_batch);
+}
+
+void end_extended_vertices(std::uint8_t* rdram) {
+    // Later passes continue in the game's pool, from where it was, and the
+    // pool is only moved on by their vertices.
+    store32(rdram, face_vertex_pointer, game_vertex_pointer);
+    store16(rdram, face_batch_count, full_batch);
+    store32(rdram, face_vertex_total, 0);
+}
+
 } // namespace
 
 extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_context* ctx) {
+    extended_ready = false;
+    if (const int ring = extended_ring(); ring > 0 && load16(rdram, player_count) < 2) {
+        static const ExtendedBaseGrid grid(base_table(rdram), ring);
+        extended_sphere.build(ring, gather(rdram, ctx, false), grid);
+        extended_ready = true;
+    }
+    // BLOCKPLANET_SPHERE_EXTENDED_TEST=1 in verify mode checks the extended
+    // path with no extra cells against the game's quadrant passes.
+    if (extended_test() && mode() == Mode::Verify) {
+        static const ExtendedBaseGrid exact_grid(base_table(rdram), 0, true);
+        extended_sphere.build(0, gather(rdram, ctx, false), exact_grid);
+    }
     const Mode m = mode_for("mesh");
     if (m == Mode::Original) return false;
     if (m == Mode::Verify) {
@@ -632,6 +701,15 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
         quadrant_checks[static_cast<std::size_t>(quadrant)].begin(rdram, ctx, quadrant_schedule.next());
         return false;
     }
+    if (extended_ready) {
+        if (quadrant == 0) begin_extended_vertices(rdram);
+        draw_extended_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant), extended_sphere);
+        if (quadrant == 3) {
+            stats_sphere_end(rdram);
+            end_extended_vertices(rdram);
+        }
+        return true;
+    }
     draw_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant));
     if (quadrant == 3) stats_sphere_end(rdram);  // the end hook does not run when replaced
     return true;
@@ -647,6 +725,7 @@ extern "C" void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_cont
     // (for example because of other host threads).
     static const bool self_test = std::getenv("BLOCKPLANET_SPHERE_SELFTEST") != nullptr;
     quadrant_checks[static_cast<std::size_t>(quadrant)].end(rdram, [quadrant](std::uint8_t* r, recomp_context* c) {
+        if (extended_test()) return draw_extended_quadrant(r, c, static_cast<Quadrant>(quadrant), extended_sphere);
         if (!self_test) return draw_quadrant(r, c, static_cast<Quadrant>(quadrant));
         static constexpr void (*originals[4])(std::uint8_t*, recomp_context*) = {
             func_8009E630, func_8009EB28, func_8009F024, func_8009F520};

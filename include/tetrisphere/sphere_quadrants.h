@@ -23,4 +23,10 @@ enum class Quadrant { RowsUpColumnsUp, RowsDownColumnsUp, RowsUpColumnsDown, Row
 // functions in the same order.
 void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant);
 
+class ExtendedSphere;
+// The same for the extended patch: cells from -ring to 14 + ring, set up from
+// `sphere` instead of the game's tables (see sphere_extended.h).
+void draw_extended_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant,
+                            const ExtendedSphere& sphere);
+
 } // namespace tetrisphere::sphere

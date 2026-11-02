@@ -1,6 +1,7 @@
 #include "tetrisphere/sphere_quadrants.h"
 
 #include "tetrisphere/guest_memory.h"
+#include "tetrisphere/sphere_extended.h"
 
 #include <array>
 
@@ -81,9 +82,10 @@ constexpr std::array<QuadrantShape, 4> shapes{{
     {true, true, 0x1F15u, {0x04, func_8009CA98}, {0x01, func_8009D1D4}},
 }};
 
-// Rows and columns run 0..7 upwards or 14..8 downwards; the patch is 15 cells
-// across, between 16 mesh points.
-constexpr std::int16_t start(bool down) { return down ? 14 : 0; }
+// Rows and columns run upwards to 7 or downwards to 8; the game's patch
+// starts at 0 or 14 (15 cells across, between 16 mesh points), an extended
+// patch `ring` cells further out.
+constexpr std::int16_t start(bool down, int ring) { return static_cast<std::int16_t>(down ? 14 + ring : -ring); }
 constexpr bool in_range(std::int16_t v, bool down) { return down ? v >= 8 : v < 8; }
 
 void advance(std::uint8_t* rdram, std::uint32_t address, bool down) {
@@ -125,7 +127,12 @@ void draw_block(std::uint8_t* rdram, recomp_context* ctx, const QuadrantShape& s
 
 } // namespace
 
-void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant) {
+namespace {
+
+// The quadrant loop, with the cell setup and the patch size as parameters.
+template <typename PrepareCell, typename Room>
+void walk_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant, int ring, PrepareCell&& prepare_cell,
+                   Room&& room_left) {
     const QuadrantShape& shape = shapes[static_cast<std::size_t>(quadrant)];
     // Reserve the original's stack frame, so the functions called below put
     // their own frames (and the argument save area above them) where they
@@ -134,12 +141,13 @@ void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant) 
     ctx->r29 = static_cast<std::int32_t>(ctx->r29) - original_frame_bytes;
     // The loop counters live in guest memory and are read back after every
     // call, as the original does.
-    for (store16(rdram, cell_row, start(shape.rows_down)); in_range(load16(rdram, cell_row), shape.rows_down);
+    for (store16(rdram, cell_row, start(shape.rows_down, ring)); in_range(load16(rdram, cell_row), shape.rows_down);
          advance(rdram, cell_row, shape.rows_down)) {
-        for (store16(rdram, cell_column, start(shape.columns_down));
+        for (store16(rdram, cell_column, start(shape.columns_down, ring));
              in_range(load16(rdram, cell_column), shape.columns_down);
              advance(rdram, cell_column, shape.columns_down)) {
-            func_8009D90C(rdram, ctx);
+            if (!room_left()) continue;
+            prepare_cell();
             for (store16(rdram, cell_layer, load16(rdram, first_layer));
                  load16(rdram, cell_layer) < load16(rdram, end_layer); advance(rdram, cell_layer, false)) {
                 lift_one_layer(rdram);
@@ -148,6 +156,41 @@ void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant) 
         }
     }
     ctx->r29 = static_cast<std::int32_t>(ctx->r29) + original_frame_bytes;
+}
+
+// Guest memory read and written in place.
+class LiveMemory final : public GuestMemory {
+public:
+    explicit LiveMemory(std::uint8_t* rdram) : rdram_(rdram) {}
+    std::uint8_t read8(std::uint32_t a) const override { return load8(rdram_, a); }
+    std::int16_t read16(std::uint32_t a) const override { return load16(rdram_, a); }
+    std::uint32_t read32(std::uint32_t a) const override { return load32(rdram_, a); }
+    void write8(std::uint32_t a, std::uint8_t v) override { store8(rdram_, a, v); }
+    void write16(std::uint32_t a, std::int16_t v) override { store16(rdram_, a, v); }
+    void write32(std::uint32_t a, std::uint32_t v) override { store32(rdram_, a, v); }
+
+private:
+    std::uint8_t* rdram_;
+};
+
+} // namespace
+
+void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant) {
+    walk_quadrant(rdram, ctx, quadrant, 0, [&] { func_8009D90C(rdram, ctx); }, [] { return true; });
+}
+
+void draw_extended_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant,
+                            const ExtendedSphere& sphere) {
+    LiveMemory memory(rdram);
+    // The extended patch shares the game's display list (112 KB per frame,
+    // about 38 KB used); stop adding cells well before it could fill.
+    constexpr std::uint32_t display_list_start = 0x800F22B8u;
+    constexpr std::uint32_t display_list_current = 0x800F22B4u;
+    constexpr std::uint32_t display_list_budget = 0x18000u;
+    walk_quadrant(
+        rdram, ctx, quadrant, sphere.ring(),
+        [&] { prepare_extended_cell(memory, sphere, load16(rdram, cell_row), load16(rdram, cell_column)); },
+        [&] { return load32(rdram, display_list_current) - load32(rdram, display_list_start) < display_list_budget; });
 }
 
 } // namespace tetrisphere::sphere

@@ -50,6 +50,10 @@ On the software renderer used for development, chapter 20 cost about a third mor
 
 `BLOCKPLANET_SPHERE_STATS=1` adds a `sphere_usage` line every 300 frames: the most display list and vertex space the sphere used in one frame, the same for the whole frame, and the buffer address ranges seen (`sphere_usage_buffers` lists the distinct buffer starts). Use it when testing larger sphere patches; the game's vertex pool holds 56 KB per frame.
 
+## Trying the extended sphere
+
+`BLOCKPLANET_SPHERE=replace BLOCKPLANET_SPHERE_RING=2` draws two extra cells on every side of the sphere patch (19 × 19 instead of 15 × 15), to stop blocks going missing at the edge of the view. Values 1 to 4 are accepted. It is a test setting for now; compare the frame time with `--perf-log` against the same stage without it.
+
 ## A useful test run
 
 1. Pick one scene that feels slow, for example a busy Rescue level or VS mode, and one quiet scene, such as the main menu.

@@ -43,8 +43,9 @@ bool base_table_value_clamped(const std::array<std::int16_t, 3>& value);
 
 class ExtendedBaseGrid {
 public:
-    // `ring` extra points on every side of the table.
-    ExtendedBaseGrid(BaseTable table, int ring, GridGeometry geometry = {});
+    // `ring` extra points on every side of the table. With `keep_clamped`,
+    // clamped table values are used as they are (to compare with the game).
+    ExtendedBaseGrid(BaseTable table, int ring, bool keep_clamped = false, GridGeometry geometry = {});
 
     // Row in [-ring, 16 + ring], column in [-ring, 17 + ring].
     std::array<std::int32_t, 3> point(int row, int column) const;
@@ -53,6 +54,7 @@ public:
 private:
     BaseTable table_;
     int ring_;
+    bool keep_clamped_;
     GridGeometry geometry_;
 };
 

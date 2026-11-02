@@ -138,6 +138,17 @@ Runs just before the quadrant passes and fills the shading tables the cell setup
 
 It uses the work area (`0x8015F7CC` and nearby, `0x8015F842`) as scratch and `func_800D5100` for the square root.
 
+### Extended patch (stage 2, step 3)
+
+`BLOCKPLANET_SPHERE=replace BLOCKPLANET_SPHERE_RING=n` (n = 1 to 4) draws n extra cells on every side of the game's 15 × 15 patch (ring 2 gives 19 × 19). Single-player only for now; two-player games keep the original patch.
+
+- Each frame, alongside the game's own mesh, `ExtendedSphere` (`include/tetrisphere/sphere_extended.h`) builds a (17 + 2n)² point mesh from the extended grid and the same normals as `func_800A2374`. It lives on the host; the game's 16 × 16 tables are left for its other passes.
+- `prepare_extended_cell` writes the same work-area values as the game's cell setup, and `draw_extended_quadrant` runs the quadrant loops from −n to 14 + n, still far to near. The game's face functions draw the cells unchanged.
+- Vertices go to BlockPlanet buffers above 4 MB (`0x80400000` and `0x80600000`, 2 MB each, one per game frame buffer). At the switch to and from them the vertex batch is forced full, so the next face loads a fresh batch and no triangle mixes buffers. Afterwards the game's vertex count is reset, so the game's pool is only moved on by the passes that follow. RT64 draws from these addresses.
+- Display list commands stay in the game's display list (the sphere's share grew from about 7.7 KB to 12.6 KB in chapter 15 with ring 2); the loops stop adding cells if the frame's display list passes 96 KB of its 112 KB.
+- Checked: with `BLOCKPLANET_SPHERE_EXTENDED_TEST=1` in verify mode, the extended path with no extra cells is compared with the game's quadrant passes. 128 checks in chapter 15 showed zero differing bytes, so the extended mesh, normals and cell setup match the game exactly. With ring 2 the sphere draws correctly in chapter 15. Whether it removes the edge artifacts the owner saw needs a playtest: dig deep near the edge of the view and turn the sphere.
+- Known difference: the game's normal for the far row edge of row 14 reads an unrelated value (`0x8015EE1A`, the next table entry does not exist); the extended patch computes it. The quadrant passes never draw a face that uses it, so the original patch is unaffected.
+
 ### Buffer budget (stage 2, step 1)
 
 Measured on 2026-11-02 with `BLOCKPLANET_SPHERE_STATS=1` (chapter 15, Linux test setup):

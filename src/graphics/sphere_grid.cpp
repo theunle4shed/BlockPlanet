@@ -27,14 +27,14 @@ bool base_table_value_clamped(const std::array<std::int16_t, 3>& value) {
     return false;
 }
 
-ExtendedBaseGrid::ExtendedBaseGrid(BaseTable table, int ring, GridGeometry geometry)
-    : table_(std::move(table)), ring_(ring), geometry_(geometry) {}
+ExtendedBaseGrid::ExtendedBaseGrid(BaseTable table, int ring, bool keep_clamped, GridGeometry geometry)
+    : table_(std::move(table)), ring_(ring), keep_clamped_(keep_clamped), geometry_(geometry) {}
 
 std::array<std::int32_t, 3> ExtendedBaseGrid::point(int row, int column) const {
     const bool in_table = row >= 0 && row < base_table_rows && column >= 0 && column < base_table_columns;
     if (in_table) {
         const auto value = table_(row, column);
-        if (!base_table_value_clamped(value)) return {value[0], value[1], value[2]};
+        if (keep_clamped_ || !base_table_value_clamped(value)) return {value[0], value[1], value[2]};
     }
     const auto p = grid_formula_point(row, column, geometry_);
     return {static_cast<std::int32_t>(std::lround(p[0])), static_cast<std::int32_t>(std::lround(p[1])),
