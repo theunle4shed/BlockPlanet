@@ -52,7 +52,15 @@ struct OpenRequest {
     std::string screen;
 };
 struct CloseRequest {};
-using Request = std::variant<OpenRequest, CloseRequest, Action>;
+struct SettingRequest {
+    std::string name;
+    std::string value;
+};
+struct ListRequest {
+    std::string name;
+    std::vector<ListItem> items;
+};
+using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest>;
 std::mutex requests_mutex;
 std::deque<Request> requests;
 std::deque<std::string> commands;
@@ -92,6 +100,10 @@ void apply_requests() {
                 std::fprintf(stderr, "{\"event\":\"ui_screen_missing\",\"screen\":\"%s\"}\n", open->screen.c_str());
         } else if (std::holds_alternative<CloseRequest>(request)) {
             navigator->close();
+        } else if (auto* setting = std::get_if<SettingRequest>(&request)) {
+            navigator->set_setting(setting->name, setting->value);
+        } else if (auto* list = std::get_if<ListRequest>(&request)) {
+            navigator->set_list(list->name, std::move(list->items));
         } else {
             navigator->handle(std::get<Action>(request));
         }
@@ -113,7 +125,9 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
     if (!started) {
         // Start RmlUi only once a menu is wanted.
         std::lock_guard lock(requests_mutex);
-        if (requests.empty()) return;
+        if (std::none_of(requests.begin(), requests.end(),
+                         [](const Request& r) { return std::holds_alternative<OpenRequest>(r); }))
+            return;
     }
     const std::uint32_t width = framebuffer->getWidth();
     const std::uint32_t height = framebuffer->getHeight();
@@ -169,6 +183,16 @@ void request_close() {
 void queue_action(Action action) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(action);
+}
+
+void set_setting(const std::string& name, const std::string& value) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(SettingRequest{name, value});
+}
+
+void set_list(const std::string& name, std::vector<ListItem> items) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(ListRequest{name, std::move(items)});
 }
 
 bool menus_open() { return open_flag.load(); }

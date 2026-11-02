@@ -38,6 +38,10 @@ void GameOptionApplier::apply(std::uint8_t* rdram) {
         if (playing) start_chapter_done_ = true;
         else set16(rdram, game_state::chapter, static_cast<std::int16_t>(*options_.start_chapter - 1));
     }
+    if (chosen_chapter_) {
+        if (playing) chosen_chapter_.reset();
+        else set16(rdram, game_state::chapter, static_cast<std::int16_t>(*chosen_chapter_ - 1));
+    }
 
     if (!options_.casual || !playing || state.mode == game_state::mode_vs_cpu) return;
     const auto context = game_state::p1_context;

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace blockplanet::ui {
 
@@ -23,6 +24,11 @@ void request_open(const std::string& screen);
 void request_close();
 // Navigation input, applied at the next frame.
 void queue_action(Action action);
+
+// Current values for setting rows (data-setting), and the contents of lists
+// (data-list). Applied at the next frame.
+void set_setting(const std::string& name, const std::string& value);
+void set_list(const std::string& name, std::vector<ListItem> items);
 
 // True while a menu screen is open (or about to open).
 bool menus_open();

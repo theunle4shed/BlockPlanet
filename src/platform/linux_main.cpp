@@ -52,6 +52,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <cstring>
 #include <mutex>
 #include <memory>
@@ -303,6 +304,10 @@ std::atomic<bool> menus_block_game{false};
 std::atomic<std::uint32_t> launcher_buttons{0};
 ModeLauncher mode_launcher;
 
+// Settings changed in BlockPlanet's menus, applied like the PC settings menu.
+std::deque<PCSettingsRequest> menu_settings_requests;
+
+
 bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (port < 0 || port >= 2) return false;
     if (const auto injected = launcher_buttons.load(); injected & 0x10000u) {
@@ -457,6 +462,8 @@ void show_error(const char* message) {
 
 } // namespace
 
+void publish_menu_settings(const Settings& settings);
+
 extern "C" void tetrisphere_rt64_clear_keyboard_input() {
     SDL_Event focus_lost{};
     focus_lost.type = SDL_WINDOWEVENT;
@@ -582,6 +589,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     }
     persisted_settings=active_settings;
     initialize_pc_settings(persisted_settings);
+    publish_menu_settings(persisted_settings);
     if (run_options.fullscreen) {
         active_settings.graphics.window_mode = *run_options.fullscreen
             ? GraphicsWindowMode::Fullscreen : GraphicsWindowMode::Windowed;
@@ -741,6 +749,67 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 #endif
 }
 
+// Current values for the menus' setting rows (assets/ui/screens/options.rml).
+void publish_menu_settings(const Settings& settings) {
+    blockplanet::ui::set_setting("sphere", graphics_sphere_name(settings.graphics.sphere));
+    blockplanet::ui::set_setting("window",
+        settings.graphics.window_mode == GraphicsWindowMode::Fullscreen ? "fullscreen" : "windowed");
+    blockplanet::ui::set_setting("texture_filter", graphics_texture_filter_name(settings.graphics.three_point_filter));
+    blockplanet::ui::set_setting("presentation_filter",
+                                 graphics_presentation_filter_name(settings.graphics.presentation_filter));
+}
+
+// "setting:NAME=VALUE" from the menus, as a settings change (field numbers
+// as in the PC settings menu). False if the command is not a known setting.
+bool queue_menu_setting(const std::string& command) {
+    const auto equals = command.find('=');
+    if (command.rfind("setting:", 0) != 0 || equals == std::string::npos) return false;
+    const auto name = command.substr(8, equals - 8);
+    const auto value = command.substr(equals + 1);
+    Settings requested = persisted_settings;
+    int field = -1;
+    if (name == "sphere" && parse_graphics_sphere(value, requested.graphics.sphere)) field = 7;
+    else if (name == "window" && (value == "fullscreen" || value == "windowed")) {
+        requested.graphics.window_mode =
+            value == "fullscreen" ? GraphicsWindowMode::Fullscreen : GraphicsWindowMode::Windowed;
+        field = 3;
+    } else if (name == "texture_filter" && parse_graphics_texture_filter(value, requested.graphics.three_point_filter))
+        field = 6;
+    else if (name == "presentation_filter" &&
+             parse_graphics_presentation_filter(value, requested.graphics.presentation_filter))
+        field = 5;
+    if (field < 0) return false;
+    menu_settings_requests.push_back({requested, field});
+    return true;
+}
+
+// The Story chapter select: the chapters this profile has completed, and the
+// next one. Empty when there is nothing to choose (a guest, or no chapter
+// completed yet), in which case Story starts Rescue directly.
+constexpr int rescue_chapters = 15;
+std::vector<blockplanet::ui::ListItem> chapter_choices() {
+    std::vector<blockplanet::ui::ListItem> items;
+    if (!profile_save) return items;
+    const auto found = profile_data.progress.chapters_completed.find("rescue");
+    if (found == profile_data.progress.chapters_completed.end() || found->second.empty()) return items;
+    const int last = std::min(*found->second.rbegin() + 1, rescue_chapters);
+    for (int chapter = 1; chapter <= last; ++chapter) {
+        const bool completed = found->second.count(chapter) != 0;
+        items.push_back({"chapter" + std::to_string(chapter), "Chapter " + std::to_string(chapter),
+                         completed ? "completed" : "next", "command:chapter:" + std::to_string(chapter), true});
+    }
+    return items;
+}
+
+void launch_mode(LaunchMode mode) {
+    if (guest_rdram == nullptr) return;
+    const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
+    if (accepted) blockplanet::ui::request_close();
+    std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
+                 launch_mode_name(mode), accepted ? "started" : "refused");
+    std::fflush(stdout);
+}
+
 [[noreturn]] void close_game() {
     save_trophies();
     save_profile();
@@ -790,6 +859,10 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             auto request=take_pc_settings_change();
             if(!request) {
                 if(auto controls=take_controls_apply())request=PCSettingsRequest{*controls,13};
+            }
+            if(!request && !menu_settings_requests.empty()) {
+                request=menu_settings_requests.front();
+                menu_settings_requests.pop_front();
             }
             if(!request)break;
             const auto merged=merge_pc_settings_change(persisted_settings,request->settings,request->field);
@@ -848,6 +921,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             if(request->field==13) {
                 complete_controls_apply(true);
             }
+            publish_menu_settings(persisted_settings);
             std::fprintf(stdout, "{\"event\":\"pc_options_saved\",\"window_applied\":%s}\n",
                          window_applied ? "true" : "false");
             std::fflush(stdout);
@@ -956,13 +1030,23 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             std::fprintf(stdout, "{\"event\":\"ui_command\",\"command\":\"%s\"}\n", command->c_str());
             std::fflush(stdout);
             if (*command == "exit") close_game();
-            if (const auto mode = launch_mode_for_command(*command); mode && guest_rdram != nullptr) {
-                const bool accepted = mode_launcher.request(*mode, guest_rdram, std::chrono::steady_clock::now());
-                if (accepted) blockplanet::ui::request_close();
-                std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
-                             launch_mode_name(*mode), accepted ? "started" : "refused");
-                std::fflush(stdout);
+            if (queue_menu_setting(*command)) continue;
+            if (*command == "story") {
+                if (auto chapters = chapter_choices(); !chapters.empty()) {
+                    blockplanet::ui::set_list("chapters", std::move(chapters));
+                    blockplanet::ui::request_open("chapters");
+                    continue;
+                }
             }
+            if (command->rfind("chapter:", 0) == 0) {
+                const int chapter = std::atoi(command->c_str() + 8);
+                if (chapter >= 1 && chapter <= rescue_chapters && game_option_applier) {
+                    game_option_applier->choose_chapter(chapter);
+                    launch_mode(LaunchMode::Rescue);
+                }
+                continue;
+            }
+            if (const auto mode = launch_mode_for_command(*command)) launch_mode(*mode);
         }
         if (mode_launcher.active() && guest_rdram != nullptr) {
             std::uint16_t press = 0;

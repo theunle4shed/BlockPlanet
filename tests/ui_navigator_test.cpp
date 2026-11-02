@@ -45,6 +45,11 @@ int main(int argc, char** argv) {
            "<div class='item disabled' id='skipped' data-action='command:never'/>"
            "<div class='item' id='quit' data-action='command:exit'/>"
            "<div class='item' id='close' data-action='close'/>");
+    screen(dir, "options",
+           "<div class='item value' id='sphere' data-setting='sphere' data-options='extended:Extended,original:Original'>"
+           "Sphere<span class='value'/></div>"
+           "<div class='list' data-list='chapters'/>"
+           "<div class='item' id='back' data-action='back'/>");
     screen(dir, "solo",
            "<div><div class='item' id='story' data-action='command:story'/></div>"
            "<div class='item' id='back' data-action='back'/>");
@@ -90,6 +95,35 @@ int main(int argc, char** argv) {
         nav.handle(Action::Up);
         nav.handle(Action::Confirm);
         assert(!nav.is_open());
+
+        // Setting rows show the current value and report changes.
+        nav.set_setting("sphere", "extended");
+        nav.set_list("chapters", {{"chapter1", "Chapter 1", "completed", "command:chapter:1", true},
+                                  {"chapter2", "Chapter 2", "", "command:chapter:2", false},
+                                  {"chapter3", "Chapter 3", "next", "command:chapter:3", true}});
+        assert(nav.open("options") && nav.focused_item() == "sphere");
+        auto shown = [&] {
+            Rml::ElementList values;
+            context->GetDocument(context->GetNumDocuments() - 1)->GetElementsByClassName(values, "value");
+            return values.empty() ? std::string() : values.back()->GetInnerRML();  // the row also has the class
+        };
+        assert(shown() == "Extended");
+        nav.handle(Action::Right);
+        assert(shown() == "Original" && nav.take_command() == std::optional<std::string>("setting:sphere=original"));
+        nav.handle(Action::Left);
+        assert(shown() == "Extended" && nav.take_command() == std::optional<std::string>("setting:sphere=extended"));
+        nav.handle(Action::Confirm);  // Confirm also changes a setting row
+        assert(nav.take_command() == std::optional<std::string>("setting:sphere=original"));
+        nav.set_setting("sphere", "extended");  // the game's value wins
+        assert(shown() == "Extended" && nav.focused_item() == "sphere");
+        // Filled-in lists: disabled entries are skipped.
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "chapter1");
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "chapter3");
+        nav.handle(Action::Confirm);
+        assert(nav.take_command() == std::optional<std::string>("chapter:3"));
+        nav.close();
     }
     Rml::Shutdown();
     std::filesystem::remove_all(dir);

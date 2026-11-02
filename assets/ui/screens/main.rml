@@ -11,7 +11,7 @@
         <div class="item" id="multiplayer" data-action="open:multiplayer">Multiplayer</div>
         <div class="item" id="media" data-action="command:media_player">Media Player<span class="note">coming later</span></div>
         <div class="item" id="trophies" data-action="command:trophies">Trophies<span class="note">coming later</span></div>
-        <div class="item" id="options" data-action="command:options">Options<span class="note">coming later</span></div>
+        <div class="item" id="options" data-action="open:options">Options</div>
         <div class="item" id="credits" data-action="command:credits">Credits<span class="note">coming later</span></div>
         <div class="item" id="exit" data-action="command:exit">Exit</div>
         <div class="hint">Placeholder screens. F1 closes the menu.</div>

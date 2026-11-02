@@ -68,3 +68,17 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     font-size: 24dp;
     color: #7f8bb0;
 }
+
+/* Setting rows: label on the left, value on the right. */
+.item.value .value {
+    float: right;
+    color: #ffd166;
+}
+.item.value.focused .value { color: #ffffff; }
+
+/* Long lists scroll inside the panel. */
+.list {
+    display: block;
+    max-height: 600dp;
+    overflow-y: auto;
+}

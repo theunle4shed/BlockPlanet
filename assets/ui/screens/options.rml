@@ -1,0 +1,21 @@
+<rml>
+<head>
+    <title>Options</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Options</div>
+        <div class="subtitle">Changes apply and save straight away</div>
+        <div class="item value" id="sphere" data-setting="sphere"
+             data-options="extended:Extended,original:Original">Sphere<span class="value"></span></div>
+        <div class="item value" id="window" data-setting="window"
+             data-options="windowed:Window,fullscreen:Full screen">Display<span class="value"></span></div>
+        <div class="item value" id="texture_filter" data-setting="texture_filter"
+             data-options="three-point:Three-point,linear:Linear">Textures<span class="value"></span></div>
+        <div class="item value" id="presentation_filter" data-setting="presentation_filter"
+             data-options="pixel:Pixel,linear:Smooth,nearest:Sharp">Scaling<span class="value"></span></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>

@@ -34,9 +34,14 @@ public:
     // True when an option changes the game in a way that should not award trophies.
     bool affects_awards() const { return options_.casual || options_.start_chapter.has_value(); }
 
+    // The player chose a chapter (1-based) in the chapter select: Rescue
+    // begins there. Written until play begins; does not affect trophies.
+    void choose_chapter(int chapter) { chosen_chapter_ = chapter; }
+
 private:
     GameOptions options_;
     bool start_chapter_done_ = false;
+    std::optional<int> chosen_chapter_;
 };
 
 } // namespace tetrisphere

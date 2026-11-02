@@ -32,6 +32,10 @@ A screen is an RML document in `ui/screens/<name>.rml` that links `../menu.rcss`
 | `close` | Closes the menus. |
 | `command:NAME` | Reports NAME to the game, which logs it as `ui_command`. `exit` closes the game; `story`, `time_trial`, `lines`, `puzzle`, `versus` (and `hide_and_seek`) start a mode (below); the others are not connected yet. |
 
+**Setting rows** have the classes `item value`, `data-setting="NAME"` and `data-options="value:Label,value:Label"`, and show the current value's label in a child with the class `value`. Left and Right (and Confirm) cycle the value and report `setting:NAME=VALUE`; the game applies and saves it through the same path as the PC settings menu, then sends the saved value back, so the row always shows what was saved. Current values come from `set_setting`.
+
+**Lists the game fills in:** an element with `data-list="NAME"` gets the items given to `set_list` when its screen opens (label, note, action; disabled entries are skipped).
+
 Screens get the class `entering` when opened and `returning` when shown again after going back, which `menu.rcss` uses for a quick slide (0.18 s).
 
 Input while menus are open:
@@ -56,14 +60,22 @@ Mode list rows (the player page's table at `0x800EDAE4`): 0 Rescue (mode 1), 1 H
 
 Requests are refused during play and inside other original pages such as Options, and give up after 15 seconds. The log shows `mode_launch` with `started`, `playing`, `refused` or `timed_out`. Checked from the title in the Linux test setup: Story (Rescue 1:1), Time Trial, Lines (its rules screen), Puzzle and Versus (VS CPU) all start.
 
+## Screens connected to the game
+
+| Screen | What it does |
+| --- | --- |
+| Options (`options.rml`) | Sphere (Extended or Original), Display (window or full screen), Textures (three-point or linear) and Scaling (pixel, smooth or sharp). Each change applies and saves at once. |
+| Story chapter select (`chapters.rml`) | Story opens it when the profile has completed a Rescue chapter: the completed chapters and the next one (up to 15). Choosing one starts Rescue there (`GameOptionApplier::choose_chapter`, which, unlike `--start-chapter`, does not pause trophies or progress). Without a completed chapter, or as a guest, Story starts Rescue directly. |
+
 ## Status
 
 - Placeholder screens follow the planned structure (`docs/REDESIGN.md`): main menu (Solo, Multiplayer, Media Player, Trophies, Options, Credits, Exit), Solo (Story, Time Trial, Lines, Puzzle, Custom, Training) and Multiplayer (Versus, Collaborate, Custom). Their look is a plain placeholder until the art direction is set.
 - Checked in the Linux test setup (Vulkan, 720p): drawing, focus, opening Solo, a command, going back with focus remembered, and closing with F1.
-- Not yet: Left and Right on value items (settings), mouse input, Training, Custom and the other commands, choosing a chapter, replacing the original title and mode menus, pausing the game behind a menu, and checks on Windows.
+- Checked in the Linux test setup: the Options screen shows and changes Sphere and Textures, and the settings file has the new values; with chapters 1 and 2 completed, Story lists Chapters 1 to 3 and Chapter 3 starts Rescue at 3:1.
+- Not yet: mouse input, Training, Custom and the other commands, the profile screen, replacing the original title and mode menus, pausing the game behind a menu, and checks on Windows.
 
 ## Next
 
-1. Value items for settings, then the options, chapter select and profile screens (the chapter select can use the `--start-chapter` mechanism).
+1. The profile screen (choose, create, delete, character), then more options (audio, controls).
 2. Training and a pause screen.
 3. Replacing the original title and mode-select menus with these screens.

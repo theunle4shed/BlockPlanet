@@ -7,6 +7,30 @@
 namespace blockplanet::ui {
 namespace {
 
+// "value:Label,value:Label" as pairs.
+std::vector<std::pair<std::string, std::string>> parse_options(const std::string& text) {
+    std::vector<std::pair<std::string, std::string>> result;
+    std::size_t start = 0;
+    while (start <= text.size()) {
+        const auto end = text.find(',', start);
+        const auto entry = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        const auto colon = entry.find(':');
+        if (!entry.empty())
+            result.emplace_back(entry.substr(0, colon), colon == std::string::npos ? entry : entry.substr(colon + 1));
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return result;
+}
+
+void collect_lists(Rml::Element* element, std::vector<Rml::Element*>& out) {
+    for (int i = 0; i < element->GetNumChildren(); ++i) {
+        Rml::Element* child = element->GetChild(i);
+        if (child->HasAttribute("data-list")) out.push_back(child);
+        collect_lists(child, out);
+    }
+}
+
 void collect_items(Rml::Element* element, std::vector<Rml::Element*>& out) {
     for (int i = 0; i < element->GetNumChildren(); ++i) {
         Rml::Element* child = element->GetChild(i);
@@ -34,6 +58,7 @@ bool Navigator::push(const std::string& screen) {
     if (document == nullptr) return false;
     if (!stack_.empty()) stack_.back().document->Hide();
     stack_.push_back({screen, document, 0});
+    fill(stack_.back());
     document->SetClass("entering", true);  // CSS animates screens with this class
     document->Show();
     set_focus(stack_.back(), 0);
@@ -68,9 +93,78 @@ void Navigator::set_focus(Screen& screen, std::size_t index) {
     list[screen.focus]->ScrollIntoView(false);
 }
 
+void Navigator::fill(Screen& screen) {
+    // Lists first, so their items get values and focus like any other.
+    std::vector<Rml::Element*> lists;
+    collect_lists(screen.document, lists);
+    for (Rml::Element* container : lists) {
+        while (container->GetNumChildren() > 0) container->RemoveChild(container->GetFirstChild());
+        const auto found = lists_.find(container->GetAttribute<Rml::String>("data-list", ""));
+        if (found == lists_.end()) continue;
+        for (const auto& entry : found->second) {
+            auto element = container->GetOwnerDocument()->CreateElement("div");
+            element->SetId(entry.id);
+            element->SetClass("item", true);
+            element->SetClass("disabled", !entry.enabled);
+            element->SetAttribute("data-action", entry.action);
+            Rml::String text = entry.label;
+            if (!entry.note.empty()) text += "<span class=\"note\">" + entry.note + "</span>";
+            element->SetInnerRML(text);
+            container->AppendChild(std::move(element));
+        }
+    }
+    for (Rml::Element* item : items(screen)) {
+        if (!item->IsClassSet("value")) continue;
+        const auto name = item->GetAttribute<Rml::String>("data-setting", "");
+        const auto options = parse_options(item->GetAttribute<Rml::String>("data-options", ""));
+        const auto current = settings_.find(name);
+        std::string label;
+        for (const auto& [value, text] : options) {
+            if (current != settings_.end() && current->second == value) label = text;
+        }
+        Rml::ElementList shown;
+        item->GetElementsByClassName(shown, "value");
+        if (!shown.empty()) shown.front()->SetInnerRML(label);
+    }
+}
+
+void Navigator::change_value(Screen& screen, int direction) {
+    const auto list = items(screen);
+    if (list.empty() || !list[screen.focus]->IsClassSet("value")) return;
+    Rml::Element* item = list[screen.focus];
+    const auto name = item->GetAttribute<Rml::String>("data-setting", "");
+    const auto options = parse_options(item->GetAttribute<Rml::String>("data-options", ""));
+    if (name.empty() || options.empty()) return;
+    std::size_t index = 0;
+    for (std::size_t i = 0; i < options.size(); ++i) {
+        if (settings_[name] == options[i].first) index = i;
+    }
+    index = (index + options.size() + (direction < 0 ? options.size() - 1 : 1)) % options.size();
+    settings_[name] = options[index].first;
+    commands_.push_back("setting:" + name + "=" + options[index].first);
+    fill(screen);
+    set_focus(screen, screen.focus);
+}
+
+void Navigator::set_setting(const std::string& name, const std::string& value) {
+    settings_[name] = value;
+    if (!stack_.empty()) {
+        fill(stack_.back());
+        set_focus(stack_.back(), stack_.back().focus);
+    }
+}
+
+void Navigator::set_list(const std::string& name, std::vector<ListItem> items) {
+    lists_[name] = std::move(items);
+}
+
 void Navigator::activate(Screen& screen) {
     const auto list = items(screen);
     if (list.empty()) return;
+    if (list[screen.focus]->IsClassSet("value")) {
+        change_value(screen, 1);
+        return;
+    }
     const std::string action = list[screen.focus]->GetAttribute<Rml::String>("data-action", "");
     if (action.rfind("open:", 0) == 0) {
         push(action.substr(5));
@@ -95,8 +189,11 @@ void Navigator::handle(Action action) {
         if (count != 0) set_focus(screen, (screen.focus + 1) % count);
         break;
     case Action::Left:
+        change_value(screen, -1);
+        break;
     case Action::Right:
-        break;  // for value items, later
+        change_value(screen, 1);
+        break;
     case Action::Confirm:
         activate(screen);
         break;

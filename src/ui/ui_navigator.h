@@ -10,6 +10,14 @@
 //   back          go back one screen
 //   close         close the menus
 //   command:NAME  report NAME to the game (take_command)
+//
+// Setting rows: class "item value", data-setting="NAME" and
+// data-options="value:Label,value:Label". Left and Right (or Confirm) cycle
+// the value, show its label in a child with class "value", and report
+// "setting:NAME=VALUE" as a command. Current values come from set_setting.
+//
+// Lists: an element with data-list="NAME" is filled with the items given to
+// set_list when its screen opens.
 
 #include "ui_actions.h"
 
@@ -17,6 +25,7 @@
 #include <RmlUi/Core/ElementDocument.h>
 
 #include <deque>
+#include <map>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -34,6 +43,11 @@ public:
     bool is_open() const { return !stack_.empty(); }
 
     void handle(Action action);
+
+    // Current setting values and list contents, used when screens open
+    // (and applied at once to the screen showing).
+    void set_setting(const std::string& name, const std::string& value);
+    void set_list(const std::string& name, std::vector<ListItem> items);
 
     // Commands chosen by the player (command:NAME), oldest first.
     std::optional<std::string> take_command();
@@ -54,11 +68,15 @@ private:
     std::vector<Rml::Element*> items(const Screen& screen) const;
     void set_focus(Screen& screen, std::size_t index);
     void activate(Screen& screen);
+    void change_value(Screen& screen, int direction);
+    void fill(Screen& screen);
 
     Rml::Context* context_;
     std::filesystem::path screens_;
     std::vector<Screen> stack_;
     std::deque<std::string> commands_;
+    std::map<std::string, std::string> settings_;
+    std::map<std::string, std::vector<ListItem>> lists_;
 };
 
 } // namespace blockplanet::ui

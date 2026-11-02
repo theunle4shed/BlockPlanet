@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>Story</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Story</div>
+        <div class="subtitle">Choose a chapter</div>
+        <div class="list" data-list="chapters"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>
