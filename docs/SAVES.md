@@ -2,12 +2,12 @@
 
 ## Where data lives
 
-BlockPlanet keeps settings, saves and caches in the standard per-user folder:
+BlockPlanet keeps settings, saves and caches in one folder per PC, so every profile is available whichever account starts the game:
 
 | System | Folder |
 | --- | --- |
-| Windows | `%APPDATA%\BlockPlanet` |
-| Linux | `$XDG_DATA_HOME/BlockPlanet`, usually `~/.local/share/BlockPlanet` |
+| Windows | `C:\ProgramData\BlockPlanet` (`%PROGRAMDATA%`), shared by every Windows account on the PC. BlockPlanet creates it writable for all users; if it cannot be written, it falls back to the account's own `%APPDATA%\BlockPlanet`. |
+| Linux | `$XDG_DATA_HOME/BlockPlanet`, usually `~/.local/share/BlockPlanet` (a folder shared by all accounts is not normally writable on Linux) |
 
 - **Portable mode:** put a file named `portable.txt` beside the game executable, and everything is kept in the `data` folder there instead, as Blocksphere did. Use this for a copy on a USB stick.
 - **Moving from an earlier build:** Blocksphere and earlier BlockPlanet builds kept data in `data` beside the executable. On the first start with no profile list, BlockPlanet copies what it finds there once (settings, controller mappings, the imported ROM, the cartridge save and trophies) into the new folder and the first profile. The originals are left in place.

@@ -339,6 +339,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/settings_store.cpp
     src/platform/run_options.cpp
     src/platform/profiles.cpp
+    src/platform/data_directory.cpp
     src/platform/window_mode_controller.cpp
     src/platform/config_cli.cpp
     src/platform/windows_delay_libraries.cpp
@@ -950,6 +951,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/diagnostic/main.cpp
         src/platform/run_options.cpp
         src/platform/profiles.cpp
+        src/platform/data_directory.cpp
         src/platform/window_mode_controller.cpp
         src/diagnostic/indirect_dispatch.cpp
         src/graphics/prompt_atlas.cpp
@@ -1020,6 +1022,8 @@ if(TETRISPHERE_GAME_ENABLED)
     else()
         # Keep the Windows min/max macros out of RT64 and hlslpp headers.
         target_compile_definitions(tetrisphere-m1 PRIVATE NOMINMAX)
+        # data_directory.cpp: the shared ProgramData folder and its permissions.
+        target_link_libraries(tetrisphere-m1 PRIVATE advapi32 shell32 ole32)
     endif()
     target_include_directories(tetrisphere-m1 PRIVATE
         "${CMAKE_SOURCE_DIR}/include"
@@ -1066,12 +1070,17 @@ if(TETRISPHERE_GAME_ENABLED)
     add_executable(tetrisphere-config
         src/platform/config_cli.cpp src/platform/config_gui.cpp
         src/platform/settings_store.cpp
-        src/platform/eeprom_store.cpp src/platform/profiles.cpp)
+        src/platform/eeprom_store.cpp src/platform/profiles.cpp
+        src/platform/data_directory.cpp)
     target_include_directories(tetrisphere-config PRIVATE
         "${CMAKE_SOURCE_DIR}/include"
         "${N64MODERN_RUNTIME}/thirdparty/json"
         ${TETRISPHERE_SDL_INCLUDE_DIRS})
     target_link_libraries(tetrisphere-config PRIVATE ${TETRISPHERE_SDL_LIBRARIES})
+    if(WIN32)
+        # data_directory.cpp: the shared ProgramData folder and its permissions.
+        target_link_libraries(tetrisphere-config PRIVATE advapi32 shell32 ole32)
+    endif()
     if(UNIX AND NOT APPLE)
         set_target_properties(tetrisphere-m1 PROPERTIES
             BUILD_WITH_INSTALL_RPATH TRUE INSTALL_RPATH "$ORIGIN/lib")
@@ -1119,7 +1128,8 @@ if(TETRISPHERE_GAME_ENABLED)
             "${CMAKE_SOURCE_DIR}/assets/trophies/trophies.json"
             "$<TARGET_FILE_DIR:tetrisphere-m1>/trophies.json")
     add_executable(controller_mappings_test tests/controller_mappings_test.cpp
-        src/platform/controller_mappings.cpp src/platform/controller_ports.cpp)
+        src/platform/controller_mappings.cpp src/platform/controller_ports.cpp
+        src/platform/data_directory.cpp)
     add_executable(controller_ports_test tests/controller_ports_test.cpp
         src/platform/controller_ports.cpp)
     add_executable(qa_virtual_controllers_test tests/qa_virtual_controllers_test.cpp
@@ -1151,6 +1161,9 @@ if(TETRISPHERE_GAME_ENABLED)
         "${N64MODERN_RUNTIME}/thirdparty")
     target_compile_definitions(guest_trace_hooks_test PRIVATE TETRISPHERE_LINUX_DEMO)
     target_link_libraries(controller_mappings_test PRIVATE ${TETRISPHERE_SDL_LIBRARIES} ${TETRISPHERE_CONFIG_SDL_LIBRARY})
+    if(WIN32)
+        target_link_libraries(controller_mappings_test PRIVATE advapi32 shell32 ole32)
+    endif()
     if(WIN32)
         target_link_directories(controller_mappings_test PRIVATE
             "${RT64_ROOT}/src/contrib/mupen64plus-win32-deps/SDL2-2.26.3/lib/x64")
