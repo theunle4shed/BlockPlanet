@@ -19,6 +19,7 @@
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/settings_store.h"
+#include "tetrisphere/profiles.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/wav_capture.h"
 #include "tetrisphere/window_mode_controller.h"
@@ -456,8 +457,28 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         show_error("Cannot determine the game data directory.");
         std::exit(74);
     }
+    // Player profiles: the cartridge save and trophies live in the active
+    // profile's folder; settings are shared (docs/SAVES.md).
+    ProfileStore profiles(user_path);
+    std::string profile_error;
+    if (!profiles.load(profile_error) ||
+        (run_options.profile && !profiles.use(*run_options.profile, profile_error))) {
+        show_error(profile_error.c_str());
+        std::exit(74);
+    }
+    const auto profile_path = profiles.directory(profiles.active());
+    {
+        std::error_code ignored;
+        std::filesystem::create_directories(profile_path, ignored);
+    }
     std::string eeprom_error;
-    const auto eeprom_path = user_path / "tetrisphere-us-rev0.eep";
+    const auto eeprom_path = profile_path / "cartridge.eep";
+    // Keep the cartridge saves of the last three sessions.
+    if (!rotate_backup(eeprom_path, profile_path / "backups", 3, eeprom_error))
+        std::fprintf(stderr, "Could not back up the save: %s\n", eeprom_error.c_str());
+    std::fprintf(stdout, "{\"event\":\"profile\",\"id\":\"%s\",\"profiles\":%zu}\n",
+                 profiles.active().id.c_str(), profiles.profiles().size());
+    std::fflush(stdout);
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
         std::exit(74);
@@ -501,7 +522,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         const auto definitions = base != nullptr
             ? std::filesystem::u8path(base) / "trophies.json" : std::filesystem::path("trophies.json");
         if (base != nullptr) SDL_free(base);
-        initialize_trophies(definitions, user_path / "trophies.json");
+        initialize_trophies(definitions, profile_path / "trophies.json");
     }
     game_option_applier = std::make_unique<GameOptionApplier>(
         GameOptions{run_options.casual, run_options.start_chapter});

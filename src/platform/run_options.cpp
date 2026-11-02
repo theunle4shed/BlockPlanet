@@ -1,4 +1,5 @@
 #include "tetrisphere/run_options.h"
+#include "tetrisphere/profiles.h"
 
 #include <string_view>
 
@@ -96,6 +97,12 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             else return invalid("framebuffer readback must be on or off");
             continue;
         }
+        if (argument.starts_with("--profile=")) {
+            result.profile = std::string(argument.substr(sizeof("--profile=") - 1));
+            if (!valid_profile_name(*result.profile))
+                return invalid("profile names are 1 to 24 printable characters");
+            continue;
+        }
         if (argument.starts_with("--sphere=")) {
             const auto value = argument.substr(sizeof("--sphere=") - 1);
             if (value == "original") result.sphere_extended = false;
@@ -143,6 +150,7 @@ const char* run_options_help() {
            "  --present-mode=console|skip-buffering|early\n"
            "                                   When finished frames are shown (default console)\n"
            "  --framebuffer-readback=on|off    Copy each frame back to game memory (default on)\n"
+           "  --profile=NAME                   Play as this profile (created if new)\n"
            "  --sphere=original|extended       Draw the game's sphere patch, or more of it\n"
            "                                   (overrides the saved SPHERE setting)\n"
            "  --casual                         No game over: hearts refill, Time Trial clock\n"

@@ -338,6 +338,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/rom_cache.cpp
     src/platform/settings_store.cpp
     src/platform/run_options.cpp
+    src/platform/profiles.cpp
     src/platform/window_mode_controller.cpp
     src/platform/config_cli.cpp
     src/platform/windows_delay_libraries.cpp
@@ -410,6 +411,7 @@ tetrisphere_bind_runtime_identity(TETRISPHERE_BUILD_ID
 add_executable(tetrisphere_diag
     src/diagnostic/main.cpp
     src/platform/run_options.cpp
+    src/platform/profiles.cpp
     src/diagnostic/indirect_dispatch.cpp
     src/diagnostic/rescue_pause_snapshot_stub.cpp
     src/graphics/sphere_mesh.cpp
@@ -510,9 +512,20 @@ target_compile_definitions(pc_settings_hook_test PRIVATE TETRISPHERE_PC_SETTINGS
 add_test(NAME pc_settings_menu COMMAND pc_settings_menu_test)
 add_test(NAME pc_settings_hook COMMAND pc_settings_hook_test)
 
-add_executable(run_options_test tests/run_options_test.cpp src/platform/run_options.cpp)
-target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+add_executable(run_options_test tests/run_options_test.cpp src/platform/run_options.cpp src/platform/profiles.cpp)
+target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
+    "${N64MODERN_RUNTIME}/thirdparty/json")
 add_test(NAME run_options COMMAND run_options_test)
+add_executable(profiles_test tests/profiles_test.cpp src/platform/profiles.cpp)
+target_include_directories(profiles_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
+    "${N64MODERN_RUNTIME}/thirdparty/json")
+if(MSVC)
+    target_compile_options(profiles_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(profiles_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME profiles COMMAND profiles_test "${CMAKE_CURRENT_BINARY_DIR}/profiles-test")
+
 add_executable(trophies_test tests/trophies_test.cpp src/platform/trophies.cpp)
 target_include_directories(trophies_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")
@@ -936,6 +949,7 @@ if(TETRISPHERE_GAME_ENABLED)
     add_executable(tetrisphere-m1
         src/diagnostic/main.cpp
         src/platform/run_options.cpp
+        src/platform/profiles.cpp
         src/platform/window_mode_controller.cpp
         src/diagnostic/indirect_dispatch.cpp
         src/graphics/prompt_atlas.cpp

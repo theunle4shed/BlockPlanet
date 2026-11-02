@@ -79,3 +79,10 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Researched the layer and core limits: the board has 9 layers built into about 70 functions, and the sphere's proportions live only in the mesh builder. Added an experimental `BLOCKPLANET_SPHERE_CORE_SCALE` (replace mode) that resizes the core; documented in `docs/research/blockplanet-game-state.md`.
 - Added the SPHERE graphics setting (Options > Graphics, ORIGINAL or EXTENDED, saved in settings version 7, applies during play) and `--sphere=original|extended`. Extended uses BlockPlanet's renderer with two extra cells on every side. The drawing mode is read once per frame and logged as `sphere_mode`. The Graphics page now fits eight rows (17 pixels apart instead of 19); reviewed at 16:9 and 4:3.
 - Made SPHERE = EXTENDED the default, including for settings saved before the option existed. ORIGINAL remains available in Options > Graphics and as `--sphere=original`.
+
+## 2026-11-02: Saves and profiles
+
+- Data now lives in the standard per-user folder (`%APPDATA%\BlockPlanet` on Windows, `$XDG_DATA_HOME/BlockPlanet` on Linux) instead of beside the executable. A `portable.txt` beside the game keeps Blocksphere's portable behaviour. Data from earlier builds is copied once on first start.
+- Added player profiles (`include/tetrisphere/profiles.h`, `--profile=NAME`): each has its own cartridge save and trophies; settings stay shared. The cartridge save is backed up at the start of each session (last three kept).
+- Documented the game's save mechanism and a first map of its 512 bytes in `docs/SAVES.md`.
+- Tests: `tests/profiles_test.cpp`; `tests/portable_data_test.py` now covers both portable mode and the per-user default.

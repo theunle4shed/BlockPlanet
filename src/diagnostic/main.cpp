@@ -8,6 +8,7 @@
 #include "gui/rt64_file_dialog.h"
 #include <SDL.h>
 #include "tetrisphere/data_directory.h"
+#include "tetrisphere/profiles.h"
 #endif
 #ifdef TETRISPHERE_LINUX_DEMO
 #include "tetrisphere/linux_platform.h"
@@ -187,6 +188,13 @@ int main(int argc, char** argv) {
         return 0;
     }
 #ifdef TETRISPHERE_LINUX_DEMO
+    // One-time copy of data from beside the executable (earlier builds) to
+    // the per-user data folder, before the ROM cache is read.
+    if (const auto data = tetrisphere::application_data_directory(); !data.empty()) {
+        for (const auto& name : tetrisphere::migrate_legacy_data(tetrisphere::legacy_data_directory(), data))
+            std::printf("{\"event\":\"data_migrated\",\"file\":\"%s\"}\n", name.c_str());
+        std::fflush(stdout);
+    }
     const auto cache_paths = rom_cache_paths();
     if (run_options.rom_path.empty()) {
         bool invalid_cache = false;

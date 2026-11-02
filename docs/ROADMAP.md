@@ -178,6 +178,7 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 - **HUD art:** made by the project owner. The current HUD stays until the new art is ready. [HUD_INVENTORY.md](HUD_INVENTORY.md) lists what the HUD shows, where and when.
 - **Look:** modern only, with no "Classic" option. Menus should be simple and TV-like, with quick transitions.
 - **Online:** private rooms joined with a friend code. No public matchmaking.
+- **Saves:** kept in the standard per-user folder (`%APPDATA%\BlockPlanet` on Windows), with a portable option; several player profiles, each with its own save, trophies and progress. See [SAVES.md](SAVES.md).
 - **Board:** the board stays 32 × 32 cells with 9 layers, as in the game. Its limits are built into about 70 game functions (see [blockplanet-game-state.md](research/blockplanet-game-state.md#layers-core-size-and-stacking-2026-11-02)). Sphere changes are visual only: drawing more of it, and possibly a different core size.
 
 ## Open questions

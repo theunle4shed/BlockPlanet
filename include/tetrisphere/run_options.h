@@ -38,6 +38,8 @@ struct RunOptions {
     // How much of the sphere to draw: true for Extended (overrides the
     // saved SPHERE setting for this run).
     std::optional<bool> sphere_extended;
+    // Play as this profile (created if new) and make it the active one.
+    std::optional<std::string> profile;
     bool perf_log = false;
     // Casual play: no game over. Trophies are paused.
     bool casual = false;
