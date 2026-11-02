@@ -51,6 +51,10 @@ void initialize_ipl3_state(std::uint8_t* rdram);
 void set_runtime_rom(std::span<const std::uint8_t> rom);
 bool initialize_eeprom(const std::filesystem::path& path, std::string& error);
 [[noreturn]] void await_runtime_handoff();
+// Called with guest memory just before each graphics task is submitted (the
+// frame's display list is complete). One observer; nullptr removes it.
+using GfxTaskObserver = void (*)(const std::uint8_t* rdram);
+void set_gfx_task_observer(GfxTaskObserver observer);
 
 [[noreturn]] void fatal_unsupported(std::string_view symbol, std::uint32_t address,
                                     std::uint32_t callsite, std::string_view phase);

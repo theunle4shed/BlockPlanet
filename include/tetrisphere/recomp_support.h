@@ -42,7 +42,6 @@ bool blockplanet_sphere_cell_begin(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_sphere_cell_end(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_sphere_face_begin(std::uint8_t* rdram, recomp_context* ctx, int face);
 void blockplanet_sphere_face_end(std::uint8_t* rdram, recomp_context* ctx, int face);
-void blockplanet_sphere_stats_task(const std::uint8_t* rdram);
 bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant);
 void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant);
 void tetrisphere_rescue_pause_snapshot_hook(std::uint8_t* rdram,

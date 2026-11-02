@@ -1,7 +1,6 @@
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/eeprom_store.h"
-#include "tetrisphere/recomp_support.h"
 
 #include "recomp.h"
 #include "ultramodern/ultra64.h"
@@ -234,6 +233,12 @@ bool initialize_eeprom(const std::filesystem::path& path, std::string& error) {
 
 } // namespace tetrisphere
 
+namespace {
+std::atomic<tetrisphere::GfxTaskObserver> gfx_task_observer{nullptr};
+} // namespace
+
+void tetrisphere::set_gfx_task_observer(GfxTaskObserver observer) { gfx_task_observer.store(observer); }
+
 extern "C" {
 void yield_self_1ms(std::uint8_t* rdram);
 
@@ -367,7 +372,8 @@ void osSpTaskStartGo_recomp(std::uint8_t* rdram, recomp_context* ctx) {
     }
     if (descriptor_offset <= 0x800000u - sizeof(OSTask)) {
         const auto* task = reinterpret_cast<const OSTask*>(rdram + descriptor_offset);
-        if (task->t.type == M_GFXTASK) blockplanet_sphere_stats_task(rdram);
+        const auto observer = gfx_task_observer.load();
+        if (task->t.type == M_GFXTASK && observer != nullptr) observer(rdram);
     }
     ultramodern::submit_rsp_task(rdram, static_cast<std::int32_t>(ctx->r4));
 }

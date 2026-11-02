@@ -29,6 +29,7 @@
 // scratch data). Live guest memory is never changed by the check.
 
 #include "tetrisphere/recomp_support.h"
+#include "tetrisphere/runtime.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_faces.h"
@@ -527,10 +528,8 @@ void note_range(std::uint32_t& low, std::uint32_t& high, std::uint32_t from, std
     if (to > high) high = to;
 }
 
-} // namespace
 
-extern "C" void blockplanet_sphere_stats_task(const std::uint8_t* rdram) {
-    if (!stats.enabled) return;
+void record_gfx_task(const std::uint8_t* rdram) {
     const std::uint32_t dl_start = load32(rdram, display_list_start);
     const std::uint32_t dl_end = load32(rdram, display_list_current);
     const std::uint32_t pool_start = load32(rdram, vertex_pool_start);
@@ -560,7 +559,12 @@ extern "C" void blockplanet_sphere_stats_task(const std::uint8_t* rdram) {
     stats = SphereStats{};
 }
 
-namespace {
+// Registers with the runtime when the statistics are turned on.
+[[maybe_unused]] const bool stats_registered = [] {
+    if (stats.enabled) tetrisphere::set_gfx_task_observer(record_gfx_task);
+    return stats.enabled;
+}();
+
 void stats_sphere_begin(const std::uint8_t* rdram) {
     if (!stats.enabled) return;
     stats.frame_dl_at_sphere = load32(rdram, display_list_current);
