@@ -113,6 +113,11 @@ def create_package(*, platform: str, binary: Path, configurator: Path,
     }.items():
         payload = source.read_bytes()
         files[name] = payload
+    # BlockPlanet's menu layer: documents and fonts (with the font licence).
+    ui_root = controller_root / "assets/ui"
+    for source in sorted(ui_root.rglob("*")):
+        if source.is_file() and "controllers" not in source.relative_to(ui_root).parts:
+            files["ui/" + source.relative_to(ui_root).as_posix()] = source.read_bytes()
     if _hash(files["gamecontrollerdb.txt"]) != controller_provenance["files"]["gamecontrollerdb.txt"]["sha256"] or \
             _hash(files["licenses/controller-db/LICENSE"]) != controller_provenance["files"]["LICENSE"]["sha256"]:
         raise ValueError("controller database provenance mismatch")

@@ -1,4 +1,6 @@
 #include "tetrisphere/rt64_context.h"
+#include "tetrisphere/data_directory.h"
+#include "ui_system.h"
 #include "tetrisphere/diagnostic_log.h"
 #include "tetrisphere/dl_ui_tags.h"
 #include "tetrisphere/f3d_flat_shade.h"
@@ -206,6 +208,13 @@ ultramodern::renderer::SetupResult setup_result(RT64::Application::SetupResult v
     std::abort();
 }
 
+// ui/ beside the executable, or BLOCKPLANET_UI_ASSETS.
+std::filesystem::path ui_assets_directory() {
+    if (const char* override = std::getenv("BLOCKPLANET_UI_ASSETS"); override != nullptr && *override != '\0')
+        return std::filesystem::u8path(override);
+    return tetrisphere::executable_directory() / "ui";
+}
+
 class Context final : public ultramodern::renderer::RendererContext {
 public:
     Context(std::uint8_t* rdram, ultramodern::renderer::WindowHandle window,
@@ -247,6 +256,9 @@ public:
         core.VI_X_SCALE_REG = const_cast<std::uint32_t*>(&vi->VI_X_SCALE_REG);
         core.VI_Y_SCALE_REG = const_cast<std::uint32_t*>(&vi->VI_Y_SCALE_REG);
 
+        // BlockPlanet's menu layer draws through RT64's hooks, which must be
+        // registered before RT64 starts.
+        blockplanet::ui::install(ui_assets_directory());
         RT64::ApplicationConfiguration config{};
         config.appId = "tetrisphere-m1";
         config.useConfigurationFile = false;

@@ -1,0 +1,59 @@
+<rml>
+<head>
+    <title>BlockPlanet menu layer test</title>
+    <style>
+        body {
+            width: 100%;
+            height: 100%;
+            font-family: LatoLatin;
+            color: #f2f5ff;
+        }
+        @keyframes slide-in {
+            from { opacity: 0; transform: translateX(-60dp); }
+            to { opacity: 1; transform: translateX(0dp); }
+        }
+        #panel {
+            position: absolute;
+            left: 96dp;
+            top: 160dp;
+            width: 640dp;
+            padding: 48dp;
+            background-color: #0b1020d8;
+            border-radius: 24dp;
+            animation: 0.35s cubic-out slide-in;
+        }
+        h1 {
+            display: block;
+            font-size: 64dp;
+            font-weight: bold;
+            margin-bottom: 8dp;
+        }
+        p {
+            display: block;
+            font-size: 28dp;
+            color: #a9b4d6;
+            margin-bottom: 40dp;
+        }
+        .item {
+            display: block;
+            font-size: 40dp;
+            padding: 16dp 24dp;
+            margin-bottom: 8dp;
+            border-radius: 12dp;
+        }
+        .item.focused {
+            background-color: #3a6df0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="panel">
+        <h1>BlockPlanet</h1>
+        <p>Menu layer test</p>
+        <div class="item focused">Story</div>
+        <div class="item">Time Trial</div>
+        <div class="item">Options</div>
+    </div>
+</body>
+</rml>

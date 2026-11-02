@@ -92,3 +92,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added the profile save file, `profiles/<id>/save.json` (`include/tetrisphere/profile_save.h`): the profile's controls, and progress and statistics recorded from game events (levels, chapters and puzzles completed, pieces, lives, Versus rounds, time in play). Controls now belong to the profile; `settings.dat` keeps the PC's default controls for new profiles and guests. Saved at milestones, every 30 seconds and on exit, with a `.bak`.
 - Planned more statistics (blocks destroyed, largest combo, pieces sent in VS, Collaborate combos, local and online battles, magic used and its blocks destroyed) and recorded the trophy coverage by mode, with the gaps (Hide & Seek, Lines, local VS, Collaborate, online), in `docs/SAVES.md` and `docs/TROPHIES.md`.
 - Roadmap: single player first, with Rescue as the reference mode, a checklist for "single player finished", and a multiplayer checklist to review as shared pieces are finished.
+
+## 2026-11-02: Menu layer
+
+- Added BlockPlanet's menu layer (`docs/UI.md`): RmlUi 6.2 with FreeType 2.13.3, drawn over the game through RT64's render hooks by a renderer written for BlockPlanet (`src/ui/`). RecompFrontend was not used because it has no licence. `BLOCKPLANET_UI_TEST=1` shows a test screen.
+- Bundled the Lato font (SIL Open Font License) in `assets/ui/fonts`, added the RmlUi and FreeType notices, and the release package now includes `ui/`.

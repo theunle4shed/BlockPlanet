@@ -38,6 +38,22 @@
       "repository": "https://github.com/Decompollaborate/spimdisasm",
       "commit": "4b5d4c68eeb9f9eae14b3bb713971433ae2c3c43",
       "status": "checkout-verified"
+    },
+    {
+      "name": "RmlUi",
+      "repository": "https://github.com/mikke89/RmlUi",
+      "commit": "2230d1a6e8e0848ed87a5761e2a5160b2a175ba4",
+      "status": "menu-layer",
+      "license": "MIT",
+      "note": "Release 6.2. BlockPlanet's menu layer (docs/UI.md)."
+    },
+    {
+      "name": "freetype",
+      "repository": "https://github.com/freetype/freetype",
+      "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
+      "status": "menu-layer",
+      "license": "FTL or GPL-2.0",
+      "note": "Release 2.13.3. Font rendering for RmlUi."
     }
   ]
 }

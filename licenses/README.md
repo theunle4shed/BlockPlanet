@@ -26,3 +26,9 @@ DXC-1.8.2505.1-* files. These terms apply to those separate libraries; they
 are not relicensed under GPL. Use and redistribution of the Microsoft signing
 library are subject to its accompanying Microsoft terms. The historical older
 compiler notice is retained as development provenance.
+
+BlockPlanet's menu layer (docs/UI.md) adds RmlUi 6.2 (MIT) and FreeType
+2.13.3 (FreeType License, or GPL-2.0 at the user's choice), built from the
+pinned sources and listed in ../THIRD_PARTY_NOTICES.md. The bundled Lato font
+(assets/ui/fonts) is under the SIL Open Font License 1.1; its text is in
+../assets/ui/fonts/OFL-Lato.txt and is copied beside the game with the font.

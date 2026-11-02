@@ -1061,6 +1061,9 @@ if(TETRISPHERE_GAME_ENABLED)
     target_link_libraries(tetrisphere-m1 PRIVATE ultramodern rt64
                           tetrisphere_miniz
                           ${TETRISPHERE_SDL_LIBRARIES})
+    # BlockPlanet's menu layer (docs/UI.md).
+    include(cmake/BlockPlanetUI.cmake)
+    blockplanet_add_ui(tetrisphere-m1)
     add_executable(audio_output_test tests/audio_output_test.cpp
         src/platform/audio_output.cpp)
     if(NOT WIN32)
