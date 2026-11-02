@@ -41,6 +41,10 @@ struct MeshInputs {
     // points beyond that range, so `wide` keeps them in 32 bits; with values
     // inside the 16-bit range the result is the same.
     bool wide = false;
+    // Core size relative to the game's (1.0 = the game's: base = v / 3,
+    // layer step = v / 10). Other values keep the top of layer 8 (base + 7
+    // steps) where the game has it, so a bigger core means thinner layers.
+    double core_scale = 1.0;
 };
 
 // Fill `out` (rows x columns entries) exactly as func_800ADD6C does.

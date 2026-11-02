@@ -149,6 +149,27 @@ It uses the work area (`0x8015F7CC` and nearby, `0x8015F842`) as scratch and `fu
 - Checked: with `BLOCKPLANET_SPHERE_EXTENDED_TEST=1` in verify mode, the extended path with no extra cells is compared with the game's quadrant passes. 128 checks in chapter 15 showed zero differing bytes, so the extended mesh, normals and cell setup match the game exactly. With ring 2 the sphere draws correctly in chapter 15. Whether it removes the edge artifacts the owner saw needs a playtest: dig deep near the edge of the view and turn the sphere.
 - Known difference: the game's normal for the far row edge of row 14 reads an unrelated value (`0x8015EE1A`, the next table entry does not exist); the extended patch computes it. The quadrant passes never draw a face that uses it, so the original patch is unaffected.
 
+### Layers, core size and stacking (2026-11-02)
+
+**The board has 9 layers, 0 to 8**, each 32 × 32 cells (1,024), held in parallel tables: block values (2 bytes per cell, `0x800E44D0`, 0x4900 bytes), face masks (1 byte, `0x800E44D4`), a 4-byte entry (`0x800E44D8`, 0x9200 bytes), and the column map (`0x800E44DC`, one byte per column). Addresses in a gameplay dump: `0x80116BF0`, `0x8011B4F0`, `0x8011D9F0`, `0x80126BF0`.
+
+- `func_8008B0E0` builds a column's map byte from the face masks: the high nibble is the lowest layer with an exposed face (searching layers 0 to 7), the low nibble the highest (searching 8 down to 0). The quadrant loops draw that range.
+- Layer 8, above the normal surface, is drawn by its own pass, `func_8009FA20`, which runs only when the cell setup has seen a column reaching it (the "capped at 7" flag at `0x8015D770`).
+- Rescue levels use at most 6 playfield layers plus the core, so layer 8 is the only headroom.
+- The board helpers (`0x8008A7A0` to `0x8008CA34`, 42 functions) are called from about 70 functions across the game (block values via `func_8008A7A0` from 49, block types via `func_8008A7EC` from 28, face masks via `func_8008C9CC` from 17 and others). The 1,024-cell layer size, the 9-layer bounds and the 4-bit layer numbers in the column map are built into this code.
+
+**Sphere proportions live only in the mesh builder.** Its divisions by 3 (base) and 10 (layer step) are the only ones in the game that shape the sphere (other divisions by 10 split numbers into digits). Everything placed on the sphere reads the mesh table (`func_80097E3C`, `func_80098D8C`, `func_8009D90C`, `func_8009FA20`, `func_800A0ED8`, `func_800A2374`) or the work area the cell setup fills (`func_800A18F4`, `func_800A1E58`, which call the face functions). So resizing the core or the layers in the mesh builder moves everything together. The top of layer *n* is at base + (*n* − 1) steps: the core's outer surface at 1/3 of the grid point's length, layer 8's top at 1.033, about 3.1 times the core's radius.
+
+**Experiment:** `BLOCKPLANET_SPHERE_CORE_SCALE` (replace mode, 0.5 to 2.0) scales the core while keeping the top of layer 8 in place, so the layers get thinner. At 1.6 in chapter 1 the sphere draws and plays correctly with a visibly bigger core; because chapter 1 uses few layers, its visible surface also moves outwards. Not yet checked: the rescued character shown in the core, the camera's zoom when the core opens, and effects.
+
+**What each change would take:**
+
+| Change | Work | Main risks |
+| --- | --- | --- |
+| Bigger core, same board | A mesh builder setting (done as an experiment); decide which surface stays fixed | The rescued character's size and placement in the core, the core-opening camera, effects |
+| More core cells, or a bigger board | The 32 × 32 board is built into the game logic (wrapping with `& 0x1F`, `<< 5` indexing) | Very large |
+| Taller stacks (more than 9 layers) | Move the four tables to memory above 4 MB (about 7 KB per extra layer) and change every bound in about 70 functions: generation, gravity, matching, explosions and magic, landing, game over, scoring; widen the column map past 4 bits for more than 15 layers | Large; also the camera, since higher layers come closer to it |
+
 ### Buffer budget (stage 2, step 1)
 
 Measured on 2026-11-02 with `BLOCKPLANET_SPHERE_STATS=1` (chapter 15, Linux test setup):

@@ -507,8 +507,17 @@ extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_contex
         build_mesh(gather(rdram, ctx, false), expected_mesh);
         return false;
     }
+    // Experiment: BLOCKPLANET_SPHERE_CORE_SCALE (replace mode) resizes the
+    // core, keeping the outer surface in place.
+    static const double core_scale = [] {
+        const char* value = std::getenv("BLOCKPLANET_SPHERE_CORE_SCALE");
+        const double v = value != nullptr ? std::atof(value) : 1.0;
+        return v >= 0.5 && v <= 2.0 ? v : 1.0;
+    }();
+    MeshInputs inputs = gather(rdram, ctx, true);
+    inputs.core_scale = core_scale;
     std::vector<MeshEntry> mesh;
-    build_mesh(gather(rdram, ctx, true), mesh);
+    build_mesh(inputs, mesh);
     store_mesh(rdram, mesh);
     return true;
 }

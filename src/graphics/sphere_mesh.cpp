@@ -1,5 +1,6 @@
 #include "tetrisphere/sphere_mesh.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -57,8 +58,16 @@ void build_mesh(const MeshInputs& in, std::vector<MeshEntry>& out) {
             }
             MeshEntry& e = out[index++];
             for (int axis = 0; axis < 3; ++axis) {
-                e.inner[axis] = s16(v[axis] / 10);
-                e.outer[axis] = s16(v[axis] / 3);
+                if (in.core_scale == 1.0) {
+                    e.inner[axis] = s16(v[axis] / 10);
+                    e.outer[axis] = s16(v[axis] / 3);
+                } else {
+                    // Top of layer 8 stays at v x (1/3 + 7/10).
+                    const double top = v[axis] * (1.0 / 3.0 + 7.0 / 10.0);
+                    const double base = v[axis] / 3.0 * in.core_scale;
+                    e.outer[axis] = s16(static_cast<std::int32_t>(std::lround(base)));
+                    e.inner[axis] = s16(static_cast<std::int32_t>(std::lround((top - base) / 7.0)));
+                }
             }
             if (in.two_player) e.outer[0] = s16(e.outer[0] + (in.player_one ? 0x40 : -0x20));
             current = next;
