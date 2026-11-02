@@ -155,16 +155,35 @@ bool ProfileStore::set_character(std::string_view name, std::string_view charact
         error = "no profile with that name";
         return false;
     }
-    const bool valid_character = !character.empty() && character.size() <= 32 &&
+    const bool valid_character = character.size() <= 32 &&
         std::all_of(character.begin(), character.end(), [](char c) {
             return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
         });
     if (!valid_character || palette < 0 || palette > 7) {
-        error = "characters are 1 to 32 of a-z, 0-9 and '-'; colour variants are 0 to 7";
+        error = "characters are up to 32 of a-z, 0-9 and '-'; colour variants are 0 to 7";
         return false;
     }
     it->character = std::string(character);
     it->palette = palette;
+    return save(error);
+}
+
+bool ProfileStore::rename(std::string_view name, std::string_view new_name, std::string& error) {
+    auto it = std::find_if(profiles_.begin(), profiles_.end(), [&](const Profile& p) { return same_name(p.name, name); });
+    if (it == profiles_.end()) {
+        error = "no profile with that name";
+        return false;
+    }
+    if (!valid_profile_name(new_name)) {
+        error = "profile names are 1 to 24 printable characters";
+        return false;
+    }
+    const auto* other = find(new_name);
+    if (other != nullptr && other->id != it->id) {
+        error = "a profile with that name already exists";
+        return false;
+    }
+    it->name = std::string(new_name);
     return save(error);
 }
 

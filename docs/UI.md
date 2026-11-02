@@ -34,6 +34,10 @@ A screen is an RML document in `ui/screens/<name>.rml` that links `../menu.rcss`
 
 **Setting rows** have the classes `item value`, `data-setting="NAME"` and `data-options="value:Label,value:Label"`, and show the current value's label in a child with the class `value`. Left and Right (and Confirm) cycle the value and report `setting:NAME=VALUE`; the game applies and saves it through the same path as the PC settings menu, then sends the saved value back, so the row always shows what was saved. Current values come from `set_setting`.
 
+**Grids:** items directly inside an element with `data-columns="N"` form a grid: Left and Right move along it (wrapping), Up and Down move a row and leave the grid at its top and bottom. Give grid items widths as shares of the row (see `.keys` in `menu.rcss`) so each row holds exactly N.
+
+**Text fields:** an element with `data-text="NAME"` shows the text given to `set_text` (as plain text).
+
 **Lists the game fills in:** an element with `data-list="NAME"` gets the items given to `set_list` when its screen opens (label, note, action; disabled entries are skipped).
 
 Screens get the class `entering` when opened and `returning` when shown again after going back, which `menu.rcss` uses for a quick slide (0.18 s).
@@ -65,7 +69,7 @@ Requests are refused during play and inside other original pages such as Options
 | Screen | What it does |
 | --- | --- |
 | Options (`options.rml`) | Sphere (Extended or Original), Display (window or full screen), Textures (three-point or linear) and Scaling (pixel, smooth or sharp). Each change applies and saves at once. |
-| Profiles (`profiles.rml`, `profile.rml`, `confirm.rml`) | Main > Profiles, and at launch when there is more than one profile (unless `--profile` or `--guest` was given). Lists the playing profile first, the others, New profile ("Player N") and Play as guest. A profile offers Play as (or Keep playing) and Delete, which asks to confirm. Switching restarts the game (see [SAVES.md](SAVES.md#profiles)). Commands are listed in `include/tetrisphere/profile_menu.h`. |
+| Profiles (`profiles.rml`, `profile.rml`, `confirm.rml`) | Main > Profiles, and at launch when there is more than one profile (unless `--profile` or `--guest` was given). Lists the playing profile first, the others, New profile ("Player N") and Play as guest. A profile offers Play as (or Keep playing), Rename, Character and Delete, which asks to confirm. New profile and Rename open the name screen (`name.rml`): typing on a keyboard enters text, Backspace deletes and Enter finishes; with a controller, letters are picked from an on-screen keyboard (shift lasts one letter) and Start finishes. Names are 1 to 24 printable characters; a new profile left empty is called "Player N". The Character screen (`character.rml`) picks None or one of the six robots and a colour variant (Original, Crimson, Amber, Lime, Teal, Sky, Violet, Rose). Switching restarts the game (see [SAVES.md](SAVES.md#profiles)). Commands are listed in `include/tetrisphere/profile_menu.h`. |
 | Story chapter select (`chapters.rml`) | Story opens it when the profile has completed a Rescue chapter: the completed chapters and the next one (up to 15). Choosing one starts Rescue there (`GameOptionApplier::choose_chapter`, which, unlike `--start-chapter`, does not pause trophies or progress). Without a completed chapter, or as a guest, Story starts Rescue directly. |
 
 ## Status
@@ -73,11 +77,11 @@ Requests are refused during play and inside other original pages such as Options
 - Placeholder screens follow the planned structure (`docs/REDESIGN.md`): main menu (Solo, Multiplayer, Media Player, Trophies, Options, Credits, Exit), Solo (Story, Time Trial, Lines, Puzzle, Custom, Training) and Multiplayer (Versus, Collaborate, Custom). Their look is a plain placeholder until the art direction is set.
 - Checked in the Linux test setup (Vulkan, 720p): drawing, focus, opening Solo, a command, going back with focus remembered, and closing with F1.
 - Checked in the Linux test setup: the Options screen shows and changes Sphere and Textures, and the settings file has the new values; with chapters 1 and 2 completed, Story lists Chapters 1 to 3 and Chapter 3 starts Rescue at 3:1.
-- Checked in the Linux test setup: the launch prompt with two profiles, switching to the other profile (the game restarts as it), deleting another profile, adding "Player 2", deleting the playing profile (restarts as Player 1, folder moved to `deleted/`) and playing as a guest.
-- Not yet: mouse input, Training, Custom and the other commands, naming profiles and choosing a character, replacing the original title and mode menus, pausing the game behind a menu, and checks on Windows.
+- Checked in the Linux test setup: the launch prompt with two profiles, switching to the other profile (the game restarts as it), deleting another profile, adding "Player 2", deleting the playing profile (restarts as Player 1, folder moved to `deleted/`) and playing as a guest; renaming by typing, choosing a character and colour, and naming a new profile. The name and character screens were reviewed at 16:9, 4:3 and 21:9. On-screen keys were checked by unit test only (they need a controller).
+- Not yet: mouse input, Training, Custom and the other commands, showing the profile's character in the game, replacing the original title and mode menus, pausing the game behind a menu, and checks on Windows.
 
 ## Next
 
-1. Naming profiles and choosing a character (needs text entry and the character list), then more options (audio, controls).
+1. More options (audio, controls); showing the profile's character and unlocking characters as they are rescued (needs research).
 2. Training and a pause screen.
 3. Replacing the original title and mode-select menus with these screens.

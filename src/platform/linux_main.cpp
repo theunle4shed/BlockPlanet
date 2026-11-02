@@ -101,6 +101,9 @@ std::unique_ptr<ProfileSave> profile_save;
 // The profile list, for the profile screens; and whether this is guest play.
 std::unique_ptr<ProfileStore> profile_store;
 bool guest_session = false;
+// The name screen's text, and the profile the character screen is for.
+NameEditor name_editor;
+std::string character_profile_id;
 ProfileSaveData profile_data;
 bool profile_recording = false;
 bool profile_dirty = false;
@@ -896,6 +899,102 @@ bool handle_profile_command(const std::string& command) {
         blockplanet::ui::request_show("profiles");
         return true;
     }
+    // Refreshes the lists that show this profile.
+    const auto refresh = [&](const std::string& id) {
+        blockplanet::ui::set_list("profiles", profile_list(store, guest_session));
+        blockplanet::ui::set_list("profile_actions", profile_actions(store, id, guest_session));
+        blockplanet::ui::set_list("characters", character_choices(store, id));
+    };
+    const auto show_name = [&](const std::string& hint) {
+        blockplanet::ui::set_text("name_edit", name_editor.text() + "|");
+        blockplanet::ui::set_text("name_hint", hint);
+    };
+    if (const auto id = argument("profile_rename:")) {
+        const auto* profile = profile_by_id(store, *id);
+        if (profile == nullptr) return true;
+        name_editor.start(*id, profile->name);
+        blockplanet::ui::set_list("keyboard", name_editor.keyboard());
+        show_name("");
+        blockplanet::ui::request_show("name");
+        return true;
+    }
+    if (command == "profile_new") {
+        name_editor.start("new", "");
+        blockplanet::ui::set_list("keyboard", name_editor.keyboard());
+        show_name("Leave it empty for \"" + next_profile_name(store) + "\"");
+        blockplanet::ui::request_show("name");
+        return true;
+    }
+    if (const auto key = argument("name_key:")) {
+        if (name_editor.press(*key)) blockplanet::ui::set_list("keyboard", name_editor.keyboard());
+        show_name("");
+        return true;
+    }
+    if (const auto text = argument("name_type:")) {
+        name_editor.type(*text);
+        show_name("");
+        return true;
+    }
+    if (command == "name_done") {
+        std::string name = name_editor.text();
+        while (!name.empty() && name.back() == ' ') name.pop_back();
+        if (name_editor.target() == "new") {
+            if (name.empty()) name = next_profile_name(store);
+            if (store.find(name) != nullptr) show_name("That name is taken");
+            else restart_as(name, false);  // --profile creates it
+            return true;
+        }
+        const auto* profile = profile_by_id(store, name_editor.target());
+        if (profile == nullptr) return true;
+        if (name.empty()) {
+            show_name("Enter a name");
+            return true;
+        }
+        std::string error;
+        const std::string old_name = profile->name;
+        if (!store.rename(old_name, name, error)) {
+            show_name(store.find(name) != nullptr ? "That name is taken" : "Names are letters, digits and symbols");
+            return true;
+        }
+        refresh(name_editor.target());
+        blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
+        return true;
+    }
+    if (const auto id = argument("profile_character:")) {
+        const auto* profile = profile_by_id(store, *id);
+        if (profile == nullptr) return true;
+        character_profile_id = *id;
+        blockplanet::ui::set_text("character_for", "For " + profile->name);
+        blockplanet::ui::set_setting("profile_colour", std::to_string(profile->palette));
+        blockplanet::ui::set_list("characters", character_choices(store, *id));
+        blockplanet::ui::request_show("character");
+        return true;
+    }
+    if (const auto choice = argument("profile_set_character:")) {
+        const auto colon = choice->find(':');
+        if (colon == std::string::npos) return true;
+        const auto id = choice->substr(0, colon);
+        const auto character = choice->substr(colon + 1);
+        const auto* profile = profile_by_id(store, id);
+        if (profile == nullptr) return true;
+        std::string error;
+        const std::string name = profile->name;
+        if (!store.set_character(name, character == "none" ? "" : character, profile->palette, error))
+            std::fprintf(stderr, "Could not set the character: %s\n", error.c_str());
+        refresh(id);
+        return true;
+    }
+    if (const auto colour = argument("setting:profile_colour=")) {
+        const auto* profile = profile_by_id(store, character_profile_id);
+        if (profile == nullptr) return true;
+        std::string error;
+        const std::string name = profile->name;
+        const int palette = std::atoi(colour->c_str());
+        if (!store.set_character(name, profile->character, palette, error))
+            std::fprintf(stderr, "Could not set the colour: %s\n", error.c_str());
+        blockplanet::ui::set_setting("profile_colour", std::to_string(profile_by_id(store, character_profile_id)->palette));
+        return true;
+    }
     if (const auto id = argument("profile:")) {
         blockplanet::ui::set_list("profile_actions", profile_actions(store, *id, guest_session));
         blockplanet::ui::request_show("profile");
@@ -904,10 +1003,6 @@ bool handle_profile_command(const std::string& command) {
     if (const auto id = argument("profile_play:")) {
         if (const auto* profile = profile_by_id(store, *id)) restart_as(profile->name, false);
         return true;
-    }
-    if (command == "profile_new") {
-        const auto name = next_profile_name(store);
-        restart_as(name, false);  // --profile creates it
     }
     if (command == "profile_guest") restart_as(std::nullopt, true);
     if (const auto id = argument("profile_delete_confirmed:")) {

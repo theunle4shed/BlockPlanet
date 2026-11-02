@@ -9,6 +9,13 @@
 //   profile_guest              restart as a guest
 //   profile_delete:ID          ask to confirm
 //   profile_delete_confirmed:ID
+//   profile_rename:ID          edit the name (name screen)
+//   profile_character:ID       choose a character (character screen)
+//   profile_set_character:ID:CHARACTER   (CHARACTER "none" clears it)
+//   setting:profile_colour=N   the colour variant, on the character screen
+// The name screen's keys report name_key:KEY (a character, or space,
+// delete, shift), typing on a keyboard reports name_type:TEXT, and Done
+// reports name_done.
 
 #include "tetrisphere/profiles.h"
 #include "../../src/ui/ui_actions.h"
@@ -21,9 +28,46 @@ namespace tetrisphere {
 // The playing profile first (marked "playing now"), then the others, then
 // New profile and Play as guest. `guest` is true when playing as a guest.
 std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, bool guest);
-// Keep playing (for the playing profile) or Play as NAME, then Delete.
+// Keep playing (for the playing profile) or Play as NAME, then Rename,
+// Character and Delete.
 std::vector<blockplanet::ui::ListItem> profile_actions(const ProfileStore& store, const std::string& id, bool guest);
 std::vector<blockplanet::ui::ListItem> delete_confirmation(const ProfileStore& store, const std::string& id);
+
+// The characters a profile can choose: the robots rescued in Story (named
+// in the ROM next to the credits). Unlocking them as they are rescued needs
+// the chapter each one is rescued in (not researched yet).
+struct Character {
+    const char* id;
+    const char* label;
+};
+const std::vector<Character>& characters();
+// The character's label, or "" for none or an unknown id.
+std::string character_label(const std::string& id);
+// Colour variant names, 0 to 7 (0 is the character's own colours).
+const std::vector<std::string>& colour_names();
+// None, then the characters; the chosen one is marked.
+std::vector<blockplanet::ui::ListItem> character_choices(const ProfileStore& store, const std::string& id);
+
+// The name being typed on the name screen, with an on-screen keyboard for
+// controllers (letters, digits and a few symbols).
+class NameEditor {
+public:
+    void start(std::string target, std::string text);
+    const std::string& target() const { return target_; }  // a profile id, or "new"
+    const std::string& text() const { return text_; }
+    // A key from the on-screen keyboard (name_key:KEY). Returns true if
+    // the keyboard's labels changed (shift).
+    bool press(const std::string& key);
+    // Text typed on a keyboard; characters that names cannot hold are skipped.
+    void type(const std::string& text);
+    std::vector<blockplanet::ui::ListItem> keyboard() const;
+
+private:
+    std::string target_;
+    std::string text_;
+    bool shift_ = false;
+};
+constexpr int keyboard_columns = 10;
 
 // "Player N" with the lowest N not already taken.
 std::string next_profile_name(const ProfileStore& store);

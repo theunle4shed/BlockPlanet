@@ -61,10 +61,15 @@ struct ListRequest {
     std::string name;
     std::vector<ListItem> items;
 };
-using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest>;
+struct TextRequest {
+    std::string name;
+    std::string text;
+};
+using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest, TextRequest>;
 std::mutex requests_mutex;
 std::deque<Request> requests;
 std::deque<std::string> commands;
+std::string shown_screen;  // under requests_mutex
 std::atomic<bool> open_flag{false};
 
 std::string asset(const char* name) { return (assets_path / name).string(); }
@@ -105,12 +110,15 @@ void apply_requests() {
             navigator->set_setting(setting->name, setting->value);
         } else if (auto* list = std::get_if<ListRequest>(&request)) {
             navigator->set_list(list->name, std::move(list->items));
+        } else if (auto* text = std::get_if<TextRequest>(&request)) {
+            navigator->set_text(text->name, text->text);
         } else {
             navigator->handle(std::get<Action>(request));
         }
     }
     std::lock_guard lock(requests_mutex);
     while (auto command = navigator->take_command()) commands.push_back(*command);
+    shown_screen = navigator->current_screen();
     // Keep the flag set while requests are still waiting.
     open_flag.store(navigator->is_open() || std::any_of(requests.begin(), requests.end(), [](const Request& r) {
                         return std::holds_alternative<OpenRequest>(r);
@@ -200,6 +208,21 @@ void set_setting(const std::string& name, const std::string& value) {
 void set_list(const std::string& name, std::vector<ListItem> items) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(ListRequest{name, std::move(items)});
+}
+
+void set_text(const std::string& name, const std::string& text) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(TextRequest{name, text});
+}
+
+void send_command(const std::string& command) {
+    std::lock_guard lock(requests_mutex);
+    commands.push_back(command);
+}
+
+std::string current_screen() {
+    std::lock_guard lock(requests_mutex);
+    return open_flag.load() ? shown_screen : std::string();
 }
 
 bool menus_open() { return open_flag.load(); }

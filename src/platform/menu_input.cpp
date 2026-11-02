@@ -3,6 +3,7 @@
 #include "ui_system.h"
 
 #include <map>
+#include <string>
 #include <utility>
 
 namespace tetrisphere {
@@ -36,6 +37,33 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         blockplanet::ui::queue_action(action);
         return true;
     };
+    // The name screen: typed text goes into the name; Backspace deletes and
+    // Enter finishes instead of their usual meanings.
+    const bool naming = blockplanet::ui::current_screen() == "name";
+    if (naming && event.type == SDL_TEXTINPUT) {
+        blockplanet::ui::send_command(std::string("name_type:") + event.text.text);
+        return true;
+    }
+    if (naming && event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.scancode) {
+        case SDL_SCANCODE_BACKSPACE:
+            blockplanet::ui::send_command("name_key:delete");
+            return true;
+        case SDL_SCANCODE_RETURN:
+        case SDL_SCANCODE_KP_ENTER:
+            if (!event.key.repeat) blockplanet::ui::send_command("name_done");
+            return true;
+        case SDL_SCANCODE_SPACE:
+            return true;  // arrives as text
+        default: break;
+        }
+    }
+    if (naming && event.type == SDL_CONTROLLERBUTTONDOWN && assigned &&
+        event.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
+        blockplanet::ui::send_command("name_done");
+        return true;
+    }
+    if (event.type == SDL_TEXTINPUT) return true;
     if (event.type == SDL_KEYDOWN) {
         switch (event.key.keysym.scancode) {
         case SDL_SCANCODE_UP: return send(Action::Up);

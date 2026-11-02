@@ -34,12 +34,49 @@ int main(int argc, char** argv) {
 
     // The playing profile can be kept; another one restarts the game.
     auto actions = profile_actions(store, sam, false);
-    assert(actions.size() == 2 && actions[0].action == "close" && actions[1].action == "command:profile_delete:" + sam);
+    assert(actions.size() == 4 && actions[0].action == "close" && actions[3].action == "command:profile_delete:" + sam);
     actions = profile_actions(store, "1", false);
     assert(actions[0].label == "Play as Player 1" && actions[0].action == "command:profile_play:1");
     actions = profile_actions(store, sam, true);
     assert(actions[0].action == "command:profile_play:" + sam);
     assert(profile_actions(store, "99", false).empty());
+
+    assert(actions.size() == 4 && actions[1].action == "command:profile_rename:" + sam &&
+           actions[2].action == "command:profile_character:" + sam && actions[2].note.empty());
+
+    // Characters: None, then the six robots; the chosen one is marked and
+    // shown in the profile list.
+    auto choices = character_choices(store, sam);
+    assert(choices.size() == 7 && choices[0].note == "chosen" &&
+           choices[0].action == "command:profile_set_character:" + sam + ":none");
+    assert(store.set_character("Sam", "gyro", 3, error));
+    choices = character_choices(store, sam);
+    assert(choices[0].note.empty() && choices[3].label == "Gyro" && choices[3].note == "chosen");
+    assert(profile_list(store, false)[0].note == "Gyro \u00B7 playing now");
+    assert(profile_actions(store, sam, false)[2].note == "Gyro");
+    assert(character_label("nobody").empty() && colour_names().size() == 8);
+
+    // Names: on-screen keys (shift lasts one letter), typing, limits.
+    NameEditor editor;
+    editor.start("new", "");
+    assert(editor.keyboard().size() == 40 && editor.keyboard()[0].label == "A");
+    assert(editor.press("A") && editor.keyboard()[0].label == "a");  // shift released
+    assert(!editor.press("B") && editor.text() == "Ab");
+    editor.press("space");
+    editor.press("space");  // no double spaces
+    editor.press("7");
+    editor.press("delete");
+    editor.press("delete");
+    assert(editor.text() == "Ab");
+    editor.type("c\x01 Dé!");
+    assert(editor.text() == "Abc D!");
+    editor.type(std::string(40, 'x'));
+    assert(editor.text().size() == 24);
+    editor.start("1", "Sam");
+    assert(editor.target() == "1" && editor.keyboard()[0].label == "a");
+    editor.press("shift");
+    editor.press("Q");
+    assert(editor.text() == "SamQ");
 
     auto confirm = delete_confirmation(store, "1");
     assert(confirm.size() == 1 && confirm[0].action == "command:profile_delete_confirmed:1");

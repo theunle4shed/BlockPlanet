@@ -18,6 +18,12 @@
 //
 // Lists: an element with data-list="NAME" is filled with the items given to
 // set_list when its screen opens.
+//
+// Grids: items directly inside an element with data-columns="N" form a
+// grid. Left and Right move along it; Up and Down move a row, and leave the
+// grid to the items before or after it.
+//
+// Text: an element with data-text="NAME" shows the text given to set_text.
 
 #include "ui_actions.h"
 
@@ -50,6 +56,7 @@ public:
     // (and applied at once to the screen showing).
     void set_setting(const std::string& name, const std::string& value);
     void set_list(const std::string& name, std::vector<ListItem> items);
+    void set_text(const std::string& name, const std::string& text);
 
     // Commands chosen by the player (command:NAME), oldest first.
     std::optional<std::string> take_command();
@@ -72,6 +79,10 @@ private:
     void activate(Screen& screen);
     void change_value(Screen& screen, int direction);
     void fill(Screen& screen);
+    void fill_text(Screen& screen);
+    // The focused item's grid: first index and size, and the column count.
+    bool grid(const Screen& screen, std::size_t& first, std::size_t& size, int& columns) const;
+    void move(Screen& screen, Action action);
 
     Rml::Context* context_;
     std::filesystem::path screens_;
@@ -79,6 +90,7 @@ private:
     std::deque<std::string> commands_;
     std::map<std::string, std::string> settings_;
     std::map<std::string, std::vector<ListItem>> lists_;
+    std::map<std::string, std::string> texts_;
 };
 
 } // namespace blockplanet::ui

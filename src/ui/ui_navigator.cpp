@@ -125,6 +125,7 @@ void Navigator::fill(Screen& screen) {
             container->AppendChild(std::move(element));
         }
     }
+    fill_text(screen);
     for (Rml::Element* item : items(screen)) {
         if (!item->IsClassSet("value")) continue;
         const auto name = item->GetAttribute<Rml::String>("data-setting", "");
@@ -207,16 +208,10 @@ void Navigator::handle(Action action) {
     const auto count = items(screen).size();
     switch (action) {
     case Action::Up:
-        if (count != 0) set_focus(screen, (screen.focus + count - 1) % count);
-        break;
     case Action::Down:
-        if (count != 0) set_focus(screen, (screen.focus + 1) % count);
-        break;
     case Action::Left:
-        change_value(screen, -1);
-        break;
     case Action::Right:
-        change_value(screen, 1);
+        if (count != 0) move(screen, action);
         break;
     case Action::Confirm:
         activate(screen);
@@ -224,6 +219,62 @@ void Navigator::handle(Action action) {
     case Action::Back:
         pop();
         break;
+    }
+}
+
+bool Navigator::grid(const Screen& screen, std::size_t& first, std::size_t& size, int& columns) const {
+    const auto list = items(screen);
+    if (list.empty()) return false;
+    Rml::Element* container = list[screen.focus]->GetParentNode();
+    if (container == nullptr || !container->HasAttribute("data-columns")) return false;
+    columns = std::max(1, container->GetAttribute<int>("data-columns", 1));
+    first = screen.focus;
+    while (first > 0 && list[first - 1]->GetParentNode() == container) --first;
+    size = 0;
+    while (first + size < list.size() && list[first + size]->GetParentNode() == container) ++size;
+    return true;
+}
+
+void Navigator::move(Screen& screen, Action action) {
+    const std::size_t count = items(screen).size();
+    std::size_t first = 0, size = 0;
+    int columns = 1;
+    const bool in_grid = grid(screen, first, size, columns);
+    const bool horizontal = action == Action::Left || action == Action::Right;
+    if (horizontal && !in_grid) {
+        change_value(screen, action == Action::Left ? -1 : 1);
+        return;
+    }
+    if (horizontal) {
+        const std::size_t position = screen.focus - first;
+        set_focus(screen, first + (action == Action::Left ? (position + size - 1) % size : (position + 1) % size));
+        return;
+    }
+    const bool up = action == Action::Up;
+    if (in_grid) {
+        const std::size_t position = screen.focus - first;
+        const auto step = static_cast<std::size_t>(columns);
+        if (up && position >= step) return set_focus(screen, screen.focus - step);
+        if (!up && position + step < size) return set_focus(screen, screen.focus + step);
+        // Leave the grid: to the item before it, or after it.
+        if (up) set_focus(screen, (first + count - 1) % count);
+        else set_focus(screen, (first + size) % count);
+        return;
+    }
+    set_focus(screen, up ? (screen.focus + count - 1) % count : (screen.focus + 1) % count);
+}
+
+void Navigator::set_text(const std::string& name, const std::string& text) {
+    texts_[name] = text;
+    for (auto& screen : stack_) fill_text(screen);
+}
+
+void Navigator::fill_text(Screen& screen) {
+    Rml::ElementList all;
+    screen.document->QuerySelectorAll(all, "[data-text]");
+    for (Rml::Element* element : all) {
+        const auto found = texts_.find(element->GetAttribute<Rml::String>("data-text", ""));
+        element->SetInnerRML(found == texts_.end() ? Rml::String() : escaped(found->second));
     }
 }
 

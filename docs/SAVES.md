@@ -37,12 +37,12 @@ BlockPlanet/
 
 Each profile has its own cartridge save, trophies and (planned) save file with progress and preferences. The first profile is "Player 1".
 
-- **Character:** each profile can choose a character to represent it, with a colour variant (0 to 7). The characters will be the ones rescued in the game, possibly unlocking as they are rescued, with more added later. The profile list stores the choice (`character`, `palette`); the list of characters comes with the character choice.
+- **Character:** each profile can choose a character to represent it, with a colour variant (0 to 7). The characters will be the ones rescued in the game, possibly unlocking as they are rescued, with more added later. The profile list stores the choice (`character`, `palette`); the characters are Rocket, Gear, Gyro, Stomp, Wheels and Turbine (ids `rocket` … `turbine`).
 - **Guest:** `--guest` plays without a profile. The cartridge save starts fresh and stays in memory, nothing is written, and no trophies are earned.
 - **Deleting** moves the profile's folder to `deleted/` and removes it from the list; it can be restored for 30 days, then it is removed at the next start. Deleting the last profile leaves a fresh "Player 1".
 - **Launch and local multiplayer (with the new menus):** at launch (done; local multiplayer still to come), choose an existing profile, create one, play as a guest, or delete one; the last profile used is pre-selected. In local multiplayer each player chooses their own profile or plays as a guest, and two players cannot use the same profile. Player 1's profile owns the game's own cartridge save; other players' results go to their own save files. If player 1 is a guest, the cartridge save is not written that session.
 
-**The profile screens** (Main > Profiles, [UI.md](UI.md#screens-connected-to-the-game)) choose, add, delete and play as a guest. With more than one profile they open at launch. The game reads its cartridge save while booting, so switching profile saves everything and restarts the game with `--profile=NAME` or `--guest` (the other launch options are kept). New profiles are named "Player N" for now; naming and the character choice come next.
+**The profile screens** (Main > Profiles, [UI.md](UI.md#screens-connected-to-the-game)) choose, add, delete and play as a guest. With more than one profile they open at launch. The game reads its cartridge save while booting, so switching profile saves everything and restarts the game with `--profile=NAME` or `--guest` (the other launch options are kept). New profile and Rename open a name screen; Character chooses one of the six robots (Rocket, Gear, Gyro, Stomp, Wheels, Turbine, named in the ROM) and a colour variant.
 
 Also available:
 
@@ -98,4 +98,4 @@ Agreed layout (2026-11-02):
 - **`settings.dat` stays shared by the PC:** resolution, window, aspect, filters, sphere detail, audio output.
 - **`records.json`, shared by the PC:** best times, high scores and Time Trial runs per mode, each entry tagged with the profile that set it, viewable for everyone or one profile. Guests do not set records. Daily challenges and online leaderboards can build on it.
 - Decoding the cartridge save, so its scores and names can appear in the new menus and be copied into `records.json`.
-- Naming profiles and choosing a character in the profile screens, with the character list.
+- Characters unlocking as they are rescued (needs the chapter each robot is rescued in), the character shown in the game, and art for the colour variants.

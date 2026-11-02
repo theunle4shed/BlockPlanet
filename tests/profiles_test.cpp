@@ -65,6 +65,19 @@ int main(int argc, char** argv) {
         assert(store.find("sam")->character == "rescue-3" && store.find("sam")->palette == 2);
         assert(!store.add("SAM", error));  // names are unique regardless of case
     }
+    // Renaming keeps the folder; clearing the character is allowed.
+    {
+        ProfileStore store(data);
+        assert(store.load(error));
+        const auto id = store.find("Sam")->id;
+        assert(store.rename("Sam", "Sammy", error) && store.find("sammy")->id == id);
+        assert(!store.rename("Sammy", "player 1", error));  // taken
+        assert(!store.rename("Sammy", "", error) && !store.rename("Nobody", "X", error));
+        assert(store.rename("Sammy", "SAMMY", error));  // case only
+        assert(store.rename("SAMMY", "Sam", error));
+        assert(store.set_character("Sam", "", 0, error) && store.find("Sam")->character.empty());
+        assert(store.set_character("Sam", "rescue-3", 2, error));
+    }
     // Deleting moves the profile aside; restoring brings it and its files back.
     {
         ProfileStore store(data);

@@ -82,3 +82,57 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     max-height: 600dp;
     overflow-y: auto;
 }
+
+/* A wider panel, for the name screen's keyboard. */
+#panel.wide { width: 860dp; }
+
+/* The name being typed, with a caret. */
+.name-field {
+    display: block;
+    font-size: 56dp;
+    font-weight: bold;
+    padding: 12dp 24dp;
+    margin-bottom: 8dp;
+    border-radius: 14dp;
+    background-color: #ffffff14;
+    min-height: 68dp;
+}
+.name-field-hint {
+    display: block;
+    font-size: 24dp;
+    color: #ffd166;
+    margin-bottom: 20dp;
+    min-height: 30dp;
+}
+
+/* Grids (data-columns): keys side by side, sized as shares of the row so
+   each row holds exactly the grid's column count (10 keys, 4 actions). */
+.keys .item {
+    display: inline-block;
+    width: 8%;
+    padding: 10dp 0dp;
+    margin: 0dp 1.8% 8dp 0dp;
+    text-align: center;
+    font-size: 34dp;
+    background-color: #ffffff0c;
+}
+.keys .item.focused { background-color: #3a6df0; }
+.keys #keyspace { font-size: 20dp; padding: 17dp 0dp; }
+.keys.actions { margin-top: 16dp; }
+.keys.actions .item { width: 22.5%; margin-right: 2%; font-size: 30dp; }
+.tiles .item {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 31%;
+    margin-right: 2%;
+}
+.tiles .item {
+    vertical-align: top;
+    height: 92dp;
+    font-size: 40dp;
+}
+.tiles .item .note {
+    display: block;
+    margin-left: 0dp;
+    font-size: 22dp;
+}

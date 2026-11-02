@@ -52,9 +52,12 @@ public:
     bool use(std::string_view name, std::string& error);
     // Adds a profile without making it active.
     bool add(std::string_view name, std::string& error);
-    // Sets the profile's character (1 to 32 of a-z, 0-9, '-') and colour
-    // variant (0 to 7).
+    // Sets the profile's character (up to 32 of a-z, 0-9, '-'; empty for
+    // none) and colour variant (0 to 7).
     bool set_character(std::string_view name, std::string_view character, int palette, std::string& error);
+    // Renames a profile (its folder keeps its id). A change of case only is
+    // allowed; another profile's name is not.
+    bool rename(std::string_view name, std::string_view new_name, std::string& error);
 
     // Moves the profile's folder to <data>/deleted and removes it from the
     // list. If it was active, the first remaining profile becomes active; if

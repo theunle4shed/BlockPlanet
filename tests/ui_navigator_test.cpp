@@ -54,6 +54,12 @@ int main(int argc, char** argv) {
            "<div><div class='item' id='story' data-action='command:story'/></div>"
            "<div class='item' id='back' data-action='back'/>");
 
+    screen(dir, "keys",
+           "<div data-text='typed'/>"
+           "<div class='item' id='top' data-action='back'/>"
+           "<div data-columns='3' data-list='keyboard'/>"
+           "<div class='item' id='done' data-action='command:done'/>");
+
     NullRenderer renderer;
     QuietSystem system;
     Rml::SetRenderInterface(&renderer);
@@ -140,6 +146,38 @@ int main(int argc, char** argv) {
                "A &lt;b&gt; &amp; C");
         nav.handle(Action::Back);
         assert(nav.current_screen() == "main");
+        nav.close();
+
+        // Grids: Left and Right move along, Up and Down move a row and
+        // leave the grid at its edges. Text fields show set_text.
+        std::vector<ListItem> keys;
+        for (const char* key : {"a", "b", "c", "d", "e"}) keys.push_back({key, key, "", std::string("command:") + key, true});
+        nav.set_list("keyboard", keys);
+        nav.set_text("typed", "x<y");
+        assert(nav.open("keys") && nav.focused_item() == "top");
+        assert(context->GetDocument(context->GetNumDocuments() - 1)->QuerySelector("[data-text]")->GetInnerRML() ==
+               "x&lt;y");
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "a");
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "d");
+        nav.handle(Action::Right);
+        assert(nav.focused_item() == "e");
+        nav.handle(Action::Right);
+        assert(nav.focused_item() == "a");  // wraps around the grid
+        nav.handle(Action::Left);
+        nav.handle(Action::Up);
+        assert(nav.focused_item() == "b");
+        nav.handle(Action::Up);
+        assert(nav.focused_item() == "top");
+        nav.handle(Action::Up);
+        assert(nav.focused_item() == "done");
+        nav.handle(Action::Up);
+        assert(nav.focused_item() == "e");  // into the grid from below
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "done");
+        nav.set_text("typed", "z");
+        assert(context->GetDocument(context->GetNumDocuments() - 1)->QuerySelector("[data-text]")->GetInnerRML() == "z");
         nav.close();
     }
     Rml::Shutdown();

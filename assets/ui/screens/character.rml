@@ -1,0 +1,16 @@
+<rml>
+<head>
+    <title>Character</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Character</div>
+        <div class="subtitle" data-text="character_for"></div>
+        <div class="item value" id="colour" data-setting="profile_colour"
+             data-options="0:Original,1:Crimson,2:Amber,3:Lime,4:Teal,5:Sky,6:Violet,7:Rose">Colour<span class="value"></span></div>
+        <div class="list tiles" data-list="characters" data-columns="3"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>
