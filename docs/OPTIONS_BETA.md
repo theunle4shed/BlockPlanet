@@ -53,7 +53,7 @@ filtering, texture filtering and sphere detail on eight rows. Up/Down selects a 
 cycles its values. There are no MORE pages or repeated options. Each change saves
 before another edit is accepted; failed saves restore the persisted value and
 show a retry message. Back returns to Options. Window mode, presentation/texture filters and SPHERE apply during play.
-SPHERE (BlockPlanet) is ORIGINAL (the game's sphere drawing) or EXTENDED (BlockPlanet's renderer, two extra cells on every side so blocks near the edge of the view are not missing); `--sphere=original|extended` overrides it for one run.
+SPHERE (BlockPlanet) is EXTENDED by default (BlockPlanet's renderer, two extra cells on every side so blocks near the edge of the view are not missing) or ORIGINAL (the game's sphere drawing); `--sphere=original|extended` overrides it for one run.
 Resolution, aspect, refresh and MSAA are saved for the next launch. Controls apply
 after successful saving without restarting the game.
 

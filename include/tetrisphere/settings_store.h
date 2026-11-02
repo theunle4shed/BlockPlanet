@@ -26,7 +26,7 @@ struct GraphicsSettings {
     int msaa_samples = 0;
     PresentationFilter presentation_filter = PresentationFilter::Pixel;
     bool three_point_filter = true;
-    GraphicsSphere sphere = GraphicsSphere::Original;
+    GraphicsSphere sphere = GraphicsSphere::Extended;
 };
 
 constexpr const char* graphics_resolution_name(GraphicsResolution value) {

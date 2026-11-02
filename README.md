@@ -31,7 +31,7 @@ Until a BlockPlanet release exists, the latest playable build is [Blocksphere 1.
 - Native executables for Linux and Windows x86-64, with RT64 rendering and recompiled RSP audio.
 - Original gameplay and modes, including Rescue, Hide & Seek, Puzzle, Time Trial, Training, and VS, with local two-player support.
 - 4:3 and 16:9 presentation, with game-specific HUD, pause-image, and framebuffer fixes.
-- Saved graphics settings: resolution, aspect ratio, window mode, refresh request, MSAA, presentation filtering, texture filtering, and sphere detail (BlockPlanet: Original or Extended).
+- Saved graphics settings: resolution, aspect ratio, window mode, refresh request, MSAA, presentation filtering, texture filtering, and sphere detail (BlockPlanet: Extended by default, or Original).
 - Keyboard and controller input, persistent remapping by action, and prompts that follow the last active input device.
 - One-time import of a supported ROM, with settings and progress stored locally.
 

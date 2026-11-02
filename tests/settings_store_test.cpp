@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
         loaded.graphics.aspect != tetrisphere::GraphicsAspect::Expand16x9 ||
         loaded.graphics.refresh != tetrisphere::GraphicsRefresh::Original ||
         loaded.graphics.window_mode != tetrisphere::GraphicsWindowMode::Windowed ||
-        loaded.graphics.sphere != tetrisphere::GraphicsSphere::Original) {
+        loaded.graphics.sphere != tetrisphere::GraphicsSphere::Extended) {
         return fail("new settings did not load defaults");
     }
     // The SPHERE setting round-trips (schema 7).
@@ -58,6 +58,8 @@ int main(int argc, char** argv) {
         loaded.graphics.presentation_filter != tetrisphere::PresentationFilter::Nearest ||
         loaded.graphics.three_point_filter)
         return fail("saved image quality values were ignored");
+    if (loaded.graphics.sphere != tetrisphere::GraphicsSphere::Extended)
+        return fail("settings saved before the SPHERE option did not default to Extended");
     if (loaded.magic != tetrisphere::MagicControl::West)
         return fail("old left-trigger default did not migrate to west");
     loaded.magic = tetrisphere::MagicControl::TriggerLeft;
