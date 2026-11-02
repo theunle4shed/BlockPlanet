@@ -101,6 +101,10 @@ Needs care in VS and with game timing.
 
 First document every existing magic: trigger, effect code, animation, sound and how it is earned. New magic means adding entries to the game's magic tables and writing the effect logic as new C++ functions hooked into the game. Balance testing is needed for VS.
 
+### Custom levels (research M, then L)
+
+Levels are generated: the game fills a 32×32 grid per layer with random pieces around a fixed core, and the chapter sets the depth (see [blockplanet-game-state.md](research/blockplanet-game-state.md)). A level editor could write a designed grid before play starts. Research: what each cell value means (piece, colour, crystal, link to neighbours), and where the generator runs, so a custom grid can replace its output cleanly.
+
 ### Custom characters you can save (M to L, plus art)
 
 Let players create characters (name, colors, portrait, look) and keep them in BlockPlanet's own save data rather than the 512-byte N64 EEPROM. Research: how the game stores and draws its characters. Then use texture replacement for the look, and hook the character selection to load custom entries.

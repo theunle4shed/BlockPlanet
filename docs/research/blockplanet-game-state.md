@@ -21,6 +21,17 @@ RDRAM is stored as 32-bit host-order words, so a byte address is read at `addres
 | Level in chapter | context `+0x23BA` (`0x801125DA`) | s16 | Level within the chapter, 0-based; the puzzle number in Puzzle. Advanced from 0 to 1 when level 1:1 was cleared. |
 | Time Trial clock | context `+0x2B0C` | s32 | Blocksphere's candidate. Counts down from 18 059 (1/60 s, about five minutes) in mode 2. |
 
+## How levels are built
+
+The P1 block grid at `0x80116BF0` (Blocksphere's map) holds 32×32 cells of s16 per layer, 2048 bytes per layer.
+
+- **Layer 0 is the core:** a fixed repeating tile pattern (cell values 0x5A to 0x5D).
+- **The playfield layers are generated randomly on each start.** Two starts of chapter 1 left layer 1 different in 887 of 1024 cells, with similar mixes of values.
+- **The chapter sets the depth:** chapter 1 filled 2 layers (core and one playfield layer) and chapter 10 filled 6.
+- Layer 9 held identical values in both runs (384 cells of 0x1010).
+
+So levels are generated, not stored designs. Custom levels are possible in principle: BlockPlanet could write a designed grid before play starts, as `--start-chapter` does for the chapter. The meaning of each cell value (piece id, colour, crystal) still needs mapping.
+
 ## Inferred, not yet confirmed
 
 | Value | Evidence |
