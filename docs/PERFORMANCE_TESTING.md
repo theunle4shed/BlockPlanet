@@ -46,6 +46,10 @@ tetrisphere.exe --perf-log --casual --start-chapter=15
 
 On the software renderer used for development, chapter 20 cost about a third more renderer time per frame than chapter 1, with higher peaks.
 
+## Sphere buffer use
+
+`BLOCKPLANET_SPHERE_STATS=1` adds a `sphere_usage` line every 300 frames: the most display list and vertex space the sphere used in one frame, the same for the whole frame, and the buffer address ranges seen (`sphere_usage_buffers` lists the distinct buffer starts). Use it when testing larger sphere patches; the game's vertex pool holds 56 KB per frame.
+
 ## A useful test run
 
 1. Pick one scene that feels slow, for example a busy Rescue level or VS mode, and one quiet scene, such as the main menu.

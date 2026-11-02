@@ -1,6 +1,7 @@
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/eeprom_store.h"
+#include "tetrisphere/recomp_support.h"
 
 #include "recomp.h"
 #include "ultramodern/ultra64.h"
@@ -363,6 +364,10 @@ void osSpTaskStartGo_recomp(std::uint8_t* rdram, recomp_context* ctx) {
                      static_cast<unsigned>(task->t.ucode),
                      static_cast<unsigned>(task->t.data_ptr));
         std::fflush(stdout);
+    }
+    if (descriptor_offset <= 0x800000u - sizeof(OSTask)) {
+        const auto* task = reinterpret_cast<const OSTask*>(rdram + descriptor_offset);
+        if (task->t.type == M_GFXTASK) blockplanet_sphere_stats_task(rdram);
     }
     ultramodern::submit_rsp_task(rdram, static_cast<std::int32_t>(ctx->r4));
 }

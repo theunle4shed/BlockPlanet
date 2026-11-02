@@ -67,3 +67,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `BLOCKPLANET_SPHERE_VERIFY` to check only some groups of passes, and `BLOCKPLANET_SPHERE_SELFTEST` to measure the snapshot check's own noise.
 - Documented how the game culls faces: a precomputed face mask per block, with each quarter drawing only the outer face and the two sides that look towards the view centre.
 - Corrected the research notes: each mesh table entry holds a base point and a fixed layer step (not a core point), and `0x8015EDB2`/`0x8015EDAE` are the cell's height and kind (not a column span).
+
+## 2026-11-02: Sphere renderer, stage 2 (buffer budget)
+
+- Added `BLOCKPLANET_SPHERE_STATS=1`, which logs how much display list and vertex space the sphere and the whole frame use (`docs/PERFORMANCE_TESTING.md`).
+- Measured the budget in chapter 15: the sphere uses up to 18 KB of the game's 56 KB vertex pool and 9.5 KB of its 112 KB display list. A wider patch would only just fit the game's pool, but the upper 4 MB of memory is unused by the game, so BlockPlanet's larger patches will keep their vertices there. Details in `docs/research/blockplanet-game-state.md`.

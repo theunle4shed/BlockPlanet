@@ -115,4 +115,20 @@ The six **face functions** are reimplemented in `src/graphics/sphere_faces.cpp`.
 
 `BLOCKPLANET_SPHERE_VERIFY` limits verify mode to some groups (comma-separated: `mesh`, `cell`, `faces`, `quadrants`). With only the quadrant check on, about 1 check in 100 differs by one display list word where a special block's triangle and a side face's triangle trade places. `BLOCKPLANET_SPHERE_SELFTEST=1`, which replays the original function itself instead of BlockPlanet's, shows the same differences at the same rate. So they come from the check (some input changing between the snapshot and the original's run), not from the port. Their cause is not known yet.
 
-Both need the game's drawing functions replaced with BlockPlanet code (N64Recomp can call host functions in place of recompiled ones). The fixed sizes live in the table builder (16 × 16 loops), the table storage (16 rows of `0xC0` bytes), the base grid (18 points per row), the drawing passes (8-row loops with column spans at `0x8015EDB2`/`0x8015EDAE`) and the per-frame vertex buffer.
+Both need the game's drawing functions replaced with BlockPlanet code (done in stage 1). The fixed sizes live in the table builder (16 × 16 loops), the table storage (16 rows of `0xC0` bytes), the base grid (18 points per row), the quadrant loops (15 × 15 cells) and the per-frame buffers.
+
+### Buffer budget (stage 2, step 1)
+
+Measured on 2026-11-02 with `BLOCKPLANET_SPHERE_STATS=1` (chapter 15, Linux test setup):
+
+| Buffer | Copies (double-buffered) | Size each | Peak use, whole frame | Peak use, sphere |
+| --- | --- | --- | --- | --- |
+| Vertex pool (pointer `0x8013DCF8`, frame start `0x8013DCFC`) | `0x80246000`, `0x80254000` | 56 KB (3,584 vertices) | 22.9 KB (41%) | 18.0 KB (about 1,120 vertices) |
+| Display list (pointer `0x800F22B4`, frame start `0x800F22B8`) | `0x80262000`, `0x8027E000` | 112 KB | 38.2 KB (34%) | 9.5 KB |
+
+Menus use smaller buffers (vertices at `0x80266000`/`0x80268000`, display list from `0x8026A000`). The buffers are set per frame from the task structures at `0x800FACC0` (`+0x18E8` display list, `+0x18EC` vertex pool; the second at `+0x3200`/`+0x3204`). After the sphere, `func_800CD3B8` moves the vertex pool on by the vertex count at `0x800E44F0` × 16.
+
+- **An extended patch fits the game's own buffers, just.** 19 × 19 cells is about 1.6 times the 15 × 15 patch's vertices: roughly 29 KB for the sphere and 34 KB for the frame, 61% of the pool. A heavily dug stage could push past it, so this is not a safe home.
+- **The upper 4 MB is free.** The game is written for 4 MB: in a gameplay memory dump everything from `0x80400000` to `0x807FFFFF` is zero. The code's only references to that range are the constant `0x80400001` in comparisons, which look like pointer-range checks rather than memory use. The runtime reports 8 MB (`osMemSize`). BlockPlanet can keep its own double-buffered sphere vertex buffers there, sized for the full sphere, and leave the game's pool untouched.
+- Display list commands for the sphere can stay in the game's display list (9.5 KB of 112 KB, with room for several times that), or move up as well for the full sphere.
+- Still to confirm in practice: that RT64 draws vertices from above 4 MB (it supports 8 MB for Expansion Pak games), and that no game mode uses the upper 4 MB (only gameplay was dumped).

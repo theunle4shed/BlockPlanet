@@ -35,6 +35,7 @@
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/sphere_quadrants.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <atomic>
@@ -479,6 +480,100 @@ extern "C" void blockplanet_sphere_face_end(std::uint8_t* rdram, recomp_context*
     face_checks[static_cast<std::size_t>(face)].end(rdram);
 }
 
+// ---- usage statistics (BLOCKPLANET_SPHERE_STATS=1) ------------------------
+//
+// How much of the frame's display list and vertex pool the sphere uses, for
+// sizing the larger patches of stage 2. One line every 300 graphics tasks.
+
+namespace {
+
+constexpr std::uint32_t display_list_current = 0x800F22B4u;
+constexpr std::uint32_t display_list_start = 0x800F22B8u;
+constexpr std::uint32_t vertex_pool_current = 0x8013DCF8u;
+constexpr std::uint32_t vertex_pool_start = 0x8013DCFCu;
+constexpr std::uint32_t sphere_vertex_pointer = 0x8015F848u;
+
+struct SphereStats {
+    bool enabled = std::getenv("BLOCKPLANET_SPHERE_STATS") != nullptr;
+    std::uint32_t frame_dl_at_sphere = 0;
+    std::uint32_t frame_vertices_at_sphere = 0;
+    // Maximums over the window.
+    std::uint32_t sphere_dl_bytes = 0;
+    std::uint32_t sphere_vertex_bytes = 0;
+    std::uint32_t frame_dl_bytes = 0;
+    std::uint32_t frame_vertex_bytes = 0;
+    // Ranges of the buffers seen.
+    std::uint32_t lowest_dl = 0xFFFFFFFFu, highest_dl = 0;
+    std::uint32_t lowest_vertex = 0xFFFFFFFFu, highest_vertex = 0;
+    // Distinct buffer starts (double buffering gives two of each).
+    std::array<std::uint32_t, 4> dl_starts{};
+    std::array<std::uint32_t, 4> vertex_starts{};
+    unsigned tasks = 0;
+};
+SphereStats stats;
+
+void note_start(std::array<std::uint32_t, 4>& starts, std::uint32_t start) {
+    for (auto& s : starts) {
+        if (s == start) return;
+        if (s == 0) {
+            s = start;
+            return;
+        }
+    }
+}
+
+void note_range(std::uint32_t& low, std::uint32_t& high, std::uint32_t from, std::uint32_t to) {
+    if (from < low) low = from;
+    if (to > high) high = to;
+}
+
+} // namespace
+
+extern "C" void blockplanet_sphere_stats_task(const std::uint8_t* rdram) {
+    if (!stats.enabled) return;
+    const std::uint32_t dl_start = load32(rdram, display_list_start);
+    const std::uint32_t dl_end = load32(rdram, display_list_current);
+    const std::uint32_t pool_start = load32(rdram, vertex_pool_start);
+    const std::uint32_t pool_end = load32(rdram, vertex_pool_current);
+    if (dl_end >= dl_start && dl_end - dl_start < 0x100000u) {
+        stats.frame_dl_bytes = std::max(stats.frame_dl_bytes, dl_end - dl_start);
+        note_range(stats.lowest_dl, stats.highest_dl, dl_start, dl_end);
+        note_start(stats.dl_starts, dl_start);
+    }
+    if (pool_end >= pool_start && pool_end - pool_start < 0x100000u) {
+        stats.frame_vertex_bytes = std::max(stats.frame_vertex_bytes, pool_end - pool_start);
+        note_range(stats.lowest_vertex, stats.highest_vertex, pool_start, pool_end);
+        note_start(stats.vertex_starts, pool_start);
+    }
+    if (++stats.tasks % 300 != 0) return;
+    std::fprintf(stdout,
+                 "{\"event\":\"sphere_usage\",\"sphere_dl_bytes\":%u,\"sphere_vertex_bytes\":%u,"
+                 "\"frame_dl_bytes\":%u,\"frame_vertex_bytes\":%u,"
+                 "\"dl_range\":[\"0x%08X\",\"0x%08X\"],\"vertex_range\":[\"0x%08X\",\"0x%08X\"]}\n",
+                 stats.sphere_dl_bytes, stats.sphere_vertex_bytes, stats.frame_dl_bytes, stats.frame_vertex_bytes,
+                 stats.lowest_dl, stats.highest_dl, stats.lowest_vertex, stats.highest_vertex);
+    std::fprintf(stdout, "{\"event\":\"sphere_usage_buffers\",\"dl_starts\":[\"0x%08X\",\"0x%08X\",\"0x%08X\",\"0x%08X\"],"
+                 "\"vertex_starts\":[\"0x%08X\",\"0x%08X\",\"0x%08X\",\"0x%08X\"]}\n",
+                 stats.dl_starts[0], stats.dl_starts[1], stats.dl_starts[2], stats.dl_starts[3],
+                 stats.vertex_starts[0], stats.vertex_starts[1], stats.vertex_starts[2], stats.vertex_starts[3]);
+    std::fflush(stdout);
+    stats = SphereStats{};
+}
+
+namespace {
+void stats_sphere_begin(const std::uint8_t* rdram) {
+    if (!stats.enabled) return;
+    stats.frame_dl_at_sphere = load32(rdram, display_list_current);
+    stats.frame_vertices_at_sphere = load32(rdram, sphere_vertex_pointer);
+}
+void stats_sphere_end(const std::uint8_t* rdram) {
+    if (!stats.enabled) return;
+    stats.sphere_dl_bytes = std::max(stats.sphere_dl_bytes, load32(rdram, display_list_current) - stats.frame_dl_at_sphere);
+    stats.sphere_vertex_bytes =
+        std::max(stats.sphere_vertex_bytes, load32(rdram, sphere_vertex_pointer) - stats.frame_vertices_at_sphere);
+}
+} // namespace
+
 // Game functions for the quadrant self-test (see blockplanet_sphere_quadrant_end).
 extern "C" {
 void func_8009E630(std::uint8_t* rdram, recomp_context* ctx);
@@ -495,6 +590,7 @@ bool replaying_original = false;
 
 extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
     if (replaying_original) return false;
+    if (quadrant == 0) stats_sphere_begin(rdram);
     const Mode m = mode_for("quadrants");
     if (m == Mode::Original) return false;
     if (m == Mode::Verify) {
@@ -502,12 +598,15 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
         return false;
     }
     draw_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant));
+    if (quadrant == 3) stats_sphere_end(rdram);  // the end hook does not run when replaced
     return true;
 }
 
 extern "C" void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
     (void)ctx;
-    if (replaying_original || mode_for("quadrants") != Mode::Verify) return;
+    if (replaying_original) return;
+    if (quadrant == 3) stats_sphere_end(rdram);
+    if (mode_for("quadrants") != Mode::Verify) return;
     // BLOCKPLANET_SPHERE_SELFTEST=1 replays the original instead of
     // BlockPlanet's version, to measure how often the check itself differs
     // (for example because of other host threads).
