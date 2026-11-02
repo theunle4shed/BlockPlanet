@@ -35,6 +35,10 @@ Large multi-layer spheres seem to build in over several frames when they come in
 
 A menu that lists every music track and sound effect and plays them. Research: find the game's song table and the function that starts a song (the music format is documented by Chris Gilmore's `n64tetristools` and `dcm2xm` research, credited in the README). Then call that function from a new menu. Unlockables or track names can come later.
 
+### Casual play: no game over (S, done as a launch option)
+
+`--casual` refills hearts as soon as one is lost and stops the Time Trial clock at 30 seconds, so a game never ends. Trophies are paused while it is on. It becomes an Options setting with the new menus. Requested both for testing later stages and as a relaxed way to play.
+
 ## Phase 2: presentation
 
 ### Variable screen sizes: ultrawide, vertical and any window shape (L)

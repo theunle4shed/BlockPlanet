@@ -36,6 +36,10 @@ struct RunOptions {
     // game wait for the GPU every frame.
     std::optional<bool> framebuffer_readback;
     bool perf_log = false;
+    // Casual play: no game over. Trophies are paused.
+    bool casual = false;
+    // Start Rescue at this chapter (1-based), for testing. Trophies are paused.
+    std::optional<int> start_chapter;
 };
 
 RunOptions parse_run_options(int argc, const char* const argv[]);

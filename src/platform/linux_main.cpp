@@ -11,6 +11,7 @@
 #include "tetrisphere/perf_metrics.h"
 #include "tetrisphere/trophy_service.h"
 #include "tetrisphere/game_event_watcher.h"
+#include "tetrisphere/game_options.h"
 #include "tetrisphere/close_game_menu.h"
 
 #include "tetrisphere/rt64_context.h"
@@ -82,10 +83,12 @@ std::atomic<std::uint64_t> audio_rsp_max_us{0};
 bool perf_log_enabled = false;
 const std::uint8_t* guest_rdram = nullptr;
 GameEventWatcher game_event_watcher;
+std::unique_ptr<GameOptionApplier> game_option_applier;
 bool log_game_events = false;
 
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
+    if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
     for (const auto& event : game_event_watcher.update(read_game_state(guest_rdram))) {
         if (log_game_events) {
             std::string fields;
@@ -498,6 +501,15 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             ? std::filesystem::u8path(base) / "trophies.json" : std::filesystem::path("trophies.json");
         if (base != nullptr) SDL_free(base);
         initialize_trophies(definitions, user_path / "trophies.json");
+    }
+    game_option_applier = std::make_unique<GameOptionApplier>(
+        GameOptions{run_options.casual, run_options.start_chapter});
+    if (game_option_applier->affects_awards()) {
+        trophy_engine().set_awards_enabled(false);
+        std::fprintf(stdout, "{\"event\":\"game_options\",\"casual\":%s,\"start_chapter\":%d,"
+                     "\"trophies\":\"paused\"}\n", run_options.casual ? "true" : "false",
+                     run_options.start_chapter.value_or(0));
+        std::fflush(stdout);
     }
     SDL_Rect usable_display{};
     if (SDL_GetDisplayUsableBounds(0, &usable_display) != 0)

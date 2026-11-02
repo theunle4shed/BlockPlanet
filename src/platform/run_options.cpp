@@ -96,6 +96,23 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             else return invalid("framebuffer readback must be on or off");
             continue;
         }
+        if (argument == "--casual") {
+            result.casual = true;
+            continue;
+        }
+        if (argument == "--start-chapter" || argument.starts_with("--start-chapter=")) {
+            const auto value = argument == "--start-chapter"
+                ? (index + 1 < argc ? std::string_view(argv[++index]) : std::string_view{})
+                : argument.substr(sizeof("--start-chapter=") - 1);
+            int chapter = 0;
+            for (const char c : value) {
+                if (c < '0' || c > '9' || chapter > 1000) return invalid("start chapter must be a number from 1 to 99");
+                chapter = chapter * 10 + (c - '0');
+            }
+            if (chapter < 1 || chapter > 99) return invalid("start chapter must be a number from 1 to 99");
+            result.start_chapter = chapter;
+            continue;
+        }
         if (argument == "--perf-log") {
             result.perf_log = true;
             continue;
@@ -119,6 +136,9 @@ const char* run_options_help() {
            "  --present-mode=console|skip-buffering|early\n"
            "                                   When finished frames are shown (default console)\n"
            "  --framebuffer-readback=on|off    Copy each frame back to game memory (default on)\n"
+           "  --casual                         No game over: hearts refill, Time Trial clock\n"
+           "                                   stops at 30 s. Trophies are paused\n"
+           "  --start-chapter=N                Start Rescue at chapter N (testing). Trophies are paused\n"
            "  --perf-log                       Report frame timings every 5 seconds\n"
            "  --help                           Show this help\n"
            "Examples: tetrisphere --fullscreen --msaa4x\n"

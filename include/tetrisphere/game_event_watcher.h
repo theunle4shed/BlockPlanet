@@ -28,6 +28,8 @@ constexpr std::uint32_t score_offset = 0x2AF8;      // s32; the HUD shows score 
 constexpr std::uint32_t hearts_offset = 0x2D7E;     // s16 hearts left; 3..1, -1 = out
 constexpr std::uint32_t piece = 0x801127FB;         // u8 current piece; 8 while dropping
 constexpr std::uint8_t piece_dropping = 8;
+constexpr std::uint32_t chapter = 0x800E44A0;       // s16 Rescue / Hide & Seek chapter, 0-based
+constexpr std::uint32_t level_offset = 0x23BA;      // s16 level within chapter, or puzzle number; 0-based
 }
 
 struct GameStateSnapshot {
@@ -37,6 +39,8 @@ struct GameStateSnapshot {
     std::int16_t hearts = 0;
     std::int16_t p2_hearts = 0;
     std::uint8_t piece = 0;
+    std::int16_t chapter = 0;
+    std::int16_t level = 0;
 };
 
 // Read a snapshot from RDRAM as laid out by N64Recomp (32-bit words in host
@@ -53,7 +57,10 @@ public:
 
 private:
     std::optional<GameStateSnapshot> previous_;
+    // Last snapshot taken during play; the game leaves play between levels.
+    std::optional<GameStateSnapshot> last_play_;
     std::int32_t best_score_this_game_ = 0;
+    std::int64_t hearts_lost_this_level_ = 0;
 };
 
 } // namespace tetrisphere

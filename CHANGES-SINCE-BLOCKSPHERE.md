@@ -39,3 +39,9 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - Added `GameEventWatcher` (`include/tetrisphere/game_event_watcher.h`, `src/platform/game_event_watcher.cpp`), which reads known game memory each pass of the main loop and reports `mode_started`, `piece_placed`, `life_lost`, `game_over` and `vs_round` to the trophy engine. Set `TETRISPHERE_LOG_GAME_EVENTS=1` to print them.
 - Recorded the addresses and how they were found in [docs/research/blockplanet-game-state.md](docs/research/blockplanet-game-state.md), including the game's mode numbers. Mode 4, which has the catch-up cap, is Puzzle.
+
+## 2026-11-02: Casual play, start chapter and level events
+
+- Added `--casual` (no game over: hearts refill and the Time Trial clock stops at 30 seconds) and `--start-chapter=N` (start Rescue at chapter N). Both pause trophies. Implemented in `include/tetrisphere/game_options.h` and `src/platform/game_options.cpp`.
+- The game event watcher now reports `level_completed`, `chapter_completed` and `puzzle_solved`, using the chapter (`0x800E44A0`) and level (`+0x23BA`) found this session. A real `level_completed` was seen when clearing level 1:1.
+- Testing later stages is described in [docs/PERFORMANCE_TESTING.md](docs/PERFORMANCE_TESTING.md).

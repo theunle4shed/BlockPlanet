@@ -17,6 +17,9 @@ RDRAM is stored as 32-bit host-order words, so a byte address is read at `addres
 | Heart states | context `+0x2FFC + 0x20 × i`, i = 0..2 | u8 | 0 heart, 1 turning, 2 skull. |
 | Current piece | `0x801127FB` | u8 | Piece type; 8 for about 0.1 s on every drop. |
 | Retries | `0x800E088F` | u8 | Increments on each TRY AGAIN, not on the first game. |
+| Chapter | `0x800E44A0` | s16 | Rescue and Hide & Seek chapter, 0-based. Writing 4 during play showed "5:1" in the HUD. Writing it before the level loads builds that chapter's sphere (chapter 10, 15 and 20 tested). |
+| Level in chapter | context `+0x23BA` (`0x801125DA`) | s16 | Level within the chapter, 0-based; the puzzle number in Puzzle. Advanced from 0 to 1 when level 1:1 was cleared. |
+| Time Trial clock | context `+0x2B0C` | s32 | Blocksphere's candidate. Counts down from 18 059 (1/60 s, about five minutes) in mode 2. |
 
 ## Inferred, not yet confirmed
 
@@ -24,6 +27,8 @@ RDRAM is stored as 32-bit host-order words, so a byte address is read at `addres
 | --- | --- |
 | `0x801125DA` = puzzle number | The HUD draws this number only in mode 4 (Puzzle), in the level badge. |
 | Catch-up cap applies to Puzzle | The cap is for mode 4. See [frame pacing findings](blockplanet-frame-pacing.md). |
+| Puzzle solved = puzzle number advancing | Same field as the Rescue level. Not yet seen in play. |
+| Highest chapter | Chapter 20 loads a sphere; the real number of chapters is not known yet. |
 
 ## Events the watcher reports
 
@@ -33,6 +38,9 @@ RDRAM is stored as 32-bit host-order words, so a byte address is read at `addres
 | `piece_placed` | Current piece changes to 8. |
 | `life_lost` | Hearts left decreases. |
 | `game_over` | Hearts left becomes -1, outside VS. Reports `score` as the HUD shows it. |
+| `level_completed` | In Rescue or Hide & Seek, chapter or level higher than at the last moment of play. Reports `chapter` and `level` (1-based), `score` and `hearts_lost` during that level. Seen in play: clearing 1:1. |
+| `chapter_completed` | The chapter number went up. `final` is always 0 until the last chapter is known. |
+| `puzzle_solved` | In Puzzle, the puzzle number went up. Not yet seen in play. |
 | `vs_round` | In VS CPU, P1's hearts reaching -1 is a `loss`; P2's (context `0x80113488 + 0x2D7E`) is a `win`. The P1 side was recorded: hearts run out and refill each round. The P2 side is inferred from the same layout. |
 
 Mode names are reported for modes 1 to 6. Practice, two-player VS and Lines are not identified yet and report events without a mode. Puzzle keeps hearts at 3, so it never reports `life_lost` or `game_over`.
@@ -40,9 +48,8 @@ Mode names are reported for modes 1 to 6. Practice, two-player VS and Lines are 
 ## Still to find
 
 - Mode numbers for Practice, two-player VS and Lines.
-- Level and chapter numbers, and level and chapter completion. The HUD formats the level with `sprintf` (`func_800D3184`, format at `0x800EE060`) before `0x8007691C`.
+- The number of chapters, to report `final` on the last one.
 - Combo size and multiplier.
 - Magic use and magic type.
-- VS round result.
-- Puzzle solved, drops and slides.
+- Puzzle drops and slides.
 - Game over for modes without hearts: Puzzle, and Time Trial when the clock runs out.

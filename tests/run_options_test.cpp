@@ -68,6 +68,17 @@ int main() {
         assert(!options.valid && options.error.find("readback") != std::string::npos);
     }
     {
+        const char* argv[] = {"tetrisphere-m1", "--casual", "--start-chapter=12"};
+        const auto options = parse_run_options(3, argv);
+        assert(options.valid && options.casual && options.start_chapter && *options.start_chapter == 12);
+    }
+    {
+        const char* argv[] = {"tetrisphere-m1", "--start-chapter", "0"};
+        assert(!parse_run_options(3, argv).valid);
+        const char* argv2[] = {"tetrisphere-m1", "--start-chapter=x"};
+        assert(!parse_run_options(2, argv2).valid);
+    }
+    {
         const char* argv[] = {"tetrisphere-m1", "--present-mode=fast"};
         const auto options = parse_run_options(2, argv);
         assert(!options.valid && options.error.find("present mode") != std::string::npos);

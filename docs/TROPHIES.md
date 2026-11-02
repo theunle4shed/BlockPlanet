@@ -15,6 +15,7 @@ game hooks ──GameEvent──▶ TrophyEngine ──▶ stats and unlocks ─
 - **`TrophyEngine`** (`include/tetrisphere/trophies.h`) applies the definitions: it updates stats, unlocks trophies, and tells every sink once per unlock.
 - **Definitions** are data in `assets/trophies/trophies.json`, copied beside the executable. Adding or changing a trophy needs no code, only an event that the game already reports.
 - **Progress** is saved to `data/trophies.json` with a `.bak` backup, separate from the N64 EEPROM save. It is saved on every unlock, every 30 seconds while stats change, and when the game closes.
+- **Casual play and `--start-chapter`** pause trophies too.
 - **Online guests** earn nothing. While a guest plays a stage the host unlocked, `set_awards_enabled(false)` stops both stats and unlocks.
 
 ## Definition format
@@ -63,9 +64,9 @@ The trophy list depends on these events. `GameEventWatcher` (`include/tetrispher
 | `vs_round` | `mode`, `result` (`win` or `loss`) | A VS CPU round ends. | Loss recorded in play; win inferred |
 | `combo` | `mode`, `size`, `score`, `multiplier` | A combo scores. | Not yet |
 | `magic_used` | `mode`, `type` | Magic is launched. | Not yet |
-| `level_completed` | `mode`, `chapter`, `level`, `score`, `hearts_lost` | A level is cleared. | Not yet |
-| `chapter_completed` | `mode`, `chapter`, `final` (1 for the last chapter) | A chapter is cleared. | Not yet |
-| `puzzle_solved` | `puzzle`, `drops`, `slides`, `seconds` | A puzzle is solved. | Not yet |
+| `level_completed` | `mode`, `chapter`, `level`, `score`, `hearts_lost` | A Rescue or Hide & Seek level is cleared. | Working |
+| `chapter_completed` | `mode`, `chapter`, `final` (1 for the last chapter) | A chapter is cleared. | Working; `final` not yet |
+| `puzzle_solved` | `puzzle`, `drops`, `slides`, `seconds` | A puzzle is solved. | `puzzle` only; not yet seen in play |
 
 Set `TETRISPHERE_LOG_GAME_EVENTS=1` to print each event as it happens.
 

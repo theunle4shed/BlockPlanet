@@ -41,6 +41,8 @@ GameStateSnapshot read_game_state(const std::uint8_t* rdram) {
     snapshot.hearts = read_s16(rdram, p1_context + hearts_offset);
     snapshot.p2_hearts = read_s16(rdram, p2_context + hearts_offset);
     snapshot.piece = read_u8(rdram, piece);
+    snapshot.chapter = read_s16(rdram, chapter);
+    snapshot.level = read_s16(rdram, p1_context + level_offset);
     return snapshot;
 }
 
@@ -64,20 +66,52 @@ std::vector<GameEvent> GameEventWatcher::update(const GameStateSnapshot& now) {
     if (playing && (!previous_ || previous_->scene != -1) && now.hearts == 3 && now.score == 0) {
         events.push_back(event("mode_started", game_mode_name(now.mode)));
         best_score_this_game_ = 0;
+        hearts_lost_this_level_ = 0;
+    }
+    // Level progress, compared with the last moment of play.
+    if (playing && last_play_ && last_play_->mode == now.mode) {
+        const auto& before = *last_play_;
+        const auto mode = game_mode_name(now.mode);
+        const bool chaptered = now.mode == 1 || now.mode == 5;  // Rescue, Hide & Seek
+        const bool advanced = now.chapter > before.chapter ||
+            (now.chapter == before.chapter && now.level > before.level);
+        if (chaptered && advanced) {
+            auto done = event("level_completed", mode);
+            done.fields["chapter"] = static_cast<std::int64_t>(before.chapter) + 1;
+            done.fields["level"] = static_cast<std::int64_t>(before.level) + 1;
+            done.fields["score"] = static_cast<std::int64_t>(before.score) * 10;
+            done.fields["hearts_lost"] = hearts_lost_this_level_;
+            events.push_back(std::move(done));
+            if (now.chapter > before.chapter) {
+                auto chapter = event("chapter_completed", mode);
+                chapter.fields["chapter"] = static_cast<std::int64_t>(before.chapter) + 1;
+                chapter.fields["final"] = std::int64_t{0};  // the last chapter is not identified yet
+                events.push_back(std::move(chapter));
+            }
+            hearts_lost_this_level_ = 0;
+        } else if (now.mode == 4 && now.level > before.level) {  // Puzzle
+            auto solved = event("puzzle_solved", "");
+            solved.fields["puzzle"] = static_cast<std::int64_t>(before.level) + 1;
+            events.push_back(std::move(solved));
+        }
     }
     if (previous_ && playing && previous_->scene == -1) {
         const auto& before = *previous_;
         const auto mode = game_mode_name(now.mode);
         const bool vs = now.mode == game_state::mode_vs_cpu;
-        // A fresh game resets the hearts to three. In VS they refill every round.
-        if (!vs && now.hearts == 3 && before.hearts != 3) {
+        // A retry refills the hearts straight after game over. In VS they refill
+        // every round; in casual play BlockPlanet refills them mid-game.
+        if (!vs && now.hearts == 3 && before.hearts == -1) {
             events.push_back(event("mode_started", mode));
             best_score_this_game_ = 0;
+            hearts_lost_this_level_ = 0;
         }
         if (now.piece == game_state::piece_dropping && before.piece != game_state::piece_dropping)
             events.push_back(event("piece_placed", mode));
-        if (now.hearts < before.hearts && before.hearts > 0 && before.hearts <= 3)
+        if (now.hearts < before.hearts && before.hearts > 0 && before.hearts <= 3) {
             events.push_back(event("life_lost", mode));
+            ++hearts_lost_this_level_;
+        }
         best_score_this_game_ = std::max(best_score_this_game_, now.score);
         if (vs) {
             // A player whose hearts run out loses the round. P2's hearts are
@@ -95,6 +129,7 @@ std::vector<GameEvent> GameEventWatcher::update(const GameStateSnapshot& now) {
             events.push_back(std::move(over));
         }
     }
+    if (playing) last_play_ = now;
     previous_ = now;
     return events;
 }
