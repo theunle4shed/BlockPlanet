@@ -30,7 +30,7 @@ A screen is an RML document in `ui/screens/<name>.rml` that links `../menu.rcss`
 | `open:NAME` | Shows screen NAME on top. The screen being left keeps its focus for when the player comes back. |
 | `back` | Goes back one screen; from the first screen it closes the menus. Also what the Back input does. |
 | `close` | Closes the menus. |
-| `command:NAME` | Reports NAME to the game, which logs it as `ui_command`. `exit` closes the game; the other commands will start modes and open the new options screens. |
+| `command:NAME` | Reports NAME to the game, which logs it as `ui_command`. `exit` closes the game; `story`, `time_trial`, `lines`, `puzzle`, `versus` (and `hide_and_seek`) start a mode (below); the others are not connected yet. |
 
 Screens get the class `entering` when opened and `returning` when shown again after going back, which `menu.rcss` uses for a quick slide (0.18 s).
 
@@ -44,14 +44,26 @@ Input while menus are open:
 
 While menus are open the game receives no input, and after they close it stays blocked until every button is released, so the closing press does not reach the game. For now F1 opens and closes the menus, and `BLOCKPLANET_UI_TEST=1` opens them at start; the game keeps running behind them.
 
+## Starting modes
+
+`ModeLauncher` (`src/platform/mode_launcher.cpp`) starts the game's modes by driving the original menus, so the game sets each mode up exactly as when a player chooses it. From the title, the main menu or the player page it puts the original menu's cursor on the right item and presses A (on port 1, through `get_input`), step by step:
+
+1. Main menu row (`0x800E121C`) to SINGLE, press, until the player page opens (`0x800E1222` ≥ 0).
+2. Player page row to START, press, until its mode list is active (`0x800E1224` ≥ 0).
+3. Mode list row to the mode's row, press, until play begins (`0x800E121C` = −1).
+
+Mode list rows (the player page's table at `0x800EDAE4`): 0 Rescue (mode 1), 1 Hide & Seek (5), 2 Puzzle (4), 3 Time Trial (2), 4 VS CPU (6), 5 Lines (mode 9). The original menu lists only rows 0 to 4 until Lines is unlocked; the launcher starts Lines directly, which is how BlockPlanet makes it available from the start.
+
+Requests are refused during play and inside other original pages such as Options, and give up after 15 seconds. The log shows `mode_launch` with `started`, `playing`, `refused` or `timed_out`. Checked from the title in the Linux test setup: Story (Rescue 1:1), Time Trial, Lines (its rules screen), Puzzle and Versus (VS CPU) all start.
+
 ## Status
 
 - Placeholder screens follow the planned structure (`docs/REDESIGN.md`): main menu (Solo, Multiplayer, Media Player, Trophies, Options, Credits, Exit), Solo (Story, Time Trial, Lines, Puzzle, Custom, Training) and Multiplayer (Versus, Collaborate, Custom). Their look is a plain placeholder until the art direction is set.
 - Checked in the Linux test setup (Vulkan, 720p): drawing, focus, opening Solo, a command, going back with focus remembered, and closing with F1.
-- Not yet: Left and Right on value items (settings), mouse input, starting modes from commands, replacing the original title and mode menus, pausing the game behind a menu, and checks on Windows.
+- Not yet: Left and Right on value items (settings), mouse input, Training, Custom and the other commands, choosing a chapter, replacing the original title and mode menus, pausing the game behind a menu, and checks on Windows.
 
 ## Next
 
-1. Starting the game's modes from menu commands (Story, Time Trial, Puzzle, Lines, Versus), through the mode numbers already mapped.
-2. Value items for settings, then the options, chapter select and profile screens.
+1. Value items for settings, then the options, chapter select and profile screens (the chapter select can use the `--start-chapter` mechanism).
+2. Training and a pause screen.
 3. Replacing the original title and mode-select menus with these screens.

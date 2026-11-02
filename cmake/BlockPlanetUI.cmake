@@ -68,7 +68,8 @@ function(blockplanet_add_ui TARGET)
         "${CMAKE_SOURCE_DIR}/src/ui/ui_navigator.cpp"
         "${CMAKE_SOURCE_DIR}/src/ui/ui_renderer.cpp"
         "${CMAKE_SOURCE_DIR}/src/ui/ui_system.cpp"
-        "${CMAKE_SOURCE_DIR}/src/platform/menu_input.cpp")
+        "${CMAKE_SOURCE_DIR}/src/platform/menu_input.cpp"
+        "${CMAKE_SOURCE_DIR}/src/platform/mode_launcher.cpp")
     blockplanet_ui_shader(${TARGET} UiVS vs_6_3 VSMain)
     blockplanet_ui_shader(${TARGET} UiPS ps_6_3 PSMain)
     target_include_directories(${TARGET} PRIVATE

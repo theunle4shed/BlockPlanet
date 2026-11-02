@@ -518,6 +518,15 @@ add_executable(run_options_test tests/run_options_test.cpp src/platform/run_opti
 target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")
 add_test(NAME run_options COMMAND run_options_test)
+add_executable(mode_launcher_test tests/mode_launcher_test.cpp src/platform/mode_launcher.cpp)
+target_include_directories(mode_launcher_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(mode_launcher_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(mode_launcher_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME mode_launcher COMMAND mode_launcher_test)
+
 add_executable(profile_save_test tests/profile_save_test.cpp src/platform/profile_save.cpp)
 target_include_directories(profile_save_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")

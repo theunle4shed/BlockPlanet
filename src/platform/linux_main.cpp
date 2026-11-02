@@ -21,6 +21,7 @@
 #include "tetrisphere/settings_store.h"
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/menu_input.h"
+#include "tetrisphere/mode_launcher.h"
 #include "ui_system.h"
 #include "tetrisphere/profile_save.h"
 #include "tetrisphere/sphere_mesh.h"
@@ -298,9 +299,17 @@ void count_vi() {
 // BlockPlanet's menus take the input while open, and until every button is
 // released after they close (so the closing press does not reach the game).
 std::atomic<bool> menus_block_game{false};
+// Buttons the mode launcher presses on port 1 (bit 16 set while active).
+std::atomic<std::uint32_t> launcher_buttons{0};
+ModeLauncher mode_launcher;
 
 bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (port < 0 || port >= 2) return false;
+    if (const auto injected = launcher_buttons.load(); injected & 0x10000u) {
+        *buttons = port == 0 ? static_cast<std::uint16_t>(injected & 0xFFFFu) : 0;
+        *x = 0; *y = 0;
+        return true;
+    }
     if (controls_editor_blocks_game() || pc_settings_blocks_game() || menus_block_game.load()) {*buttons=0;*x=0;*y=0;return true;}
     // The runtime asks for ports in order. Freeze both readings together so
     // an SDL event between get_input(0) and get_input(1) cannot mix cycles.
@@ -947,6 +956,24 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             std::fprintf(stdout, "{\"event\":\"ui_command\",\"command\":\"%s\"}\n", command->c_str());
             std::fflush(stdout);
             if (*command == "exit") close_game();
+            if (const auto mode = launch_mode_for_command(*command); mode && guest_rdram != nullptr) {
+                const bool accepted = mode_launcher.request(*mode, guest_rdram, std::chrono::steady_clock::now());
+                if (accepted) blockplanet::ui::request_close();
+                std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
+                             launch_mode_name(*mode), accepted ? "started" : "refused");
+                std::fflush(stdout);
+            }
+        }
+        if (mode_launcher.active() && guest_rdram != nullptr) {
+            std::uint16_t press = 0;
+            const auto result = mode_launcher.update(const_cast<std::uint8_t*>(guest_rdram),
+                                                     std::chrono::steady_clock::now(), press);
+            launcher_buttons.store(result == ModeLauncher::Result::Working ? (0x10000u | press) : 0u);
+            if (result == ModeLauncher::Result::Started || result == ModeLauncher::Result::TimedOut) {
+                std::fprintf(stdout, "{\"event\":\"mode_launch\",\"status\":\"%s\"}\n",
+                             result == ModeLauncher::Result::Started ? "playing" : "timed_out");
+                std::fflush(stdout);
+            }
         }
         pc_settings_release_guard(held);
         poll_game_events();

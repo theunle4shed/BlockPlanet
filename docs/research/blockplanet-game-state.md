@@ -9,7 +9,8 @@ RDRAM is stored as 32-bit host-order words, so a byte address is read at `addres
 | Value | Address | Type | Evidence |
 | --- | --- | --- | --- |
 | Scene | `0x800E121C` | s16 | -1 for the whole of gameplay, including retries. Other values in menus and transitions. |
-| Game mode | `0x800E44A8` | s16 | During play: 1 Rescue, 2 Time Trial, 3 Training, 4 Puzzle, 5 Hide & Seek, 6 VS CPU (one recording each, read with the screenshots). Menus also show 2, so read it only during play. |
+| Game mode | `0x800E44A8` | s16 | During play: 1 Rescue, 2 Time Trial, 3 Training, 4 Puzzle, 5 Hide & Seek, 6 VS CPU, 9 Lines (one recording each, read with the screenshots). Menus also show 2, so read it only during play. |
+| Original menu cursor | `0x800E121C`, `0x800E1220`, `0x800E1222`, `0x800E1224` | s16 | Main menu row (SINGLE 0 … CLOSE GAME 5; −1 when no menu is shown, as in play); submenu row (Options and similar pages); player page row (START 0); player page mode list row (0 Rescue, 1 Hide & Seek, 2 Puzzle, 3 Time Trial, 4 VS CPU, 5 Lines). See [docs/UI.md](../UI.md#starting-modes). |
 | P1 context | `0x80110220` | base | Blocksphere's map. P2 is `0x80113488`. |
 | Score | context `+0x2AF8` (`0x80112D18`) | s32 | 0 at game start, 1040 after a scoring drop. The HUD shows ten times this value ("10 400"). The HUD's animated copy is `0x800E241C`. |
 | Hearts left | context `+0x2D7E` (`0x80112F9E`) | s16 | 3 at game start, then 2, 1, and -1 when the last heart is lost (game over). Refills to 3 at each retry, in the same frame play begins. |
@@ -54,11 +55,11 @@ So levels are generated, not stored designs. Custom levels are possible in princ
 | `puzzle_solved` | In Puzzle, the puzzle number went up. Not yet seen in play. |
 | `vs_round` | In VS CPU, P1's hearts reaching -1 is a `loss`; P2's (context `0x80113488 + 0x2D7E`) is a `win`. The P1 side was recorded: hearts run out and refill each round. The P2 side is inferred from the same layout. |
 
-Mode names are reported for modes 1 to 6. Practice, two-player VS and Lines are not identified yet and report events without a mode. Puzzle keeps hearts at 3, so it never reports `life_lost` or `game_over`.
+Mode names are reported for modes 1 to 6. Practice, two-player VS and Lines (mode 9) are not named yet and report events without a mode. Puzzle keeps hearts at 3, so it never reports `life_lost` or `game_over`.
 
 ## Still to find
 
-- Mode numbers for Practice, two-player VS and Lines.
+- Mode numbers for Practice and two-player VS. (Lines is mode 9.)
 - The number of chapters, to report `final` on the last one.
 - Combo size and multiplier.
 - Magic use and magic type.
