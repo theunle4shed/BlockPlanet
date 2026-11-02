@@ -40,15 +40,17 @@ void build_mesh(const MeshInputs& in, std::vector<MeshEntry>& out) {
                 lerp_step(a[1], b[1], row_weight),
                 lerp_step(a[2], b[2], row_weight)};
         };
+        // The game keeps the blended values in 16 bits.
+        auto narrow = [&](std::int32_t value) { return in.wide ? value : static_cast<std::int32_t>(s16(value)); };
         auto current = blended(0);
         for (int column = 0; column < in.columns; ++column) {
             const auto next = blended(column + 1);
             std::int16_t v[3];
             for (int axis = 0; axis < 3; ++axis) {
-                const std::int32_t n = s16(next[axis]);
+                const std::int32_t n = narrow(next[axis]);
                 // Blend toward the current column by the column fraction, then
                 // drop to the game's fixed-point scale.
-                v[axis] = s16(lerp_step(n, s16(current[axis]), column_weight) >> 5);
+                v[axis] = s16(lerp_step(n, narrow(current[axis]), column_weight) >> 5);
             }
             if (in.scale_enabled) {
                 for (int axis = 0; axis < 3; ++axis) v[axis] = apply_scale(v[axis], in.scale[axis]);

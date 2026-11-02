@@ -295,11 +295,13 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/sphere_cell.h
     include/tetrisphere/sphere_quadrants.h
     include/tetrisphere/sphere_faces.h
+    include/tetrisphere/sphere_grid.h
     include/tetrisphere/guest_memory.h
     src/graphics/sphere_mesh.cpp
     src/graphics/sphere_cell.cpp
     src/graphics/sphere_quadrants.cpp
     src/graphics/sphere_faces.cpp
+    src/graphics/sphere_grid.cpp
     src/graphics/sphere_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
@@ -412,6 +414,7 @@ add_executable(tetrisphere_diag
     src/graphics/sphere_cell.cpp
     src/graphics/sphere_quadrants.cpp
     src/graphics/sphere_faces.cpp
+    src/graphics/sphere_grid.cpp
     src/graphics/sphere_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
@@ -561,6 +564,15 @@ else()
     target_compile_options(sphere_faces_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME sphere_faces COMMAND sphere_faces_test)
+
+add_executable(sphere_grid_test tests/sphere_grid_test.cpp src/graphics/sphere_grid.cpp)
+target_include_directories(sphere_grid_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(sphere_grid_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(sphere_grid_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME sphere_grid COMMAND sphere_grid_test)
 add_executable(perf_metrics_test tests/perf_metrics_test.cpp)
 target_include_directories(perf_metrics_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)
@@ -961,7 +973,10 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/sphere_cell.cpp
         src/graphics/sphere_quadrants.cpp
         src/graphics/sphere_faces.cpp
+        src/graphics/sphere_grid.cpp
+    src/graphics/sphere_grid.cpp
     src/graphics/sphere_faces.cpp
+    src/graphics/sphere_grid.cpp
         src/graphics/sphere_hooks.cpp
         src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp

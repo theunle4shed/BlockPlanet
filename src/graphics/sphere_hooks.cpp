@@ -33,12 +33,14 @@
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_faces.h"
+#include "tetrisphere/sphere_grid.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/sphere_quadrants.h"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -369,7 +371,7 @@ MeshInputs gather(std::uint8_t* rdram, recomp_context* ctx, bool apply_caps) {
     in.base = [rdram](int row, int column) {
         const std::uint32_t a = base_grid + static_cast<std::uint32_t>(row) * base_row_bytes +
                                 static_cast<std::uint32_t>(column) * 6u;
-        return std::array<std::int16_t, 3>{load16(rdram, a), load16(rdram, a + 2), load16(rdram, a + 4)};
+        return std::array<std::int32_t, 3>{load16(rdram, a), load16(rdram, a + 2), load16(rdram, a + 4)};
     };
     const std::uint32_t player = load32(rdram, active_context);
     for (int axis = 0; axis < 3; ++axis) {
@@ -442,8 +444,37 @@ extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_contex
     return true;
 }
 
+// Once per run in verify mode: how far the grid formula is from the game's
+// base grid table (expected: under 50 units).
+void check_grid_formula(const std::uint8_t* rdram) {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    int largest = 0, compared = 0, clamped = 0;
+    for (int row = 0; row < base_table_rows; ++row) {
+        for (int column = 0; column < base_table_columns; ++column) {
+            const std::uint32_t a = base_grid + static_cast<std::uint32_t>(row) * base_row_bytes +
+                                    static_cast<std::uint32_t>(column) * 6u;
+            const std::array<std::int16_t, 3> value{load16(rdram, a), load16(rdram, a + 2), load16(rdram, a + 4)};
+            if (base_table_value_clamped(value)) {
+                ++clamped;
+                continue;
+            }
+            const auto f = grid_formula_point(row, column);
+            for (int axis = 0; axis < 3; ++axis) {
+                largest = std::max(largest, static_cast<int>(std::lround(std::fabs(f[axis] - value[axis]))));
+            }
+            ++compared;
+        }
+    }
+    std::fprintf(stdout, "{\"event\":\"sphere_grid_formula_check\",\"compared\":%d,\"clamped\":%d,\"largest_difference\":%d}\n",
+                 compared, clamped, largest);
+    std::fflush(stdout);
+}
+
 extern "C" void blockplanet_sphere_mesh_end(std::uint8_t* rdram, recomp_context* ctx) {
     (void)ctx;
+    if (mode_for("mesh") == Mode::Verify) check_grid_formula(rdram);
     if (mode_for("mesh") != Mode::Verify || expected_mesh.empty()) return;
     const std::uint32_t table = load32(rdram, mesh_pointer);
     std::size_t differing = 0;

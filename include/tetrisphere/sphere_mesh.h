@@ -22,7 +22,9 @@ struct MeshEntry {
 struct MeshInputs {
     // Base grid of unit directions (s16, 1.0 = 0x7FFF), row-major,
     // `base_columns` points per row. The game's grid has 18 columns.
-    std::function<std::array<std::int16_t, 3>(int row, int column)> base;
+    // Rows run from 0 to `rows`, columns from 0 to `columns` + 1 (in the
+    // extended grid these are offset so that 0 is the first extra row).
+    std::function<std::array<std::int32_t, 3>(int row, int column)> base;
     // Sub-cell rotation, as passed in a0 and a1 (s16).
     std::int16_t row_fraction = 0;
     std::int16_t column_fraction = 0;
@@ -35,6 +37,10 @@ struct MeshInputs {
     bool player_one = true;
     int rows = 16;
     int columns = 16;
+    // The game keeps intermediate values in 16 bits. Extended grids have
+    // points beyond that range, so `wide` keeps them in 32 bits; with values
+    // inside the 16-bit range the result is the same.
+    bool wide = false;
 };
 
 // Fill `out` (rows x columns entries) exactly as func_800ADD6C does.

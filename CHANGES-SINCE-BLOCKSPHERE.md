@@ -72,3 +72,6 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - Added `BLOCKPLANET_SPHERE_STATS=1`, which logs how much display list and vertex space the sphere and the whole frame use (`docs/PERFORMANCE_TESTING.md`).
 - Measured the budget in chapter 15: the sphere uses up to 18 KB of the game's 56 KB vertex pool and 9.5 KB of its 112 KB display list. A wider patch would only just fit the game's pool, but the upper 4 MB of memory is unused by the game, so BlockPlanet's larger patches will keep their vertices there. Details in `docs/research/blockplanet-game-state.md`.
+- Worked out the rule behind the game's base grid (a uniform angular grid seen from the sphere's lowest point) and added `include/tetrisphere/sphere_grid.h`, which gives grid points beyond the game's table, with a unit test. The formula is within 49 units of the table (checked in the live game).
+- The mesh builder accepts 32-bit grid values for extended grids (`MeshInputs::wide`); the game's own mesh is still reproduced exactly.
+- Documented how the game computes its lighting normals (`func_800A2374`).

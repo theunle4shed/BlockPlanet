@@ -8,9 +8,7 @@ using namespace tetrisphere::sphere;
 int main() {
     MeshInputs in;
     in.base = [](int row, int column) {
-        return std::array<std::int16_t, 3>{static_cast<std::int16_t>(row * 1000 + column * 32),
-                                            static_cast<std::int16_t>(-column * 64),
-                                            static_cast<std::int16_t>(-20000)};
+        return std::array<std::int32_t, 3>{row * 1000 + column * 32, -column * 64, -20000};
     };
     std::vector<MeshEntry> mesh;
     build_mesh(in, mesh);
@@ -44,5 +42,13 @@ int main() {
     in.columns = 20;
     build_mesh(in, mesh);
     assert(mesh.size() == 400);
+
+    // Wide values: points beyond 16 bits stay correct.
+    MeshInputs wide;
+    wide.base = [](int, int) { return std::array<std::int32_t, 3>{40000, -40000, 1000}; };
+    wide.wide = true;
+    build_mesh(wide, mesh);
+    assert(mesh[0].outer[0] == (40000 >> 5) / 3);
+    assert(mesh[0].outer[1] == (-40000 >> 5) / 3);
     return 0;
 }

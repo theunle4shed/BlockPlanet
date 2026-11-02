@@ -117,6 +117,27 @@ The six **face functions** are reimplemented in `src/graphics/sphere_faces.cpp`.
 
 Both need the game's drawing functions replaced with BlockPlanet code (done in stage 1). The fixed sizes live in the table builder (16 × 16 loops), the table storage (16 rows of `0xC0` bytes), the base grid (18 points per row), the quadrant loops (15 × 15 cells) and the per-frame buffers.
 
+### The base grid (stage 2, step 2)
+
+The base grid at `0x800E3CD8` (17 rows of 18 points, 6 bytes each) is fixed data: only the mesh builder reads it, and nothing writes it. Turning the sphere does not move it; the board scrolls through it instead (context `+0x2B20`/`+0x2B24`), with the mesh builder interpolating between grid points for the sub-cell part.
+
+- The points lie on a sphere with centre (0, 0, −10764) and radius 32856, fitted to within 49 units. Their lengths from the origin vary (about 22,000 at the middle to 40,000 at the corners) because the mesh's rays start at the origin, in front of the sphere's centre.
+- Seen from the sphere's lowest point S = (0, 0, −43620), the grid is a uniform angular grid. Row *r* lies in the plane through S tilted by (8.5 − *r*) steps about the y direction (each row is flat to about one unit). Column *c* is (8.5 − *c*) steps around that row's circle as seen from S (twice that around the circle's own centre). The step is 5.4532°, about 10.9° as seen from the sphere's centre.
+- The formula reproduces the table to within 49 units (0.15%), with the error varying smoothly by row; the table was probably made with a less precise sine table. Six points at the middle of the patch edges are clamped to the 16-bit limit.
+- `include/tetrisphere/sphere_grid.h` implements the formula and an extended grid that uses the table's own values where it has unclamped ones and the formula elsewhere. In verify mode the game logs `sphere_grid_formula_check` once (300 points compared, largest difference 49).
+
+The rule only covers the side of the sphere facing S, so it suits extended patches but not the full sphere. The board is 32 × 32 cells and wraps, so a patch can be at most 32 cells across before cells repeat.
+
+### Normals (`func_800A2374`)
+
+Runs just before the quadrant passes and fills the shading tables the cell setup copies from (the vertex colour bytes are lighting normals):
+
+- `0x8015EED0`: for each of the 256 mesh points, −120 × the layer step divided by its length (rounded toward zero), in vertex component order.
+- `0x8015EE20` (column sides, 15 entries): +120 × the normalised difference between neighbouring outer points along the middle mesh row (row 7).
+- `0x8015EDC0` (row sides, 15 entries): the same along the middle mesh column (column 7).
+
+It uses the work area (`0x8015F7CC` and nearby, `0x8015F842`) as scratch and `func_800D5100` for the square root.
+
 ### Buffer budget (stage 2, step 1)
 
 Measured on 2026-11-02 with `BLOCKPLANET_SPHERE_STATS=1` (chapter 15, Linux test setup):
