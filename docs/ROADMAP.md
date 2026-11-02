@@ -23,9 +23,28 @@ These unblock most of what follows.
 
 ## Phase 1: quick wins
 
-### Quality and performance modes (S, after Phase 0 measurements)
+### Quality and performance modes (M, after Phase 0 measurements)
 
-Presets in Options that combine resolution, MSAA, texture filtering, present mode, framebuffer readback and refresh rate. Performance favors a steady 60 FPS; Quality favors resolution and anti-aliasing. The measurements decide what each preset contains.
+Presets in Options that turn several dials together, so the game scales from handhelds to high-end PCs. Each dial is measured with `--perf-log` on real hardware before defaults are chosen.
+
+| Dial | Performance | Quality |
+| --- | --- | --- |
+| Internal resolution | native or 2× | 4K class |
+| MSAA | off | 4× or 8× |
+| Sphere detail (see below) | Original or Extended | Extended or Full |
+| Framebuffer readback | deferred | full |
+| Frame rate target | 60, or 30 on weak handhelds | 60, 120 and above |
+| Background and visualizer effects | simple | full |
+| Texture filtering | basic | enhanced |
+
+**Sphere detail** has three steps, because the game draws a fixed patch of the sphere around the view (see [blockplanet-game-state.md](research/blockplanet-game-state.md)):
+1. **Original:** the N64 patch. Cheapest, but blocks go missing near the edge of the view.
+2. **Extended:** covers the whole visible half of the sphere and fixes the edge problems.
+3. **Full:** every block with an exposed side, which the rear or peek camera needs.
+
+The larger steps cost mostly CPU (the game builds the vertices itself) and buffer memory rather than GPU time, so they may matter more on handhelds than on desktop PCs. Where Full is too expensive, the rear camera can fall back to a simpler view rather than being removed.
+
+**Handhelds:** Steam Deck and Windows handhelds run the PC build, so they need tuned presets rather than a port. Android would need the recompiled C built for ARM and the graphics and platform layers ported.
 
 ### Spheres not appearing completely or fast enough (research S, fix S to M)
 
