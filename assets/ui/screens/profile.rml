@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>Profile</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Profile</div>
+        <div class="subtitle">Switching profile restarts the game</div>
+        <div class="list" data-list="profile_actions"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>

@@ -50,6 +50,7 @@ bool start_failed = false;
 // Requests from other threads, applied on the presentation thread.
 struct OpenRequest {
     std::string screen;
+    bool on_top = false;  // keep the open screens (Back returns to them)
 };
 struct CloseRequest {};
 struct SettingRequest {
@@ -96,7 +97,7 @@ void apply_requests() {
     }
     for (auto& request : pending) {
         if (auto* open = std::get_if<OpenRequest>(&request)) {
-            if (!navigator->open(open->screen))
+            if (!(open->on_top ? navigator->show(open->screen) : navigator->open(open->screen)))
                 std::fprintf(stderr, "{\"event\":\"ui_screen_missing\",\"screen\":\"%s\"}\n", open->screen.c_str());
         } else if (std::holds_alternative<CloseRequest>(request)) {
             navigator->close();
@@ -172,6 +173,12 @@ void install(const std::filesystem::path& assets) {
 void request_open(const std::string& screen) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(OpenRequest{screen});
+    open_flag.store(true);
+}
+
+void request_show(const std::string& screen) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(OpenRequest{screen, true});
     open_flag.store(true);
 }
 

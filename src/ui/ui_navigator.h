@@ -39,6 +39,8 @@ public:
 
     // Opens the menus at `screen` (closing any open screens first).
     bool open(const std::string& screen);
+    // Shows `screen` on top of the open ones; Back returns to them.
+    bool show(const std::string& screen) { return push(screen); }
     void close();
     bool is_open() const { return !stack_.empty(); }
 

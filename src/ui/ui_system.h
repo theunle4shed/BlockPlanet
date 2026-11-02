@@ -21,6 +21,8 @@ void install(const std::filesystem::path& assets);
 // Opens the menus at a screen (ui/screens/<screen>.rml), or closes them.
 // Applied at the next frame.
 void request_open(const std::string& screen);
+// Shows a screen on top of the open ones (or opens the menus at it).
+void request_show(const std::string& screen);
 void request_close();
 // Navigation input, applied at the next frame.
 void queue_action(Action action);

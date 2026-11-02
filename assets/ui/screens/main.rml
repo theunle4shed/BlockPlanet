@@ -9,6 +9,7 @@
         <div class="subtitle">Main menu</div>
         <div class="item" id="solo" data-action="open:solo">Solo</div>
         <div class="item" id="multiplayer" data-action="open:multiplayer">Multiplayer</div>
+        <div class="item" id="profiles" data-action="command:profiles">Profiles</div>
         <div class="item" id="media" data-action="command:media_player">Media Player<span class="note">coming later</span></div>
         <div class="item" id="trophies" data-action="command:trophies">Trophies<span class="note">coming later</span></div>
         <div class="item" id="options" data-action="open:options">Options</div>

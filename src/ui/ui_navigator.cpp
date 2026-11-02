@@ -7,6 +7,18 @@
 namespace blockplanet::ui {
 namespace {
 
+// Text shown as is (profile names may contain < or &).
+Rml::String escaped(const std::string& text) {
+    Rml::String result;
+    for (char c : text) {
+        if (c == '&') result += "&amp;";
+        else if (c == '<') result += "&lt;";
+        else if (c == '>') result += "&gt;";
+        else result += c;
+    }
+    return result;
+}
+
 // "value:Label,value:Label" as pairs.
 std::vector<std::pair<std::string, std::string>> parse_options(const std::string& text) {
     std::vector<std::pair<std::string, std::string>> result;
@@ -107,8 +119,8 @@ void Navigator::fill(Screen& screen) {
             element->SetClass("item", true);
             element->SetClass("disabled", !entry.enabled);
             element->SetAttribute("data-action", entry.action);
-            Rml::String text = entry.label;
-            if (!entry.note.empty()) text += "<span class=\"note\">" + entry.note + "</span>";
+            Rml::String text = escaped(entry.label);
+            if (!entry.note.empty()) text += "<span class=\"note\">" + escaped(entry.note) + "</span>";
             element->SetInnerRML(text);
             container->AppendChild(std::move(element));
         }
@@ -156,6 +168,18 @@ void Navigator::set_setting(const std::string& name, const std::string& value) {
 
 void Navigator::set_list(const std::string& name, std::vector<ListItem> items) {
     lists_[name] = std::move(items);
+    // Refill open screens showing this list (they may be under others).
+    for (auto& screen : stack_) {
+        std::vector<Rml::Element*> lists;
+        collect_lists(screen.document, lists);
+        bool shows = false;
+        for (Rml::Element* container : lists)
+            shows = shows || container->GetAttribute<Rml::String>("data-list", "") == name;
+        if (!shows) continue;
+        fill(screen);
+        const auto count = this->items(screen).size();
+        set_focus(screen, count == 0 ? 0 : std::min(screen.focus, count - 1));
+    }
 }
 
 void Navigator::activate(Screen& screen) {

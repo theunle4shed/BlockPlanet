@@ -3,6 +3,7 @@
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/rom_input.h"
 #include "tetrisphere/rom_cache.h"
+#include "tetrisphere/relaunch.h"
 #include "tetrisphere/run_options.h"
 #ifdef TETRISPHERE_LINUX_DEMO
 #include "gui/rt64_file_dialog.h"
@@ -178,6 +179,7 @@ int main(int argc, char** argv) {
     std::vector<std::uint8_t> rom;
     const std::vector<const char*> arguments(argv, argv + argc);
     const auto run_options = tetrisphere::parse_run_options(argc, arguments.data());
+    tetrisphere::set_launch_arguments(argc, arguments.data());
     if (!run_options.valid) {
         std::cerr << "Error: " << run_options.error << "\n\n"
                   << tetrisphere::run_options_help();

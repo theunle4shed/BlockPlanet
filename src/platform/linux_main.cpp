@@ -20,6 +20,8 @@
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/settings_store.h"
 #include "tetrisphere/profiles.h"
+#include "tetrisphere/profile_menu.h"
+#include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
 #include "tetrisphere/mode_launcher.h"
 #include "ui_system.h"
@@ -96,6 +98,9 @@ bool log_game_events = false;
 // The active profile's save file (progress and preferences); none for a
 // guest. Progress is not recorded with --start-chapter (a testing option).
 std::unique_ptr<ProfileSave> profile_save;
+// The profile list, for the profile screens; and whether this is guest play.
+std::unique_ptr<ProfileStore> profile_store;
+bool guest_session = false;
 ProfileSaveData profile_data;
 bool profile_recording = false;
 bool profile_dirty = false;
@@ -497,6 +502,11 @@ unsigned linux_audio_drain_wait_budget_ms() {
 
 void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                                const RunOptions& run_options) {
+#ifndef _WIN32
+    // Without a D-Bus session (headless machines), SDL's shutdown makes a
+    // call libdbus only warns about; its default is to abort on warnings.
+    setenv("DBUS_FATAL_WARNINGS", "0", 0);
+#endif
     guest_rdram = rdram;
     {
         const char* value = std::getenv("TETRISPHERE_LOG_GAME_EVENTS");
@@ -528,7 +538,9 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // Player profiles: the cartridge save and trophies live in the active
     // profile's folder; settings are shared (docs/SAVES.md). A guest has no
     // folder: the save stays in memory and no trophies are earned.
-    ProfileStore profiles(user_path);
+    profile_store = std::make_unique<ProfileStore>(user_path);
+    guest_session = run_options.guest;
+    auto& profiles = *profile_store;
     std::string profile_error;
     if (!profiles.load(profile_error) ||
         (run_options.profile && !profiles.use(*run_options.profile, profile_error))) {
@@ -551,6 +563,11 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                  run_options.guest ? "" : profiles.active().id.c_str(), run_options.guest ? "true" : "false",
                  profiles.profiles().size());
     std::fflush(stdout);
+    // With several profiles, ask who is playing (unless the command line said).
+    if (profiles.profiles().size() > 1 && !run_options.profile && !run_options.guest) {
+        blockplanet::ui::set_list("profiles", profile_list(profiles, false));
+        blockplanet::ui::request_open("profiles");
+    }
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
         std::exit(74);
@@ -810,13 +827,19 @@ void launch_mode(LaunchMode mode) {
     std::fflush(stdout);
 }
 
-[[noreturn]] void close_game() {
+// Saves everything and stops the game's threads.
+void stop_game() {
     save_trophies();
     save_profile();
     exited.store(true);
     graphics_shutdown_ready.signal();
     ultramodern::join_event_threads();
     ultramodern::join_thread_cleaner_thread();
+}
+
+// Saves everything, stops the game and closes its devices and window.
+void shut_down() {
+    stop_game();
     // RT64's event-filter userdata dies with its rendering thread. Controller
     // teardown can emit SDL events, so remove the filter before closing devices.
     SDL_SetEventFilter(nullptr, nullptr);
@@ -828,7 +851,85 @@ void launch_mode(LaunchMode mode) {
 #ifdef _WIN32
     timeEndPeriod(1);
 #endif
+}
+
+[[noreturn]] void close_game() {
+    shut_down();
     std::exit(0);
+}
+
+// Restarts the game as another profile or as a guest (the game reads its
+// cartridge save while booting). `remove_id`, if set, is a profile deleted
+// once nothing is using its folder any more.
+[[noreturn]] void restart_as(std::optional<std::string> profile, bool guest, const std::string& remove_id = {}) {
+    std::fprintf(stdout, "{\"event\":\"profile_restart\",\"profile\":\"%s\",\"guest\":%s}\n",
+                 profile ? profile->c_str() : "", guest ? "true" : "false");
+    std::fflush(stdout);
+    shut_down();
+    if (!remove_id.empty()) {
+        std::string error;
+        if (const auto* removed = profile_by_id(*profile_store, remove_id)) {
+            const std::string name = removed->name;
+            if (!profile_store->remove(name, error))
+                std::fprintf(stderr, "Could not delete the profile: %s\n", error.c_str());
+        }
+        if (!guest) profile = profile_store->active().name;
+    }
+    if (!relaunch(relaunch_arguments(launch_arguments(), profile, guest))) {
+        std::fprintf(stderr, "Could not restart BlockPlanet.\n");
+        std::exit(75);
+    }
+    std::exit(0);  // Windows: the new process is running
+}
+
+// The profile screens' commands (profile_menu.h). True if `command` was one.
+bool handle_profile_command(const std::string& command) {
+    if (!profile_store) return false;
+    auto& store = *profile_store;
+    const auto argument = [&](const char* prefix) -> std::optional<std::string> {
+        const std::string text(prefix);
+        if (command.rfind(text, 0) != 0) return std::nullopt;
+        return command.substr(text.size());
+    };
+    if (command == "profiles") {
+        blockplanet::ui::set_list("profiles", profile_list(store, guest_session));
+        blockplanet::ui::request_show("profiles");
+        return true;
+    }
+    if (const auto id = argument("profile:")) {
+        blockplanet::ui::set_list("profile_actions", profile_actions(store, *id, guest_session));
+        blockplanet::ui::request_show("profile");
+        return true;
+    }
+    if (const auto id = argument("profile_play:")) {
+        if (const auto* profile = profile_by_id(store, *id)) restart_as(profile->name, false);
+        return true;
+    }
+    if (command == "profile_new") {
+        const auto name = next_profile_name(store);
+        restart_as(name, false);  // --profile creates it
+    }
+    if (command == "profile_guest") restart_as(std::nullopt, true);
+    if (const auto id = argument("profile_delete_confirmed:")) {
+        const auto* profile = profile_by_id(store, *id);
+        if (profile == nullptr) return true;
+        // The playing profile's folder is in use until the game stops.
+        if (!guest_session && profile->id == store.active().id) restart_as(std::nullopt, false, *id);
+        std::string error;
+        const std::string name = profile->name;
+        if (!store.remove(name, error)) std::fprintf(stderr, "Could not delete the profile: %s\n", error.c_str());
+        // Back to the (updated) profile list.
+        blockplanet::ui::set_list("profiles", profile_list(store, guest_session));
+        blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
+        blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
+        return true;
+    }
+    if (const auto id = argument("profile_delete:")) {
+        blockplanet::ui::set_list("confirm", delete_confirmation(store, *id));
+        blockplanet::ui::request_show("confirm");
+        return true;
+    }
+    return false;
 }
 
 [[noreturn]] void run_linux_event_loop() {
@@ -1031,10 +1132,11 @@ void launch_mode(LaunchMode mode) {
             std::fflush(stdout);
             if (*command == "exit") close_game();
             if (queue_menu_setting(*command)) continue;
+            if (handle_profile_command(*command)) continue;
             if (*command == "story") {
                 if (auto chapters = chapter_choices(); !chapters.empty()) {
                     blockplanet::ui::set_list("chapters", std::move(chapters));
-                    blockplanet::ui::request_open("chapters");
+                    blockplanet::ui::request_show("chapters");
                     continue;
                 }
             }

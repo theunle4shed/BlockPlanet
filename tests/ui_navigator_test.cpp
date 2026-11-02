@@ -124,6 +124,23 @@ int main(int argc, char** argv) {
         nav.handle(Action::Confirm);
         assert(nav.take_command() == std::optional<std::string>("chapter:3"));
         nav.close();
+
+        // Screens shown on top keep the ones below; a list changed while its
+        // screen is underneath is refilled (focus kept in range), and names
+        // are shown as text.
+        assert(nav.open("main") && nav.show("options"));
+        nav.handle(Action::Down);
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "chapter3");
+        assert(nav.show("solo") && nav.current_screen() == "solo");
+        nav.set_list("chapters", {{"only", "A <b> & C", "", "command:only", true}});
+        nav.handle(Action::Back);
+        assert(nav.current_screen() == "options" && nav.focused_item() == "back");  // index 3 clamped to 2
+        assert(context->GetDocument(context->GetNumDocuments() - 1)->GetElementById("only")->GetInnerRML() ==
+               "A &lt;b&gt; &amp; C");
+        nav.handle(Action::Back);
+        assert(nav.current_screen() == "main");
+        nav.close();
     }
     Rml::Shutdown();
     std::filesystem::remove_all(dir);

@@ -340,6 +340,8 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/run_options.cpp
     src/platform/profiles.cpp
     src/platform/profile_save.cpp
+    src/platform/profile_menu.cpp
+    src/platform/relaunch.cpp
     src/platform/data_directory.cpp
     src/platform/window_mode_controller.cpp
     src/platform/config_cli.cpp
@@ -414,6 +416,7 @@ add_executable(tetrisphere_diag
     src/diagnostic/main.cpp
     src/platform/run_options.cpp
     src/platform/profiles.cpp
+    src/platform/relaunch.cpp
     src/diagnostic/indirect_dispatch.cpp
     src/diagnostic/rescue_pause_snapshot_stub.cpp
     src/graphics/sphere_mesh.cpp
@@ -546,6 +549,16 @@ else()
     target_compile_options(profiles_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME profiles COMMAND profiles_test "${CMAKE_CURRENT_BINARY_DIR}/profiles-test")
+add_executable(profile_menu_test tests/profile_menu_test.cpp src/platform/profile_menu.cpp
+    src/platform/profiles.cpp src/platform/relaunch.cpp)
+target_include_directories(profile_menu_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
+    "${N64MODERN_RUNTIME}/thirdparty/json")
+if(MSVC)
+    target_compile_options(profile_menu_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(profile_menu_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME profile_menu COMMAND profile_menu_test "${CMAKE_CURRENT_BINARY_DIR}/profile-menu-test")
 
 add_executable(trophies_test tests/trophies_test.cpp src/platform/trophies.cpp)
 target_include_directories(trophies_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
@@ -972,6 +985,8 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/run_options.cpp
         src/platform/profiles.cpp
         src/platform/profile_save.cpp
+        src/platform/profile_menu.cpp
+        src/platform/relaunch.cpp
         src/platform/data_directory.cpp
         src/platform/window_mode_controller.cpp
         src/diagnostic/indirect_dispatch.cpp
