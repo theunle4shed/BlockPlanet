@@ -64,3 +64,15 @@ Mode names are reported for modes 1 to 6. Practice, two-player VS and Lines are 
 - Magic use and magic type.
 - Puzzle drops and slides.
 - Game over for modes without hearts: Puzzle, and Time Trial when the clock runs out.
+
+## How the sphere is drawn (culling research, in progress)
+
+Started 2026-11-02 to understand why blocks near the edge of the view go missing or show inner layers, which the owner confirmed also happens on real hardware.
+
+- **Cursor:** context `+0x2B1A` (x) and `+0x2B1E` (y), 0..31 on the grid, with copies 8 bytes apart. The sphere turns to keep the cursor centred. `0x8015F88A`/`0x8015F88E` hold cursor + 7, the origin of a 13×13 neighbourhood used by the drop and shadow logic (`func_8009AB60`, `func_8009AAA8`), not by rendering.
+- **The sphere's block geometry is a fixed amount every frame.** Logging RT64 vertex loads in gameplay showed 67 loads of 16 vertices from a per-frame buffer (`0x80254000` to `0x80258180` in the sampled frames) in every frame, while rotating as well. The number does not depend on the view.
+- **Writer:** a hardware watchpoint on that buffer stopped in `func_8009C330`, called by `func_8009E630` ← `func_800A348C` ← `func_800CD3B8` ← `func_80070118` ← `func_800CCE7C`.
+- `func_800A348C` calls about ten sphere drawing passes once each (`func_8009E630`, `func_8009EB28`, `func_8009F024`, `func_8009F520`, `func_8009FA20`, `func_800A0ED8`, `func_800A18F4`, `func_800A1E58`, `func_800A2374`, `func_800A2E88`).
+- `func_8009E630` loops 8 rows (counter `0x8015F836`) over a column span held in `0x8015EDB2`..`0x8015EDAE`. Each row starts with `func_8009D90C`, which reads a **precomputed mesh table** (pointer at `0x800E44E4`; rows of 0xC0 bytes, 12-byte entries) and interpolates vertex positions.
+
+**Working conclusion:** the game draws a fixed patch of the sphere's surface around the view centre and maps nearby blocks onto it, rather than drawing the whole sphere and hiding what is out of view. Blocks outside the patch have nowhere to be drawn, which explains the gaps and stray walls near the edge. Still to confirm: the patch size in cells, how cells map onto it, and whether the mesh table can be enlarged (memory, and the fixed vertex buffer size) to cover the whole visible hemisphere or the whole sphere for a rear camera.
