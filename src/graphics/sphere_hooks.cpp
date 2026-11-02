@@ -8,26 +8,30 @@
 // func_8009D90C (cell setup):
 //   start:    blockplanet_sphere_cell_begin — returns true to skip the original
 //   epilogue: blockplanet_sphere_cell_end — compares in verify mode
+// func_8009C330, func_8009C6D4, func_8009CA98, func_8009CE38, func_8009D1D4,
+// func_8009D570 (faces):
+//   start:    blockplanet_sphere_face_begin
+//   epilogue: blockplanet_sphere_face_end
 // func_8009E630, func_8009EB28, func_8009F024, func_8009F520 (quadrants):
 //   start:    blockplanet_sphere_quadrant_begin
 //   epilogue: blockplanet_sphere_quadrant_end
 //
-// Verify mode, for passes that only touch memory (mesh, cell): BlockPlanet's
+// Verify mode, for passes that only touch memory (mesh, cell, faces): BlockPlanet's
 // version runs first on a private overlay of guest memory, the original runs,
 // then every value BlockPlanet would have written is checked against what the
 // original left in memory.
 //
 // Verify mode, for passes that call other game functions (quadrants): a
 // snapshot of guest memory and registers is taken when the original starts.
-// When it is about to return, its results are saved, the starting state is
-// restored, BlockPlanet's version runs, and all of guest memory is compared
-// with the original's results (except the stack below the caller's frame,
-// which holds scratch data laid out differently). The original's results are
-// then put back, so the game continues exactly as it would have.
+// When it is about to return, BlockPlanet's version runs on a private copy
+// of that snapshot, and the copy is compared with the original's results in
+// guest memory (except the stack below the caller's frame, which holds
+// scratch data). Live guest memory is never changed by the check.
 
 #include "tetrisphere/recomp_support.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/sphere_cell.h"
+#include "tetrisphere/sphere_faces.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/sphere_quadrants.h"
 
@@ -35,6 +39,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -72,7 +77,7 @@ public:
         std::uint32_t size;
         std::uint32_t value;
     };
-    explicit OverlayMemory(const std::uint8_t* rdram) : rdram_(rdram) {}
+    OverlayMemory() = default;
 
     std::uint8_t read8(std::uint32_t a) const override {
         return static_cast<std::uint8_t>(read(a, 1, load8(rdram_, a)));
@@ -90,7 +95,9 @@ public:
     // Set when a read or write partly overlapped an earlier write of another
     // size, which the overlay cannot model; the check then counts as failed.
     bool overlapped() const { return overlapped_; }
-    void clear() {
+    // Starts a new pass over `rdram` (live memory, or a snapshot check's copy).
+    void reset(const std::uint8_t* rdram) {
+        rdram_ = rdram;
         writes_.clear();
         overlapped_ = false;
     }
@@ -114,13 +121,22 @@ private:
         writes_.push_back({a, size, v});
     }
 
-    const std::uint8_t* rdram_;
+    const std::uint8_t* rdram_ = nullptr;
     std::vector<Write> writes_;
     mutable bool overlapped_ = false;
 };
 
+// A word the original adds to in the branch delay slot of its return, which
+// runs after the epilogue hook: when checking, the original's value is taken
+// as already increased.
+struct DelaySlotAdd {
+    std::uint32_t address = 0;
+    std::uint32_t amount = 0;
+};
+
 // Logs the first few differing values of the first few mismatched checks.
-std::size_t count_differences(const std::uint8_t* rdram, const OverlayMemory& overlay, const char* event) {
+std::size_t count_differences(const std::uint8_t* rdram, const OverlayMemory& overlay, const char* event,
+                              DelaySlotAdd delay_slot = {}) {
     static std::atomic<int> detailed_checks{0};
     std::size_t differing = overlay.overlapped() ? 1 : 0;
     bool detail = false;
@@ -131,6 +147,7 @@ std::size_t count_differences(const std::uint8_t* rdram, const OverlayMemory& ov
         case 2: actual = static_cast<std::uint16_t>(load16(rdram, w.address)); break;
         default: actual = load32(rdram, w.address); break;
         }
+        if (w.size == 4 && w.address == delay_slot.address) actual += delay_slot.amount;
         if (actual == w.value) continue;
         if (differing++ == 0) detail = detailed_checks++ < 3;
         if (detail && differing <= 40) {
@@ -168,6 +185,44 @@ private:
     std::atomic<std::uint64_t> mismatched_calls_{0};
 };
 
+// Overlay check for passes that only touch memory (see the top). Also runs
+// BlockPlanet's version directly in replace mode.
+class OverlayCheck {
+public:
+    explicit OverlayCheck(const char* event, DelaySlotAdd delay_slot = {})
+        : event_(event), delay_slot_(delay_slot), log_(event, "values") {}
+
+    // Returns true when BlockPlanet's version replaced the original.
+    template <typename Port>
+    bool begin(std::uint8_t* rdram, Port&& port) {
+        const Mode m = mode();
+        if (m == Mode::Original) return false;
+        if (m == Mode::Replace) {
+            DirectMemory memory(rdram);
+            port(memory);
+            return true;
+        }
+        if (!overlay_) overlay_ = std::make_unique<OverlayMemory>();
+        overlay_->reset(rdram);
+        port(*overlay_);
+        pending_ = true;
+        return false;
+    }
+
+    void end(const std::uint8_t* rdram) {
+        if (!pending_) return;
+        pending_ = false;
+        log_.report(count_differences(rdram, *overlay_, event_, delay_slot_));
+    }
+
+private:
+    const char* event_;
+    DelaySlotAdd delay_slot_;
+    VerifyLog log_;
+    std::unique_ptr<OverlayMemory> overlay_;
+    bool pending_ = false;
+};
+
 // Snapshot check for passes that call other game functions (see the top).
 class SnapshotCheck {
 public:
@@ -183,15 +238,21 @@ public:
     }
 
     template <typename Port>
-    void end(std::uint8_t* rdram, recomp_context* ctx, Port&& port) {
+    void end(const std::uint8_t* rdram, Port&& port) {
         if (!active_) return;
         active_ = false;
         original_.assign(rdram, rdram + rdram_bytes);
-        const recomp_context original_ctx = *ctx;
 
-        std::memcpy(rdram, entry_.data(), rdram_bytes);
-        *ctx = entry_ctx_;
-        port(rdram, ctx);
+        // BlockPlanet's version runs on a private copy of guest memory and
+        // registers; live memory is never touched. (Other host threads post
+        // messages into queues in guest memory, so restoring a snapshot over
+        // live memory could lose one and hang the game.) The game's functions
+        // reach memory only through the rdram pointer they are given, so the
+        // ones the port calls work on the copy too.
+        shadow_ = entry_;
+        recomp_context shadow_ctx = entry_ctx_;
+        port(shadow_.data(), &shadow_ctx);
+        const std::uint8_t* port_result = shadow_.data();
 
         const std::uint32_t stack_top = static_cast<std::uint32_t>(entry_ctx_.r29) & 0x00FFFFFFu;
         const std::uint32_t stack_bottom = stack_top > stack_scratch ? stack_top - stack_scratch : 0;
@@ -203,7 +264,7 @@ public:
         std::size_t outside = 0;
         int detailed = 0;
         for (std::uint32_t offset = 0; offset < rdram_bytes; ++offset) {
-            if (rdram[offset] == original_[offset]) continue;
+            if (port_result[offset] == original_[offset]) continue;
             if (offset >= stack_bottom && offset < stack_top) continue;
             if (!pass_pages_[offset / page_bytes]) {
                 ++outside;
@@ -214,7 +275,7 @@ public:
                 std::fprintf(stdout,
                              "{\"event\":\"%s_detail\",\"address\":\"0x%08X\",\"blockplanet\":%u,"
                              "\"original\":%u,\"stack\":\"0x%08X\"}\n",
-                             event_, 0x80000000u | (offset ^ 3u), rdram[offset], original_[offset],
+                             event_, 0x80000000u | (offset ^ 3u), port_result[offset], original_[offset],
                              static_cast<std::uint32_t>(entry_ctx_.r29));
             }
         }
@@ -228,8 +289,6 @@ public:
             ranges_logged_ = true;
             log_written_ranges();
         }
-        std::memcpy(rdram, original_.data(), rdram_bytes);
-        *ctx = original_ctx;
         log_.report(differing, static_cast<long long>(outside_bytes_));
     }
 
@@ -265,6 +324,7 @@ private:
     const char* event_;
     std::vector<std::uint8_t> entry_;
     std::vector<std::uint8_t> original_;
+    std::vector<std::uint8_t> shadow_;
     recomp_context entry_ctx_{};
     std::uint64_t calls_ = 0;
     bool active_ = false;
@@ -318,8 +378,19 @@ VerifyLog mesh_log{"sphere_mesh_verify", "entries"};
 
 // ---- cell setup ---------------------------------------------------------
 
-OverlayMemory* cell_overlay = nullptr;
-VerifyLog cell_log{"sphere_cell_verify", "values"};
+OverlayCheck cell_check{"sphere_cell_verify"};
+
+// ---- face functions -----------------------------------------------------
+
+// Every face function adds 4 to the vertex count at 0x800E44F0 in its return's
+// delay slot.
+constexpr DelaySlotAdd face_vertex_count{0x800E44F0u, 4};
+std::array<OverlayCheck, 6> face_checks{OverlayCheck{"sphere_face_outer_verify", face_vertex_count},
+                                        OverlayCheck{"sphere_face_inner_verify", face_vertex_count},
+                                        OverlayCheck{"sphere_face_row_start_verify", face_vertex_count},
+                                        OverlayCheck{"sphere_face_row_end_verify", face_vertex_count},
+                                        OverlayCheck{"sphere_face_column_start_verify", face_vertex_count},
+                                        OverlayCheck{"sphere_face_column_end_verify", face_vertex_count}};
 
 // ---- quadrant passes ----------------------------------------------------
 
@@ -365,24 +436,23 @@ extern "C" void blockplanet_sphere_mesh_end(std::uint8_t* rdram, recomp_context*
 
 extern "C" bool blockplanet_sphere_cell_begin(std::uint8_t* rdram, recomp_context* ctx) {
     (void)ctx;
-    const Mode m = mode();
-    if (m == Mode::Original) return false;
-    if (m == Mode::Verify) {
-        static OverlayMemory overlay(rdram);
-        overlay.clear();
-        prepare_cell(overlay);
-        cell_overlay = &overlay;
-        return false;
-    }
-    DirectMemory memory(rdram);
-    prepare_cell(memory);
-    return true;
+    return cell_check.begin(rdram, [](GuestMemory& memory) { prepare_cell(memory); });
 }
 
 extern "C" void blockplanet_sphere_cell_end(std::uint8_t* rdram, recomp_context* ctx) {
     (void)ctx;
-    if (mode() != Mode::Verify || cell_overlay == nullptr) return;
-    cell_log.report(count_differences(rdram, *cell_overlay, "sphere_cell_verify"));
+    cell_check.end(rdram);
+}
+
+extern "C" bool blockplanet_sphere_face_begin(std::uint8_t* rdram, recomp_context* ctx, int face) {
+    (void)ctx;
+    return face_checks[static_cast<std::size_t>(face)].begin(
+        rdram, [face](GuestMemory& memory) { draw_face(memory, static_cast<Face>(face)); });
+}
+
+extern "C" void blockplanet_sphere_face_end(std::uint8_t* rdram, recomp_context* ctx, int face) {
+    (void)ctx;
+    face_checks[static_cast<std::size_t>(face)].end(rdram);
 }
 
 extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
@@ -398,6 +468,7 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
 
 extern "C" void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
     if (mode() != Mode::Verify) return;
+    (void)ctx;
     quadrant_checks[static_cast<std::size_t>(quadrant)].end(
-        rdram, ctx, [quadrant](std::uint8_t* r, recomp_context* c) { draw_quadrant(r, c, static_cast<Quadrant>(quadrant)); });
+        rdram, [quadrant](std::uint8_t* r, recomp_context* c) { draw_quadrant(r, c, static_cast<Quadrant>(quadrant)); });
 }
