@@ -339,6 +339,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/settings_store.cpp
     src/platform/run_options.cpp
     src/platform/profiles.cpp
+    src/platform/profile_save.cpp
     src/platform/data_directory.cpp
     src/platform/window_mode_controller.cpp
     src/platform/config_cli.cpp
@@ -517,6 +518,16 @@ add_executable(run_options_test tests/run_options_test.cpp src/platform/run_opti
 target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")
 add_test(NAME run_options COMMAND run_options_test)
+add_executable(profile_save_test tests/profile_save_test.cpp src/platform/profile_save.cpp)
+target_include_directories(profile_save_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
+    "${N64MODERN_RUNTIME}/thirdparty/json")
+if(MSVC)
+    target_compile_options(profile_save_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(profile_save_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME profile_save COMMAND profile_save_test "${CMAKE_CURRENT_BINARY_DIR}/profile-save-test")
+
 add_executable(profiles_test tests/profiles_test.cpp src/platform/profiles.cpp)
 target_include_directories(profiles_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")
@@ -951,6 +962,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/diagnostic/main.cpp
         src/platform/run_options.cpp
         src/platform/profiles.cpp
+        src/platform/profile_save.cpp
         src/platform/data_directory.cpp
         src/platform/window_mode_controller.cpp
         src/diagnostic/indirect_dispatch.cpp

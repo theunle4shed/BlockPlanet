@@ -17,7 +17,8 @@ BlockPlanet keeps settings, saves and caches in one folder per PC, so every prof
 
 ```
 BlockPlanet/
-  settings.dat                 graphics and controls (shared by all profiles)
+  settings.dat                 graphics, and the default controls for new
+                               profiles and guests (shared by all profiles)
   gamecontrollerdb.txt         optional extra controller mappings
   tetrisphere-us-rev0/rom.z64  the imported ROM
   diagnostics/                 one log per session
@@ -25,6 +26,7 @@ BlockPlanet/
   deleted/<id>-<time>/         deleted profiles, restorable for 30 days
   profiles/<id>/
     cartridge.eep              the game's own save (see below)
+    save.json                  progress and preferences (below)
     trophies.json
     backups/cartridge.1.eep    the save as it was at the start of each of the
     backups/cartridge.2.eep    last three sessions (1 is the newest)
@@ -49,6 +51,16 @@ Until the profile screen exists:
 
 Names are 1 to 24 printable characters and are unique regardless of case.
 
+## The profile save file (`save.json`)
+
+Written by BlockPlanet: atomically, with the previous version kept as `save.json.bak` (used if the main file is damaged).
+
+- **Preferences:** the profile's controls (controller family, button layout, magic button). A profile without controls of its own starts from the PC's defaults in `settings.dat`, which are then copied in. Changing controls in the game saves them to the profile, not to `settings.dat`; `tetrisphere-config bind` and `family` change the PC's defaults. A guest uses the defaults, and changes last only for the session.
+- **Progress:** levels completed per mode and chapter, chapters completed per mode, puzzles solved.
+- **Statistics:** games started and over, pieces placed, lives lost, levels, chapters and puzzles completed, Versus rounds won and lost, and seconds in play (not in menus).
+
+Progress is saved at once when a level, chapter or puzzle is completed, otherwise every 30 seconds and when the game closes. It comes from the game events BlockPlanet detects (`include/tetrisphere/game_event_watcher.h`), so it can only cover what those events report. Casual mode records progress; `--start-chapter` (a testing option) does not.
+
 ## The game's own save
 
 Tetrisphere saved to a 4-Kbit EEPROM in the cartridge: 512 bytes in 64 blocks of 8. The recompiled game still reads and writes it; BlockPlanet keeps the 512 bytes in `cartridge.eep` with a header and checksum, writing it as soon as the game saves, with a `.bak` of the previous write.
@@ -69,7 +81,7 @@ What is in it, from comparing saves after different test sessions (not yet decod
 
 Agreed layout (2026-11-02):
 
-- **`profiles/<id>/save.json`, one per profile:** progress (chapters and levels completed for the chapter select, unlocks, puzzles solved, tutorials, lifetime statistics) and preferences (controls and button layout, casual mode, HUD and accessibility options, the Collaborate colour and shape). Written from the game events BlockPlanet already detects; no size limit. Controls move here from `settings.dat`; the existing ones are copied into "Player 1".
+- **`save.json` (done, first version):** later additions are unlocks, tutorials, casual mode as a preference, HUD and accessibility options, and the Collaborate colour and shape.
 - **`settings.dat` stays shared by the PC:** resolution, window, aspect, filters, sphere detail, audio output.
 - **`records.json`, shared by the PC:** best times, high scores and Time Trial runs per mode, each entry tagged with the profile that set it, viewable for everyone or one profile. Guests do not set records. Daily challenges and online leaderboards can build on it.
 - Decoding the cartridge save, so its scores and names can appear in the new menus and be copied into `records.json`.

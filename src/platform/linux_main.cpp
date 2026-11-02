@@ -20,6 +20,7 @@
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/settings_store.h"
 #include "tetrisphere/profiles.h"
+#include "tetrisphere/profile_save.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/wav_capture.h"
 #include "tetrisphere/window_mode_controller.h"
@@ -88,10 +89,51 @@ GameEventWatcher game_event_watcher;
 std::unique_ptr<GameOptionApplier> game_option_applier;
 bool log_game_events = false;
 
+// The active profile's save file (progress and preferences); none for a
+// guest. Progress is not recorded with --start-chapter (a testing option).
+std::unique_ptr<ProfileSave> profile_save;
+ProfileSaveData profile_data;
+bool profile_recording = false;
+bool profile_dirty = false;
+// The PC's default controls from settings.dat, for new profiles and guests.
+ControlPreferences pc_controls;
+std::chrono::steady_clock::time_point last_play_poll{};
+
+ControlPreferences controls_of(const Settings& settings) {
+    return {settings.family_override, settings.bindings, settings.magic};
+}
+
+void apply_controls(Settings& settings, const ControlPreferences& controls) {
+    settings.family_override = controls.family_override;
+    settings.bindings = controls.bindings;
+    settings.magic = controls.magic;
+}
+
+void save_profile() {
+    if (!profile_save || !profile_dirty) return;
+    std::string error;
+    if (profile_save->save(profile_data, error)) profile_dirty = false;
+    else std::fprintf(stderr, "Could not save the profile: %s\n", error.c_str());
+}
+
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
-    for (const auto& event : game_event_watcher.update(read_game_state(guest_rdram))) {
+    const auto state = read_game_state(guest_rdram);
+    const auto now = std::chrono::steady_clock::now();
+    if (profile_recording && state.scene == -1 && last_play_poll != std::chrono::steady_clock::time_point{}) {
+        // Time in play, in whole seconds (the remainder carries over).
+        static std::chrono::steady_clock::duration carried{};
+        carried += now - last_play_poll;
+        const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(carried);
+        if (seconds.count() > 0) {
+            profile_data.progress.statistics.seconds_played += seconds.count();
+            carried -= seconds;
+            profile_dirty = true;
+        }
+    }
+    last_play_poll = now;
+    for (const auto& event : game_event_watcher.update(state)) {
         if (log_game_events) {
             std::string fields;
             for (const auto& [key, value] : event.fields) {
@@ -105,6 +147,10 @@ void poll_game_events() {
             std::fflush(stdout);
         }
         post_game_event(event);
+        if (profile_recording) {
+            profile_dirty = true;
+            if (record_game_event(profile_data.progress, event)) save_profile();  // milestones at once
+        }
     }
 }
 const char* perf_present_mode = "console";
@@ -499,6 +545,26 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         show_error(settings_error.c_str());
         std::exit(74);
     }
+    // Controls belong to the profile. settings.dat keeps the PC's defaults,
+    // which a profile without controls of its own starts from; a guest uses
+    // them for the session.
+    pc_controls = controls_of(active_settings);
+    if (!run_options.guest) {
+        profile_save = std::make_unique<ProfileSave>(profile_path / "save.json");
+        std::string save_error;
+        if (!profile_save->load(profile_data, save_error)) {
+            show_error(save_error.c_str());
+            std::exit(74);
+        }
+        if (profile_data.preferences.controls) {
+            apply_controls(active_settings, *profile_data.preferences.controls);
+        } else {
+            profile_data.preferences.controls = pc_controls;
+            profile_dirty = true;
+            save_profile();
+        }
+        profile_recording = !run_options.start_chapter;
+    }
     persisted_settings=active_settings;
     initialize_pc_settings(persisted_settings);
     if (run_options.fullscreen) {
@@ -662,6 +728,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 
 [[noreturn]] void close_game() {
     save_trophies();
+    save_profile();
     exited.store(true);
     graphics_shutdown_ready.signal();
     ultramodern::join_event_threads();
@@ -714,7 +781,23 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             const auto* requested=&merged;
             std::string error;
             SettingsStore store(application_data_directory() / "settings.dat");
-            if (!store.save(*requested, error)) {
+            // settings.dat keeps the PC's default controls; a profile's own
+            // controls go to its save file, and a guest's last the session.
+            auto on_disk = *requested;
+            apply_controls(on_disk, pc_controls);
+            if (request->field==13 && profile_save) {
+                profile_data.preferences.controls = controls_of(*requested);
+                profile_dirty = true;
+                std::string save_error;
+                if (!profile_save->save(profile_data, save_error)) {
+                    std::fprintf(stderr, "Could not save the profile's controls: %s\n", save_error.c_str());
+                    acknowledge_controls_settings(persisted_settings);
+                    complete_controls_apply(false);
+                    continue;
+                }
+                profile_dirty = false;
+            }
+            if (!store.save(on_disk, error)) {
                 std::fprintf(stderr, "Could not save PC options: %s\n", error.c_str());
                 acknowledge_controls_settings(persisted_settings);
                 if(request->field==13)complete_controls_apply(false);
@@ -873,6 +956,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         }
         if (now >= next_trophy_save) {
             save_trophies();
+            save_profile();
             next_trophy_save = now + std::chrono::seconds(30);
         }
         if (report_audio && now >= next_audio_report) {
