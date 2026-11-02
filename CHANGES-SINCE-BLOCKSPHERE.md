@@ -45,3 +45,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `--casual` (no game over: hearts refill and the Time Trial clock stops at 30 seconds) and `--start-chapter=N` (start Rescue at chapter N). Both pause trophies. Implemented in `include/tetrisphere/game_options.h` and `src/platform/game_options.cpp`.
 - The game event watcher now reports `level_completed`, `chapter_completed` and `puzzle_solved`, using the chapter (`0x800E44A0`) and level (`+0x23BA`) found this session. A real `level_completed` was seen when clearing level 1:1.
 - Testing later stages is described in [docs/PERFORMANCE_TESTING.md](docs/PERFORMANCE_TESTING.md).
+
+## 2026-11-02: Level data research
+
+- Added `tools/analysis/level_table.py`, which prints the level parameter table from the player's own ROM. The output is derived from game data and stays out of Git.
+- Documented the level data format and how difficulty scales in [docs/research/blockplanet-level-data.md](docs/research/blockplanet-level-data.md). Rescue has 15 chapters of 10 levels; starting chapters above 16 reads into other data.
