@@ -42,7 +42,7 @@ Presets in Options that turn several dials together, so the game scales from han
 **Sphere detail** has three steps, because the game draws a fixed patch of the sphere around the view (see [blockplanet-game-state.md](research/blockplanet-game-state.md)):
 1. **Original:** the N64 patch. Cheapest, but blocks go missing near the edge of the view.
 2. **Extended:** covers the whole visible half of the sphere and fixes the edge problems.
-3. **Full:** every block with an exposed side, which the rear or peek camera needs.
+3. **Full:** every block with an exposed side, which the rear or peek camera needs. This step also makes the far side visible through an opened core: the undersides of far-side blocks, darkened so they read as distant and in shadow. The original never draws them.
 
 The larger steps cost mostly CPU (the game builds the vertices itself) and buffer memory rather than GPU time, so they may matter more on handhelds than on desktop PCs. Where Full is too expensive, the rear camera can fall back to a simpler view rather than being removed.
 

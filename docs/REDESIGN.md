@@ -46,12 +46,13 @@ This proposal builds on what BlockPlanet has already learned about the original 
 **What is added.**
 - A gentle push towards the sphere while a piece falls, returning to the default framing after placement. It adds focus and weight to each drop.
 - A peek camera: hold a button to look at the back of the sphere, without changing game state.
+- **See through an opened core.** When the core is opened, the undersides of the blocks on the far side of the sphere become visible through the hole, dark but readable. The original never draws the far side, so the opening shows nothing behind it. Showing it makes the sphere feel solid, and lets players read the far side before rotating to it.
 
 **Changes to the original intention.** Make the push subtle (a few percent of zoom, eased) and switch it off with "Reduce camera motion". Zooming on every drop can cause motion sickness and makes repeated fast play harder to read. Consider zooming only on the final part of a long fall, or only on large combos.
 
 **Player benefit.** The sphere always reads clearly on any screen, nothing important is ever hidden by the renderer, and drops feel more physical.
 
-**Feasibility.** Framing and aspect support are mostly RT64 projection and HUD anchoring work. Drawing every exposed block means enlarging the game's sphere patch (research in progress). The push and peek cameras need the game's camera values, which are not found yet.
+**Feasibility.** Framing and aspect support are mostly RT64 projection and HUD anchoring work. Drawing every exposed block means enlarging the game's sphere patch (research in progress). Seeing through the core needs the far side drawn as well (the "Full" sphere detail step), with the inward-facing block faces darkened, for example by lighting them with depth so the far side reads as distant and in shadow. The push and peek cameras need the game's camera values, which are not found yet.
 
 ## 3. Story and progression
 
@@ -94,7 +95,7 @@ EXIT
 **Changes to the original intention.**
 - Keep **Puzzle**. It is the original's most distinctive mode after Rescue, and it suits short sessions.
 - Fold **Practice** into Custom (choose chapter, depth, speed, no fail), and keep **Training** as the onboarding path rather than a menu destination players must find.
-- **Hide & Seek** becomes a Story level type or a Custom rule set rather than a top-level mode.
+- **Hide & Seek** becomes a Story level type and a rule set for multiplayer: in **Collaborate**, two players uncover one picture together; in **Versus**, both race to uncover the same picture (shared seed) or the most of it before time runs out.
 
 **Player benefit.** Every activity is one or two steps from the main menu, and the names say what each mode is.
 
@@ -130,6 +131,7 @@ EXIT
 - The host selects chapter or difficulty, and the format: best of 1, 3 or 5.
 - Random level selection from chosen pools, using shared seeds so every player gets an equal sphere.
 - Handicaps per player (depth, speed or junk received), so mixed-skill groups stay competitive.
+- A **Hide & Seek race:** both players uncover the same hidden picture (shared seed); first to finish, or most uncovered when time runs out, wins.
 
 **Player benefit.** Flexible, fair matches for friends of any skill, at home or online.
 
@@ -208,6 +210,17 @@ Ordered by importance, as in the original notes:
 - **Support needs real actions:** magic aiming and the hold or swap piece make the role active rather than advisory.
 - **Identity by shape as well as colour.**
 
+### Collaborate tutorial
+
+Collaborate adds roles and signals that solo players have never seen, so it needs its own short, hands-on tutorial that both players play together:
+
+1. **Roles:** the drop player places a piece; the support player moves their cursor and sees where the drop player is.
+2. **Signals:** each player pings a block and watches the other's outline, halo and edge marker.
+3. **Support actions:** the support player fires magic at their cursor and swaps the next piece.
+4. **A first shared level:** a small sphere cleared together, with hints only when needed.
+
+Each step is short, can be skipped, and can be replayed from the Collaborate menu. Hide & Seek levels suit the first shared level, since the goal is visible to both players.
+
 ### Player benefit
 
 A cooperative mode that keeps the original's single, focused sphere, gives two players distinct and meaningful jobs, and lets them coordinate silently. It suits mixed-skill pairs: the stronger player drops, the newer one supports.
@@ -220,7 +233,8 @@ A cooperative mode that keeps the original's single, focused sphere, gives two p
 - **Magic at the support cursor:** needs the magic system mapped (not yet found), then a hook that fires magic at a chosen cell rather than the drop cursor. Research first.
 - **Hold or swap piece:** the piece queue is game state; needs mapping, then a hook. Medium.
 - **Online play:** both players share one simulation. The practical route is host-authoritative: the host runs the game, the remote player's support inputs are sent as small messages (support actions are infrequent, so latency matters less than for the drop player), and the remote player's view is kept in step from the host's state. This is different from Versus, where each player runs their own game, and should come after local Collaborate works.
-- **Order:** local Collaborate with the support cursor, outlines, pings and edge indicators first; then magic aiming and hold or swap; then activity halos and polish; online last.
+- **Order:** local Collaborate with the support cursor, outlines, pings and edge indicators first; then magic aiming and hold or swap; then activity halos and polish; then the tutorial; online last.
+- **Hide & Seek levels** already exist as level records with goal text, so a Collaborate or Versus Hide & Seek level can reuse them.
 
 ## 9. Media Player
 
@@ -293,6 +307,9 @@ Not in the original brief, but essential for a modern release.
 | Collaborate: colour identity | **Change** | Add shape and line style so it never relies on colour alone. |
 | Collaborate: support role | **Add** | Magic aiming and a hold or swap piece, so support is active, not advisory. |
 | Collaborate: camera | **Decide** | The camera follows the drop player; the support player relies on edge indicators. |
+| Collaborate tutorial | **Add** | Roles and signals are new to everyone; teach them by playing together. |
+| Hide & Seek in Collaborate and Versus | **Add** | A shared picture suits co-operation, and a race on the same picture is a fair duel. |
+| See through an opened core | **Add** | The far side's undersides, dark but visible, make the sphere feel solid. |
 
 ## Risks and constraints
 
