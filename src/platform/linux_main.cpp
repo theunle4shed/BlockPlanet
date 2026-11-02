@@ -458,7 +458,8 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         std::exit(74);
     }
     // Player profiles: the cartridge save and trophies live in the active
-    // profile's folder; settings are shared (docs/SAVES.md).
+    // profile's folder; settings are shared (docs/SAVES.md). A guest has no
+    // folder: the save stays in memory and no trophies are earned.
     ProfileStore profiles(user_path);
     std::string profile_error;
     if (!profiles.load(profile_error) ||
@@ -466,18 +467,21 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         show_error(profile_error.c_str());
         std::exit(74);
     }
-    const auto profile_path = profiles.directory(profiles.active());
-    {
+    profiles.purge_deleted(30);
+    const auto profile_path = run_options.guest ? std::filesystem::path{} : profiles.directory(profiles.active());
+    std::string eeprom_error;
+    std::filesystem::path eeprom_path;
+    if (!run_options.guest) {
         std::error_code ignored;
         std::filesystem::create_directories(profile_path, ignored);
+        eeprom_path = profile_path / "cartridge.eep";
+        // Keep the cartridge saves of the last three sessions.
+        if (!rotate_backup(eeprom_path, profile_path / "backups", 3, eeprom_error))
+            std::fprintf(stderr, "Could not back up the save: %s\n", eeprom_error.c_str());
     }
-    std::string eeprom_error;
-    const auto eeprom_path = profile_path / "cartridge.eep";
-    // Keep the cartridge saves of the last three sessions.
-    if (!rotate_backup(eeprom_path, profile_path / "backups", 3, eeprom_error))
-        std::fprintf(stderr, "Could not back up the save: %s\n", eeprom_error.c_str());
-    std::fprintf(stdout, "{\"event\":\"profile\",\"id\":\"%s\",\"profiles\":%zu}\n",
-                 profiles.active().id.c_str(), profiles.profiles().size());
+    std::fprintf(stdout, "{\"event\":\"profile\",\"id\":\"%s\",\"guest\":%s,\"profiles\":%zu}\n",
+                 run_options.guest ? "" : profiles.active().id.c_str(), run_options.guest ? "true" : "false",
+                 profiles.profiles().size());
     std::fflush(stdout);
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
@@ -522,7 +526,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         const auto definitions = base != nullptr
             ? std::filesystem::u8path(base) / "trophies.json" : std::filesystem::path("trophies.json");
         if (base != nullptr) SDL_free(base);
-        initialize_trophies(definitions, profile_path / "trophies.json");
+        if (!run_options.guest) initialize_trophies(definitions, profile_path / "trophies.json");
     }
     game_option_applier = std::make_unique<GameOptionApplier>(
         GameOptions{run_options.casual, run_options.start_chapter});

@@ -73,6 +73,14 @@ int main() {
         assert(options.valid && options.casual && options.start_chapter && *options.start_chapter == 12);
     }
     {
+        const char* argv[] = {"tetrisphere-m1", "--guest"};
+        assert(parse_run_options(2, argv).guest);
+        const char* argv2[] = {"tetrisphere-m1", "--guest", "--profile=Sam"};
+        assert(!parse_run_options(3, argv2).valid);
+        const char* argv3[] = {"tetrisphere-m1", "--profile=Sam"};
+        assert(parse_run_options(2, argv3).profile == std::string("Sam"));
+    }
+    {
         const char* argv[] = {"tetrisphere-m1", "--sphere=extended"};
         const auto options = parse_run_options(2, argv);
         assert(options.valid && options.sphere_extended && *options.sphere_extended);

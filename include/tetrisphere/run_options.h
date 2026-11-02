@@ -40,6 +40,8 @@ struct RunOptions {
     std::optional<bool> sphere_extended;
     // Play as this profile (created if new) and make it the active one.
     std::optional<std::string> profile;
+    // Play as a guest: nothing is saved and no trophies are earned.
+    bool guest = false;
     bool perf_log = false;
     // Casual play: no game over. Trophies are paused.
     bool casual = false;

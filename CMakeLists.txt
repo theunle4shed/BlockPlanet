@@ -1066,7 +1066,7 @@ if(TETRISPHERE_GAME_ENABLED)
     add_executable(tetrisphere-config
         src/platform/config_cli.cpp src/platform/config_gui.cpp
         src/platform/settings_store.cpp
-        src/platform/eeprom_store.cpp)
+        src/platform/eeprom_store.cpp src/platform/profiles.cpp)
     target_include_directories(tetrisphere-config PRIVATE
         "${CMAKE_SOURCE_DIR}/include"
         "${N64MODERN_RUNTIME}/thirdparty/json"

@@ -50,6 +50,48 @@ int main(int argc, char** argv) {
         assert(store.load(error) && store.active().name == "Sam" && store.profiles().size() == 2);
         assert(store.use("player 1", error) && store.active().id == "1" && store.profiles().size() == 2);
     }
+    // Characters: chosen per profile, with a colour variant.
+    {
+        ProfileStore store(data);
+        assert(store.load(error));
+        assert(store.set_character("Sam", "rescue-3", 2, error));
+        assert(!store.set_character("Sam", "Bad Name", 0, error));
+        assert(!store.set_character("Sam", "rescue-3", 8, error));
+        assert(!store.set_character("Nobody", "rescue-3", 0, error));
+    }
+    {
+        ProfileStore store(data);
+        assert(store.load(error));
+        assert(store.find("sam")->character == "rescue-3" && store.find("sam")->palette == 2);
+        assert(!store.add("SAM", error));  // names are unique regardless of case
+    }
+    // Deleting moves the profile aside; restoring brings it and its files back.
+    {
+        ProfileStore store(data);
+        assert(store.load(error));
+        write(store.directory(*store.find("Sam")) / "cartridge.eep", "sam's save");
+        assert(store.use("Sam", error));
+        assert(store.remove("Sam", error));
+        assert(store.find("Sam") == nullptr && store.active().id == "1");
+        assert(store.deleted().size() == 1 && store.deleted().front().profile.name == "Sam");
+        assert(!std::filesystem::exists(data / "profiles" / "2"));
+        assert(store.add("Alex", error) && store.find("Alex")->id == "3");  // id 2 is still held
+        assert(store.restore("sam", error));
+        assert(store.find("Sam")->id == "2" && store.find("Sam")->character == "rescue-3");
+        assert(read(data / "profiles" / "2" / "cartridge.eep") == "sam's save");
+        assert(store.deleted().empty() && !store.restore("Sam", error));
+    }
+    // Deleting the last profile leaves a fresh "Player 1".
+    {
+        ProfileStore store(root / "single");
+        assert(store.load(error));
+        assert(store.remove("Player 1", error));
+        assert(store.profiles().size() == 1 && store.active().name == "Player 1" && store.active().id == "2");
+        store.purge_deleted(30);
+        assert(store.deleted().size() == 1);  // recent deletions are kept
+        store.purge_deleted(-1);
+        assert(store.deleted().empty());
+    }
     // Damaged lists are reported, not replaced.
     write(root / "bad" / "profiles.json", "{not json");
     {

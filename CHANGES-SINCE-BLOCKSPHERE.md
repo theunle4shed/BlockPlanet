@@ -86,3 +86,5 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added player profiles (`include/tetrisphere/profiles.h`, `--profile=NAME`): each has its own cartridge save and trophies; settings stay shared. The cartridge save is backed up at the start of each session (last three kept).
 - Documented the game's save mechanism and a first map of its 512 bytes in `docs/SAVES.md`.
 - Tests: `tests/profiles_test.cpp`; `tests/portable_data_test.py` now covers both portable mode and the per-user default.
+- Profiles gained a character and colour variant, deleting with a 30-day restore (`deleted/`), and guest play (`--guest`: the save stays in memory, no trophies). `tetrisphere-config` manages profiles (`profiles`, `profile-add`, `profile-use`, `profile-delete`, `profile-restore`, `profile-character`) and the sphere setting (`graphics sphere`), and `show` reports settings version 7.
+- Recorded the agreed save layout in `docs/SAVES.md`: a save file per profile (progress and preferences), shared PC settings, and a shared records file.

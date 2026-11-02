@@ -22,6 +22,7 @@ BlockPlanet/
   tetrisphere-us-rev0/rom.z64  the imported ROM
   diagnostics/                 one log per session
   profiles.json                the profiles and which one is active
+  deleted/<id>-<time>/         deleted profiles, restorable for 30 days
   profiles/<id>/
     cartridge.eep              the game's own save (see below)
     trophies.json
@@ -32,7 +33,21 @@ BlockPlanet/
 
 ## Profiles
 
-Each profile has its own cartridge save and trophies. The first profile is "Player 1". `--profile=NAME` plays as that profile, creating it if it is new, and makes it the active one for later starts. Names are 1 to 24 printable characters and match regardless of case. A profile menu will come with the new menus.
+Each profile has its own cartridge save, trophies and (planned) save file with progress and preferences. The first profile is "Player 1".
+
+- **Character:** each profile can choose a character to represent it, with a colour variant (0 to 7). The characters will be the ones rescued in the game, possibly unlocking as they are rescued, with more added later. The profile list stores the choice (`character`, `palette`); the list of characters comes with the profile screen.
+- **Guest:** `--guest` plays without a profile. The cartridge save starts fresh and stays in memory, nothing is written, and no trophies are earned.
+- **Deleting** moves the profile's folder to `deleted/` and removes it from the list; it can be restored for 30 days, then it is removed at the next start. Deleting the last profile leaves a fresh "Player 1".
+- **Launch and local multiplayer (with the new menus):** at launch, choose an existing profile, create one, play as a guest, or delete one; the last profile used is pre-selected. In local multiplayer each player chooses their own profile or plays as a guest, and two players cannot use the same profile. Player 1's profile owns the game's own cartridge save; other players' results go to their own save files. If player 1 is a guest, the cartridge save is not written that session.
+
+Until the profile screen exists:
+
+| Where | Command |
+| --- | --- |
+| Game | `--profile=NAME` plays as that profile (created if new) and makes it active; `--guest` plays as a guest |
+| `tetrisphere-config` | `profiles` (list as JSON, with deleted ones), `profile-add NAME`, `profile-use NAME`, `profile-delete NAME`, `profile-restore NAME`, `profile-character NAME CHARACTER [COLOUR]` |
+
+Names are 1 to 24 printable characters and are unique regardless of case.
 
 ## The game's own save
 
@@ -52,6 +67,10 @@ What is in it, from comparing saves after different test sessions (not yet decod
 
 ## Planned
 
-- A BlockPlanet progress file per profile (`progress.json`): chapters completed (for the chapter select), statistics and records, written from the game events BlockPlanet already detects. It can grow without the 512-byte limit.
-- Decoding the cartridge save, so its scores and names can appear in the new menus.
-- A profile menu in the new menus.
+Agreed layout (2026-11-02):
+
+- **`profiles/<id>/save.json`, one per profile:** progress (chapters and levels completed for the chapter select, unlocks, puzzles solved, tutorials, lifetime statistics) and preferences (controls and button layout, casual mode, HUD and accessibility options, the Collaborate colour and shape). Written from the game events BlockPlanet already detects; no size limit. Controls move here from `settings.dat`; the existing ones are copied into "Player 1".
+- **`settings.dat` stays shared by the PC:** resolution, window, aspect, filters, sphere detail, audio output.
+- **`records.json`, shared by the PC:** best times, high scores and Time Trial runs per mode, each entry tagged with the profile that set it, viewable for everyone or one profile. Guests do not set records. Daily challenges and online leaderboards can build on it.
+- Decoding the cartridge save, so its scores and names can appear in the new menus and be copied into `records.json`.
+- The profile screen in the new menus, with the character list.

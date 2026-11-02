@@ -103,6 +103,10 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
                 return invalid("profile names are 1 to 24 printable characters");
             continue;
         }
+        if (argument == "--guest") {
+            result.guest = true;
+            continue;
+        }
         if (argument.starts_with("--sphere=")) {
             const auto value = argument.substr(sizeof("--sphere=") - 1);
             if (value == "original") result.sphere_extended = false;
@@ -135,6 +139,7 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
         if (!result.rom_path.empty()) return invalid("provide at most one ROM path");
         result.rom_path = argument;
     }
+    if (result.guest && result.profile) return invalid("choose either --guest or --profile");
     return result;
 }
 
@@ -151,6 +156,7 @@ const char* run_options_help() {
            "                                   When finished frames are shown (default console)\n"
            "  --framebuffer-readback=on|off    Copy each frame back to game memory (default on)\n"
            "  --profile=NAME                   Play as this profile (created if new)\n"
+           "  --guest                          Play as a guest: nothing is saved, no trophies\n"
            "  --sphere=original|extended       Draw the game's sphere patch, or more of it\n"
            "                                   (overrides the saved SPHERE setting)\n"
            "  --casual                         No game over: hearts refill, Time Trial clock\n"

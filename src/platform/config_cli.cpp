@@ -1,5 +1,6 @@
 #include "tetrisphere/config_gui.h"
 #include "tetrisphere/settings_store.h"
+#include "tetrisphere/profiles.h"
 #include "tetrisphere/data_directory.h"
 
 #include <SDL.h>
@@ -65,6 +66,59 @@ tetrisphere::PhysicalButton* binding_for(tetrisphere::Settings& settings,
     return nullptr;
 }
 
+int profile_usage() {
+    std::cerr << "usage: tetrisphere-config [--data-dir PATH] profiles | profile-add NAME | "
+                 "profile-use NAME | profile-delete NAME | profile-restore NAME | "
+                 "profile-character NAME CHARACTER [COLOUR 0-7]\n";
+    return 64;
+}
+
+// Profile management (docs/SAVES.md). `profiles` prints the profiles, the
+// active one and the deleted ones that can be restored, as JSON.
+int profile_command(const std::filesystem::path& data_dir, int argc, char** argv) {
+    tetrisphere::ProfileStore profiles(data_dir);
+    std::string error;
+    if (!profiles.load(error)) {
+        std::cerr << error << '\n';
+        return 74;
+    }
+    const std::string command = argv[0];
+    bool ok = true;
+    if (command == "profiles" && argc == 1) {
+        auto list = nlohmann::json::array();
+        for (const auto& p : profiles.profiles())
+            list.push_back({{"id", p.id}, {"name", p.name}, {"character", p.character}, {"palette", p.palette}});
+        auto deleted = nlohmann::json::array();
+        for (const auto& d : profiles.deleted()) deleted.push_back({{"name", d.profile.name}, {"folder", d.folder}});
+        std::cout << nlohmann::json{{"active", profiles.active().name}, {"profiles", list}, {"deleted", deleted}}.dump()
+                  << '\n';
+        return 0;
+    } else if (command == "profile-add" && argc == 2) {
+        ok = profiles.add(argv[1], error);
+    } else if (command == "profile-use" && argc == 2) {
+        ok = profiles.use(argv[1], error);
+    } else if (command == "profile-delete" && argc == 2) {
+        ok = profiles.remove(argv[1], error);
+    } else if (command == "profile-restore" && argc == 2) {
+        ok = profiles.restore(argv[1], error);
+    } else if (command == "profile-character" && (argc == 3 || argc == 4)) {
+        int palette = 0;
+        if (argc == 4) {
+            const std::string value = argv[3];
+            if (value.size() != 1 || value[0] < '0' || value[0] > '7') return profile_usage();
+            palette = value[0] - '0';
+        }
+        ok = profiles.set_character(argv[1], argv[2], palette, error);
+    } else {
+        return profile_usage();
+    }
+    if (!ok) {
+        std::cerr << error << '\n';
+        return 65;
+    }
+    return 0;
+}
+
 int usage() {
     std::cerr << "usage: tetrisphere-config [--data-dir PATH] show | family "
                  "auto|keyboard|xbox|playstation|nintendo-switch | bind "
@@ -74,7 +128,8 @@ int usage() {
                  "auto|240p|720p|1080p|1440p|2160p | graphics aspect 4:3|16:9 | "
                  "graphics refresh original|30|60|120 | "
                  "graphics window-mode windowed|fullscreen | graphics msaa off|2x|4x|8x |\n"
-                 "graphics presentation-filter nearest|linear|pixel | graphics texture-filter linear|three-point\n"
+                 "graphics presentation-filter nearest|linear|pixel | graphics texture-filter linear|three-point |\n"
+                 "graphics sphere original|extended\n"
                  "Graphics values are requests; RT64 may cap FPS, and VS 16:9 "
                  "gameplay is not yet verified.\n";
     return 64;
@@ -118,6 +173,8 @@ int main(int argc, char** argv) {
             return 74;
         }
     }
+    if (argc > first && std::string(argv[first]).starts_with("profile"))
+        return profile_command(data_dir, argc - first, argv + first);
     tetrisphere::SettingsStore store(data_dir / "settings.dat");
     if (argc <= first)
         return tetrisphere::run_graphics_config_gui(store, show_desktop_dialog);
@@ -130,7 +187,7 @@ int main(int argc, char** argv) {
     const std::string command = argv[first];
     if (command == "show" && argc == first + 1) {
         std::cout << nlohmann::json{
-            {"schema_version", 6},
+            {"schema_version", 7},
             {"family_override", settings.family_override},
             {"graphics", {
                 {"resolution", tetrisphere::graphics_resolution_name(settings.graphics.resolution)},
@@ -139,7 +196,8 @@ int main(int argc, char** argv) {
                 {"window_mode", tetrisphere::graphics_window_mode_name(settings.graphics.window_mode)},
                 {"msaa_samples", settings.graphics.msaa_samples},
                 {"presentation_filter", tetrisphere::graphics_presentation_filter_name(settings.graphics.presentation_filter)},
-                {"texture_filter", tetrisphere::graphics_texture_filter_name(settings.graphics.three_point_filter)}}},
+                {"texture_filter", tetrisphere::graphics_texture_filter_name(settings.graphics.three_point_filter)},
+                {"sphere", tetrisphere::graphics_sphere_name(settings.graphics.sphere)}}},
             {"bindings", {
                 {"confirm", button_name(settings.bindings.confirm)},
                 {"cancel", button_name(settings.bindings.cancel)},
@@ -171,6 +229,9 @@ int main(int argc, char** argv) {
                 return usage();
         } else if (option == "window-mode") {
             if (!tetrisphere::parse_graphics_window_mode(value, settings.graphics.window_mode))
+                return usage();
+        } else if (option == "sphere") {
+            if (!tetrisphere::parse_graphics_sphere(value, settings.graphics.sphere))
                 return usage();
         } else if (option == "msaa") {
             if (!tetrisphere::parse_graphics_msaa(value, settings.graphics.msaa_samples)) return usage();

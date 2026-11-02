@@ -8,6 +8,10 @@
 //   <data>/profiles/<id>/cartridge.eep   the game's 512-byte EEPROM save
 //   <data>/profiles/<id>/trophies.json
 //   <data>/profiles/<id>/backups/        cartridge saves from earlier sessions
+//   <data>/deleted/<id>-<name>/          deleted profiles, kept for 30 days
+//
+// A guest plays without a profile: nothing is saved and no trophies are
+// earned (see docs/SAVES.md).
 
 #include <filesystem>
 #include <string>
@@ -19,6 +23,16 @@ namespace tetrisphere {
 struct Profile {
     std::string id;    // folder name: 1, 2, 3 ...
     std::string name;  // shown to the player
+    // The character representing the player (empty until chosen; the
+    // available ones come with the profile screen) and its colour variant.
+    std::string character;
+    int palette = 0;
+};
+
+// A deleted profile that can still be restored.
+struct DeletedProfile {
+    std::string folder;  // under <data>/deleted
+    Profile profile;
 };
 
 class ProfileStore {
@@ -36,8 +50,28 @@ public:
     // Makes the profile with this name active, creating it if needed.
     // Names are 1 to 24 printable characters; matching ignores case.
     bool use(std::string_view name, std::string& error);
+    // Adds a profile without making it active.
+    bool add(std::string_view name, std::string& error);
+    // Sets the profile's character (1 to 32 of a-z, 0-9, '-') and colour
+    // variant (0 to 7).
+    bool set_character(std::string_view name, std::string_view character, int palette, std::string& error);
+
+    // Moves the profile's folder to <data>/deleted and removes it from the
+    // list. If it was active, the first remaining profile becomes active; if
+    // none remain, a new "Player 1" is created.
+    bool remove(std::string_view name, std::string& error);
+    std::vector<DeletedProfile> deleted() const;
+    // Brings back the most recently deleted profile with this name. It gets
+    // a new id if its old one has been reused.
+    bool restore(std::string_view name, std::string& error);
+    // Permanently removes deleted profiles older than `days`.
+    void purge_deleted(int days);
+
+    const Profile* find(std::string_view name) const;
 
 private:
+    std::string next_id() const;
+
     std::filesystem::path data_directory_;
     std::vector<Profile> profiles_;
     std::string active_id_;

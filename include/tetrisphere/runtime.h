@@ -49,6 +49,7 @@ bool load_initial_image(std::span<const std::uint8_t> rom,
                         std::size_t size);
 void initialize_ipl3_state(std::uint8_t* rdram);
 void set_runtime_rom(std::span<const std::uint8_t> rom);
+// An empty path keeps the save in memory only (guest play).
 bool initialize_eeprom(const std::filesystem::path& path, std::string& error);
 [[noreturn]] void await_runtime_handoff();
 // Called with guest memory just before each graphics task is submitted (the

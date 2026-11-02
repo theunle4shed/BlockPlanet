@@ -210,6 +210,14 @@ void set_runtime_rom(std::span<const std::uint8_t> rom) {
 }
 
 bool initialize_eeprom(const std::filesystem::path& path, std::string& error) {
+    if (path.empty()) {
+        // A guest: a fresh cartridge save, kept in memory only.
+        std::lock_guard lock(eeprom_mutex);
+        eeprom.fill(0);
+        eeprom_store.reset();
+        error.clear();
+        return true;
+    }
     auto store = std::make_unique<EepromStore>(path);
     std::array<std::uint8_t, 512> loaded{};
     if (!store->load(loaded, error)) return false;
