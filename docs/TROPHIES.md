@@ -67,10 +67,32 @@ The trophy list depends on these events. `GameEventWatcher` (`include/tetrispher
 | `level_completed` | `mode`, `chapter`, `level`, `score`, `hearts_lost` | A Rescue or Hide & Seek level is cleared. | Working |
 | `chapter_completed` | `mode`, `chapter`, `final` (1 for the last chapter) | A chapter is cleared. | Working; `final` not yet |
 | `puzzle_solved` | `puzzle`, `drops`, `slides`, `seconds` | A puzzle is solved. | `puzzle` only; not yet seen in play |
+| `blocks_destroyed` | `mode`, `count`, `by_magic` (1 or 0) | Blocks are cleared, by a match or by magic. | Not yet (planned) |
+| `junk_sent` | `mode`, `pieces` | VS: pieces are sent to the opponent. | Not yet (planned) |
+| `battle_result` | `mode`, `kind` (`local`, `online`, `cpu`), `result` | A Versus battle against people ends. | Not yet (planned; local VS and online) |
+| `collab_combo` | `mode`, `size`, `player` | Collaborate: a combo, with the player who contributed it. | Not yet (Collaborate mode is planned) |
 
 Set `TETRISPHERE_LOG_GAME_EVENTS=1` to print each event as it happens.
 
 Mode names: `rescue`, `hide_and_seek`, `puzzle`, `time_trial`, `vs_cpu` and `training` are reported now. `practice`, `vs` (two players) and `lines` are reserved until their mode numbers are found.
+
+## Coverage by mode
+
+Trophies should cover every mode. Status of the first list (19 trophies), 2026-11-02:
+
+| Mode | Trophies now | Gap |
+| --- | --- | --- |
+| Rescue | first level, chapter 1, all chapters, flawless level | — |
+| Puzzle | first solved, solved in one drop | — |
+| Time Trial | 100,000 points | More goals (times, survival) need the Time Trial clock and results |
+| Hide & Seek | none | Needs Hide & Seek trophies (finding cores, clearing chapters) |
+| Lines | none | Needs Lines detected and its own trophies |
+| VS CPU | win one, win 50 | Needs a reliable win event |
+| Local VS (people) | none | Needs `battle_result` |
+| Collaborate, online | none | Modes still to be built |
+| Any mode | first drop, 1,000 pieces, combos (3), magic (2), picture found, a million points, platinum | Combo and magic trophies wait for the `combo` and `magic_used` events |
+
+Planned additions alongside the new statistics (see [SAVES.md](SAVES.md)): blocks destroyed in a lifetime, largest combo, pieces sent in VS, largest combo contributed in Collaborate, local and online battles won, magic used and blocks destroyed by magic. All need the events above.
 
 ## Connecting a launcher
 
