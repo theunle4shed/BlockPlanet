@@ -75,4 +75,19 @@ Started 2026-11-02 to understand why blocks near the edge of the view go missing
 - `func_800A348C` calls about ten sphere drawing passes once each (`func_8009E630`, `func_8009EB28`, `func_8009F024`, `func_8009F520`, `func_8009FA20`, `func_800A0ED8`, `func_800A18F4`, `func_800A1E58`, `func_800A2374`, `func_800A2E88`).
 - `func_8009E630` loops 8 rows (counter `0x8015F836`) over a column span held in `0x8015EDB2`..`0x8015EDAE`. Each row starts with `func_8009D90C`, which reads a **precomputed mesh table** (pointer at `0x800E44E4`; rows of 0xC0 bytes, 12-byte entries) and interpolates vertex positions.
 
-**Working conclusion:** the game draws a fixed patch of the sphere's surface around the view centre and maps nearby blocks onto it, rather than drawing the whole sphere and hiding what is out of view. Blocks outside the patch have nowhere to be drawn, which explains the gaps and stray walls near the edge. Still to confirm: the patch size in cells, how cells map onto it, and whether the mesh table can be enlarged (memory, and the fixed vertex buffer size) to cover the whole visible hemisphere or the whole sphere for a rear camera.
+**How the patch is built:**
+
+- The mesh table (pointer at `0x800E44E4`, P2's at `0x800E44E8`; `0x801270F0` in the sampled run) is **16 × 16 grid points**. Each 12-byte entry holds two points along the same direction: one on the outer surface and one at about 0.3 × that radius (the core). The renderer interpolates between them to place each layer.
+- It is **recomputed while the sphere rotates** by `func_800ADD6C` (a hardware watchpoint on the table stopped there; it did not fire during a minute without rotation). It interpolates a fixed base grid of unit direction vectors at `0x800E3CD8` (rows of 18 points, 6 bytes each) by the sub-cell rotation, with 16 × 16 output loops.
+- The table spans about **158° in both directions**, about 10.5° per grid step (360° / 32 cells is 11.25°). So the game draws the cells within about 79° of the view centre.
+
+**Revised conclusion:** the patch is almost a hemisphere, not a small window. The visible edge of the sphere, seen from a camera at a finite distance, falls a little inside 90°, so the **patch boundary sits just beyond the silhouette**. Cells at the boundary have neighbours the renderer never considers, which shows as missing walls, or walls drawn as exposed, at the edge of the view. A deep hole viewed at an angle exposes walls right at the boundary, which is the case the owner reported (also on real hardware).
+
+**Fix options:**
+
+| Option | Work | Result |
+| --- | --- | --- |
+| Extended, for example 20 × 20 points (about 200°) | Reimplement the table builder and the drawing passes with larger loops; move their buffers into memory above 8 MB | Boundary moves behind the silhouette, fixing the edge artifacts. About 1.6 × the vertices. |
+| Full, 32 × 32 | Replace the game's sphere drawing with BlockPlanet's own, built from the block grid | Edge fix, rear and peek cameras, the far side visible through an opened core (darkened), and Collaborate outlines and halos. About 4 × the vertices. |
+
+Both need the game's drawing functions replaced with BlockPlanet code (N64Recomp can call host functions in place of recompiled ones). The fixed sizes live in the table builder (16 × 16 loops), the table storage (16 rows of `0xC0` bytes), the base grid (18 points per row), the drawing passes (8-row loops with column spans at `0x8015EDB2`/`0x8015EDAE`) and the per-frame vertex buffer.
