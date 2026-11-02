@@ -2,6 +2,8 @@
 
 A living plan. Each item lists what it involves, what it depends on, and how big it is. Sizes are rough: **S** is days, **M** is one to three weeks, **L** is one to two months, **XL** is a multi-month project. All sizes assume part-time work, testing on a real PC, and that the item's research does not turn up something unexpected.
 
+The longer-term design direction (visual identity, camera, story, modes, junk rules, media player, accessibility) is in [REDESIGN.md](REDESIGN.md). This roadmap covers what to build and in what order.
+
 ## How the game is built, and why it matters for these plans
 
 BlockPlanet runs the original game code, recompiled to PC code, inside N64ModernRuntime, with RT64 drawing the graphics. That shapes every item below:
