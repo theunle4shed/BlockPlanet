@@ -65,7 +65,10 @@ struct TextRequest {
     std::string name;
     std::string text;
 };
-using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest, TextRequest>;
+struct PadRequest {
+    bool pad;
+};
+using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest>;
 std::mutex requests_mutex;
 std::deque<Request> requests;
 std::deque<std::string> commands;
@@ -110,6 +113,8 @@ void apply_requests() {
             navigator->set_setting(setting->name, setting->value);
         } else if (auto* list = std::get_if<ListRequest>(&request)) {
             navigator->set_list(list->name, std::move(list->items));
+        } else if (auto* pad = std::get_if<PadRequest>(&request)) {
+            navigator->set_pad(pad->pad);
         } else if (auto* text = std::get_if<TextRequest>(&request)) {
             navigator->set_text(text->name, text->text);
         } else {
@@ -213,6 +218,11 @@ void set_list(const std::string& name, std::vector<ListItem> items) {
 void set_text(const std::string& name, const std::string& text) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(TextRequest{name, text});
+}
+
+void set_pad(bool pad) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(PadRequest{pad});
 }
 
 void send_command(const std::string& command) {

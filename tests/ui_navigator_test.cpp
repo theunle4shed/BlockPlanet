@@ -164,8 +164,8 @@ int main(int argc, char** argv) {
         nav.handle(Action::Right);
         assert(nav.focused_item() == "e");
         nav.handle(Action::Right);
-        assert(nav.focused_item() == "a");  // wraps around the grid
-        nav.handle(Action::Left);
+        assert(nav.focused_item() == "d");  // wraps around the row
+        nav.handle(Action::Right);
         nav.handle(Action::Up);
         assert(nav.focused_item() == "b");
         nav.handle(Action::Up);
@@ -176,6 +176,51 @@ int main(int argc, char** argv) {
         assert(nav.focused_item() == "e");  // into the grid from below
         nav.handle(Action::Down);
         assert(nav.focused_item() == "done");
+        nav.handle(Action::Up);    // e
+        nav.handle(Action::Up);    // b
+        nav.handle(Action::Right); // c
+        nav.handle(Action::Down);  // row 1 is shorter, so its last item
+        assert(nav.focused_item() == "e");
+
+        // Wide items and wrapping: a 4-column grid over a bottom row of
+        // [x][ wide ][y]; Up from the top row goes to the bottom row, and
+        // the column is kept across the wide item.
+        std::vector<ListItem> wide;
+        for (const char* key : {"k0", "k1", "k2", "k3"}) wide.push_back({key, key, "", "command:k", true});
+        wide.push_back({"x", "x", "", "command:x", true});
+        wide.push_back({"wide", "wide", "", "command:w", true, 2});
+        wide.push_back({"y", "y", "", "command:y", true});
+        nav.set_list("keyboard", wide);
+        screen(dir, "wrap", "<div data-columns='4' data-wrap='' data-list='keyboard'/>");
+        assert(nav.show("wrap") && nav.focused_item() == "k0");
+        nav.handle(Action::Right);
+        nav.handle(Action::Right);
+        nav.handle(Action::Up);
+        assert(nav.focused_item() == "wide");  // k2 is over the wide item
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "k2");    // back to the same column
+        nav.handle(Action::Left);
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "wide");
+        nav.handle(Action::Up);
+        assert(nav.focused_item() == "k1");
+        nav.handle(Action::Left);
+        nav.handle(Action::Left);
+        assert(nav.focused_item() == "k3");    // wraps along the row
+        nav.handle(Action::Down);
+        assert(nav.focused_item() == "y");
+        nav.handle(Action::Right);
+        assert(nav.focused_item() == "x");
+        // The controller class follows set_pad, on open and new screens.
+        auto top_document = [&] { return context->GetDocument(context->GetNumDocuments() - 1); };
+        assert(!top_document()->IsClassSet("pad"));
+        nav.set_pad(true);
+        assert(top_document()->IsClassSet("pad"));
+        nav.handle(Action::Back);
+        assert(nav.show("solo") && top_document()->IsClassSet("pad"));
+        nav.set_pad(false);
+        assert(!top_document()->IsClassSet("pad"));
+        nav.handle(Action::Back);
         nav.set_text("typed", "z");
         assert(context->GetDocument(context->GetNumDocuments() - 1)->QuerySelector("[data-text]")->GetInnerRML() == "z");
         nav.close();

@@ -59,8 +59,14 @@ int main(int argc, char** argv) {
     // Names: on-screen keys (shift lasts one letter), typing, limits.
     NameEditor editor;
     editor.start("new", "");
-    assert(editor.keyboard().size() == 40 && editor.keyboard()[0].label == "A");
-    assert(editor.press("A") && editor.keyboard()[0].label == "a");  // shift released
+    auto keys = editor.keyboard();
+    assert(keys.size() == 44 && keys[0].label == "1" && keys[10].label == "Q" && keys[20].label == "A" &&
+           keys[29].id == "keyquote" && keys[30].label == "Z");
+    int spans = 0;
+    for (std::size_t i = 40; i < keys.size(); ++i) spans += keys[i].span;
+    assert(spans == keyboard_columns && keys[41].id == "keyspace" && keys[43].action == "command:name_done");
+    assert(keys[40].label == "SHIFT");
+    assert(editor.press("A") && editor.keyboard()[20].label == "a" && editor.keyboard()[40].label == "Shift");
     assert(!editor.press("B") && editor.text() == "Ab");
     editor.press("space");
     editor.press("space");  // no double spaces
@@ -73,7 +79,7 @@ int main(int argc, char** argv) {
     editor.type(std::string(40, 'x'));
     assert(editor.text().size() == 24);
     editor.start("1", "Sam");
-    assert(editor.target() == "1" && editor.keyboard()[0].label == "a");
+    assert(editor.target() == "1" && editor.keyboard()[10].label == "q");
     editor.press("shift");
     editor.press("Q");
     assert(editor.text() == "SamQ");

@@ -49,7 +49,8 @@ const std::vector<std::string>& colour_names();
 std::vector<blockplanet::ui::ListItem> character_choices(const ProfileStore& store, const std::string& id);
 
 // The name being typed on the name screen, with an on-screen keyboard for
-// controllers (letters, digits and a few symbols).
+// controllers: QWERTY with the numbers on top and a few symbols, then
+// Shift, Space, Delete and Done. (Other layouts can come with localisation.)
 class NameEditor {
 public:
     void start(std::string target, std::string text);

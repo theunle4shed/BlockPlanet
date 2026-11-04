@@ -6,16 +6,10 @@
 <body>
     <div id="panel" class="wide">
         <div class="title">Name</div>
-        <div class="subtitle">Type, or choose letters below</div>
+        <div class="subtitle"><span class="for-keys">Type a name. Enter finishes, Esc cancels.</span><span class="for-pad">Choose letters. Start finishes, B cancels.</span></div>
         <div class="name-field" data-text="name_edit"></div>
         <div class="name-field-hint" data-text="name_hint"></div>
-        <div class="keys" data-list="keyboard" data-columns="10"></div>
-        <div class="keys actions" data-columns="4">
-            <div class="item" id="shift" data-action="command:name_key:shift">Shift</div>
-            <div class="item" id="delete" data-action="command:name_key:delete">Delete</div>
-            <div class="item" id="done" data-action="command:name_done">Done</div>
-            <div class="item" id="cancel" data-action="back">Cancel</div>
-        </div>
+        <div class="keys for-pad" data-list="keyboard" data-columns="10" data-wrap></div>
     </div>
 </body>
 </rml>

@@ -79,7 +79,8 @@ std::vector<blockplanet::ui::ListItem> character_choices(const ProfileStore& sto
 namespace {
 
 constexpr std::size_t name_limit = 24;
-const std::string keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._";
+// The on-screen keyboard: QWERTY with the numbers on top, ten to a row.
+const std::string keys = "1234567890QWERTYUIOPASDFGHJKL'ZXCVBNM-._";
 
 char shown(char key, bool shift) {
     return shift ? key : static_cast<char>(key >= 'A' && key <= 'Z' ? key - 'A' + 'a' : key);
@@ -128,12 +129,21 @@ void NameEditor::type(const std::string& text) {
 std::vector<blockplanet::ui::ListItem> NameEditor::keyboard() const {
     std::vector<blockplanet::ui::ListItem> items;
     for (char key : keys) {
-        const std::string label(1, shown(key, shift_));
-        items.push_back({std::string("key") + (key == '.' ? std::string("dot") : key == '-' ? std::string("dash")
-                                                : key == '_' ? std::string("under") : std::string(1, key)),
-                         label, "", "command:name_key:" + std::string(1, key), true});
+        std::string id = "key";
+        switch (key) {
+        case '\'': id += "quote"; break;
+        case '-': id += "dash"; break;
+        case '.': id += "dot"; break;
+        case '_': id += "under"; break;
+        default: id += key;
+        }
+        items.push_back({id, std::string(1, shown(key, shift_)), "", "command:name_key:" + std::string(1, key), true});
     }
-    items.push_back({"keyspace", "Space", "", "command:name_key:space", true});
+    // The bottom row, under the keys (spans add up to keyboard_columns).
+    items.push_back({"shift", shift_ ? "SHIFT" : "Shift", "", "command:name_key:shift", true, 2});
+    items.push_back({"keyspace", "Space", "", "command:name_key:space", true, 4});
+    items.push_back({"delete", "Delete", "", "command:name_key:delete", true, 2});
+    items.push_back({"done", "Done", "", "command:name_done", true, 2});
     return items;
 }
 

@@ -69,6 +69,7 @@ bool Navigator::push(const std::string& screen) {
     Rml::ElementDocument* document = context_->LoadDocument((screens_ / (screen + ".rml")).string());
     if (document == nullptr) return false;
     if (!stack_.empty()) stack_.back().document->Hide();
+    document->SetClass("pad", pad_);
     stack_.push_back({screen, document, 0});
     fill(stack_.back());
     document->SetClass("entering", true);  // CSS animates screens with this class
@@ -119,6 +120,10 @@ void Navigator::fill(Screen& screen) {
             element->SetClass("item", true);
             element->SetClass("disabled", !entry.enabled);
             element->SetAttribute("data-action", entry.action);
+            if (entry.span > 1) {
+                element->SetAttribute("data-span", entry.span);
+                element->SetClass("span" + std::to_string(entry.span), true);
+            }
             Rml::String text = escaped(entry.label);
             if (!entry.note.empty()) text += "<span class=\"note\">" + escaped(entry.note) + "</span>";
             element->SetInnerRML(text);
@@ -222,46 +227,90 @@ void Navigator::handle(Action action) {
     }
 }
 
-bool Navigator::grid(const Screen& screen, std::size_t& first, std::size_t& size, int& columns) const {
+bool Navigator::grid(const Screen& screen, Grid& out) const {
     const auto list = items(screen);
     if (list.empty()) return false;
     Rml::Element* container = list[screen.focus]->GetParentNode();
     if (container == nullptr || !container->HasAttribute("data-columns")) return false;
-    columns = std::max(1, container->GetAttribute<int>("data-columns", 1));
-    first = screen.focus;
-    while (first > 0 && list[first - 1]->GetParentNode() == container) --first;
-    size = 0;
-    while (first + size < list.size() && list[first + size]->GetParentNode() == container) ++size;
+    out.columns = std::max(1, container->GetAttribute<int>("data-columns", 1));
+    out.wrap = container->HasAttribute("data-wrap");
+    out.first = screen.focus;
+    while (out.first > 0 && list[out.first - 1]->GetParentNode() == container) --out.first;
+    out.size = 0;
+    while (out.first + out.size < list.size() && list[out.first + out.size]->GetParentNode() == container) ++out.size;
+    int row = 0, column = 0;
+    for (std::size_t i = 0; i < out.size; ++i) {
+        const int span = std::clamp(list[out.first + i]->GetAttribute<int>("data-span", 1), 1, out.columns);
+        if (column + span > out.columns) {
+            ++row;
+            column = 0;
+        }
+        out.row.push_back(row);
+        out.start.push_back(column);
+        out.span.push_back(span);
+        column += span;
+    }
+    out.rows = row + 1;
     return true;
 }
 
 void Navigator::move(Screen& screen, Action action) {
     const std::size_t count = items(screen).size();
-    std::size_t first = 0, size = 0;
-    int columns = 1;
-    const bool in_grid = grid(screen, first, size, columns);
+    Grid g;
+    const bool in_grid = grid(screen, g);
     const bool horizontal = action == Action::Left || action == Action::Right;
     if (horizontal && !in_grid) {
         change_value(screen, action == Action::Left ? -1 : 1);
         return;
     }
+    const bool up = action == Action::Up || action == Action::Left;
+    if (!in_grid) {
+        screen.column = -1;
+        set_focus(screen, up ? (screen.focus + count - 1) % count : (screen.focus + 1) % count);
+        return;
+    }
+    const std::size_t here = screen.focus - g.first;
+    const int row = g.row[here];
     if (horizontal) {
-        const std::size_t position = screen.focus - first;
-        set_focus(screen, first + (action == Action::Left ? (position + size - 1) % size : (position + 1) % size));
+        // Along the row, wrapping at its ends.
+        std::size_t first = here, last = here;
+        while (first > 0 && g.row[first - 1] == row) --first;
+        while (last + 1 < g.size && g.row[last + 1] == row) ++last;
+        const std::size_t next = action == Action::Left ? (here == first ? last : here - 1)
+                                                        : (here == last ? first : here + 1);
+        screen.column = -1;
+        set_focus(screen, g.first + next);
         return;
     }
-    const bool up = action == Action::Up;
-    if (in_grid) {
-        const std::size_t position = screen.focus - first;
-        const auto step = static_cast<std::size_t>(columns);
-        if (up && position >= step) return set_focus(screen, screen.focus - step);
-        if (!up && position + step < size) return set_focus(screen, screen.focus + step);
-        // Leave the grid: to the item before it, or after it.
-        if (up) set_focus(screen, (first + count - 1) % count);
-        else set_focus(screen, (first + size) % count);
-        return;
+    if (screen.column < g.start[here] || screen.column >= g.start[here] + g.span[here]) screen.column = g.start[here];
+    int target = up ? row - 1 : row + 1;
+    if (target < 0 || target >= g.rows) {
+        if (!g.wrap) {
+            // Leave the grid: to the item before it, or after it.
+            screen.column = -1;
+            set_focus(screen, up ? (g.first + count - 1) % count : (g.first + g.size) % count);
+            return;
+        }
+        target = (target + g.rows) % g.rows;
     }
-    set_focus(screen, up ? (screen.focus + count - 1) % count : (screen.focus + 1) % count);
+    // The item in the target row covering the column, or the row's last
+    // item if the row is shorter.
+    std::size_t best = g.size;
+    for (std::size_t i = 0; i < g.size; ++i) {
+        if (g.row[i] != target) continue;
+        if (g.start[i] <= screen.column) best = i;
+    }
+    if (best == g.size)
+        for (std::size_t i = 0; i < g.size; ++i)
+            if (g.row[i] == target) { best = i; break; }
+    const int column = screen.column;
+    set_focus(screen, g.first + best);
+    screen.column = column;
+}
+
+void Navigator::set_pad(bool pad) {
+    pad_ = pad;
+    for (auto& screen : stack_) screen.document->SetClass("pad", pad);
 }
 
 void Navigator::set_text(const std::string& name, const std::string& text) {

@@ -34,6 +34,10 @@ void set_list(const std::string& name, std::vector<ListItem> items);
 // Text for elements with data-text="NAME". Applied at the next frame.
 void set_text(const std::string& name, const std::string& text);
 
+// Whether the player is using a controller (true) or the keyboard; screens
+// get the class "pad" while a controller is used.
+void set_pad(bool pad);
+
 // Reports a command as if a menu item had been chosen (for typed text).
 void send_command(const std::string& command);
 // The screen on top, as of the last frame; empty when the menus are closed.

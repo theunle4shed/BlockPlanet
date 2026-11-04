@@ -2,6 +2,7 @@
 
 #include "ui_system.h"
 
+#include <cstdlib>
 #include <map>
 #include <string>
 #include <utility>
@@ -33,6 +34,17 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         return true;
     }
     if (!blockplanet::ui::menus_open()) return false;
+    // Follow the device in use: screens show controller-only parts (the
+    // on-screen keyboard) only while a controller is used.
+    static bool pad = false;
+    const bool from_pad = assigned && (event.type == SDL_CONTROLLERBUTTONDOWN || event.type == SDL_CONTROLLERAXISMOTION);
+    const bool from_keys = event.type == SDL_KEYDOWN || event.type == SDL_TEXTINPUT;
+    if ((from_pad && !pad && (event.type == SDL_CONTROLLERBUTTONDOWN ||
+                              std::abs(event.caxis.value) > 16000)) ||
+        (from_keys && pad)) {
+        pad = !pad;
+        blockplanet::ui::set_pad(pad);
+    }
     auto send = [](Action action) {
         blockplanet::ui::queue_action(action);
         return true;

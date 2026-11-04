@@ -20,10 +20,17 @@
 // set_list when its screen opens.
 //
 // Grids: items directly inside an element with data-columns="N" form a
-// grid. Left and Right move along it; Up and Down move a row, and leave the
-// grid to the items before or after it.
+// grid, filled row by row; an item with data-span="K" takes K columns.
+// Left and Right move along a row, wrapping. Up and Down go to the item
+// covering the same column in the next row (remembering the column across
+// wide items); at the top and bottom they wrap if the grid has data-wrap,
+// and otherwise leave it for the items before or after.
 //
 // Text: an element with data-text="NAME" shows the text given to set_text.
+//
+// Input device: while the player uses a controller, every screen's body has
+// the class "pad", so screens can show controller-only parts (the name
+// screen's on-screen keyboard).
 
 #include "ui_actions.h"
 
@@ -57,6 +64,7 @@ public:
     void set_setting(const std::string& name, const std::string& value);
     void set_list(const std::string& name, std::vector<ListItem> items);
     void set_text(const std::string& name, const std::string& text);
+    void set_pad(bool pad);
 
     // Commands chosen by the player (command:NAME), oldest first.
     std::optional<std::string> take_command();
@@ -70,6 +78,7 @@ private:
         std::string name;
         Rml::ElementDocument* document;
         std::size_t focus;
+        int column = -1;  // the column Up and Down aim for in a grid
     };
 
     bool push(const std::string& screen);
@@ -81,7 +90,14 @@ private:
     void fill(Screen& screen);
     void fill_text(Screen& screen);
     // The focused item's grid: first index and size, and the column count.
-    bool grid(const Screen& screen, std::size_t& first, std::size_t& size, int& columns) const;
+    struct Grid {
+        std::size_t first = 0, size = 0;  // item indices
+        int columns = 1;
+        bool wrap = false;
+        std::vector<int> row, start, span;  // per grid item
+        int rows = 0;
+    };
+    bool grid(const Screen& screen, Grid& out) const;
     void move(Screen& screen, Action action);
 
     Rml::Context* context_;
@@ -91,6 +107,7 @@ private:
     std::map<std::string, std::string> settings_;
     std::map<std::string, std::vector<ListItem>> lists_;
     std::map<std::string, std::string> texts_;
+    bool pad_ = false;
 };
 
 } // namespace blockplanet::ui

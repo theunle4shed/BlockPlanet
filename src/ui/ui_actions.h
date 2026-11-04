@@ -14,6 +14,7 @@ struct ListItem {
     std::string note;    // small text after the label
     std::string action;  // data-action
     bool enabled = true;
+    int span = 1;  // columns taken in a grid (data-columns)
 };
 
 } // namespace blockplanet::ui

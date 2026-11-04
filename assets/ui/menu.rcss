@@ -106,7 +106,8 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 }
 
 /* Grids (data-columns): keys side by side, sized as shares of the row so
-   each row holds exactly the grid's column count (10 keys, 4 actions). */
+   each row holds exactly the grid's column count; wide keys (span2, span4)
+   take that many columns. */
 .keys .item {
     display: inline-block;
     width: 8%;
@@ -117,9 +118,9 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     background-color: #ffffff0c;
 }
 .keys .item.focused { background-color: #3a6df0; }
-.keys #keyspace { font-size: 20dp; padding: 17dp 0dp; }
-.keys.actions { margin-top: 16dp; }
-.keys.actions .item { width: 22.5%; margin-right: 2%; font-size: 30dp; }
+.keys .item.span2 { width: 17.8%; font-size: 26dp; padding: 17dp 0dp; }
+.keys .item.span4 { width: 37.4%; font-size: 26dp; padding: 17dp 0dp; }
+.keys .item.span2, .keys .item.span4 { margin-top: 8dp; }
 .tiles .item {
     display: inline-block;
     box-sizing: border-box;
@@ -136,3 +137,11 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     margin-left: 0dp;
     font-size: 22dp;
 }
+
+/* Controller-only and keyboard-only parts (body.pad while a controller is used). */
+.for-pad { display: none; }
+body.pad .for-pad { display: block; }
+body.pad .for-keys { display: none; }
+.subtitle .for-pad, .subtitle .for-keys { display: inline; }
+.subtitle .for-pad { display: none; }
+body.pad .subtitle .for-pad { display: inline; }
