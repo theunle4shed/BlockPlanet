@@ -22,11 +22,10 @@ struct ControlPreferences {
     MagicControl magic = MagicControl::West;
 };
 
-// Audio (Options): the PC-side volume, the game's music and effects levels,
-// and whether it picks music at random. Applied by BlockPlanet
+// Audio (Options): the game's music and effects levels, and whether it picks
+// music at random. Applied by BlockPlanet
 // (src/graphics/audio_hooks.cpp); docs/UI.md.
 struct AudioPreferences {
-    int volume = 100;         // percent, the PC's audio output
     int music = 100;          // percent of the game's full music level
     int effects = 100;        // percent of the game's full effects level
     bool random_music = false;  // the game's RANDOM, else AUTO

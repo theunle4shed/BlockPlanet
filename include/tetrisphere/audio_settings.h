@@ -1,15 +1,10 @@
 #pragma once
 
-// Audio settings (docs/UI.md, Options and the pause menu's Audio). The
-// volume is applied to the PC's audio output; music and effects levels and
-// the music choice go to the game, on its own thread
-// (src/graphics/audio_hooks.cpp).
+// Audio settings (docs/UI.md, Options and the pause menu's Audio): music
+// and effects levels and the music choice, applied to the game on its own
+// thread (src/graphics/audio_hooks.cpp). The overall level is the PC's.
 
 namespace blockplanet {
-
-// 0..100 percent, the PC's output.
-void set_audio_volume(int percent);
-int audio_volume();
 
 // The game's music and effects levels, 0..100 percent each, kept applied
 // (the game resets the music level when a song starts).

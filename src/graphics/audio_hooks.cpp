@@ -52,7 +52,6 @@ constexpr std::uint32_t track_banner = 0x800E14A8u;
 constexpr std::uint32_t music_player = 0x80107290u;
 constexpr std::uint32_t effects_max = 0x7FFF;
 
-std::atomic<int> volume{100};
 std::atomic<bool> levels_wanted{false};
 std::atomic<bool> levels_changed{false};
 std::atomic<int> music_percent{100};
@@ -80,8 +79,6 @@ void call(void (*function)(std::uint8_t*, recomp_context*), std::uint8_t* rdram,
 
 } // namespace
 
-void set_audio_volume(int percent) { volume.store(std::clamp(percent, 0, 100)); }
-int audio_volume() { return volume.load(); }
 
 void set_audio_levels(int music, int effects) {
     music_percent.store(std::clamp(music, 0, 100));

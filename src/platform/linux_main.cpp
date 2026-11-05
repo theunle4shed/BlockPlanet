@@ -518,13 +518,6 @@ void set_audio_frequency(std::uint32_t frequency) {
 void queue_audio(std::int16_t* samples, std::size_t count) {
     std::lock_guard lock(audio_mutex);
     std::string error;
-    // The Volume setting (Options), applied to the PC's output.
-    static std::vector<std::int16_t> scaled;
-    if (const int volume = blockplanet::audio_volume(); volume < 100) {
-        scaled.assign(samples, samples + count);
-        for (auto& sample : scaled) sample = static_cast<std::int16_t>(sample * volume / 100);
-        samples = scaled.data();
-    }
     if (!audio_output.queue(samples, count, error)) {
         diagnostic_log().error("audio_queue_failed");
         std::fprintf(stderr,
@@ -725,7 +718,6 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         profile_recording = !run_options.start_chapter;
         // The profile's audio settings, kept applied over the game's own.
         if (profile_data.preferences.audio) {
-            blockplanet::set_audio_volume(profile_data.preferences.audio->volume);
             blockplanet::set_audio_levels(profile_data.preferences.audio->music, profile_data.preferences.audio->effects);
             blockplanet::set_music_random(profile_data.preferences.audio->random_music);
         }
@@ -912,11 +904,10 @@ void publish_audio_settings() {
     const auto audio = current_audio();
     const int track = guest_rdram != nullptr ? blockplanet::current_track(guest_rdram) : 0;
     const std::string choice = blockplanet::track_override() ? "choose" : audio.random_music ? "random" : "auto";
-    const std::string key = std::to_string(audio.volume) + "/" + std::to_string(audio.music) + "/" +
+    const std::string key = std::to_string(audio.music) + "/" +
                             std::to_string(audio.effects) + "/" + choice + "/" + std::to_string(track);
     if (key == last) return;
     last = key;
-    blockplanet::ui::set_setting("volume", std::to_string(audio.volume));
     blockplanet::ui::set_setting("music_volume", std::to_string(audio.music));
     blockplanet::ui::set_setting("effects_volume", std::to_string(audio.effects));
     blockplanet::ui::set_setting("music", audio.random_music ? "random" : "auto");
@@ -929,7 +920,7 @@ void end_track_override() {
     if (blockplanet::track_override()) blockplanet::set_music_random(current_audio().random_music);
 }
 
-// Audio settings from the menus. Volume, music and effects levels and
+// Audio settings from the menus. Music and effects levels and
 // Auto/Random are saved in the profile (a guest's last the session); the
 // pause menu's Choose and Track play a track now, for this game only.
 bool handle_audio_setting(const std::string& command) {
@@ -947,17 +938,15 @@ bool handle_audio_setting(const std::string& command) {
         publish_audio_settings();
         return true;
     }
-    if (name != "volume" && name != "music_volume" && name != "effects_volume" && name != "music" &&
+    if (name != "music_volume" && name != "effects_volume" && name != "music" &&
         name != "music_choice")
         return false;
     auto audio = current_audio();
     const int number = std::clamp(std::atoi(value.c_str()), 0, 100);
-    if (name == "volume") audio.volume = number;
     if (name == "music_volume") audio.music = number;
     if (name == "effects_volume") audio.effects = number;
     if (name == "music" || name == "music_choice") audio.random_music = value == "random";
     profile_data.preferences.audio = audio;
-    blockplanet::set_audio_volume(audio.volume);
     blockplanet::set_audio_levels(audio.music, audio.effects);
     if (name == "music" || name == "music_choice") blockplanet::set_music_random(audio.random_music);
     profile_dirty = true;

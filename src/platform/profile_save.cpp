@@ -40,7 +40,7 @@ nlohmann::json to_json(const ProfileSaveData& data) {
     }
     if (data.preferences.audio) {
         const auto& a = *data.preferences.audio;
-        preferences["audio"] = {{"volume", a.volume}, {"music", a.music}, {"effects", a.effects},
+        preferences["audio"] = {{"music", a.music}, {"effects", a.effects},
                                 {"random_music", a.random_music}};
     }
     nlohmann::json levels = nlohmann::json::object();
@@ -96,12 +96,11 @@ bool from_json(const std::string& text, ProfileSaveData& data) {
         if (preferences.contains("audio")) {
             const auto& a = preferences.at("audio");
             AudioPreferences audio;
-            audio.volume = a.value("volume", 100);
             audio.music = a.value("music", 100);
             audio.effects = a.value("effects", 100);
             audio.random_music = a.value("random_music", false);
             const auto percent = [](int v) { return v >= 0 && v <= 100; };
-            if (!percent(audio.volume) || !percent(audio.music) || !percent(audio.effects)) return false;
+            if (!percent(audio.music) || !percent(audio.effects)) return false;
             result.preferences.audio = audio;
         }
         const nlohmann::json progress = document.value("progress", nlohmann::json::object());
