@@ -271,3 +271,24 @@ So **Rescue has 10 episodes**: 1–5, then the first ending with credits ("great
 **Cheats in the messages:** name CR… (credits), LINES (the hidden Lines game), +;<>^ (any level), L + C-right + C-down at name entry; "finishing the bonus episodes will give you a code".
 
 **How big the original draws the sphere** (measured at 16:9, where the picture's height matches the original 4:3 height): at stage 1:1 the sphere is about **55% of the screen height**, centred (about 22% above and below). At 10:1 it is **larger than the screen**, overflowing the top and bottom, because deeper stages have more layers on the same core. So the original's sphere size varies with the stage. In windows wider than 4:3 (Fill window), the game keeps the same size relative to the height, so the original framing already holds; in windows narrower than 4:3 (portrait) the picture is boxed and the sphere is smaller relative to the window.
+
+### The piece queue (2026-11-05)
+
+Found for the HUD's piece sprites (Rescue 1:1 and 6:1, memory dumps after each drop).
+
+**The queue** is nine halfwords in the player context at **`+0x2374`** (`0x80112594` for player 1). Entry 0 is the next piece, entry 1 the one after, and so on; the original shows entries 0 to 2, the next piece at the bottom of its stack. When a piece is taken, `func_8008A2BC` copies entry 0 to **`+0x2386`** (the piece in hand, `0x801125A6`; −1 while nothing is held), shifts entries 1–8 down one and writes the new piece (its argument) into entry 8, so the game always knows eight pieces ahead. The same function shifts each slot's model rotation (16 bytes per slot from `+0x21D8`) and position (12 bytes per slot from `+0x2278`; the original's slots sit at x = −210 on screen), which is what makes the original's stack slide. Called from `func_8008A6F8`, `func_8008A758` and `func_8008E91C`. `func_800A3E6C(slot)` draws one slot's model.
+
+**Entry values are indexes into the level's shape table**, 48 pointers at **`0x8014CBC8`**, set up for each level by `func_800906E8` (the loop at `0x80090E60`): every entry first points at a blank record (`0x801317C0`), then entries 0 to n−1 (n at `0x800E44B8`, the level's number of shapes: 2 at 1:1, 3 at 6:1) point at the level's shape records, and entries from 22 on point at fixed records. **22 is the "?" mystery piece** (writing 22 into the queue turns every slot into "?" pieces). So the same index means different shapes in different levels; the HUD should go by the record.
+
+**Shape record** (as far as decoded):
+
+| Offset | Size | Meaning | 1:1 square | 1:1 bar | 6:1 example |
+| --- | --- | --- | --- | --- | --- |
+| `+0` | s16 | Block value (material × 9, the value written to the board) | 297 | 288 | 324 |
+| `+2` | s16 | Material, which sets the colour (33 blue, 32 yellow, 36, 37 seen) | 33 | 32 | 36 |
+| `+4` | s16 | Number of cells | 4 | 3 | 4 |
+| `+6`, `+7` | u8, u8 | Footprint size (probably width and height) | 2, 2 | 3, 3 | 2, 3 and 3, 2 |
+| `+8` | u8 | **Shape ID**, the same in every level (1 the bar, 2 the square, 5 and 6 two four-cell shapes) | 2 | 1 | 5, 6 |
+| `+0xC` on | s16s | Cell layout data, not yet decoded | | | |
+
+For sprites, the shape ID (`+8`) picks the picture and the material (`+2`) its colour. Which picture each shape ID is (beyond 1 and 2) can be read off screenshots as levels with more shapes come up, or by decoding the layout data.

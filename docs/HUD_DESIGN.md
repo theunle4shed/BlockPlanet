@@ -18,7 +18,7 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 | --- | --- | --- | --- |
 | Hearts | Left, top of the left group | As the original: three hearts, each lost one turns to a skull | |
 | Magic | Left, below the hearts | An **item box** (a square, like Mario Kart's) holding the stored magic, with a **charge bar** (like a health bar) for the next magic | Replaces the bowl, ring and dot trail. One item, as the original (a second slot is a later idea, perhaps for casual mode) |
-| Next pieces | Left, below the magic | **2D sprites** instead of 3D models; the next piece at the top, a little larger; the stack **slides up** as a piece is played | Needs the piece-queue data (research) and art per piece shape |
+| Next pieces | Left, below the magic | **2D sprites** instead of 3D models; the next piece at the top, a little larger; the stack **slides up** as a piece is played | Queue found (player context `+0x2374`, eight pieces ahead; see the research notes). Art: one sprite per shape ID, coloured by the shape's material, plus the "?" piece |
 | Mode and stage | Top right | Plain text: the mode name small ("Rescue"), the stage number larger beneath ("1:3") | Replaces the RESCUE label and the gold ring |
 | Episode timer | Right, middle | The episode's total time, with the difference from the profile's personal best for that point of the episode (**−5:21** ahead, **+2:11** behind) | Personal bests per episode in the records file. Levels are generated randomly, so per-episode times are the fair comparison |
 | Progress bar | Right, with the timer | A % bar. At the level start, the **weakest point** is the core-sized window with the fewest blocks above the core; that count is 100%. Progress = 1 − (blocks left at the current weakest point ÷ the starting count). It does not show where that point is | Needs the core size each level requires (research). A **scanner** magic that shows the weakest point is a separate idea (ROADMAP) |
@@ -101,7 +101,7 @@ Not shown in VS: mode and stage text, timer, score.
 
 ## Research needed
 
-- The piece queue (for the sprites).
+- ~~The piece queue (for the sprites).~~ Found: [research notes](research/blockplanet-game-state.md#the-piece-queue-2026-11-05). Still open: the picture for each shape ID beyond the bar (1) and the square (2).
 - The core size each level needs, and where the game counts it (for the progress bar).
 - The magic charge and the stored magic type (for the item box and bar).
 - Where a combo or drop happened on the board (for the floating numbers), and the time and points each one earned.
