@@ -78,11 +78,26 @@ Pieces are removed by lining up three in a row (horizontal or vertical); the goa
 | Magic item box and charge bar (if Lines uses magic; to be checked) | Progress bar toward the core opening |
 | Next pieces | Timer, with −/+ against the profile's best for the stage |
 
+## VS (local split screen, and VS CPU)
+
+Each player sees the other's HUD, and each has half the screen, so VS shows **only the necessary items**, in **a single column per player** at their half's outer edge (P1 far left, P2 far right). On **tall screens** the screen splits **horizontally** (P1 above, P2 below) and each HUD is **a single row** along that half's outer edge.
+
+Per player, in order:
+
+1. Hearts / rounds
+2. **X count** (attack strength: it sets how many pieces are sent)
+3. Magic item box and charge bar
+4. Next pieces (the next one or two)
+5. Incoming junk marker, only while junk is on its way
+
+**Shared:** a single **progress bar** along the divider shows both players' progress towards their core area and who is closer (each player's colour fills from their end, like a tug of war); on tall screens it runs along the horizontal split.
+
+Not shown in VS: mode and stage text, timer, score.
+
 ## Other modes (to be decided)
 
 - **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.
-- **VS:** the X count matters (it sets how many pieces are sent), so it is shown clearly.
-- **VS**: next in the review.
+- Online VS, Collaborate, Custom: when those modes are designed.
 
 ## Research needed
 
