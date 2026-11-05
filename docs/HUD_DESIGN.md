@@ -21,7 +21,7 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 | Next pieces | Left, below the magic | **2D sprites** instead of 3D models; the next piece at the top, a little larger; the stack **slides up** as a piece is played | Queue found (player context `+0x2374`, eight pieces ahead; see the research notes). Art: one sprite per shape ID, coloured by the shape's material, plus the "?" piece |
 | Mode and stage | Top right | Plain text: the mode name small ("Rescue"), the stage number larger beneath ("1:3") | Replaces the RESCUE label and the gold ring |
 | Episode timer | Right, middle | The episode's total time, with the difference from the profile's personal best for that point of the episode (**−5:21** ahead, **+2:11** behind) | Personal bests per episode in the records file. Levels are generated randomly, so per-episode times are the fair comparison |
-| Progress bar | Right, with the timer | A % bar. At the level start, the **weakest point** is the core-sized window with the fewest blocks above the core; that count is 100%. Progress = 1 − (blocks left at the current weakest point ÷ the starting count). It does not show where that point is | Needs the core size each level requires (research). A **scanner** magic that shows the weakest point is a separate idea (ROADMAP) |
+| Progress bar | Right, with the timer | A % bar. At the level start, the **weakest point** is the core-sized window with the fewest blocks above the core; that count is 100%. Progress = 1 − (blocks left at the current weakest point ÷ the starting count). It does not show where that point is | The opening is S × S core cells at even corners (S = player context `+0x23E4`, 4 to 8 in Rescue); see the research notes. A **scanner** magic that shows the weakest point is a separate idea (ROADMAP) |
 | Score, X count, per-move points | Not shown | In the pause menu, the level results and the records | Score-based modes show them (below) |
 
 ## Messages and cards
@@ -102,7 +102,7 @@ Not shown in VS: mode and stage text, timer, score.
 ## Research needed
 
 - ~~The piece queue (for the sprites).~~ Found: [research notes](research/blockplanet-game-state.md#the-piece-queue-2026-11-05). Still open: the picture for each shape ID beyond the bar (1) and the square (2).
-- The core size each level needs, and where the game counts it (for the progress bar).
+- ~~The core size each level needs~~ Found: an S × S square of uncovered core, S from the level data ([research notes](research/blockplanet-game-state.md#the-core-opening-a-level-needs-2026-11-05)). To check in play: how cleared cells are marked, and type 1 blocks.
 - The magic charge and the stored magic type (for the item box and bar).
 - Where a combo or drop happened on the board (for the floating numbers), and the time and points each one earned.
 - Hiding the original HUD's 2D elements (done for the pause screen; the same technique) and the 3D piece queue and bowl.

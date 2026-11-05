@@ -292,3 +292,15 @@ Found for the HUD's piece sprites (Rescue 1:1 and 6:1, memory dumps after each d
 | `+0xC` on | s16s | Cell layout data, not yet decoded | | | |
 
 For sprites, the shape ID (`+8`) picks the picture and the material (`+2`) its colour. Which picture each shape ID is (beyond 1 and 2) can be read off screenshots as levels with more shapes come up, or by decoding the layout data.
+
+### The core opening a level needs (2026-11-05)
+
+Found for the HUD's progress bar, from the game's code (`func_800AB4C8`, `func_800AA3A4`, `func_8008B220`); not yet seen completing a level under observation, because blind test drops never make a match.
+
+**A Rescue level is won when an S × S square of the core is uncovered**, where **S is the player context's `+0x23E4`** (`0x80112604` for player 1): twice the level record's byte 12, kept between 2 and 10, so 4 to 8 in Rescue (4 at 1:1, 6 at 6:1 in the test runs). See [blockplanet-level-data.md](blockplanet-level-data.md).
+
+- **The exposed-core map:** 32 words, one per board row, pointer at `0x800E44C8` (`0x801166F0` in play); bit *x* of row *y* is set while the core under column *x* is uncovered. Kept by `func_8008B220` (write a block: x, y, layer, value): when it writes **layer 1**, the layer just above the core, a value of type 3 or 31 (an emptied cell) sets the bit (`func_8008A880`, which also checks the core cell below) and any other value clears it (`func_8008A83C`). So "uncovered" means layer 1's cell has been cleared.
+- **The check:** after blocks are cleared (`func_800AB4C8`), if the level's goal type `0x800E44A4` is 3 (core opening; Hide & Seek's goals use other values), the game tries every square whose corner is at **even** coordinates (x and y = 0, 2, …, 30; squares wrap round the board's edges), counting with `func_800AA3A4(x, y, S, S)` the rows whose S bits from column x are all set. A square with S full rows wins: `func_800AC8E8` sets the won flag (context `+0x3236`) and blows open that square through layers 7 to 1.
+- In layer 1 at the start, apart from the colours (types 32–37), about a fifth of the cells are type 1 (still unknown); none are type 3 or 31, so the map starts empty.
+
+**For the HUD's progress bar** (weakest point, [HUD_DESIGN.md](../HUD_DESIGN.md)): use the same squares the game checks, S × S at even corners with wrapping. A square's "blocks left" is the number of filled cells above the core in its columns: layer 1 cells not of type 3 or 31, plus non-zero cells in layers 2 to 8. The weakest point is the square with the fewest; its count at the level start is 100%. This reads the board each frame (1,024 cells × 8 layers, cheap), so it needs no hook. Still to check in play: that a cleared layer-1 cell is type 3 or 31 as the code says, and whether type 1 cells can be cleared (if not, they never count as progress).

@@ -52,7 +52,7 @@ Using the tool's byte numbers:
 | 12 | `0x8013D266`, then the player context `+0x23E2`; twice the value, kept between 2 and 10, goes to `+0x23E4` | In VS CPU the game adds a chapter-based amount first. `+0x23E4` = 4, 6 or 8 also sets `0x8015F4F0` to 0, 1 or 2 |
 | 15, 16 | `0x8013D260`, `0x8013D264`, `0x8013D25C` | |
 
-**What `+0x23E4` does is not confirmed.** `func_800AC8E8` searches the board for a square region whose width and height are `+0x23E4` and compares the result with it, so it is a size, possibly the core opening a level needs (the Practice menu offers "layers" and "core area" settings). A test that forced it to 2 or 10 during play did not change whether chapter 1 level 1 completed within 20 drops, but the value may only be read when a level starts, so the test does not rule this out.
+**`+0x23E4` is the size of the core opening that wins the level** (found 2026-11-05 in the code, see [the game-state notes](blockplanet-game-state.md#the-core-opening-a-level-needs-2026-11-05)): an S × S square of uncovered core. Earlier notes: `func_800AC8E8` searches the board for a square region whose width and height are `+0x23E4` and compares the result with it, so it is a size, possibly the core opening a level needs (the Practice menu offers "layers" and "core area" settings). A test that forced it to 2 or 10 during play did not change whether chapter 1 level 1 completed within 20 drops, but the value may only be read when a level starts, so the test does not rule this out.
 
 ## Block types on the board
 
@@ -95,5 +95,5 @@ The playfield is generated randomly at each start from these settings (see [bloc
 
 - **Fall speed and timers.** Not in the fields followed so far. Byte 12 now looks like a size rather than a speed. Values in the player context around `+0x2DFC`–`+0x2E08` read 1203, 601 or 467 (20, 10 or about 8 seconds at 60 per second), but they do not follow any record field, so they may come from chapter rules in code.
 - **Levels per chapter in play.** The data has 10 levels per chapter, but `func_80089D04` returns 5 for Rescue (3 for Hide & Seek and VS CPU). It may count something else, such as levels between rewards. Needs a playthrough of a full chapter.
-- **Core size.** The core always fills the whole bottom layer; "uncover multiple cores" goals suggest Hide & Seek uses separate core objects.
+- **Core size.** Solved for Rescue: byte 12 × 2 is the side of the core square to uncover. The core itself always fills the whole bottom layer; "uncover multiple cores" goals suggest Hide & Seek uses separate core objects.
 - What byte 12's size means in play, and what the type 1 and type 7 blocks are. Next steps: set `+0x23E4` before the level starts (as `--start-chapter` does for the chapter) and repeat the completion test several times; and follow the readers of the level structure at `0x8013D170` and of `0x8013D248`.
