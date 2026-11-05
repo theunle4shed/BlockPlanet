@@ -319,7 +319,9 @@ Found for the HUD's progress bar from the game's code (`func_800AB4C8`, `func_80
 | 4 | A white and red bomb or missile |
 | 5 | A green and gold spinning top or drill |
 
-  What each one does to the board is still to record (use each and watch).
+  Likely names, from guides (Hard Drop, Breezewiki, the manual): 0 Firecracker, 1 Bundle O' Dynamite, 2 Electro-Magnet, 3 Atom (or Molecule), 4 Rocket, 5 Ray Gun; the order of 4 and 5 is not confirmed. What each one does to the board is still to record (use each and watch).
+- **The magic meter** (the original's dot trail): player context **`+0x2AEC`** (u16), filled at **`+0x2AEE`**: **14** in most modes, **9** in modes 6 and 7 (VS), set at level start (`0x800AE9E4`). `func_800941B8(n)` adds *n*: **1 for each combo of 6 or more pieces** (`func_800CD3B8`) and **3** from two other places (`func_800C7FC4`, and again `func_800CD3B8`), which the guides say are fuse and gravity combos. When the meter reaches the limit it returns to 0, a sound plays and the held magic goes up by one, exactly as a 20+ combo does. Seen in the Training lesson: the 21-piece combo left the meter at 1 of 14.
+- **Other ways to get magic, from the guides** (not yet seen in the code): 1×1 **magic crystals** hidden on the sphere, which give or upgrade magic when broken open; and **losing a life destroys the held magic**. In multiplayer only one magic (the Bomb) is available. Magic is used with C-down.
 - **Combo counter:** **`+0x2AE0`** counts the pieces in the combo as they clear (`func_8009423C` adds 1 per piece). When the combo ends it is copied to `+0x2B14` (what the ring shows) and `+0x2AF0`, the best combo of the level goes to `+0x2C78`, and the running count returns to 0. Combos of 6 or more also call `func_800941B8`; 20 or more give magic.
 - **Score:** **`+0x2AF8`** (u32, `0x80112D18`); the HUD shows it times ten.
 - **Combos set off by writing to the board give no magic.** Painting blocks one colour clears them in one combo (768 cells with walls in every fourth row, so the level does not end), but `+0x702` stayed −1. Magic is only awarded where a drop's combo is resolved.
