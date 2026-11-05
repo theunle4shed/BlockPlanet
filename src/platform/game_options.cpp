@@ -39,8 +39,15 @@ void GameOptionApplier::apply(std::uint8_t* rdram) {
         else set16(rdram, game_state::chapter, static_cast<std::int16_t>(*options_.start_chapter - 1));
     }
     if (chosen_chapter_) {
-        if (playing) chosen_chapter_.reset();
-        else set16(rdram, game_state::chapter, static_cast<std::int16_t>(*chosen_chapter_ - 1));
+        if (playing) {
+            chosen_chapter_.reset();
+            chosen_level_.reset();
+        } else {
+            set16(rdram, game_state::chapter, static_cast<std::int16_t>(*chosen_chapter_ - 1));
+            if (chosen_level_)
+                set16(rdram, game_state::p1_context + game_state::level_offset,
+                      static_cast<std::int16_t>(*chosen_level_ - 1));
+        }
     }
 
     if (!options_.casual || !playing || state.mode == game_state::mode_vs_cpu) return;

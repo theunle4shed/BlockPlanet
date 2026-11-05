@@ -24,9 +24,19 @@ bool pressing(PauseBridge::Clock::duration elapsed) {
 
 } // namespace
 
-std::vector<blockplanet::ui::ListItem> pause_items(bool training_mode) {
+bool can_restart(int game_mode, int training_type) {
+    switch (game_mode) {
+    case 1: case 2: case 4: case 5: case 6: case 9: return true;  // Rescue, Time Trial, Puzzle, Hide & Seek, VS CPU, Lines
+    case 3: return training_type == 1 || training_type == 3;      // Training Basics or Puzzle (Chapter 0)
+    default: return false;
+    }
+}
+
+std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_type) {
     std::vector<blockplanet::ui::ListItem> items{{"resume", "Resume", "", "command:pause_resume", true, 1, true}};
-    if (training_mode) items.push_back({"skip", "Skip lesson", "", "command:pause_skip", true});
+    if (can_restart(game_mode, training_type))
+        items.push_back({"restart", game_mode == 3 ? "Restart lesson" : "Restart level", "", "command:pause_restart", true});
+    if (game_mode == training) items.push_back({"skip", "Skip lesson", "", "command:pause_skip", true});
     items.push_back({"audio", "Audio", "", "open:audio", true});
     items.push_back({"options", "Options", "", "open:options", true});
     items.push_back({"quit", "Quit to menu", "", "command:pause_quit", true});
@@ -69,7 +79,7 @@ PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Cl
     if (!showing_ && !choice_) {
         showing_ = true;
         out.open_menu = true;
-        out.items = pause_items(load16(rdram, mode) == training);
+        out.items = pause_items(load16(rdram, mode), load16(rdram, 0x800E44ACu));
         return out;
     }
     // Closing the menus (Back) means Resume.

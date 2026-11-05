@@ -115,9 +115,16 @@ bool profile_recording = false;
 bool profile_dirty = false;
 // A Chapter 0 (a Training lesson) started from a chapter list: when it is
 // finished, carry on into that mode's next part (Story Chapter 1, or the
-// puzzles). continue_mode is then set until it starts.
+// puzzles).
 std::string chapter_zero_lesson;  // "basics" or "puzzle"
-std::optional<LaunchMode> continue_mode;
+// A mode to start once the game is back at its menu: after a Chapter 0, or
+// for Restart level. `start` is the chapter and level (1-based) to begin at.
+struct PendingLaunch {
+    LaunchMode mode;
+    std::optional<std::pair<int, int>> start;
+    bool keep_music = false;  // keep the pause menu's track override (a restart)
+};
+std::optional<PendingLaunch> continue_mode;
 // The PC's default controls from settings.dat, for new profiles and guests.
 ControlPreferences pc_controls;
 std::chrono::steady_clock::time_point last_play_poll{};
@@ -205,7 +212,8 @@ void poll_type47_experiment() {
 }
 
 // Research aid: with BLOCKPLANET_POKE_FILE set, lines "0xADDRESS:SIZE=VALUE"
-// written to that file are stored into guest memory, then the file is removed.
+// written to that file are stored into guest memory, and lines "cmd:NAME" run
+// a menu command, then the file is removed.
 void poll_pokes() {
     static const char* path = std::getenv("BLOCKPLANET_POKE_FILE");
     if (path == nullptr) return;
@@ -214,6 +222,10 @@ void poll_pokes() {
     auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
     std::string line;
     while (std::getline(in, line)) {
+        if (line.rfind("cmd:", 0) == 0) {  // a menu command, as if chosen
+            blockplanet::ui::send_command(line.substr(4));
+            continue;
+        }
         unsigned long address = 0, size = 0;
         long value = 0;
         if (std::sscanf(line.c_str(), "%lx:%lu=%ld", &address, &size, &value) != 3) continue;
@@ -262,7 +274,8 @@ void poll_game_events() {
         }
         if (event.name == "training_completed" && !chapter_zero_lesson.empty() &&
             std::get<std::string>(event.fields.at("lesson")) == chapter_zero_lesson) {
-            continue_mode = chapter_zero_lesson == "basics" ? LaunchMode::Rescue : LaunchMode::Puzzle;
+            continue_mode = chapter_zero_lesson == "basics" ? PendingLaunch{LaunchMode::Rescue, std::pair{1, 1}}
+                                                            : PendingLaunch{LaunchMode::Puzzle, std::nullopt};
             chapter_zero_lesson.clear();
         }
         post_game_event(event);
@@ -991,9 +1004,9 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
     return story_chapters(completed, rescue_chapters);
 }
 
-void launch_mode(LaunchMode mode) {
+void launch_mode(LaunchMode mode, bool keep_music = false) {
     if (guest_rdram == nullptr) return;
-    end_track_override();
+    if (!keep_music) end_track_override();
     const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
     if (accepted) blockplanet::ui::request_close();
     std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
@@ -1416,6 +1429,32 @@ bool handle_profile_command(const std::string& command) {
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
                 continue;
             }
+            if (*command == "pause_restart" && guest_rdram != nullptr) {
+                // Quit through the game's pause, then start the same place again.
+                const auto state = read_game_state(guest_rdram);
+                std::optional<LaunchMode> mode;
+                std::optional<std::pair<int, int>> start;
+                switch (state.mode) {
+                case 1: mode = LaunchMode::Rescue; start = std::pair{state.chapter + 1, state.level + 1}; break;
+                case 5: mode = LaunchMode::HideAndSeek; start = std::pair{state.chapter + 1, state.level + 1}; break;
+                case 4: mode = LaunchMode::Puzzle; start = std::pair{state.chapter + 1, state.level + 1}; break;
+                case 2: mode = LaunchMode::TimeTrial; break;
+                case 6: mode = LaunchMode::VsCpu; break;
+                case 9: mode = LaunchMode::Lines; break;
+                case 3:
+                    if (state.training_type == 1) mode = LaunchMode::TrainingBasics;
+                    if (state.training_type == 3) mode = LaunchMode::TrainingPuzzle;
+                    break;
+                default: break;
+                }
+                if (mode) {
+                    continue_mode = PendingLaunch{*mode, start, true};
+                    pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
+                    std::fprintf(stdout, "{\"event\":\"restart\",\"mode\":\"%s\"}\n", launch_mode_name(*mode));
+                    std::fflush(stdout);
+                }
+                continue;
+            }
             if (*command == "pause_resume" || *command == "pause_skip" || *command == "pause_quit") {
                 if (*command == "pause_quit") end_track_override();
                 pause_bridge.choose(*command == "pause_resume" ? PauseBridge::Choice::Resume
@@ -1453,7 +1492,12 @@ bool handle_profile_command(const std::string& command) {
                 if (chapter == 0) {
                     launch_mode(LaunchMode::TrainingBasics);
                 } else if (chapter <= rescue_chapters && game_option_applier) {
-                    game_option_applier->choose_chapter(chapter);
+                    // chapter:N, or chapter:N:L to start at level L.
+                    const auto colon = command->find(':', 8);
+                    if (colon != std::string::npos)
+                        game_option_applier->choose_start(chapter, std::atoi(command->c_str() + colon + 1));
+                    else
+                        game_option_applier->choose_chapter(chapter);
                     launch_mode(LaunchMode::Rescue);
                 }
                 continue;
@@ -1500,15 +1544,16 @@ bool handle_profile_command(const std::string& command) {
         pc_settings_release_guard(held);
         poll_game_events();
         publish_audio_settings();
-        // After a Chapter 0, the mode's next part starts once the game is back
-        // at its menu (Story at Chapter 1, or the puzzles).
+        // A pending launch (after a Chapter 0, or Restart level) starts once
+        // the game is back at its menu.
         static auto last_continue_try = std::chrono::steady_clock::time_point{};
         if (continue_mode && !mode_launcher.active() && guest_rdram != nullptr && game_option_applier &&
             read_game_state(guest_rdram).scene >= 0 &&
             std::chrono::steady_clock::now() - last_continue_try > std::chrono::seconds(1)) {
             last_continue_try = std::chrono::steady_clock::now();
-            if (*continue_mode == LaunchMode::Rescue) game_option_applier->choose_chapter(1);
-            launch_mode(*continue_mode);
+            if (continue_mode->start)
+                game_option_applier->choose_start(continue_mode->start->first, continue_mode->start->second);
+            launch_mode(continue_mode->mode, continue_mode->keep_music);
             if (mode_launcher.active()) continue_mode.reset();
         }
         const auto now = std::chrono::steady_clock::now();

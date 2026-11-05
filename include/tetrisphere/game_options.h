@@ -36,12 +36,16 @@ public:
 
     // The player chose a chapter (1-based) in the chapter select: Rescue
     // begins there. Written until play begins; does not affect trophies.
-    void choose_chapter(int chapter) { chosen_chapter_ = chapter; }
+    void choose_chapter(int chapter) { chosen_chapter_ = chapter; chosen_level_.reset(); }
+    // The same with a level in the chapter (1-based; for Puzzle, the puzzle
+    // number), for Restart level.
+    void choose_start(int chapter, int level) { chosen_chapter_ = chapter; chosen_level_ = level; }
 
 private:
     GameOptions options_;
     bool start_chapter_done_ = false;
     std::optional<int> chosen_chapter_;
+    std::optional<int> chosen_level_;
 };
 
 } // namespace tetrisphere

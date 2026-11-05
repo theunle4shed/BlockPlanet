@@ -51,6 +51,10 @@ private:
     Clock::time_point since_{};
 };
 
-std::vector<blockplanet::ui::ListItem> pause_items(bool training);
+// The pause screen's items for the game mode (0x800E44A8) and, in Training,
+// its lesson type (0x800E44AC: 1 Basics, 2 Advanced, 3 Puzzle). Restart is
+// offered where BlockPlanet can start the same place again.
+std::vector<blockplanet::ui::ListItem> pause_items(int mode, int training_type);
+bool can_restart(int mode, int training_type);
 
 } // namespace tetrisphere
