@@ -130,6 +130,17 @@ Levels are generated: the game fills a 32×32 grid per layer with random pieces 
 
 Puzzle limits its play area with a border of type 47 blocks (the purple "out of bounds"). Tested in Rescue, they act as an inert wall: drawn purple, never cleared, pieces land on them ([research](research/blockplanet-game-state.md#puzzle-boards-the-purple-border-2026-11-05)). That makes arenas of any shape, obstacles and shrinking arenas possible without changing game code; place them as whole cells when a level is built. Still to test when a mode needs them: dragging onto or across them, and magic.
 
+### New game modes (ideas, saved for later, 2026-11-05)
+
+**Escape.** The player and the camera start inside the sphere. No core layer is visible. The player drops blocks onto the underside of the existing blocks. Orphaned blocks can still drop to the core with gravity. Blocks that miss their target cannot stay under the core line: if the player misses, the block dissolves and they lose a life.
+
+**Multiphasic.** Several levels stitched together seamlessly through visual trickery. It starts with stage 1, which looks the same as usual: dig down to the core. But the core looks like a different sphere with a different block combination (purely representative, the core picture design) and is faded. The core cannot be destroyed, and anything dropped on top of it follows the normal core rules. Once the target core size is reached (4 × 4 etc.), there is a detonation and all remaining blocks are thrown off the sphere. The trick (the transition): what remains is the core, decorated to look exactly like the next stage. It grows to match the next phase's (level's) starting size and is replaced by the actual next level, and play continues with the new block set. As it is a long game, it needs a way to earn lives.
+
+First technical notes (not yet researched):
+
+- **Escape:** the camera inside the sphere means the renderer drawing the inner faces and culling differently (BlockPlanet now draws the sphere itself, `docs/research/blockplanet-game-state.md`). Dropping onto the underside reverses the drop direction and gravity, which is game logic spread over many functions (the board limits table in the same document); likely the largest change of the two.
+- **Multiphasic:** the transition fits what is already known: the core can be resized in the mesh builder (the `BLOCKPLANET_SPHERE_CORE_SCALE` experiment), BlockPlanet draws the sphere, and an indestructible block type exists (type 47, Puzzle's border). The "core picture" stage would need art for the next stage drawn on the core, and a way to load the next level without leaving play (the game builds a level between levels today). Earning lives needs a rule (for example a score or combo threshold) and a HUD element.
+
 ### Custom characters you can save (M to L, plus art)
 
 Let players create characters (name, colors, portrait, look) and keep them in BlockPlanet's own save data rather than the 512-byte N64 EEPROM. Research: how the game stores and draws its characters. Then use texture replacement for the look, and hook the character selection to load custom entries.
