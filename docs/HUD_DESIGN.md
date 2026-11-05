@@ -68,11 +68,21 @@ Each level has a goal type (MULTI, DRILL, SHIFT, UNIQUE, BRICK, CONNECT, TOWER, 
 
 New compared with the original, which only states the goal at the start. Each goal type needs research to count its progress.
 
+## Lines
+
+Pieces are removed by lining up three in a row (horizontal or vertical); the goal is a big enough opening in the core. 10 levels per stage. The same layout as Story:
+
+| Priority 1 (left, top to bottom) | Priority 2 (right) |
+| --- | --- |
+| Hearts | Mode and stage (text, top right) |
+| Magic item box and charge bar (if Lines uses magic; to be checked) | Progress bar toward the core opening |
+| Next pieces | Timer, with −/+ against the profile's best for the stage |
+
 ## Other modes (to be decided)
 
 - **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.
 - **VS:** the X count matters (it sets how many pieces are sent), so it is shown clearly.
-- **Lines**, **VS**: next in the review.
+- **VS**: next in the review.
 
 ## Research needed
 
