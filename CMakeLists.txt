@@ -1055,7 +1055,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/sphere_hooks.cpp
         src/graphics/pause_draw_hooks.cpp
         src/graphics/audio_hooks.cpp
-        src/graphics/f3d_flat_shade.cpp
+            src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp
         src/runtime/unsupported.cpp
         "${TETRISPHERE_RSP_RECOMP_SOURCE}"

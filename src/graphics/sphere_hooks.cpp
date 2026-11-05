@@ -385,6 +385,14 @@ MeshInputs gather(std::uint8_t* rdram, recomp_context* ctx, bool apply_caps) {
         in.scale[axis] = value;
     }
     in.scale_enabled = load16(rdram, player + 0x2478u) != 0;
+    // Framing (sphere_mesh.h, set_view_scale): on top of the game's own scale.
+    if (const double size = view_scale(); size != 1.0) {
+        for (int axis = 0; axis < 3; ++axis) {
+            const double base = in.scale_enabled ? in.scale[axis] : 0x4000;
+            in.scale[axis] = static_cast<std::int16_t>(std::lround(base * size));
+        }
+        in.scale_enabled = true;
+    }
     in.two_player = load16(rdram, player_count) >= 2;
     in.player_one = load16(rdram, player + 0x23B2u) == 1;
     return in;

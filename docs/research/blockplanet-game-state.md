@@ -234,3 +234,13 @@ Writing the balance alone changes nothing: the page's handler (around `0x800552E
 Playing a track, as the page's track row does: set `0x800DFE84` to 1, call `func_8007F720(track, music player)` then `func_8007ACFC(music player)`, clear `0x800DFE84`, store the track at `0x80102B09` (save data) and 15 at `0x800E14A8`. BlockPlanet keeps the balance at 6 (both full) and scales the volumes as described above.
 
 Research aid: with `BLOCKPLANET_POKE_FILE` set, lines `0xADDRESS:SIZE=VALUE` written to that file are stored into guest memory.
+
+### Camera and framing (2026-11-05)
+
+**The game has no moving camera for the sphere.** Every frame `func_800699B4` builds orthographic projections (guOrtho, `func_800D5094`) into the per-frame graphics data (pointer at `0x801028D4`): all with extents −160..160 × −120..120 (a 320 × 240 view), at `+0x300` (near/far ±1024), `+0x1080` (±1000), `+0x1640` (−1000..0) and `+0x1680` (0..1000). The only perspective projections in play (guPerspective, `func_800D47E0`, 40° at 4:3) are for other models, not the sphere. The sphere's apparent 3D shape and size come entirely from its mesh (the base grid times the per-frame mesh table).
+
+Experiments: scaling the `+0x1640` projection's extents (zoom out 1.5×, by hooking guOrtho) shrank only some elements; scaling the other projections shrank the HUD-side models and pieces too, never the sphere alone. Widening the 40° perspective changed nothing visible on the sphere.
+
+**What does change the sphere's size: its mesh.** The mesh builder already supports a per-axis scale (player context `+0x2478` flag, `+0x247A/C/E`, `0x4000` = 1.0; the game only ever shrinks with it). Applying a uniform scale on top (BlockPlanet's renderer, `sphere::set_view_scale`, `BLOCKPLANET_SPHERE_SIZE` for testing) resizes the whole sphere around its centre, and everything placed on it (cursor, the falling piece's landing spot, effects) follows, because they all read the same mesh table. Checked at 0.8 and 1.15 in Rescue 1:1, including a drop: the piece lands correctly at both sizes. Limits: only with Sphere = Extended (BlockPlanet's renderer); the pieces in flight above the sphere and the background are not scaled.
+
+So framing (sphere size for the screen, the drop push, a zoom option) is done through the mesh scale, and a peek camera would be a rotation of the mesh rather than a camera move.

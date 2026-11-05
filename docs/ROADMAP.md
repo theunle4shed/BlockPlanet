@@ -185,7 +185,7 @@ Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, m
 **Single player is finished when:**
 
 1. Performance is measured on Windows, with quality and performance presets (the extended sphere is done).
-2. Camera and screen sizes work, including ultrawide, as the base for the rear and peek camera.
+2. Camera and screen sizes work, including ultrawide, as the base for the rear and peek camera. (Ultrawide done. The game has no sphere camera; the sphere's size on screen is set through its mesh, now adjustable: see the research notes.)
 3. The new menu layer exists, with the main menu, chapter select and profile screen. (Profiles done: choose, add, name, character, delete and guest.)
 4. The HUD has the new art and a layout that adapts to the screen.
 5. The Story structure is in place: chapter map, unlocks, casual play.

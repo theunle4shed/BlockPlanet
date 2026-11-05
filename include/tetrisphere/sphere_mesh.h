@@ -50,6 +50,15 @@ struct MeshInputs {
 // Fill `out` (rows x columns entries) exactly as func_800ADD6C does.
 void build_mesh(const MeshInputs& inputs, std::vector<MeshEntry>& out);
 
+// Framing: the sphere's size on screen, 1.0 = the game's (applied in
+// BlockPlanet's renderer only, so with Detail::Extended). The game has no
+// camera to move; the sphere's size comes from its mesh, and everything on it
+// (cursor, pieces, effects) reads the same mesh, so it scales with it.
+// For the drop "push" and sphere-size options. BLOCKPLANET_SPHERE_SIZE sets
+// the starting value for testing.
+void set_view_scale(double scale);
+double view_scale();
+
 // How much of the sphere to draw (the SPHERE graphics setting).
 // Original: the game's own drawing code. Extended: BlockPlanet's renderer
 // with extended_detail_ring extra cells on every side.

@@ -1,5 +1,6 @@
 #include "tetrisphere/sphere_mesh.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -81,6 +82,11 @@ void build_mesh(const MeshInputs& in, std::vector<MeshEntry>& out) {
 namespace {
 
 std::atomic<Detail> requested_detail{Detail::Original};
+std::atomic<double> requested_view_scale{[] {
+    const char* text = std::getenv("BLOCKPLANET_SPHERE_SIZE");
+    const double parsed = text != nullptr ? std::strtod(text, nullptr) : 1.0;
+    return parsed > 0.3 && parsed < 1.5 ? parsed : 1.0;
+}()};
 std::atomic<Mode> frame_mode{Mode::Original};
 std::atomic<int> frame_ring_value{0};
 
@@ -108,6 +114,9 @@ std::optional<int> ring_override() {
 }
 
 } // namespace
+
+void set_view_scale(double scale) { requested_view_scale.store(std::clamp(scale, 0.3, 1.5)); }
+double view_scale() { return requested_view_scale.load(); }
 
 void set_detail(Detail detail) { requested_detail.store(detail); }
 
