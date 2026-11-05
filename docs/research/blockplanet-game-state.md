@@ -228,4 +228,6 @@ The original Audio page (Options > Audio, or Audio in the pause menu) has three 
 
 Writing the balance alone changes nothing: the page's handler (around `0x800552E4`) also calls `func_80079B80(music volume, music player 0x80107290)`, which sets the player's volume (`+0x1578`, with `+0x2000` for track ids 14 to 99) and a changed flag (`+0x1583`), and `func_80079BD4(effects volume)`, which updates the playing voices. BlockPlanet does the same from a hook at the top of the controller and save thread's loop (`func_80029938` at `0x800299A0`, about 60 times a second in every scene). `func_8003FE3C` (the menu driver) and `func_8002B348` do not run at the title screen, so they cannot carry a per-frame hook.
 
+Playing a track, as the page's track row does: set `0x800DFE84` to 1, call `func_8007F720(track, music player)` then `func_8007ACFC(music player)`, clear `0x800DFE84`, store the track at `0x80102B09` (save data) and 15 at `0x800E14A8`. The game recomputes the music level from the balance when a song starts; BlockPlanet keeps the balance at 6 (both full) and re-applies its own levels.
+
 Research aid: with `BLOCKPLANET_POKE_FILE` set, lines `0xADDRESS:SIZE=VALUE` written to that file are stored into guest memory.

@@ -56,12 +56,12 @@ int main(int argc, char** argv) {
     controls.bindings.confirm = PhysicalButton::East;
     controls.magic = MagicControl::RightShoulder;
     data.preferences.controls = controls;
-    data.preferences.audio = AudioPreferences{80, 3, 7};
+    data.preferences.audio = AudioPreferences{80, 60, 30, true};
     assert(store.save(data, error));
     ProfileSaveData read;
     assert(store.load(read, error));
-    assert(read.preferences.audio && read.preferences.audio->volume == 80 && read.preferences.audio->balance == 3 &&
-           read.preferences.audio->music == 7);
+    assert(read.preferences.audio && read.preferences.audio->volume == 80 && read.preferences.audio->music == 60 &&
+           read.preferences.audio->effects == 30 && read.preferences.audio->random_music);
     assert(read.preferences.controls && read.preferences.controls->family_override == "playstation");
     assert(read.preferences.controls->bindings.confirm == PhysicalButton::East);
     assert(read.preferences.controls->magic == MagicControl::RightShoulder);

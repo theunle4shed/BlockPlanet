@@ -27,8 +27,8 @@ int main() {
     set(0x800E1228, 0);
     out = step(bridge, false);
     assert(out.open_menu && bridge.hide_original());
-    assert(out.items.size() == 3 && out.items[0].action == "command:pause_resume" && out.items[0].focus &&
-           out.items[2].action == "command:pause_quit");
+    assert(out.items.size() == 4 && out.items[0].action == "command:pause_resume" && out.items[0].focus &&
+           out.items[1].action == "open:audio" && out.items[3].action == "command:pause_quit");
     out = step(bridge, true);
     assert(!out.open_menu && !out.inject);
 
@@ -53,7 +53,7 @@ int main() {
     set(0x800E44A8, 3);
     set(0x800E1228, 0);
     out = step(bridge, false);
-    assert(out.open_menu && out.items.size() == 4 && out.items[1].action == "command:pause_skip");
+    assert(out.open_menu && out.items.size() == 5 && out.items[1].action == "command:pause_skip");
     out = step(bridge, false);  // menus are closed
     assert(out.inject && load16(m, 0x800E1228) == 0);
     set(0x800E1228, -1);  // resumed

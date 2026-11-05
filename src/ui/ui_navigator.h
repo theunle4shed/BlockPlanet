@@ -15,6 +15,8 @@
 // data-options="value:Label,value:Label". Left and Right (or Confirm) cycle
 // the value, show its label in a child with class "value", and report
 // "setting:NAME=VALUE" as a command. Current values come from set_setting.
+// Rows that also have the class "slider" stop at their ends instead of
+// wrapping, and a child with class "fill" gets a width matching the value.
 //
 // Lists: an element with data-list="NAME" is filled with the items given to
 // set_list when its screen opens. An item marked `focus` gets the focus

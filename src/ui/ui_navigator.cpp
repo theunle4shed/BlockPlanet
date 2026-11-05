@@ -151,7 +151,16 @@ void Navigator::fill(Screen& screen) {
         }
         Rml::ElementList shown;
         item->GetElementsByClassName(shown, "value");
-        if (!shown.empty()) shown.front()->SetInnerRML(label);
+        if (!shown.empty()) shown.front()->SetInnerRML(escaped(label));
+        // Sliders: a bar filled to the value's position among the options.
+        Rml::ElementList fills;
+        item->GetElementsByClassName(fills, "fill");
+        if (!fills.empty() && options.size() > 1) {
+            std::size_t index = 0;
+            for (std::size_t i = 0; i < options.size(); ++i)
+                if (current != settings_.end() && current->second == options[i].first) index = i;
+            fills.front()->SetProperty("width", std::to_string(100.0 * index / (options.size() - 1)) + "%");
+        }
     }
 }
 
@@ -166,7 +175,13 @@ void Navigator::change_value(Screen& screen, int direction) {
     for (std::size_t i = 0; i < options.size(); ++i) {
         if (settings_[name] == options[i].first) index = i;
     }
-    index = (index + options.size() + (direction < 0 ? options.size() - 1 : 1)) % options.size();
+    if (item->IsClassSet("slider")) {  // sliders stop at their ends
+        if (direction < 0 && index == 0) return;
+        if (direction > 0 && index + 1 == options.size()) return;
+        index = direction < 0 ? index - 1 : index + 1;
+    } else {
+        index = (index + options.size() + (direction < 0 ? options.size() - 1 : 1)) % options.size();
+    }
     settings_[name] = options[index].first;
     commands_.push_back("setting:" + name + "=" + options[index].first);
     fill(screen);

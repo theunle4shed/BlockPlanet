@@ -1,13 +1,17 @@
-// The game's audio settings, applied the way its Audio page does
-// (docs/research/blockplanet-game-state.md, Audio):
+// The game's audio, driven the way its Audio page does
+// (docs/research/blockplanet-game-state.md, Audio settings):
 //   0x800E0B1C  balance, 0..12        0x800E0B20  selection: 0 auto, 1 random, 2 choose
-//   0x800E0B24  track, 0..22          0x80102B08  save byte: selection << 4 | balance
-// A balance change sets the music volume, min(0x4FFF, 0xA008 - 3414 * b),
-// through func_80079B80(volume, music player 0x80107290), and the effects
-// volume, min(0x7FFF, 0x1556 * b), through func_80079BD4. A hook at the top
-// of the controller and save thread's loop (func_80029938 at 0x800299A0),
-// which runs continuously in every scene, calls blockplanet_audio_frame.
-// The runtime runs one game thread at a time, so this cannot race the game.
+//   0x800E0B24  track, 0..22          0x80102B08  save bytes: selection << 4 | balance, track
+// The page sets one balance; BlockPlanet sets the two levels it controls
+// separately: the music volume through func_80079B80(volume, music player
+// 0x80107290) (0x800E28E8 holds it, at most 0x4FFF) and the effects volume
+// through func_80079BD4(volume) (0x800E28EC, at most 0x7FFF). A track is
+// played as the page does: flag 0x800DFE84, func_8007F720(track, player),
+// func_8007ACFC(player).
+//
+// blockplanet_audio_frame runs from a hook at the top of the controller and
+// save thread's loop (func_80029938 at 0x800299A0), about 60 times a second
+// in every scene; the runtime runs one game thread at a time.
 
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/guest_memory.h"
@@ -20,6 +24,8 @@
 extern "C" {
 void func_80079B80(std::uint8_t* rdram, recomp_context* ctx);
 void func_80079BD4(std::uint8_t* rdram, recomp_context* ctx);
+void func_8007F720(std::uint8_t* rdram, recomp_context* ctx);
+void func_8007ACFC(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace blockplanet {
@@ -30,14 +36,22 @@ using namespace tetrisphere::guest;
 constexpr std::uint32_t balance_address = 0x800E0B1Cu;
 constexpr std::uint32_t selection_address = 0x800E0B20u;
 constexpr std::uint32_t track_address = 0x800E0B24u;
-constexpr std::uint32_t save_byte = 0x80102B08u;
-constexpr std::uint32_t music_volume = 0x800E28E8u;
+constexpr std::uint32_t save_bytes = 0x80102B08u;
+constexpr std::uint32_t music_level_address = 0x800E28E8u;
+constexpr std::uint32_t effects_level_address = 0x800E28ECu;
+constexpr std::uint32_t changing_track = 0x800DFE84u;
+constexpr std::uint32_t track_banner = 0x800E14A8u;
 constexpr std::uint32_t music_player = 0x80107290u;
+constexpr std::uint32_t music_max = 0x4FFF;
+constexpr std::uint32_t effects_max = 0x7FFF;
 
 std::atomic<int> volume{100};
-std::atomic<bool> wanted{false};
-std::atomic<int> wanted_balance{6};
-std::atomic<int> wanted_music{-2};
+std::atomic<bool> levels_wanted{false};
+std::atomic<int> music_percent{100};
+std::atomic<int> effects_percent{100};
+std::atomic<int> selection_wanted{-1};  // 0 auto, 1 random, -1 leave the game's
+std::atomic<int> override_track{-1};    // CHOOSE this track
+std::atomic<int> play_request{-1};      // play this track now
 
 const char* const names[track_count] = {
     "Prophetic", "Azule Lux", "Martist", "Compliant Confuse", "Faze", "Flim Flam", "Manicdrummix", "Hallucid",
@@ -46,8 +60,9 @@ const char* const names[track_count] = {
 
 gpr address(std::uint32_t value) { return static_cast<gpr>(static_cast<std::int64_t>(static_cast<std::int32_t>(value))); }
 
-// Calls a game function with two arguments, leaving the caller's registers as they were.
-void call(void (*function)(std::uint8_t*, recomp_context*), std::uint8_t* rdram, recomp_context* ctx, gpr a0, gpr a1) {
+// Calls a game function, leaving the caller's registers as they were.
+void call(void (*function)(std::uint8_t*, recomp_context*), std::uint8_t* rdram, recomp_context* ctx, gpr a0,
+          gpr a1 = 0) {
     const recomp_context saved = *ctx;
     ctx->r4 = a0;
     ctx->r5 = a1;
@@ -60,21 +75,28 @@ void call(void (*function)(std::uint8_t*, recomp_context*), std::uint8_t* rdram,
 void set_audio_volume(int percent) { volume.store(std::clamp(percent, 0, 100)); }
 int audio_volume() { return volume.load(); }
 
-void set_game_audio(int balance, int music) {
-    wanted_balance.store(std::clamp(balance, 0, 12));
-    wanted_music.store(std::clamp(music, -2, track_count - 1));
-    wanted.store(true);
+void set_audio_levels(int music, int effects) {
+    music_percent.store(std::clamp(music, 0, 100));
+    effects_percent.store(std::clamp(effects, 0, 100));
+    levels_wanted.store(true);
 }
 
-GameAudio read_game_audio(const unsigned char* rdram) {
-    GameAudio audio;
-    audio.balance = static_cast<int>(load32(rdram, balance_address));
-    const auto selection = load32(rdram, selection_address);
-    audio.music = selection == 0 ? -2 : selection == 1 ? -1 : static_cast<int>(load32(rdram, track_address));
-    audio.balance = std::clamp(audio.balance, 0, 12);
-    audio.music = std::clamp(audio.music, -2, track_count - 1);
-    return audio;
+void set_music_random(bool random) {
+    override_track.store(-1);
+    selection_wanted.store(random ? 1 : 0);
 }
+
+void play_track(int track) {
+    track = (track % track_count + track_count) % track_count;
+    override_track.store(track);
+    play_request.store(track);
+}
+
+int current_track(const unsigned char* rdram) {
+    return std::clamp(static_cast<int>(load32(rdram, track_address)), 0, track_count - 1);
+}
+
+bool track_override() { return override_track.load() >= 0; }
 
 const char* track_name(int track) { return track >= 0 && track < track_count ? names[track] : ""; }
 
@@ -83,26 +105,42 @@ const char* track_name(int track) { return track >= 0 && track < track_count ? n
 extern "C" void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace blockplanet;
     using namespace tetrisphere::guest;
-    if (!wanted.load(std::memory_order_relaxed)) return;
-    const auto balance = static_cast<std::uint32_t>(wanted_balance.load());
-    const int music = wanted_music.load();
-    const std::uint32_t selection = music == -2 ? 0 : music == -1 ? 1 : 2;
-    bool changed = false;
-    if (load32(rdram, selection_address) != selection) {
-        store32(rdram, selection_address, selection);
-        changed = true;
+    bool save = false;
+    // The game computes its levels from the balance; 6 gives both at full,
+    // which BlockPlanet's levels then scale.
+    if (levels_wanted.load(std::memory_order_relaxed)) {
+        if (load32(rdram, balance_address) != 6) {
+            store32(rdram, balance_address, 6);
+            save = true;
+        }
+        const auto music = music_max * static_cast<std::uint32_t>(music_percent.load()) / 100;
+        const auto effects = effects_max * static_cast<std::uint32_t>(effects_percent.load()) / 100;
+        if (static_cast<std::uint16_t>(load16(rdram, music_level_address)) != music) {
+            store16(rdram, music_level_address, static_cast<std::int16_t>(music));
+            call(func_80079B80, rdram, ctx, music, address(music_player));
+        }
+        if (static_cast<std::uint16_t>(load16(rdram, effects_level_address)) != effects)
+            call(func_80079BD4, rdram, ctx, effects);
     }
-    if (music >= 0 && load32(rdram, track_address) != static_cast<std::uint32_t>(music)) {
-        store32(rdram, track_address, static_cast<std::uint32_t>(music));
-        changed = true;
+    // Music choice: CHOOSE while a track override is on, else auto or random.
+    const int track = override_track.load();
+    const int selection = track >= 0 ? 2 : selection_wanted.load();
+    if (selection >= 0 && load32(rdram, selection_address) != static_cast<std::uint32_t>(selection)) {
+        store32(rdram, selection_address, static_cast<std::uint32_t>(selection));
+        save = true;
     }
-    if (load32(rdram, balance_address) != balance) {
-        store32(rdram, balance_address, balance);
-        const auto music_level = std::min<std::uint32_t>(0x4FFF, 0xA008 - 3414 * balance);
-        store16(rdram, music_volume, static_cast<std::int16_t>(music_level));
-        call(func_80079B80, rdram, ctx, music_level, address(music_player));
-        call(func_80079BD4, rdram, ctx, std::min<std::uint32_t>(0x7FFF, 0x1556 * balance), 0);
-        changed = true;
+    if (const int play = play_request.exchange(-1); play >= 0) {
+        store32(rdram, track_address, static_cast<std::uint32_t>(play));
+        store32(rdram, changing_track, 1);
+        call(func_8007F720, rdram, ctx, static_cast<gpr>(play), address(music_player));
+        call(func_8007ACFC, rdram, ctx, address(music_player));
+        store32(rdram, changing_track, 0);
+        store32(rdram, track_banner, 15);
+        save = true;
     }
-    if (changed) store8(rdram, save_byte, static_cast<std::uint8_t>(selection << 4 | balance));
+    if (save) {
+        store8(rdram, save_bytes,
+               static_cast<std::uint8_t>(load32(rdram, selection_address) << 4 | (load32(rdram, balance_address) & 0xF)));
+        store8(rdram, save_bytes + 1, static_cast<std::uint8_t>(load32(rdram, track_address)));
+    }
 }

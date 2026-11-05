@@ -164,3 +164,29 @@ body.over-pause { background-color: #00000000; }
     letter-spacing: 12dp;
     margin-bottom: 4dp;
 }
+
+/* Sliders: a bar beside the value, filled to it (placed absolutely, as
+   floats beside the value do not line up in RmlUi). */
+.item.slider { position: relative; }
+.item.slider .value {
+    float: none;
+    position: absolute;
+    right: 28dp;
+    top: 10dp;
+}
+.item.slider .bar {
+    position: absolute;
+    right: 150dp;
+    top: 31dp;
+    width: 200dp;
+    height: 10dp;
+    border-radius: 5dp;
+    background-color: #ffffff26;
+}
+.item.slider .fill {
+    display: block;
+    height: 10dp;
+    border-radius: 5dp;
+    background-color: #f5821f;
+}
+.item.slider.focused .fill { background-color: #f8f8f8; }

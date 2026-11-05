@@ -726,7 +726,8 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         // The profile's audio settings, kept applied over the game's own.
         if (profile_data.preferences.audio) {
             blockplanet::set_audio_volume(profile_data.preferences.audio->volume);
-            blockplanet::set_game_audio(profile_data.preferences.audio->balance, profile_data.preferences.audio->music);
+            blockplanet::set_audio_levels(profile_data.preferences.audio->music, profile_data.preferences.audio->effects);
+            blockplanet::set_music_random(profile_data.preferences.audio->random_music);
         }
     }
     persisted_settings=active_settings;
@@ -901,50 +902,64 @@ void publish_menu_settings(const Settings& settings) {
                                  graphics_presentation_filter_name(settings.graphics.presentation_filter));
 }
 
-// The audio rows (assets/ui/screens/options.rml): the profile's choice, or the
-// game's own values until the player changes one. Sent only when changed.
+// The audio rows (Options, and the pause menu's Audio): the profile's
+// choices (defaults until the player changes one) and, for the pause menu,
+// the game's current track. Sent only when changed.
+AudioPreferences current_audio() { return profile_data.preferences.audio.value_or(AudioPreferences{}); }
+
 void publish_audio_settings() {
     static std::string last;
-    AudioPreferences audio;
-    if (profile_data.preferences.audio) {
-        audio = *profile_data.preferences.audio;
-    } else if (guest_rdram != nullptr) {
-        const auto game = blockplanet::read_game_audio(guest_rdram);
-        audio.balance = game.balance;
-        audio.music = game.music;
-    }
-    const std::string key = std::to_string(audio.volume) + "/" + std::to_string(audio.balance) + "/" +
-                            std::to_string(audio.music);
+    const auto audio = current_audio();
+    const int track = guest_rdram != nullptr ? blockplanet::current_track(guest_rdram) : 0;
+    const std::string choice = blockplanet::track_override() ? "choose" : audio.random_music ? "random" : "auto";
+    const std::string key = std::to_string(audio.volume) + "/" + std::to_string(audio.music) + "/" +
+                            std::to_string(audio.effects) + "/" + choice + "/" + std::to_string(track);
     if (key == last) return;
     last = key;
     blockplanet::ui::set_setting("volume", std::to_string(audio.volume));
-    blockplanet::ui::set_setting("audio_balance", std::to_string(audio.balance));
-    blockplanet::ui::set_setting("music", std::to_string(audio.music));
+    blockplanet::ui::set_setting("music_volume", std::to_string(audio.music));
+    blockplanet::ui::set_setting("effects_volume", std::to_string(audio.effects));
+    blockplanet::ui::set_setting("music", audio.random_music ? "random" : "auto");
+    blockplanet::ui::set_setting("music_choice", choice);
+    blockplanet::ui::set_setting("track", std::to_string(track));
 }
 
-// "setting:volume=…", "setting:audio_balance=…" and "setting:music=…": saved in
-// the profile (a guest's last the session) and applied.
+// Ends the pause menu's track override (quitting, or starting another game).
+void end_track_override() {
+    if (blockplanet::track_override()) blockplanet::set_music_random(current_audio().random_music);
+}
+
+// Audio settings from the menus. Volume, music and effects levels and
+// Auto/Random are saved in the profile (a guest's last the session); the
+// pause menu's Choose and Track play a track now, for this game only.
 bool handle_audio_setting(const std::string& command) {
     const auto equals = command.find('=');
     if (command.rfind("setting:", 0) != 0 || equals == std::string::npos) return false;
     const auto name = command.substr(8, equals - 8);
-    if (name != "volume" && name != "audio_balance" && name != "music") return false;
-    const int value = std::atoi(command.c_str() + equals + 1);
-    if (!profile_data.preferences.audio) {
-        AudioPreferences audio;
-        if (guest_rdram != nullptr) {
-            const auto game = blockplanet::read_game_audio(guest_rdram);
-            audio.balance = game.balance;
-            audio.music = game.music;
-        }
-        profile_data.preferences.audio = audio;
+    const auto value = command.substr(equals + 1);
+    if (name == "track") {
+        blockplanet::play_track(std::atoi(value.c_str()));
+        publish_audio_settings();
+        return true;
     }
-    auto& audio = *profile_data.preferences.audio;
-    if (name == "volume") audio.volume = std::clamp(value, 0, 100);
-    if (name == "audio_balance") audio.balance = std::clamp(value, 0, 12);
-    if (name == "music") audio.music = std::clamp(value, -2, blockplanet::track_count - 1);
+    if (name == "music_choice" && value == "choose") {
+        blockplanet::play_track(guest_rdram != nullptr ? blockplanet::current_track(guest_rdram) : 0);
+        publish_audio_settings();
+        return true;
+    }
+    if (name != "volume" && name != "music_volume" && name != "effects_volume" && name != "music" &&
+        name != "music_choice")
+        return false;
+    auto audio = current_audio();
+    const int number = std::clamp(std::atoi(value.c_str()), 0, 100);
+    if (name == "volume") audio.volume = number;
+    if (name == "music_volume") audio.music = number;
+    if (name == "effects_volume") audio.effects = number;
+    if (name == "music" || name == "music_choice") audio.random_music = value == "random";
+    profile_data.preferences.audio = audio;
     blockplanet::set_audio_volume(audio.volume);
-    blockplanet::set_game_audio(audio.balance, audio.music);
+    blockplanet::set_audio_levels(audio.music, audio.effects);
+    if (name == "music" || name == "music_choice") blockplanet::set_music_random(audio.random_music);
     profile_dirty = true;
     save_profile();
     publish_audio_settings();
@@ -989,6 +1004,7 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
 
 void launch_mode(LaunchMode mode) {
     if (guest_rdram == nullptr) return;
+    end_track_override();
     const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
     if (accepted) blockplanet::ui::request_close();
     std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
@@ -1412,6 +1428,7 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "pause_resume" || *command == "pause_skip" || *command == "pause_quit") {
+                if (*command == "pause_quit") end_track_override();
                 pause_bridge.choose(*command == "pause_resume" ? PauseBridge::Choice::Resume
                                     : *command == "pause_skip" ? PauseBridge::Choice::Skip
                                                                : PauseBridge::Choice::Quit,

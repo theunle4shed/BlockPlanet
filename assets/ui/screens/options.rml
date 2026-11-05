@@ -15,12 +15,14 @@
              data-options="three-point:Three-point,linear:Linear">Textures<span class="value"></span></div>
         <div class="item value" id="presentation_filter" data-setting="presentation_filter"
              data-options="pixel:Pixel,linear:Smooth,nearest:Sharp">Scaling<span class="value"></span></div>
-        <div class="item value" id="volume" data-setting="volume"
-             data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Volume<span class="value"></span></div>
-        <div class="item value" id="audio_balance" data-setting="audio_balance"
-             data-options="0:Music only,1:Effects at 17%,2:Effects at 33%,3:Effects at 50%,4:Effects at 67%,5:Effects at 83%,6:Both full,7:Music at 83%,8:Music at 67%,9:Music at 50%,10:Music at 33%,11:Music at 17%,12:Effects only">Music / effects<span class="value"></span></div>
+        <div class="item value slider" id="volume" data-setting="volume"
+             data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Volume<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="music_volume" data-setting="music_volume"
+             data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Music<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="effects_volume" data-setting="effects_volume"
+             data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Effects<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="item value" id="music" data-setting="music"
-             data-options="-2:Auto,-1:Random,0:Prophetic,1:Azule Lux,2:Martist,3:Compliant Confuse,4:Faze,5:Flim Flam,6:Manicdrummix,7:Hallucid,8:Perpetuate303,9:Phony,10:T. Grey,11:Learn,12:Zyp Zyp,13:Extol,14:Magic Fluter,15:Spooky Baby,16:Zooming Car,17:Cheddar Funk,18:Snowy Mushrooms,19:Dog Robot,20:Sappy,21:Skank Bowl Fight,22:Birthday Bumps">Music<span class="value"></span></div>
+             data-options="auto:Auto,random:Random">Music order<span class="value"></span></div>
         <div class="item" id="back" data-action="back">Back</div>
     </div>
 </body>

@@ -60,6 +60,10 @@ int main(int argc, char** argv) {
            "<div data-columns='3' data-list='keyboard'/>"
            "<div class='item' id='done' data-action='command:done'/>");
 
+    screen(dir, "slide",
+           "<div class='item value slider' id='vol' data-setting='vol' data-options='0:0%,50:50%,100:100%'>"
+           "Volume<span class='value'/><div class='bar'><div class='fill'/></div></div>");
+
     NullRenderer renderer;
     QuietSystem system;
     Rml::SetRenderInterface(&renderer);
@@ -220,6 +224,25 @@ int main(int argc, char** argv) {
         assert(nav.show("solo") && top_document()->IsClassSet("pad"));
         nav.set_pad(false);
         assert(!top_document()->IsClassSet("pad"));
+        nav.handle(Action::Back);
+        // Sliders stop at their ends and fill their bar to the value.
+        nav.set_setting("vol", "50");
+        assert(nav.show("slide"));
+        auto fill_width = [&] {
+            Rml::ElementList fills;
+            context->GetDocument(context->GetNumDocuments() - 1)->GetElementsByClassName(fills, "fill");
+            return fills.front()->GetLocalProperty("width")->ToString();
+        };
+        assert(fill_width().rfind("50", 0) == 0);
+        nav.handle(Action::Right);
+        assert(nav.take_command() == std::optional<std::string>("setting:vol=100") && fill_width().rfind("100", 0) == 0);
+        nav.handle(Action::Right);  // already at the end
+        assert(!nav.take_command());
+        nav.handle(Action::Left);
+        nav.handle(Action::Left);
+        nav.handle(Action::Left);
+        assert(nav.take_command() == std::optional<std::string>("setting:vol=50") &&
+               nav.take_command() == std::optional<std::string>("setting:vol=0") && !nav.take_command());
         nav.handle(Action::Back);
         nav.set_text("typed", "z");
         assert(context->GetDocument(context->GetNumDocuments() - 1)->QuerySelector("[data-text]")->GetInnerRML() == "z");
