@@ -91,6 +91,7 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
             std::fflush(stdout);
         }
     }
-    if (shown && helper != 0x800353F4u) return true;  // keep only the background
+    static const bool keep_all = std::getenv("BLOCKPLANET_PAUSE_KEEP_ALL") != nullptr;  // research
+    if (shown && !keep_all && helper != 0x800353F4u) return true;  // keep only the background
     return s.skip.count(a1) != 0;
 }

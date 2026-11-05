@@ -206,3 +206,9 @@ So the purple "out of bounds" is ordinary board blocks of one type. The level bu
 So type 47 behaves as an inert wall: a floor pieces can land on that nothing clears. Still open: whether a block can be dragged onto or across it, and whether magic affects it.
 
 Research aids: `BLOCKPLANET_WATCH="0x800E44A8:2,…"` logs guest values as they change; with `BLOCKPLANET_DUMP_DIR` set, F2 saves the 8 MB of guest memory there (32-bit words in host order: bytes at address ^ 3, halfwords at ^ 2).
+
+### The pause background (2026-11-05)
+
+- **The squares** are the same in every mode (Story, Training, Puzzle) and do not show the board, so they are a fixed backdrop, not a copy of the game frame. They move, zoom and change colour while paused, keeping their spherical bulge, and the main menu uses the same kind of backdrop in blue. They are not drawn through any of the hooked 2D helpers (`0x8003396C`, `0x800353F4`, `0x80036FE4`, `0x80038478`, `0x80071DE8`, `0x8007240C`) and not by the board sphere's quadrant passes, so they are most likely a 3D model (a textured sphere) drawn by another routine, not yet found.
+- **The "paused" lettering** is slanted in perspective and disappears together with the instructor when the model helper `func_8002D93C` (object `0x801AC880`, second argument 2 to 12, which changes with time like an animation frame) is skipped. Skipping any single value of that argument leaves both visible. Separating the lettering from the instructor needs more work.
+- `BLOCKPLANET_PAUSE_KEEP_ALL=1` turns off the pause menu's hiding, for these experiments.
