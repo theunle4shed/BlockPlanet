@@ -210,6 +210,7 @@ Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, m
 - **Order:** get the modes working as designed (see [REDESIGN.md](REDESIGN.md)) before extending trophies and statistics; the events they need (combos, blocks destroyed, magic, junk, battle results) come with that work.
 - **Profile characters:** each profile picks a character to represent it, from the characters rescued in the game (with optional colour variants), with more added later.
 - **Board:** the board stays 32 × 32 cells with 9 layers, as in the game. Its limits are built into about 70 game functions (see [blockplanet-game-state.md](research/blockplanet-game-state.md#layers-core-size-and-stacking-2026-11-02)). Sphere changes are visual only: drawing more of it, and possibly a different core size.
+- **Story game over:** kept as the original: unlimited Try Agains, each restarting the chapter from its first level with full hearts and the score reset (tested: 11 retries in a row, never refused). No Restart level in Story's pause menu; getting through a chapter without a game over is the challenge.
 
 ## Open questions
 
