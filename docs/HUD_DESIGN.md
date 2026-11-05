@@ -10,7 +10,7 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 - **Feedback where it happens.** Points, time gained and combo names float up from the spot on the sphere where they were earned, like damage numbers in RPGs, instead of appearing beside a counter. BlockPlanet draws the sphere, so it knows where each board cell is on screen.
 - **Fits every screen shape.** Wide screens: priority 1 in a column on the left, priority 2 on the right. Square-ish screens (about 4:3 down to 1:1): the same columns, keeping at least a minimum gap between the sphere and the HUD. Portrait screens (taller than wide): the columns become rows, **priority 1 along the top and priority 2 along the bottom**.
 - **Messages and cards** use the menus' style (panels, the original's colours).
-- **The sphere** keeps the original's framing and the drop-timer zoom (see [ROADMAP.md](ROADMAP.md#decisions)).
+- **The sphere** keeps the original's framing and the drop-timer zoom (see [ROADMAP.md](ROADMAP.md#decisions)): the camera rests at the same distance at every stage (about 2,424 at both 1:1 and 10:1, confirmed), so the sphere's size comes from the stage's layers, about 55% of the narrow side at 1:1 and larger than the screen at 10:1. Deep stages and the timer zoom may put the sphere under the HUD or off screen, as in the original; the HUD stays readable over it (a subtle backing where needed). In deep stages the timer zoom starts within seconds.
 
 ## Story (Rescue)
 
