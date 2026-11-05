@@ -188,3 +188,11 @@ Menus use smaller buffers (vertices at `0x80266000`/`0x80268000`, display list f
 - **The upper 4 MB is free.** The game is written for 4 MB: in a gameplay memory dump everything from `0x80400000` to `0x807FFFFF` is zero. The code's only references to that range are the constant `0x80400001` in comparisons, which look like pointer-range checks rather than memory use. The runtime reports 8 MB (`osMemSize`). BlockPlanet can keep its own double-buffered sphere vertex buffers there, sized for the full sphere, and leave the game's pool untouched.
 - Display list commands for the sphere can stay in the game's display list (9.5 KB of 112 KB, with room for several times that), or move up as well for the full sphere.
 - Still to confirm in practice: that RT64 draws vertices from above 4 MB (it supports 8 MB for Expansion Pak games), and that no game mode uses the upper 4 MB (only gameplay was dumped).
+
+### Puzzle boards: the purple border (2026-11-05)
+
+A memory dump of Puzzle 1 (F2 with `BLOCKPLANET_DUMP_DIR`, see below) shows how a puzzle limits the play area. Layer 0 is the core (tile values 81 to 89). Layer 1 holds **924 cells of block value 423 (type 47: the type is value ÷ 9, `func_8008A7EC`)** covering the whole 32 × 32 board except a 10 × 10 window (rows and columns 11 to 20). The window holds 84 empty cells, through which the core shows white, and the puzzle's piece (values 297 to 300, type 33). Layers 2 to 8 are empty. The filler cells have only their outer face exposed (face mask 16), except the ones edging the window.
+
+So the purple "out of bounds" is ordinary board blocks of one type. The level builder `func_800857E8` creates the type 47 descriptor (value 423, type 47, third field 1, at `0x800885CC`). Gameplay code compares against 47 almost nowhere, so its behaviour presumably comes from per-type data. Not yet known: whether type 47 can be removed, slid or dropped on, and whether other modes use it. A small experiment (placing type 47 in a Rescue board) would show how it behaves.
+
+Research aids: `BLOCKPLANET_WATCH="0x800E44A8:2,…"` logs guest values as they change; with `BLOCKPLANET_DUMP_DIR` set, F2 saves the 8 MB of guest memory there (32-bit words in host order: bytes at address ^ 3, halfwords at ^ 2).

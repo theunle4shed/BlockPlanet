@@ -60,6 +60,7 @@
 #include <mutex>
 #include <memory>
 #include <string>
+#include <fstream>
 #include <set>
 #include <vector>
 
@@ -1238,6 +1239,18 @@ bool handle_profile_command(const std::string& command) {
             const auto detected=event_port>=0
                 ? detect_controller_family(controller_ports.snapshot()[event_port].name.c_str())
                 : ControllerFamily::Keyboard;
+            // Research aid: with BLOCKPLANET_DUMP_DIR set, F2 saves the guest's 8 MB
+            // of memory there (as held in memory: 32-bit words in host order).
+            if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_F2 &&
+                std::getenv("BLOCKPLANET_DUMP_DIR") != nullptr && guest_rdram != nullptr) {
+                static int dumps = 0;
+                const auto path = std::filesystem::u8path(std::getenv("BLOCKPLANET_DUMP_DIR")) /
+                                  ("rdram-" + std::to_string(++dumps) + ".bin");
+                std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(guest_rdram), 0x800000);
+                std::fprintf(stdout, "{\"event\":\"rdram_dump\",\"path\":\"%s\"}\n", path.string().c_str());
+                std::fflush(stdout);
+                continue;
+            }
             if (handle_menu_event(event, event_port>=0, active_settings.bindings)) continue;
             handle_controls_event(event,event_port>=0 || removed_assigned,detected);
         }
