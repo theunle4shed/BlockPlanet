@@ -173,9 +173,38 @@ void poll_watches() {
     }
 }
 
+// Experiment (docs/research/blockplanet-game-state.md, puzzle border): with
+// BLOCKPLANET_TEST_TYPE47=1, the first time Rescue is in play the blocks in
+// every other 4-column stripe become type 47 (value 423), Puzzle's border.
+void poll_type47_experiment() {
+    static const bool enabled = [] {
+        const char* value = std::getenv("BLOCKPLANET_TEST_TYPE47");
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    }();
+    static bool done = false;
+    if (!enabled || done) return;
+    auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
+    if (guest::load16(rdram, 0x800E121C) != -1 || guest::load16(rdram, 0x800E44A8) != 1) return;
+    const std::uint32_t values = guest::load32(rdram, 0x800E44D0);
+    if (values < 0x80000000u) return;
+    int changed = 0;
+    for (int layer = 1; layer < 9; ++layer)
+        for (int cell = 0; cell < 1024; ++cell) {
+            if (((cell & 31) / 4) % 2 != 0) continue;
+            const std::uint32_t address = values + 2u * static_cast<std::uint32_t>(layer * 1024 + cell);
+            if (guest::load16(rdram, address) == 0) continue;
+            guest::store16(rdram, address, 423);
+            ++changed;
+        }
+    done = true;
+    std::fprintf(stdout, "{\"event\":\"type47_experiment\",\"cells\":%d}\n", changed);
+    std::fflush(stdout);
+}
+
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
     poll_watches();
+    poll_type47_experiment();
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
     const auto state = read_game_state(guest_rdram);
     const auto now = std::chrono::steady_clock::now();

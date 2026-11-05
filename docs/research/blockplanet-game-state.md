@@ -193,6 +193,15 @@ Menus use smaller buffers (vertices at `0x80266000`/`0x80268000`, display list f
 
 A memory dump of Puzzle 1 (F2 with `BLOCKPLANET_DUMP_DIR`, see below) shows how a puzzle limits the play area. Layer 0 is the core (tile values 81 to 89). Layer 1 holds **924 cells of block value 423 (type 47: the type is value ÷ 9, `func_8008A7EC`)** covering the whole 32 × 32 board except a 10 × 10 window (rows and columns 11 to 20). The window holds 84 empty cells, through which the core shows white, and the puzzle's piece (values 297 to 300, type 33). Layers 2 to 8 are empty. The filler cells have only their outer face exposed (face mask 16), except the ones edging the window.
 
-So the purple "out of bounds" is ordinary board blocks of one type. The level builder `func_800857E8` creates the type 47 descriptor (value 423, type 47, third field 1, at `0x800885CC`). Gameplay code compares against 47 almost nowhere, so its behaviour presumably comes from per-type data. Not yet known: whether type 47 can be removed, slid or dropped on, and whether other modes use it. A small experiment (placing type 47 in a Rescue board) would show how it behaves.
+So the purple "out of bounds" is ordinary board blocks of one type. The level builder `func_800857E8` creates the type 47 descriptor (value 423, type 47, third field 1, at `0x800885CC`). Gameplay code compares against 47 almost nowhere, so its behaviour presumably comes from per-type data. **Experiment (2026-11-05):** `BLOCKPLANET_TEST_TYPE47=1` turned the blocks in every other 4-column stripe of a Rescue 1:1 board into type 47 (512 cells) when play began; then five drops with the sphere turned, a drag attempt (B held with up) and a game over, with a memory dump after each step:
+
+- **Drawn as Puzzle's purple border:** the stripes look the same as in Puzzle, so the look comes from the type.
+- **Never removed:** all 512 cells stayed, in the same places, through every drop and combo. Meanwhile 129 normal blocks on that layer and 36 core cells were cleared.
+- **Pieces land on it:** dropped pieces stacked on top (cells appeared on layers 2 and 3).
+- **Not moved by the drag attempt**, though it is not certain the cursor was on a purple block at the time.
+- **Side effect of the test:** converting only part of some pieces set off a large clear-up as play began (score 20,000 before the first drop). The game seems to clean up broken pieces (compare the "NOT IMPLODING A PIECE BECAUSE IT IS BROKEN" debug string), so a mode using type 47 should place it as whole cells of its own, as Puzzle does, not by cutting existing pieces.
+- Lives were lost on most drops, but random drops also lose lives in normal play, so that is not attributed to type 47.
+
+So type 47 behaves as an inert wall: a floor pieces can land on that nothing clears. Still open: whether a block can be dragged onto or across it, and whether magic affects it.
 
 Research aids: `BLOCKPLANET_WATCH="0x800E44A8:2,…"` logs guest values as they change; with `BLOCKPLANET_DUMP_DIR` set, F2 saves the 8 MB of guest memory there (32-bit words in host order: bytes at address ^ 3, halfwords at ^ 2).
