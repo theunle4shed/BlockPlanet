@@ -58,5 +58,7 @@ private:
 // offered where BlockPlanet can start the same place again.
 std::vector<blockplanet::ui::ListItem> pause_items(int mode, int training_type);
 bool can_restart(int mode, int training_type);
+// Modes whose pause menu offers Restart chapter (Rescue, Hide & Seek).
+bool restarts_chapter(int mode);
 
 } // namespace tetrisphere

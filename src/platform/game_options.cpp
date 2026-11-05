@@ -43,7 +43,9 @@ void GameOptionApplier::apply(std::uint8_t* rdram) {
             chosen_chapter_.reset();
             chosen_level_.reset();
         } else {
-            set16(rdram, game_state::chapter, static_cast<std::int16_t>(*chosen_chapter_ - 1));
+            // Chapter 0 or less: the level only (Hide & Seek keeps its own chapter).
+            if (*chosen_chapter_ > 0)
+                set16(rdram, game_state::chapter, static_cast<std::int16_t>(*chosen_chapter_ - 1));
             if (chosen_level_)
                 set16(rdram, game_state::p1_context + game_state::level_offset,
                       static_cast<std::int16_t>(*chosen_level_ - 1));

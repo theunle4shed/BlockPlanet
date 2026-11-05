@@ -1432,7 +1432,7 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "pause_restart_chapter") {
-                // Story: ask first; Yes restarts the chapter from its first level.
+                // Story and Hide & Seek: ask first; Yes restarts the chapter from its first level.
                 blockplanet::ui::set_text("confirm_title", "Restart chapter?");
                 blockplanet::ui::set_text("confirm_note", "Progress within the chapter will be lost.");
                 blockplanet::ui::set_list("confirm", {{"yes", "Yes", "", "command:pause_restart", true},
@@ -1447,7 +1447,7 @@ bool handle_profile_command(const std::string& command) {
                 std::optional<std::pair<int, int>> start;
                 switch (state.mode) {
                 case 1: mode = LaunchMode::Rescue; start = std::pair{state.chapter + 1, 1}; break;  // the chapter
-                case 5: mode = LaunchMode::HideAndSeek; start = std::pair{state.chapter + 1, state.level + 1}; break;
+                case 5: mode = LaunchMode::HideAndSeek; start = std::pair{0, 1}; break;  // its own chapter, level 1
                 case 4: mode = LaunchMode::Puzzle; start = std::pair{state.chapter + 1, state.level + 1}; break;
                 case 2: mode = LaunchMode::TimeTrial; break;
                 case 6: mode = LaunchMode::VsCpu; break;
@@ -1496,6 +1496,20 @@ bool handle_profile_command(const std::string& command) {
                 launch_mode(training ? LaunchMode::TrainingPuzzle : LaunchMode::Puzzle);
                 continue;
             }
+            if (command->rfind("launch:", 0) == 0) {
+                // launch:MODE:CHAPTER:LEVEL (MODE as in the menus, e.g. hide_and_seek):
+                // start a chaptered mode at a chapter and level (testing; level select).
+                const auto rest = command->substr(7);
+                const auto first = rest.find(':');
+                const auto second = first == std::string::npos ? first : rest.find(':', first + 1);
+                const auto mode = launch_mode_for_command(rest.substr(0, first));
+                if (mode && second != std::string::npos && game_option_applier) {
+                    game_option_applier->choose_start(std::atoi(rest.c_str() + first + 1),
+                                                      std::atoi(rest.c_str() + second + 1));
+                    launch_mode(*mode);
+                }
+                continue;
+            }
             if (command->rfind("chapter:", 0) == 0) {
                 const int chapter = std::atoi(command->c_str() + 8);
                 chapter_zero_lesson = chapter == 0 ? "basics" : "";
@@ -1538,7 +1552,7 @@ bool handle_profile_command(const std::string& command) {
                 case 2: where = "Time Trial"; break;
                 case 3: where = state.training_type == 3 ? "Puzzle \u00B7 Chapter 0" : "Story \u00B7 Chapter 0"; break;
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
-                case 5: where = "Hide & Seek \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
+                case 5: where = "Hide & Seek \u00B7 Level " + std::to_string(state.level + 1); break;  // its chapter is not the Rescue one
                 case 6: where = "Versus"; break;
                 case 9: where = "Lines"; break;
                 default: break;

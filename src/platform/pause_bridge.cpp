@@ -25,11 +25,16 @@ bool pressing(PauseBridge::Clock::duration elapsed) {
 
 } // namespace
 
+bool restarts_chapter(int game_mode) {
+    // Chaptered modes whose TRY AGAIN after a game over goes back to the
+    // chapter's first level (tested: Rescue, Hide & Seek): getting through a
+    // chapter without a game over is the challenge, so the pause menu offers
+    // Restart chapter, after a confirmation, instead of Restart level.
+    return game_mode == 1 || game_mode == 5;
+}
+
 bool can_restart(int game_mode, int training_type) {
     switch (game_mode) {
-    // Story (Rescue) restarts the chapter, as its TRY AGAIN after a game
-    // over does, after a confirmation: getting through a chapter without a
-    // game over is the challenge.
     case 1: case 2: case 4: case 5: case 6: case 9: return true;  // Rescue, Time Trial, Puzzle, Hide & Seek, VS CPU, Lines
     case 3: return training_type == 1 || training_type == 3;      // Training Basics or Puzzle (Chapter 0)
     default: return false;
@@ -39,7 +44,7 @@ bool can_restart(int game_mode, int training_type) {
 std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_type) {
     std::vector<blockplanet::ui::ListItem> items{{"resume", "Resume", "", "command:pause_resume", true, 1, true}};
     if (can_restart(game_mode, training_type))
-        items.push_back(game_mode == 1
+        items.push_back(restarts_chapter(game_mode)
             ? blockplanet::ui::ListItem{"restart", "Restart chapter", "", "command:pause_restart_chapter", true}
             : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart lesson" : "Restart level", "",
                                         "command:pause_restart", true});

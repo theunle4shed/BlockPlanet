@@ -28,7 +28,7 @@ int main() {
     out = step(bridge, false);
     assert(out.open_menu && bridge.hide_original());
     assert(out.items.size() == 5 && out.items[0].action == "command:pause_resume" && out.items[0].focus &&
-           out.items[1].action == "command:pause_restart" && out.items[1].label == "Restart level" &&
+           out.items[1].action == "command:pause_restart_chapter" && out.items[1].label == "Restart chapter" &&
            out.items[2].action == "open:audio" && out.items[4].action == "command:pause_quit");
     out = step(bridge, true);
     assert(!out.open_menu && !out.inject);
@@ -88,7 +88,9 @@ int main() {
     set(0x80112F9E, 3);
     out = step(over, false);
     assert(out.open_menu);
-    // Story restarts the chapter, after asking.
+    // Story and Hide & Seek restart the chapter, after asking; others the level.
+    assert(restarts_chapter(1) && restarts_chapter(5) && !restarts_chapter(4));
+    assert(pause_items(4, 0)[1].label == "Restart level" && pause_items(4, 0)[1].action == "command:pause_restart");
     assert(pause_items(1, 0)[1].label == "Restart chapter" &&
            pause_items(1, 0)[1].action == "command:pause_restart_chapter");
     // Restart is offered only where the same place can be started again.

@@ -38,7 +38,8 @@ public:
     // begins there. Written until play begins; does not affect trophies.
     void choose_chapter(int chapter) { chosen_chapter_ = chapter; chosen_level_.reset(); }
     // The same with a level in the chapter (1-based; for Puzzle, the puzzle
-    // number), for Restart level.
+    // number), for Restart level. A chapter of 0 sets the level only: Hide &
+    // Seek has its own chapter, not the Rescue chapter (0x800E44A0).
     void choose_start(int chapter, int level) { chosen_chapter_ = chapter; chosen_level_ = level; }
 
 private:
