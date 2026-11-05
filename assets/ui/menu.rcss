@@ -26,7 +26,7 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 #panel {
     position: absolute;
     left: 120dp;
-    top: 100dp;
+    top: 60dp;
     width: 720dp;
     padding: 48dp 56dp;
     background-color: #0b1020d0;
@@ -43,7 +43,7 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     display: block;
     font-size: 28dp;
     color: #e8b818;
-    margin-bottom: 36dp;
+    margin-bottom: 24dp;
 }
 
 .item {

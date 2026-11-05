@@ -12,7 +12,8 @@
 namespace tetrisphere {
 
 enum class GraphicsResolution { Auto, P240, P720, P1080, P1440, P2160 };
-enum class GraphicsAspect { Original4x3, Expand16x9 };
+// Fill: the picture takes the window's shape (wider than 16:9 included).
+enum class GraphicsAspect { Original4x3, Expand16x9, Fill };
 enum class GraphicsRefresh { Original, Fps30, Fps60, Fps120 };
 enum class GraphicsWindowMode { Windowed, Fullscreen };
 // How much of the sphere is drawn (see include/tetrisphere/sphere_mesh.h).
@@ -20,7 +21,7 @@ enum class GraphicsSphere { Original, Extended };
 
 struct GraphicsSettings {
     GraphicsResolution resolution = GraphicsResolution::Auto;
-    GraphicsAspect aspect = GraphicsAspect::Expand16x9;
+    GraphicsAspect aspect = GraphicsAspect::Fill;
     GraphicsRefresh refresh = GraphicsRefresh::Original;
     GraphicsWindowMode window_mode = GraphicsWindowMode::Windowed;
     int msaa_samples = 0;
@@ -44,6 +45,7 @@ constexpr const char* graphics_aspect_name(GraphicsAspect value) {
     switch (value) {
         case GraphicsAspect::Original4x3: return "4:3";
         case GraphicsAspect::Expand16x9: return "16:9";
+        case GraphicsAspect::Fill: return "fill";
     }
     return nullptr;
 }

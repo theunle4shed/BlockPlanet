@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
         loaded.bindings.confirm != tetrisphere::PhysicalButton::South ||
         loaded.magic != tetrisphere::MagicControl::West ||
         loaded.graphics.resolution != tetrisphere::GraphicsResolution::Auto ||
-        loaded.graphics.aspect != tetrisphere::GraphicsAspect::Expand16x9 ||
+        loaded.graphics.aspect != tetrisphere::GraphicsAspect::Fill ||
         loaded.graphics.refresh != tetrisphere::GraphicsRefresh::Original ||
         loaded.graphics.window_mode != tetrisphere::GraphicsWindowMode::Windowed ||
         loaded.graphics.sphere != tetrisphere::GraphicsSphere::Extended) {

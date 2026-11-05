@@ -68,7 +68,7 @@ bool parse_graphics_resolution(std::string_view name, GraphicsResolution& value)
 }
 
 bool parse_graphics_aspect(std::string_view name, GraphicsAspect& value) {
-    for (int raw = 0; raw <= static_cast<int>(GraphicsAspect::Expand16x9); ++raw) {
+    for (int raw = 0; raw <= static_cast<int>(GraphicsAspect::Fill); ++raw) {
         const auto candidate = static_cast<GraphicsAspect>(raw);
         if (name == graphics_aspect_name(candidate)) { value = candidate; return true; }
     }
@@ -106,7 +106,8 @@ std::pair<int, int> graphics_window_size(const GraphicsSettings& settings,
     // Keep it inside the usable display even if 2160p is selected on a 1080p monitor.
     const int max_width = available_width > 0 ? available_width : 960;
     const int max_height = available_height > 0 ? available_height : 720;
-    const bool expanded = settings.aspect == GraphicsAspect::Expand16x9;
+    // The window opens at 16:9 for Fill too; the picture follows any resize.
+    const bool expanded = settings.aspect != GraphicsAspect::Original4x3;
     height = std::max(1, std::min(height,
         std::min(max_height, expanded ? max_width * 9 / 16 : max_width * 3 / 4)));
     const int width = expanded ? (height * 16 + 4) / 9 : height * 4 / 3;

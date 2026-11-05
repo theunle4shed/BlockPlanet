@@ -33,7 +33,7 @@ def main():
         assert settings["schema_version"] == 7
         assert settings["bindings"]["magic"] == "west"
         assert settings["graphics"] == {
-            "resolution": "auto", "aspect": "16:9", "refresh": "original",
+            "resolution": "auto", "aspect": "fill", "refresh": "original",
             "window_mode": "windowed", "msaa_samples": 0,
             "presentation_filter": "pixel", "texture_filter": "three-point",
             "sphere": "extended"}

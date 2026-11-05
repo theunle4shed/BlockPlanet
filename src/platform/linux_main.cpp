@@ -626,6 +626,17 @@ unsigned linux_audio_drain_wait_budget_ms() {
                                       pacing.obtained_frequency);
 }
 
+// The renderer's picture shape for the Picture setting: 4:3 the original,
+// 16:9 a fixed widescreen picture, Fill the window's own shape.
+ultramodern::renderer::AspectRatio renderer_aspect(GraphicsAspect aspect) {
+    switch (aspect) {
+    case GraphicsAspect::Original4x3: return ultramodern::renderer::AspectRatio::Original;
+    case GraphicsAspect::Expand16x9: return ultramodern::renderer::AspectRatio::Manual;
+    case GraphicsAspect::Fill: return ultramodern::renderer::AspectRatio::Expand;
+    }
+    return ultramodern::renderer::AspectRatio::Expand;
+}
+
 void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                                const RunOptions& run_options) {
 #ifndef _WIN32
@@ -854,9 +865,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         : ultramodern::renderer::WindowMode::Windowed;
     graphics.hr_option = ultramodern::renderer::HUDRatioMode::Original;
     graphics.api_option = ultramodern::renderer::GraphicsApi::Vulkan;
-    graphics.ar_option = active_settings.graphics.aspect == GraphicsAspect::Expand16x9
-        ? ultramodern::renderer::AspectRatio::Manual
-        : ultramodern::renderer::AspectRatio::Original;
+    graphics.ar_option = renderer_aspect(active_settings.graphics.aspect);
     graphics.msaa_option = ultramodern::renderer::Antialiasing::None;
     set_rt64_run_options(resolve_graphics_run_options(active_settings.graphics, run_options));
     tetrisphere::sphere::set_detail(
@@ -900,6 +909,8 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 // Current values for the menus' setting rows (assets/ui/screens/options.rml).
 void publish_menu_settings(const Settings& settings) {
     blockplanet::ui::set_setting("sphere", graphics_sphere_name(settings.graphics.sphere));
+    blockplanet::ui::set_setting("aspect", settings.graphics.aspect == GraphicsAspect::Fill ? "fill"
+                                           : settings.graphics.aspect == GraphicsAspect::Expand16x9 ? "16x9" : "4x3");
     blockplanet::ui::set_setting("window",
         settings.graphics.window_mode == GraphicsWindowMode::Fullscreen ? "fullscreen" : "windowed");
     blockplanet::ui::set_setting("texture_filter", graphics_texture_filter_name(settings.graphics.three_point_filter));
@@ -978,6 +989,9 @@ bool queue_menu_setting(const std::string& command) {
     Settings requested = persisted_settings;
     int field = -1;
     if (name == "sphere" && parse_graphics_sphere(value, requested.graphics.sphere)) field = 7;
+    // Menu values avoid ':' (it separates a value from its label): 16x9, 4x3, fill.
+    else if (name == "aspect" && parse_graphics_aspect(value == "16x9" ? "16:9" : value == "4x3" ? "4:3" : value,
+                                                       requested.graphics.aspect)) field = 1;
     else if (name == "window" && (value == "fullscreen" || value == "windowed")) {
         requested.graphics.window_mode =
             value == "fullscreen" ? GraphicsWindowMode::Fullscreen : GraphicsWindowMode::Windowed;
@@ -1282,6 +1296,13 @@ bool handle_profile_command(const std::string& command) {
             active_settings.bindings=requested->bindings;
             active_settings.magic=requested->magic;
             if(request->field==5)active_settings.graphics.presentation_filter=requested->graphics.presentation_filter;
+            if(request->field==1) {
+                // Picture: applies at once (the renderer changes its picture shape live).
+                active_settings.graphics.aspect=requested->graphics.aspect;
+                auto config = ultramodern::renderer::get_graphics_config();
+                config.ar_option = renderer_aspect(requested->graphics.aspect);
+                ultramodern::renderer::set_graphics_config(config);
+            }
             if(request->field==6)active_settings.graphics.three_point_filter=requested->graphics.three_point_filter;
             if(request->field==7) {
                 active_settings.graphics.sphere=requested->graphics.sphere;

@@ -21,7 +21,7 @@ Settings merge_pc_settings_change(const Settings& persisted,const Settings& requ
 std::vector<std::string> PCSettingsMenu::choices(ControllerFamily) const {
  switch(field_) {
  case 0:return {"AUTO","240P","720P","1080P","1440P","2160P"};
- case 1:return {"4:3","16:9"};
+ case 1:return {"4:3","16:9","FILL"};
  case 2:return {"ORIGINAL","30 FPS","60 FPS","120 FPS"};
  case 3:return {"WINDOWED","FULLSCRN"};
  case 4:return {"OFF","2X","4X","8X"};
@@ -40,7 +40,7 @@ std::vector<std::string> PCSettingsMenu::rows(ControllerFamily) const {
 std::string PCSettingsMenu::value(int field) const {
  switch(field) {
  case 0:{constexpr const char* values[]{"AUTO","240P","720P","1080P","1440P","2160P"};return values[int(settings_.graphics.resolution)];}
- case 1:return settings_.graphics.aspect==GraphicsAspect::Original4x3 ? "4:3":"16:9";
+ case 1:return settings_.graphics.aspect==GraphicsAspect::Original4x3 ? "4:3":settings_.graphics.aspect==GraphicsAspect::Fill ? "FILL":"16:9";
  case 2:{constexpr const char* values[]{"ORIGINAL","30 FPS","60 FPS","120 FPS"};return values[int(settings_.graphics.refresh)];}
  case 3:return settings_.graphics.window_mode==GraphicsWindowMode::Windowed ? "WINDOWED":"FULLSCREEN";
  case 4:return settings_.graphics.msaa_samples ? std::to_string(settings_.graphics.msaa_samples)+"X":"OFF";

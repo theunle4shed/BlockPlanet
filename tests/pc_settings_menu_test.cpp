@@ -11,7 +11,7 @@ int main() {
  for(const auto& row:rows)assert(row!="MORE" && row!="DISPLAY" && row!="QUALITY");
  // Every field is editable without entering another page. Values cycle fully
  // in both directions; unrelated remaps and settings survive each save.
- constexpr int counts[]{6,2,4,2,4,3,2,2};
+ constexpr int counts[]{6,3,4,2,4,3,2,2};
  for(int field=0;field<8;++field) {
   PCSettingsMenu menu(original,true);
   for(int row=0;row<field;++row)menu.move(1);

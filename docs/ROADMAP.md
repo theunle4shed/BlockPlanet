@@ -64,7 +64,7 @@ A menu that lists every music track and sound effect and plays them. Research: f
 
 ### Variable screen sizes: ultrawide, vertical and any window shape (L)
 
-- **Wider than 16:9 (21:9, 32:9):** extend the existing widescreen work. RT64 already widens the projection, and Blocksphere's HUD anchors keep UI at the edges. The work is checking every scene for missing background edges, culling and framebuffer effects at extreme widths.
+- **Wider than 16:9 (21:9, 32:9): done as the Picture setting's Fill window** (now the default): RT64's expand mode follows the window's shape, and Blocksphere's HUD anchors keep the HUD at the edges. Checked at 21:9, 32:9 and 16:10 on the title, in play and in the pause; other scenes still to be looked at on a real ultrawide screen.
 - **Taller than 4:3 (portrait or phone-like):** RT64 widens rather than heightens, so this needs a vertical field-of-view adjustment and new HUD anchoring for top and bottom edges.
 - **Free resizing:** pick the projection from the actual window shape instead of fixed presets.
 

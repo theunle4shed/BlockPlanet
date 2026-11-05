@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(dir=sys.argv[2]) as tmp:
                            capture_output=True, text=True)
         assert p.returncode == 0, p.stderr
         return p.stdout
-    assert json.loads(run(config, 'show'))['graphics']['aspect'] == '16:9', 'Fresh folder must default to widescreen'
+    assert json.loads(run(config, 'show'))['graphics']['aspect'] == 'fill', 'Fresh folder must default to filling the window'
     run(config, 'graphics', 'aspect', '4:3')
     run(config, 'graphics', 'msaa', '4x')
     assert (root / 'first/data/settings.dat').is_file(), 'Settings escaped the game folder'

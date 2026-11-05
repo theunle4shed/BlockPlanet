@@ -45,10 +45,10 @@ int run_graphics_config_gui(const SettingsStore& store, const ConfigGuiDialog& d
             }
             case 1: {
                 static const std::vector<std::string> options{
-                    "Original (4:3)", "Widescreen (16:9)", "Back"};
+                    "Original (4:3)", "Widescreen (16:9)", "Fill window", "Back"};
                 choice = dialog("Aspect ratio", "Current: " +
                     std::string(graphics_aspect_name(settings.graphics.aspect)), options);
-                if (choice >= 0 && choice < 2)
+                if (choice >= 0 && choice < 3)
                     next.graphics.aspect = static_cast<GraphicsAspect>(choice);
                 break;
             }
