@@ -27,7 +27,7 @@ Shown throughout gameplay. Hidden during pause, results, level intros and game o
 | Magic ring | (263,27)–(293,57) | Right | 30×30 | Top of the magic gauge. Shows a counter during combos, for example "28". |
 | Magic gauge trail | (264,59)–(292,155) | Right | 15 images, 27×7 growing to 27×27 | A trail of dots that grows in size downwards. Animates as magic charges. |
 | Magic bowl | (234,154)–(299,231) | Right | 65×77 and 62×71 layers | Always. Holds the stored magic item. |
-| Drop timer (was listed as the magic item) | (261,157)–(284,191) | Right | 23×34 and 20×31 | An orb in a brass casing whose dial turns blue, green, yellow while a piece is held; a heart is lost when it runs out (2026-11-05). Where magic is shown in the bowl is still to confirm. |
+| Drop timer (was listed as the magic item) | (261,157)–(284,191) | Right | 23×34 and 20×31 | An orb in a brass casing whose dial turns blue, green, yellow while a piece is held; a heart is lost when it runs out (2026-11-05). The held magic (six models, one per type) is shown just above the bowl. |
 | Timer | (124,200)–(199,216) | Center bottom | 12×12 clock, font glyphs | Time Trial only. Counts down from about five minutes. |
 | Message text | about (33,94)–(114,146) | Center | font glyphs | Short messages on top of the HUD, for example level start text. |
 

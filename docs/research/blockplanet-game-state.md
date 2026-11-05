@@ -305,12 +305,24 @@ Found for the HUD's progress bar from the game's code (`func_800AB4C8`, `func_80
 
 **For the HUD's progress bar** (weakest point, [HUD_DESIGN.md](../HUD_DESIGN.md)): use the same squares the game checks, S × S at even corners with wrapping. A square's "blocks left" is the number of filled cells above the core in its columns: non-zero cells in layers 1 to 8. The weakest point is the square with the fewest; its count at the level start is 100%. This reads the board each frame (1,024 cells × 8 layers, cheap), so it needs no hook. Still to check in play: whether type 1 cells can be cleared by normal play (if not, they should not count).
 
-### Magic, combos and score (2026-11-05, in progress)
+### Magic, combos and score (2026-11-05)
 
-- **How magic is earned:** the game's own Training text says a combo of **20 or more pieces** gives a magic power-up ("IF YOU MAKE A COMBO OF 20 OR MORE PIECES, YOU GET A MAGIC POWER UP", page `0x800EF198`). So the original's dot trail is the current combo counting towards 20, not a meter that fills over time.
-- **Combo counter:** player context **`+0x2B14`** (`0x80112D34`) read 21 while the Training lesson's 21-piece combo was shown in the ring; 0 between combos.
+- **The stored magic is one byte, player context `+0x702`** (`0x80110922` for player 1): **−1 = no magic, 0 to 5 = the magic held.** When a combo ends (`func_800CD3B8`, at `0x800CE0BC`) with **20 or more pieces**, the game plays a sound and **adds 1** to it, capped at 5 (`func_800C78A0`). So the first 20+ combo gives magic 0, and each further 20+ combo while holding it **upgrades** it to the next type. Using it sets it back to −1 (seen in the Training lesson). Name cheats also set it (context `+0x1272` sets 3; `+0x1267`/`+0x1268` set 0 or 4).
+- **The six magic types**, by writing 0 to 5 into `+0x702` during Rescue 1:1 (the model appears above the bowl; the game picks it from the table at `0x80103424`):
+
+| Value | Model |
+| --- | --- |
+| 0 | A purple and yellow firework rocket |
+| 1 | A bundle of red dynamite |
+| 2 | Red claws (three prongs) on a dark base |
+| 3 | Glowing purple orbs around a light centre (atom-like) |
+| 4 | A white and red bomb or missile |
+| 5 | A green and gold spinning top or drill |
+
+  What each one does to the board is still to record (use each and watch).
+- **Combo counter:** **`+0x2AE0`** counts the pieces in the combo as they clear (`func_8009423C` adds 1 per piece). When the combo ends it is copied to `+0x2B14` (what the ring shows) and `+0x2AF0`, the best combo of the level goes to `+0x2C78`, and the running count returns to 0. Combos of 6 or more also call `func_800941B8`; 20 or more give magic.
 - **Score:** **`+0x2AF8`** (u32, `0x80112D18`); the HUD shows it times ten.
-- **The stored magic and its type are not found yet.** Training's magic lesson seems to be scripted (no context field changed only while the magic was held). The one-colour test's giant combo ended the level at once. A smaller painted strip (2 × 12 cells, too thin to win) cleared but gave no score or magic, perhaps because a poked patch is not a combo the game credits to a drop. Next: paint the strip, then drop a matching piece onto it, so the combo comes from a real drop.
-- **Correction to the HUD inventory:** the orb in a brass casing above the bowl is **the drop timer**, not the magic item. Its dial turns from blue to green to yellow while a piece is held, and a heart is lost when it runs out (seen with no input). The bowl below it is where magic is shown.
+- **Combos set off by writing to the board give no magic.** Painting blocks one colour clears them in one combo (768 cells with walls in every fourth row, so the level does not end), but `+0x702` stayed −1. Magic is only awarded where a drop's combo is resolved.
+- **Correction to the HUD inventory:** the orb in a brass casing above the bowl is **the drop timer**, not the magic item. Its dial turns from blue to green to yellow while a piece is held, and a heart is lost when it runs out (seen with no input). The magic model appears just above the bowl.
 
-**Research aid, the one-colour board:** a poke file setting every layer 1 cell (`0x801173F0` to `0x80117BEE` in Rescue 1:1; board pointer `0x800E44D0` + 2048) to 288 sets off one huge combo on the next frame. It is a quick way to test level wins, combos and the core opening without playing.
+**Research aid, the one-colour board:** a poke file setting every layer 1 cell (`0x801173F0` to `0x80117BEE` in Rescue 1:1; board pointer `0x800E44D0` + 2048) to 288 sets off one huge combo on the next frame and wins the level. With every fourth row set to 423 (type 47 walls) instead, the combo clears 768 cells and the level goes on. Only layer 1 (the top layer at the start) is drawn, so writing layer 2 shows nothing. Writing `+0x702` (0 to 5) gives a magic for testing.
