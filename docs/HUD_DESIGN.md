@@ -47,7 +47,7 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 
 - **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.
 - **VS:** the X count matters (it sets how many pieces are sent), so it is shown clearly.
-- **Time Trial**, **Puzzle** (drops, slides, timer), **Hide & Seek**, **Lines**, **VS**: next in the review.
+- **Puzzle** (drops, slides, timer), **Hide & Seek**, **Lines**, **VS**: next in the review.
 
 ## Research needed
 
