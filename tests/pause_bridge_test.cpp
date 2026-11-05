@@ -19,7 +19,7 @@ int main() {
     PauseBridge bridge;
     set(0x800E121C, -1);  // playing
     set(0x800E1228, -1);  // not paused
-    set(0x800E44A8, 1);   // Rescue
+    set(0x800E44A8, 5);   // Hide & Seek
     auto out = step(bridge, false);
     assert(!out.open_menu && !out.inject && !bridge.hide_original());
 
@@ -76,7 +76,21 @@ int main() {
     out = step(bridge, false);
     assert(!out.inject || out.buttons != 0x1000);
     assert(out.open_menu);
+    // The game-over menu uses the pause row too, with hearts at -1: left alone.
+    PauseBridge over;
+    set(0x800E121C, -1);
+    set(0x800E1228, -1);
+    set(0x80112F9E, -1);
+    step(over, false);
+    set(0x800E1228, 0);
+    out = step(over, false);
+    assert(!out.open_menu && !out.inject && !over.hide_original());
+    set(0x80112F9E, 3);
+    out = step(over, false);
+    assert(out.open_menu);
+    // Story has no restart (TRY AGAIN after a game over restarts the chapter).
+    assert(pause_items(1, 0)[1].action != "command:pause_restart");
     // Restart is offered only where the same place can be started again.
-    assert(can_restart(1, 0) && can_restart(9, 0) && can_restart(3, 3) && !can_restart(3, 2) && !can_restart(7, 0));
+    assert(!can_restart(1, 0) && can_restart(9, 0) && can_restart(3, 3) && !can_restart(3, 2) && !can_restart(7, 0));
     return 0;
 }

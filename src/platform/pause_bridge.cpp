@@ -10,6 +10,7 @@ using namespace tetrisphere::guest;
 constexpr std::uint32_t scene = 0x800E121Cu;
 constexpr std::uint32_t pause_row = 0x800E1228u;
 constexpr std::uint32_t mode = 0x800E44A8u;
+constexpr std::uint32_t p1_hearts = 0x80110220u + 0x2D7Eu;  // s16, -1 at game over
 constexpr std::int16_t training = 3;
 constexpr std::uint16_t button_a = 0x8000;
 constexpr std::uint16_t button_start = 0x1000;
@@ -26,7 +27,9 @@ bool pressing(PauseBridge::Clock::duration elapsed) {
 
 bool can_restart(int game_mode, int training_type) {
     switch (game_mode) {
-    case 1: case 2: case 4: case 5: case 6: case 9: return true;  // Rescue, Time Trial, Puzzle, Hide & Seek, VS CPU, Lines
+    // Not Story (Rescue): getting through a chapter without a game over is
+    // the challenge; its own TRY AGAIN restarts the chapter after one.
+    case 2: case 4: case 5: case 6: case 9: return true;  // Time Trial, Puzzle, Hide & Seek, VS CPU, Lines
     case 3: return training_type == 1 || training_type == 3;      // Training Basics or Puzzle (Chapter 0)
     default: return false;
     }
@@ -57,7 +60,10 @@ PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Cl
     Output out;
     const bool playing = load16(rdram, scene) == -1;
     const std::int16_t row = load16(rdram, pause_row);
-    const bool paused = playing && row >= 0;
+    // The game-over menu (TRY AGAIN, EXIT, TRAINING) uses the same row while
+    // the hearts read -1; it is left as the game shows it.
+    const bool game_over = load16(rdram, p1_hearts) == -1;
+    const bool paused = playing && row >= 0 && !game_over;
 
     if (pause_requested_) {
         // F1 during play: press Start until the game pauses.

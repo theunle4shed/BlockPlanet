@@ -10,7 +10,9 @@
 //
 // Original pause state (NTPE rev0): 0x800E1228 is the pause row during play
 // (0x800E121C == -1): -1 when not paused, 0 CONTINUE, 1 SKIP (Training
-// only), 2 AUDIO, 3 EXIT.
+// only), 2 AUDIO, 3 EXIT. The game-over menu (TRY AGAIN, EXIT, TRAINING)
+// uses the same row while player 1's hearts (0x80112F9E) read -1; it is
+// left alone.
 
 #include "../../src/ui/ui_actions.h"
 
