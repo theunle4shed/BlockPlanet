@@ -30,13 +30,13 @@ def main():
         settings = json.loads(after.stdout)
         assert settings["family_override"] == "nintendo-switch"
         assert settings["bindings"]["confirm"] == "east"
-        assert settings["schema_version"] == 7
+        assert settings["schema_version"] == 8
         assert settings["bindings"]["magic"] == "west"
         assert settings["graphics"] == {
             "resolution": "auto", "aspect": "fill", "refresh": "original",
             "window_mode": "windowed", "msaa_samples": 0,
             "presentation_filter": "pixel", "texture_filter": "three-point",
-            "sphere": "extended"}
+            "sphere": "extended", "sphere_size": 100}
         assert run("bind", "magic", "right-shoulder").returncode == 0
         assert run("graphics", "sphere", "original").returncode == 0
         assert run("graphics", "resolution", "2160p").returncode == 0
@@ -49,7 +49,7 @@ def main():
             "resolution": "2160p", "aspect": "16:9", "refresh": "120",
             "window_mode": "fullscreen", "msaa_samples": 0,
             "presentation_filter": "pixel", "texture_filter": "three-point",
-            "sphere": "original"}
+            "sphere": "original", "sphere_size": 100}
         assert run("graphics", "sphere", "full").returncode != 0
         invalid = run("family", "unknown-pad")
         assert invalid.returncode != 0

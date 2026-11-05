@@ -145,7 +145,7 @@ bool SettingsStore::load(Settings& settings, std::string& error) const {
         const auto document = nlohmann::json::parse(
             std::string(record.begin(), end));
         const auto version = document.at("schema_version").get<int>();
-        if (version < 1 || version > 7) {
+        if (version < 1 || version > 8) {
             error = "unsupported settings version";
             return false;
         }
@@ -217,6 +217,14 @@ bool SettingsStore::load(Settings& settings, std::string& error) const {
             error = "invalid graphics settings";
             return false;
         }
+        if (version >= 8) {
+            const int size = document.at("graphics").value("sphere_size", 100);
+            if (size < 80 || size > 115 || size % 5 != 0) {
+                error = "invalid graphics settings";
+                return false;
+            }
+            candidate.graphics.sphere_size = size;
+        }
         // Versions through 5 used LT as the default. Move that default to the
         // west face button once, retaining other saved Magic assignments.
         if (version <= 5 && candidate.magic == MagicControl::TriggerLeft)
@@ -261,7 +269,7 @@ bool SettingsStore::save(const Settings& settings, std::string& error) const {
         return false;
     }
     const auto serialized = nlohmann::json{
-        {"schema_version", 7},
+        {"schema_version", 8},
         {"family_override", settings.family_override},
         {"bindings", buttons},
         {"magic", static_cast<int>(settings.magic)},
@@ -271,7 +279,8 @@ bool SettingsStore::save(const Settings& settings, std::string& error) const {
                       {"presentation_filter", presentation_filter},
                       {"texture_filter", graphics_texture_filter_name(
                           settings.graphics.three_point_filter)},
-                      {"sphere", graphics_sphere_name(settings.graphics.sphere)}}}}.dump();
+                      {"sphere", graphics_sphere_name(settings.graphics.sphere)},
+                      {"sphere_size", settings.graphics.sphere_size}}}}.dump();
     if (serialized.size() >= 512) {
         error = "settings exceed storage limit";
         return false;

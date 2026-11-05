@@ -28,6 +28,8 @@ struct GraphicsSettings {
     PresentationFilter presentation_filter = PresentationFilter::Pixel;
     bool three_point_filter = true;
     GraphicsSphere sphere = GraphicsSphere::Extended;
+    // The sphere's size on screen, percent (80..115, steps of 5; Extended only).
+    int sphere_size = 100;
 };
 
 constexpr const char* graphics_resolution_name(GraphicsResolution value) {

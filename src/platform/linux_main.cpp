@@ -885,6 +885,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     graphics.ar_option = renderer_aspect(active_settings.graphics.aspect);
     graphics.msaa_option = ultramodern::renderer::Antialiasing::None;
     set_rt64_run_options(resolve_graphics_run_options(active_settings.graphics, run_options));
+    tetrisphere::sphere::set_view_scale(active_settings.graphics.sphere_size / 100.0);
     tetrisphere::sphere::set_detail(
         resolve_graphics_run_options(active_settings.graphics, run_options).sphere_extended.value_or(false)
             ? tetrisphere::sphere::Detail::Extended : tetrisphere::sphere::Detail::Original);
@@ -926,6 +927,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 // Current values for the menus' setting rows (assets/ui/screens/options.rml).
 void publish_menu_settings(const Settings& settings) {
     blockplanet::ui::set_setting("sphere", graphics_sphere_name(settings.graphics.sphere));
+    blockplanet::ui::set_setting("sphere_size", std::to_string(settings.graphics.sphere_size));
     blockplanet::ui::set_setting("aspect", settings.graphics.aspect == GraphicsAspect::Fill ? "fill"
                                            : settings.graphics.aspect == GraphicsAspect::Expand16x9 ? "16x9" : "4x3");
     blockplanet::ui::set_setting("window",
@@ -1007,6 +1009,12 @@ bool queue_menu_setting(const std::string& command) {
     int field = -1;
     if (name == "sphere" && parse_graphics_sphere(value, requested.graphics.sphere)) field = 7;
     // Menu values avoid ':' (it separates a value from its label): 16x9, 4x3, fill.
+    else if (name == "sphere_size") {
+        const int size = std::atoi(value.c_str());
+        if (size < 80 || size > 115 || size % 5 != 0) return false;
+        requested.graphics.sphere_size = size;
+        field = 8;
+    }
     else if (name == "aspect" && parse_graphics_aspect(value == "16x9" ? "16:9" : value == "4x3" ? "4:3" : value,
                                                        requested.graphics.aspect)) field = 1;
     else if (name == "window" && (value == "fullscreen" || value == "windowed")) {
@@ -1313,6 +1321,10 @@ bool handle_profile_command(const std::string& command) {
             active_settings.bindings=requested->bindings;
             active_settings.magic=requested->magic;
             if(request->field==5)active_settings.graphics.presentation_filter=requested->graphics.presentation_filter;
+            if(request->field==8) {
+                active_settings.graphics.sphere_size=requested->graphics.sphere_size;
+                tetrisphere::sphere::set_view_scale(requested->graphics.sphere_size / 100.0);
+            }
             if(request->field==1) {
                 // Picture: applies at once (the renderer changes its picture shape live).
                 active_settings.graphics.aspect=requested->graphics.aspect;

@@ -115,7 +115,10 @@ std::optional<int> ring_override() {
 
 } // namespace
 
-void set_view_scale(double scale) { requested_view_scale.store(std::clamp(scale, 0.3, 1.5)); }
+void set_view_scale(double scale) {
+    if (std::getenv("BLOCKPLANET_SPHERE_SIZE") != nullptr) return;  // the test value wins
+    requested_view_scale.store(std::clamp(scale, 0.3, 1.5));
+}
 double view_scale() { return requested_view_scale.load(); }
 
 void set_detail(Detail detail) { requested_detail.store(detail); }

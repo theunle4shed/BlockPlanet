@@ -13,6 +13,7 @@ Settings merge_pc_settings_change(const Settings& persisted,const Settings& requ
  case 5:result.graphics.presentation_filter=requested.graphics.presentation_filter;break;
  case 6:result.graphics.three_point_filter=requested.graphics.three_point_filter;break;
  case 7:result.graphics.sphere=requested.graphics.sphere;break;
+ case 8:result.graphics.sphere_size=requested.graphics.sphere_size;break;
  case 13:result.family_override=requested.family_override;result.bindings=requested.bindings;result.magic=requested.magic;break;
  }
  return result;
