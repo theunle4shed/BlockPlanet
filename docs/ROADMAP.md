@@ -130,6 +130,10 @@ Idea for later (2026-11-05): a **second magic slot** (hold two items, so a new o
 
 Levels are generated: the game fills a 32×32 grid per layer with random pieces around a fixed core, and the chapter sets the depth (see [blockplanet-game-state.md](research/blockplanet-game-state.md)). A level editor could write a designed grid before play starts. Research: what each cell value means (piece, colour, crystal, link to neighbours), and where the generator runs, so a custom grid can replace its output cleanly.
 
+### New block types (idea, saved for later, 2026-11-05)
+
+Investigate adding block types of our own. What is known: a board cell holds value = type × 9 + a variant (`func_8008A7EC` reads the type), so there is room for new type numbers; types seen so far are 1 (unknown), 7 (special, probably buried bonuses), 10 (the core), 32–37 (the colours), 38 (the "?" piece) and 47 (Puzzle's inert wall). Writing a type straight into the board already works (the type 47 test, the one-colour test). To find out: which code decides how each type looks (texture and model), how it matches and clears, how gravity and magic treat it, and whether the per-type checks (for example the 8 to 30 range in `func_8008A880`) leave free numbers. Then a new type is new art plus a behaviour hooked into those checks.
+
 ### Arena walls for new game types (idea, saved for later)
 
 Puzzle limits its play area with a border of type 47 blocks (the purple "out of bounds"). Tested in Rescue, they act as an inert wall: drawn purple, never cleared, pieces land on them ([research](research/blockplanet-game-state.md#puzzle-boards-the-purple-border-2026-11-05)). That makes arenas of any shape, obstacles and shrinking arenas possible without changing game code; place them as whole cells when a level is built. Still to test when a mode needs them: dragging onto or across them, and magic.
