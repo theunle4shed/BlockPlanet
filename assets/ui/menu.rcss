@@ -148,3 +148,12 @@ body.pad .subtitle .for-pad { display: inline; }
 
 /* Over the game's own pause background, which already hides the board. */
 body.over-pause { background-color: #00000000; }
+
+/* A large heading, for screens shown over play (the pause menu). */
+.header {
+    display: block;
+    font-size: 96dp;
+    font-weight: bold;
+    letter-spacing: 12dp;
+    margin-bottom: 4dp;
+}
