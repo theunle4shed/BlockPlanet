@@ -56,11 +56,23 @@ The 100 puzzles are fixed designs (copied from stored data, the same every time)
 
 Not shown: score and multiplier. No hearts, piece queue or magic in Puzzle.
 
+## Hide & Seek
+
+Each level has a goal type (MULTI, DRILL, SHIFT, UNIQUE, BRICK, CONNECT, TOWER, CRYSTAL TOWER), told on a card at the start; 30 levels per stage.
+
+| Priority 1 (left, top to bottom) | Priority 2 (right) |
+| --- | --- |
+| Hearts | Mode, stage and **goal type** (text, top right; e.g. "Hide & Seek" / "1:3" / "DRILL") |
+| Magic item box and charge bar | **Goal progress** for the type: e.g. "Drills found 2/5" for DRILL, a % bar like Story's for MULTI |
+| Next pieces | Timer, with −/+ against the profile's best for the stage |
+
+New compared with the original, which only states the goal at the start. Each goal type needs research to count its progress.
+
 ## Other modes (to be decided)
 
 - **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.
 - **VS:** the X count matters (it sets how many pieces are sent), so it is shown clearly.
-- **Hide & Seek**, **Lines**, **VS**: next in the review.
+- **Lines**, **VS**: next in the review.
 
 ## Research needed
 
