@@ -38,6 +38,8 @@ A screen is an RML document in `ui/screens/<name>.rml` that links `../menu.rcss`
 
 **Controller or keyboard:** while a controller is used, every screen's body has the class `pad`; `.for-pad` parts show only then and `.for-keys` parts only otherwise. The first controller press or keyboard key switches.
 
+**Section headings:** an element with the class `section` (Options: Graphics, Audio) labels the rows below it; it takes no focus.
+
 **Text fields:** an element with `data-text="NAME"` shows the text given to `set_text` (as plain text).
 
 **Lists the game fills in:** an element with `data-list="NAME"` gets the items given to `set_list` when its screen opens (label, note, action; disabled entries are skipped). An item marked `focus` takes the focus when the screen opens.

@@ -190,3 +190,16 @@ body.over-pause { background-color: #00000000; }
     background-color: #f5821f;
 }
 .item.slider.focused .fill { background-color: #f8f8f8; }
+
+/* Section headings inside a screen (Options: Graphics, Audio). */
+.section {
+    display: block;
+    font-size: 24dp;
+    font-weight: bold;
+    letter-spacing: 3dp;
+    color: #e8b818;
+    padding: 6dp 28dp 4dp 28dp;
+    margin-top: 10dp;
+    border-bottom: 1dp #ffffff33;
+    margin-bottom: 6dp;
+}
