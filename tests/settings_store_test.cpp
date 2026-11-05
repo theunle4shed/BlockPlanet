@@ -29,15 +29,14 @@ int main(int argc, char** argv) {
         loaded.graphics.sphere != tetrisphere::GraphicsSphere::Extended) {
         return fail("new settings did not load defaults");
     }
-    // The SPHERE and sphere size settings round-trip (schema 8).
+    // The SPHERE setting round-trips (schema 7).
     {
         tetrisphere::Settings extended;
         extended.graphics.sphere = tetrisphere::GraphicsSphere::Extended;
-        extended.graphics.sphere_size = 85;
         tetrisphere::SettingsStore sphere_store(dir / "sphere.dat");
         tetrisphere::Settings reread;
         if (!sphere_store.save(extended, error) || !sphere_store.load(reread, error) ||
-            reread.graphics.sphere != tetrisphere::GraphicsSphere::Extended || reread.graphics.sphere_size != 85) {
+            reread.graphics.sphere != tetrisphere::GraphicsSphere::Extended) {
             return fail("sphere setting did not round-trip");
         }
         tetrisphere::RunOptions options;
@@ -219,7 +218,7 @@ int main(int argc, char** argv) {
         tetrisphere::graphics_internal_scale(tetrisphere::GraphicsResolution::P2160) != 9.0)
         return fail("internal resolution scales are incorrect");
     std::array<std::uint8_t, 512> unsupported{};
-    const std::string future = "{\"schema_version\":9,\"family_override\":\"auto\",\"bindings\":[0,1,2,3],\"magic\":0}";
+    const std::string future = "{\"schema_version\":8,\"family_override\":\"auto\",\"bindings\":[0,1,2,3],\"magic\":0}";
     std::copy(future.begin(), future.end(), unsupported.begin());
     if (!tetrisphere::EepromStore(dir / "future.dat").save(unsupported, error)) {
         return fail("could not create future-version fixture");

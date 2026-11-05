@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
     const std::string command = argv[first];
     if (command == "show" && argc == first + 1) {
         std::cout << nlohmann::json{
-            {"schema_version", 8},
+            {"schema_version", 7},
             {"family_override", settings.family_override},
             {"graphics", {
                 {"resolution", tetrisphere::graphics_resolution_name(settings.graphics.resolution)},
@@ -197,8 +197,7 @@ int main(int argc, char** argv) {
                 {"msaa_samples", settings.graphics.msaa_samples},
                 {"presentation_filter", tetrisphere::graphics_presentation_filter_name(settings.graphics.presentation_filter)},
                 {"texture_filter", tetrisphere::graphics_texture_filter_name(settings.graphics.three_point_filter)},
-                {"sphere", tetrisphere::graphics_sphere_name(settings.graphics.sphere)},
-                {"sphere_size", settings.graphics.sphere_size}}},
+                {"sphere", tetrisphere::graphics_sphere_name(settings.graphics.sphere)}}},
             {"bindings", {
                 {"confirm", button_name(settings.bindings.confirm)},
                 {"cancel", button_name(settings.bindings.cancel)},
