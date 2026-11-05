@@ -124,6 +124,8 @@ First document every existing magic: trigger, effect code, animation, sound and 
 
 Idea (2026-11-05): a **scanner** magic that, when used, briefly highlights the board's weakest point: the core-sized window with the fewest blocks still above the core (the same calculation as Story's progress meter). It is earned like other magic, or found on the sphere as a special block, so the base game does not get easier; the hint is a reward.
 
+Idea for later (2026-11-05): a **second magic slot** (hold two items, so a new one does not replace the one held), perhaps as a casual-mode option. It changes the rules (which item fires first, VS balance), so it is not part of the HUD work.
+
 ### Custom levels (research M, then L)
 
 Levels are generated: the game fills a 32×32 grid per layer with random pieces around a fixed core, and the chapter sets the depth (see [blockplanet-game-state.md](research/blockplanet-game-state.md)). A level editor could write a designed grid before play starts. Research: what each cell value means (piece, colour, crystal, link to neighbours), and where the generator runs, so a custom grid can replace its output cleanly.
