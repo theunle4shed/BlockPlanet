@@ -2,12 +2,19 @@
 // (docs/research/blockplanet-game-state.md, Audio settings):
 //   0x800E0B1C  balance, 0..12        0x800E0B20  selection: 0 auto, 1 random, 2 choose
 //   0x800E0B24  track, 0..22          0x80102B08  save bytes: selection << 4 | balance, track
-// The page sets one balance; BlockPlanet sets the two levels it controls
-// separately: the music volume through func_80079B80(volume, music player
-// 0x80107290) (0x800E28E8 holds it, at most 0x4FFF) and the effects volume
-// through func_80079BD4(volume) (0x800E28EC, at most 0x7FFF). A track is
-// played as the page does: flag 0x800DFE84, func_8007F720(track, player),
-// func_8007ACFC(player).
+//
+// Levels: BlockPlanet keeps the game's balance at 6 (music and effects both
+// at the game's full level) and scales every volume the game sets, at the
+// two volume functions: func_80079B80(volume, player), used for the
+// background music player (0x80107290), its fades and the jingle players, by
+// the Music setting (hooked where it stores the final volume, 0x80079BB4,
+// after it adds 0x2000 for some songs); func_80079BD4(volume), at its entry,
+// by the Effects setting. A
+// change is applied at once by calling them again with the game's levels
+// (0x800E28E8 music, 0x800E28EC effects as last set).
+//
+// A track is played as the page does: flag 0x800DFE84, func_8007F720(track,
+// player), func_8007ACFC(player).
 //
 // blockplanet_audio_frame runs from a hook at the top of the controller and
 // save thread's loop (func_80029938 at 0x800299A0), about 60 times a second
@@ -19,6 +26,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 
 extern "C" {
@@ -42,11 +50,11 @@ constexpr std::uint32_t effects_level_address = 0x800E28ECu;
 constexpr std::uint32_t changing_track = 0x800DFE84u;
 constexpr std::uint32_t track_banner = 0x800E14A8u;
 constexpr std::uint32_t music_player = 0x80107290u;
-constexpr std::uint32_t music_max = 0x4FFF;
 constexpr std::uint32_t effects_max = 0x7FFF;
 
 std::atomic<int> volume{100};
 std::atomic<bool> levels_wanted{false};
+std::atomic<bool> levels_changed{false};
 std::atomic<int> music_percent{100};
 std::atomic<int> effects_percent{100};
 std::atomic<int> selection_wanted{-1};  // 0 auto, 1 random, -1 leave the game's
@@ -79,6 +87,7 @@ void set_audio_levels(int music, int effects) {
     music_percent.store(std::clamp(music, 0, 100));
     effects_percent.store(std::clamp(effects, 0, 100));
     levels_wanted.store(true);
+    levels_changed.store(true);
 }
 
 void set_music_random(bool random) {
@@ -106,21 +115,18 @@ extern "C" void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx
     using namespace blockplanet;
     using namespace tetrisphere::guest;
     bool save = false;
-    // The game computes its levels from the balance; 6 gives both at full,
-    // which BlockPlanet's levels then scale.
+    // The game's levels come from its balance; 6 gives both at full, which
+    // the volume hooks then scale. A changed setting is applied at once.
     if (levels_wanted.load(std::memory_order_relaxed)) {
         if (load32(rdram, balance_address) != 6) {
             store32(rdram, balance_address, 6);
             save = true;
         }
-        const auto music = music_max * static_cast<std::uint32_t>(music_percent.load()) / 100;
-        const auto effects = effects_max * static_cast<std::uint32_t>(effects_percent.load()) / 100;
-        if (static_cast<std::uint16_t>(load16(rdram, music_level_address)) != music) {
-            store16(rdram, music_level_address, static_cast<std::int16_t>(music));
-            call(func_80079B80, rdram, ctx, music, address(music_player));
+        if (levels_changed.exchange(false)) {
+            const auto music = static_cast<std::uint16_t>(load16(rdram, music_level_address));
+            call(func_80079B80, rdram, ctx, music ? music : 0x4FFF, address(music_player));
+            call(func_80079BD4, rdram, ctx, effects_max);
         }
-        if (static_cast<std::uint16_t>(load16(rdram, effects_level_address)) != effects)
-            call(func_80079BD4, rdram, ctx, effects);
     }
     // Music choice: CHOOSE while a track override is on, else auto or random.
     const int track = override_track.load();
@@ -143,4 +149,27 @@ extern "C" void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx
                static_cast<std::uint8_t>(load32(rdram, selection_address) << 4 | (load32(rdram, balance_address) & 0xF)));
         store8(rdram, save_bytes + 1, static_cast<std::uint8_t>(load32(rdram, track_address)));
     }
+}
+
+// Volume hooks: a0 is the volume about to be used. The game's volume acts
+// roughly on power (half the value gives a quarter of the loudness, measured
+// on the title music), so a setting of p% scales it by sqrt(p / 100), which
+// makes 50% half as loud.
+namespace {
+gpr scaled(gpr volume, int percent) {
+    const double factor = std::sqrt(percent / 100.0);
+    return static_cast<gpr>(static_cast<double>(volume & 0xFFFF) * factor);
+}
+} // namespace
+
+extern "C" void blockplanet_scale_music_volume(std::uint8_t*, recomp_context* ctx) {
+    using namespace blockplanet;
+    if (!levels_wanted.load(std::memory_order_relaxed)) return;
+    ctx->r4 = scaled(ctx->r4, music_percent.load());
+}
+
+extern "C" void blockplanet_scale_effects_volume(std::uint8_t*, recomp_context* ctx) {
+    using namespace blockplanet;
+    if (!levels_wanted.load(std::memory_order_relaxed)) return;
+    ctx->r4 = scaled(ctx->r4, effects_percent.load());
 }
