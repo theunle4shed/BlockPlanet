@@ -1,12 +1,15 @@
-/* BlockPlanet menus: placeholder style until the art direction is set
-   (docs/UI.md). Sizes are in dp, laid out for a 1080-pixel-high screen. */
+/* BlockPlanet menus: placeholder layout until the art direction is set
+   (docs/UI.md), in the original game's menu colours: orange items, the
+   selected one white, dark-outlined text, a white-outlined box and yellow
+   hints. Sizes are in dp, laid out for a 1080-pixel-high screen. */
 
 body {
     width: 100%;
     height: 100%;
     font-family: LatoLatin;
-    color: #f2f5ff;
+    color: #f8f8f8;
     background-color: #05081080;
+    font-effect: outline(2dp #1a0c04);
 }
 
 @keyframes enter {
@@ -23,10 +26,11 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 #panel {
     position: absolute;
     left: 120dp;
-    top: 140dp;
+    top: 100dp;
     width: 720dp;
     padding: 48dp 56dp;
-    background-color: #0b1020e0;
+    background-color: #0b1020d0;
+    border: 3dp #f0f0f0;
     border-radius: 28dp;
 }
 
@@ -38,43 +42,46 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 .subtitle {
     display: block;
     font-size: 28dp;
-    color: #a9b4d6;
+    color: #e8b818;
     margin-bottom: 36dp;
 }
 
 .item {
     display: block;
     font-size: 44dp;
-    padding: 14dp 28dp;
-    margin-bottom: 6dp;
+    padding: 10dp 28dp;
+    margin-bottom: 4dp;
     border-radius: 14dp;
     transition: background-color 0.12s cubic-out;
 }
+/* Items in the original orange; the selected one turns white. */
+.item { color: #e06018; }
 .item.focused {
-    background-color: #3a6df0;
+    color: #f8f8f8;
+    background-color: #ffffff1a;
     font-weight: bold;
 }
 .item .note {
     font-size: 24dp;
-    color: #a9b4d6;
+    color: #e8b818;
     margin-left: 16dp;
     font-weight: normal;
 }
-.item.focused .note { color: #dce6ff; }
+.item.focused .note { color: #e8b818; }
 
 .hint {
     display: block;
     margin-top: 32dp;
     font-size: 24dp;
-    color: #7f8bb0;
+    color: #e8b818;
 }
 
 /* Setting rows: label on the left, value on the right. */
 .item.value .value {
     float: right;
-    color: #ffd166;
+    color: #e8b818;
 }
-.item.value.focused .value { color: #ffffff; }
+.item.value.focused .value { color: #f8f8f8; }
 
 /* Long lists scroll inside the panel. */
 .list {
@@ -100,7 +107,7 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 .name-field-hint {
     display: block;
     font-size: 24dp;
-    color: #ffd166;
+    color: #e8b818;
     margin-bottom: 20dp;
     min-height: 30dp;
 }
@@ -117,7 +124,7 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     font-size: 34dp;
     background-color: #ffffff0c;
 }
-.keys .item.focused { background-color: #3a6df0; }
+.keys .item.focused { background-color: #ffffff26; }
 .keys .item.span2 { width: 17.8%; font-size: 26dp; padding: 17dp 0dp; }
 .keys .item.span4 { width: 37.4%; font-size: 26dp; padding: 17dp 0dp; }
 .keys .item.span2, .keys .item.span4 { margin-top: 8dp; }

@@ -77,7 +77,7 @@ Requests are refused during play and inside other original pages such as Options
 
 ## Status
 
-- Placeholder screens follow the planned structure (`docs/REDESIGN.md`): main menu (Solo, Multiplayer, Media Player, Trophies, Options, Credits, Exit), Solo (Story, Time Trial, Lines, Puzzle, Custom; Training is Story's Chapter 0) and Multiplayer (Versus, Collaborate, Custom). Their look is a plain placeholder until the art direction is set.
+- Placeholder screens follow the planned structure (`docs/REDESIGN.md`): main menu (Solo, Multiplayer, Media Player, Trophies, Options, Credits, Exit), Solo (Story, Time Trial, Lines, Puzzle, Custom; Training is Story's Chapter 0) and Multiplayer (Versus, Collaborate, Custom). Their layout is a placeholder until the art direction is set, but they use the original game's menu colours (sampled from its menus): items orange `#E06018`, the selected item white `#F8F8F8` on a faint bar, dark-outlined text, a white-outlined box, and yellow `#E8B818` for notes, values and hints.
 - Checked in the Linux test setup (Vulkan, 720p): drawing, focus, opening Solo, a command, going back with focus remembered, and closing with F1.
 - Checked in the Linux test setup: the Options screen shows and changes Sphere and Textures, and the settings file has the new values; with chapters 1 and 2 completed, Story lists Chapters 1 to 3 and Chapter 3 starts Rescue at 3:1.
 - Checked in the Linux test setup: the pause screen opens with Start and with F1, hides the original pause's line, text and instructor, resumes with B, opens Options and returns, quits to the menu, and skips a Training lesson; reviewed at 16:9, 4:3 and 21:9.
