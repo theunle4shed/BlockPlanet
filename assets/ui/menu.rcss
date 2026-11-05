@@ -55,7 +55,7 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     transition: background-color 0.12s cubic-out;
 }
 /* Items in the original orange; the selected one turns white. */
-.item { color: #e06018; }
+.item { color: #f5821f; }  /* the original #E06018, brightened a little */
 .item.focused {
     color: #f8f8f8;
     background-color: #ffffff1a;
