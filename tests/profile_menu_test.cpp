@@ -105,7 +105,8 @@ int main(int argc, char** argv) {
     assert(!puzzle[0].focus && puzzle[1].focus && puzzle[0].note == "completed");
 
     auto confirm = delete_confirmation(store, "1");
-    assert(confirm.size() == 1 && confirm[0].action == "command:profile_delete_confirmed:1");
+    assert(confirm.size() == 2 && confirm[0].action == "command:profile_delete_confirmed:1" &&
+           confirm[1].action == "back" && confirm[1].focus);
     assert(delete_confirmation(store, "99").empty());
 
     // Restart arguments: the old choice is replaced, everything else kept.

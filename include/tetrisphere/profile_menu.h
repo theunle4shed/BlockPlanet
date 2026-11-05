@@ -32,6 +32,7 @@ std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, b
 // Keep playing (for the playing profile) or Play as NAME, then Rename,
 // Character and Delete.
 std::vector<blockplanet::ui::ListItem> profile_actions(const ProfileStore& store, const std::string& id, bool guest);
+// Delete NAME, then Keep it (selected).
 std::vector<blockplanet::ui::ListItem> delete_confirmation(const ProfileStore& store, const std::string& id);
 
 // The characters a profile can choose: the robots rescued in Story (named

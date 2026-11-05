@@ -27,9 +27,10 @@ bool pressing(PauseBridge::Clock::duration elapsed) {
 
 bool can_restart(int game_mode, int training_type) {
     switch (game_mode) {
-    // Not Story (Rescue): getting through a chapter without a game over is
-    // the challenge; its own TRY AGAIN restarts the chapter after one.
-    case 2: case 4: case 5: case 6: case 9: return true;  // Time Trial, Puzzle, Hide & Seek, VS CPU, Lines
+    // Story (Rescue) restarts the chapter, as its TRY AGAIN after a game
+    // over does, after a confirmation: getting through a chapter without a
+    // game over is the challenge.
+    case 1: case 2: case 4: case 5: case 6: case 9: return true;  // Rescue, Time Trial, Puzzle, Hide & Seek, VS CPU, Lines
     case 3: return training_type == 1 || training_type == 3;      // Training Basics or Puzzle (Chapter 0)
     default: return false;
     }
@@ -38,7 +39,10 @@ bool can_restart(int game_mode, int training_type) {
 std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_type) {
     std::vector<blockplanet::ui::ListItem> items{{"resume", "Resume", "", "command:pause_resume", true, 1, true}};
     if (can_restart(game_mode, training_type))
-        items.push_back({"restart", game_mode == 3 ? "Restart lesson" : "Restart level", "", "command:pause_restart", true});
+        items.push_back(game_mode == 1
+            ? blockplanet::ui::ListItem{"restart", "Restart chapter", "", "command:pause_restart_chapter", true}
+            : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart lesson" : "Restart level", "",
+                                        "command:pause_restart", true});
     if (game_mode == training) items.push_back({"skip", "Skip lesson", "", "command:pause_skip", true});
     items.push_back({"audio", "Audio", "", "open:audio", true});
     items.push_back({"options", "Options", "", "open:options", true});

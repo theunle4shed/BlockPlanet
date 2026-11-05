@@ -43,8 +43,10 @@ std::vector<blockplanet::ui::ListItem> profile_actions(const ProfileStore& store
 
 std::vector<blockplanet::ui::ListItem> delete_confirmation(const ProfileStore& store, const std::string& id) {
     std::vector<blockplanet::ui::ListItem> items;
-    if (const auto* profile = profile_by_id(store, id))
+    if (const auto* profile = profile_by_id(store, id)) {
         items.push_back({"delete", "Delete " + profile->name, "", "command:profile_delete_confirmed:" + id, true});
+        items.push_back({"keep", "Keep it", "", "back", true, 1, true});  // the safe choice is selected
+    }
     return items;
 }
 

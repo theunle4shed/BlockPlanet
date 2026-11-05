@@ -1204,6 +1204,8 @@ bool handle_profile_command(const std::string& command) {
         return true;
     }
     if (const auto id = argument("profile_delete:")) {
+        blockplanet::ui::set_text("confirm_title", "Are you sure?");
+        blockplanet::ui::set_text("confirm_note", "Deleted profiles can be restored for 30 days");
         blockplanet::ui::set_list("confirm", delete_confirmation(store, *id));
         blockplanet::ui::request_show("confirm");
         return true;
@@ -1429,13 +1431,22 @@ bool handle_profile_command(const std::string& command) {
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
                 continue;
             }
+            if (*command == "pause_restart_chapter") {
+                // Story: ask first; Yes restarts the chapter from its first level.
+                blockplanet::ui::set_text("confirm_title", "Restart chapter?");
+                blockplanet::ui::set_text("confirm_note", "Progress within the chapter will be lost.");
+                blockplanet::ui::set_list("confirm", {{"yes", "Yes", "", "command:pause_restart", true},
+                                                      {"no", "No", "", "back", true, 1, true}});
+                blockplanet::ui::request_show("confirm");
+                continue;
+            }
             if (*command == "pause_restart" && guest_rdram != nullptr) {
                 // Quit through the game's pause, then start the same place again.
                 const auto state = read_game_state(guest_rdram);
                 std::optional<LaunchMode> mode;
                 std::optional<std::pair<int, int>> start;
                 switch (state.mode) {
-                case 1: mode = LaunchMode::Rescue; start = std::pair{state.chapter + 1, state.level + 1}; break;
+                case 1: mode = LaunchMode::Rescue; start = std::pair{state.chapter + 1, 1}; break;  // the chapter
                 case 5: mode = LaunchMode::HideAndSeek; start = std::pair{state.chapter + 1, state.level + 1}; break;
                 case 4: mode = LaunchMode::Puzzle; start = std::pair{state.chapter + 1, state.level + 1}; break;
                 case 2: mode = LaunchMode::TimeTrial; break;

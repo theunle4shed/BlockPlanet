@@ -5,10 +5,9 @@
 </head>
 <body>
     <div id="panel">
-        <div class="title">Are you sure?</div>
-        <div class="subtitle">Deleted profiles can be restored for 30 days</div>
+        <div class="title" data-text="confirm_title"></div>
+        <div class="subtitle" data-text="confirm_note"></div>
         <div class="list" data-list="confirm"></div>
-        <div class="item" id="keep" data-action="back">Keep it</div>
     </div>
 </body>
 </rml>

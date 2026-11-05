@@ -88,9 +88,10 @@ int main() {
     set(0x80112F9E, 3);
     out = step(over, false);
     assert(out.open_menu);
-    // Story has no restart (TRY AGAIN after a game over restarts the chapter).
-    assert(pause_items(1, 0)[1].action != "command:pause_restart");
+    // Story restarts the chapter, after asking.
+    assert(pause_items(1, 0)[1].label == "Restart chapter" &&
+           pause_items(1, 0)[1].action == "command:pause_restart_chapter");
     // Restart is offered only where the same place can be started again.
-    assert(!can_restart(1, 0) && can_restart(9, 0) && can_restart(3, 3) && !can_restart(3, 2) && !can_restart(7, 0));
+    assert(can_restart(1, 0) && can_restart(9, 0) && can_restart(3, 3) && !can_restart(3, 2) && !can_restart(7, 0));
     return 0;
 }
