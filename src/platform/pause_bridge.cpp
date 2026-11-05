@@ -49,7 +49,6 @@ std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_t
             : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart lesson" : "Restart level", "",
                                         "command:pause_restart", true});
     if (game_mode == training) items.push_back({"skip", "Skip lesson", "", "command:pause_skip", true});
-    items.push_back({"audio", "Audio", "", "open:audio", true});
     items.push_back({"options", "Options", "", "open:options", true});
     items.push_back({"quit", "Quit to menu", "", "command:pause_quit", true});
     return items;

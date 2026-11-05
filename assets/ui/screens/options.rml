@@ -6,25 +6,9 @@
 <body>
     <div id="panel">
         <div class="title">Options</div>
-        <div class="subtitle">Changes apply and save straight away</div>
-        <div class="section">Graphics</div>
-        <div class="item value" id="sphere" data-setting="sphere"
-             data-options="extended:Extended,original:Original">Sphere<span class="value"></span></div>
-        <div class="item value" id="aspect" data-setting="aspect"
-             data-options="fill:Fill window,16x9:16:9,4x3:4:3">Picture<span class="value"></span></div>
-        <div class="item value" id="window" data-setting="window"
-             data-options="windowed:Window,fullscreen:Full screen">Display<span class="value"></span></div>
-        <div class="item value" id="texture_filter" data-setting="texture_filter"
-             data-options="three-point:Three-point,linear:Linear">Textures<span class="value"></span></div>
-        <div class="item value" id="presentation_filter" data-setting="presentation_filter"
-             data-options="pixel:Pixel,linear:Smooth,nearest:Sharp">Scaling<span class="value"></span></div>
-        <div class="section">Audio</div>
-        <div class="item value slider" id="music_volume" data-setting="music_volume"
-             data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Music<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
-        <div class="item value slider" id="effects_volume" data-setting="effects_volume"
-             data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Effects<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
-        <div class="item value" id="music" data-setting="music"
-             data-options="auto:Auto,random:Random">Music order<span class="value"></span></div>
+        <div class="subtitle">Settings for this PC and your profile</div>
+        <div class="item" id="graphics" data-action="open:graphics">Graphics</div>
+        <div class="item" id="audio" data-action="command:audio_screen">Audio</div>
         <div class="item" id="back" data-action="back">Back</div>
     </div>
 </body>

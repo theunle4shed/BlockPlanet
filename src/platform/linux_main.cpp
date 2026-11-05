@@ -1448,6 +1448,13 @@ bool handle_profile_command(const std::string& command) {
             if (handle_audio_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
+            if (*command == "audio_screen") {
+                // Options > Audio: in a game (paused) the version with Choose and
+                // Track; otherwise Auto or Random only.
+                const bool in_game = guest_rdram != nullptr && read_game_state(guest_rdram).scene == -1;
+                blockplanet::ui::request_show(in_game ? "audio" : "audio_options");
+                continue;
+            }
             if (*command == "pause") {
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
                 continue;

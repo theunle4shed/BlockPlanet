@@ -27,9 +27,9 @@ int main() {
     set(0x800E1228, 0);
     out = step(bridge, false);
     assert(out.open_menu && bridge.hide_original());
-    assert(out.items.size() == 5 && out.items[0].action == "command:pause_resume" && out.items[0].focus &&
+    assert(out.items.size() == 4 && out.items[0].action == "command:pause_resume" && out.items[0].focus &&
            out.items[1].action == "command:pause_restart_chapter" && out.items[1].label == "Restart chapter" &&
-           out.items[2].action == "open:audio" && out.items[4].action == "command:pause_quit");
+           out.items[2].action == "open:options" && out.items[3].action == "command:pause_quit");
     out = step(bridge, true);
     assert(!out.open_menu && !out.inject);
 
@@ -55,7 +55,7 @@ int main() {
     set(0x800E44AC, 1);  // Basics
     set(0x800E1228, 0);
     out = step(bridge, false);
-    assert(out.open_menu && out.items.size() == 6 && out.items[1].label == "Restart lesson" &&
+    assert(out.open_menu && out.items.size() == 5 && out.items[1].label == "Restart lesson" &&
            out.items[2].action == "command:pause_skip");
     out = step(bridge, false);  // menus are closed
     assert(out.inject && load16(m, 0x800E1228) == 0);
