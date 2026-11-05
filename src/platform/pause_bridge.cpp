@@ -64,7 +64,8 @@ void PauseBridge::request_pause(Clock::time_point now) {
     since_ = now;
 }
 
-PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Clock::time_point now) {
+PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Clock::time_point now,
+                                       bool start_pressed) {
     Output out;
     const bool playing = load16(rdram, scene) == -1;
     const std::int16_t row = load16(rdram, pause_row);
@@ -82,6 +83,12 @@ PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Cl
             out.buttons = pressing(now - since_) ? button_start : 0;
             return out;
         }
+    }
+    if (!paused) not_a_pause_ = false;
+    if (paused && !showing_ && !choice_ && (not_a_pause_ || !start_pressed)) {
+        // The row was set without a Start press: a chapter-end scene, not a pause.
+        not_a_pause_ = true;
+        return out;
     }
     if (!paused) {
         // Resumed, or left play: nothing more to do.

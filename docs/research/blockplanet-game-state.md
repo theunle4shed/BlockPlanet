@@ -245,7 +245,7 @@ Experiments: scaling the `+0x1640` projection's extents (zoom out 1.5×, by hook
 
 So framing (sphere size for the screen, the drop push, a zoom option) is done through the mesh scale, and a peek camera would be a rotation of the mesh rather than a camera move.
 
-### Between-chapter scenes, endings and credits (2026-11-05, from the code; not yet watched in play)
+### Between-chapter scenes, endings and credits (2026-11-05)
 
 **Messages.** After a chapter (the game says "episode"), `func_80063F1C` (called from the menu driver `func_8005907C` when the menu row `0x800E1228` is 100) shows a scene with two pictures and a message. Message tables by mode, indexed by the chapter number `0x800E44A0` (VS CPU: chapter − 1); pictures from the image ids at `0x800E0AC0` and `0x800E0AE8`, song from `0x800E1550` (ids 314–317).
 
@@ -258,8 +258,10 @@ So framing (sphere size for the screen, the drop push, a zoom option) is done th
 
 **Endings.** In `func_8005907C` (`0x800591D4`), when the last level of a chapter is finished, `func_80057128` (the ending, with the credits) runs if the chapter just finished is the mode's **first ending** chapter (`func_80089D04`: Rescue 5, Hide & Seek 3, VS CPU 3, Lines 3) or, except in Hide & Seek, its **final** chapter (`func_80089C40`: Rescue 8, VS CPU 5, Lines 5). Otherwise the message scene runs.
 
-So **Rescue has 10 episodes**: 1–5, then the first ending with credits ("great ending"), then "it gets real hard from here" for 6–8, the final victory (second ending) after 8, and **bonus episodes 9 and 10**. BlockPlanet's chapter list currently allows 15; to be capped at 10 once this is confirmed in play.
+**Confirmed in play** (each level won by clearing the board through the poke file, in casual mode): Rescue chapter 1 has **10 levels**; after 1:10 the game shows its chapter-end menu (CONTINUE, EXIT, with the rescued robot; pause row `0x800E1228` = 0, **without a Start press**), then the message scene (row 100: an "EPISODE 2" card with message 0), then 2:1. The endings with credits are still to be watched.
 
-**Levels per chapter** (`func_80089C9C`, by mode): Rescue 10, Hide & Seek 30, VS CPU 7, Lines 10, Puzzle 100 (its puzzle count). `0x800E4498` counts the chapter's levels completed this run (reset when the chapter advances), compared with that number − 1. Not yet confirmed in play.
+So **Rescue has 10 episodes**: 1–5, then the first ending with credits ("great ending"), then "it gets real hard from here" for 6–8, the final victory (second ending) after 8, and **bonus episodes 9 and 10**. BlockPlanet's Story chapter list is capped at 10.
+
+**Levels per chapter** (`func_80089C9C`, by mode): Rescue 10 (confirmed), Hide & Seek 30, VS CPU 7, Lines 10, Puzzle 100 (its puzzle count). **The level BlockPlanet writes (`p1 context +0x23BA`) only changes the display**: starting at "1:10" and winning went on to "1:2", because the game keeps its own count of levels won in the chapter (not yet found; `0x800E4498` is overwritten every frame). Level select and Restart level for a level other than the first need that count.
 
 **Cheats in the messages:** name CR… (credits), LINES (the hidden Lines game), +;<>^ (any level), L + C-right + C-down at name entry; "finishing the bonus episodes will give you a code".

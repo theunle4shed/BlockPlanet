@@ -439,11 +439,27 @@ PauseBridge pause_bridge;
 std::deque<PCSettingsRequest> menu_settings_requests;
 
 
+// When the game last saw Start held (either port): the game opens its pause
+// only on Start, while chapter-end scenes reuse the pause row, so
+// BlockPlanet's pause screen opens only after a Start press.
+std::atomic<std::int64_t> last_start_ms{-1000000};
+void note_start(std::uint16_t buttons) {
+    if (buttons & 0x1000u)
+        last_start_ms.store(std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+bool start_pressed_recently() {
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    return now - last_start_ms.load() < 1500;
+}
+
 bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (port < 0 || port >= 2) return false;
     if (const auto injected = launcher_buttons.load(); injected & 0x10000u) {
         *buttons = port == 0 ? static_cast<std::uint16_t>(injected & 0xFFFFu) : 0;
         *x = 0; *y = 0;
+        note_start(*buttons);
         return true;
     }
     if (controls_editor_blocks_game() || pc_settings_blocks_game() || menus_block_game.load()) {*buttons=0;*x=0;*y=0;return true;}
@@ -468,6 +484,7 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     const auto mapped = map_port_input(port, controller, keys,
                                        controller_bindings(), magic_control());
     *buttons = mapped.buttons;
+    note_start(mapped.buttons);
     *x = mapped.x;
     *y = mapped.y;
     static std::array<std::uint16_t, 2> previous{};
@@ -1008,7 +1025,7 @@ bool queue_menu_setting(const std::string& command) {
 
 // The Story chapter select: Chapter 0 (Training Basics), the chapters this
 // profile has completed, and the next one. A guest gets Chapter 0 and 1.
-constexpr int rescue_chapters = 15;
+constexpr int rescue_chapters = 10;  // episodes 1-10 (9 and 10 are bonus episodes)
 std::vector<blockplanet::ui::ListItem> chapter_choices() {
     std::set<int> completed;
     if (profile_save) {
@@ -1570,7 +1587,8 @@ bool handle_profile_command(const std::string& command) {
         }
         if (!mode_launcher.active() && guest_rdram != nullptr) {
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
-                                                   blockplanet::ui::menus_open(), std::chrono::steady_clock::now());
+                                                   blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
+                                                   start_pressed_recently());
             if (pause.open_menu) {
                 // Where the player is, for the pause screen's subtitle.
                 const auto state = read_game_state(guest_rdram);

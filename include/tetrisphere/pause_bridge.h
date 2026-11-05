@@ -37,7 +37,10 @@ public:
     };
 
     // Call every main-loop pass. `menus_open`: BlockPlanet's menus are open.
-    Output update(std::uint8_t* rdram, bool menus_open, Clock::time_point now);
+    // `start_pressed`: Start was pressed just now (within about a second).
+    // The game opens its pause only on Start; chapter-end scenes use the same
+    // row without it, and are left alone.
+    Output update(std::uint8_t* rdram, bool menus_open, Clock::time_point now, bool start_pressed = true);
     // The player chose an item (the pause screen's commands).
     void choose(Choice choice, Clock::time_point now);
     // F1 during play: press Start to open the game's pause.
@@ -48,6 +51,7 @@ public:
 
 private:
     bool showing_ = false;
+    bool not_a_pause_ = false;  // the row is in use by something else (a scene)
     std::optional<Choice> choice_;
     bool pause_requested_ = false;
     Clock::time_point since_{};

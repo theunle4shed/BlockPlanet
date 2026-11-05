@@ -88,6 +88,26 @@ int main() {
     set(0x80112F9E, 3);
     out = step(over, false);
     assert(out.open_menu);
+    // A row set without a Start press (a chapter-end scene) is not a pause,
+    // even if Start is pressed later while it lasts.
+    PauseBridge scene;
+    set(0x80112F9E, 3);
+    set(0x800E1228, -1);
+    step(scene, false);
+    set(0x800E1228, 0);
+    t += std::chrono::milliseconds(50);
+    out = scene.update(m, false, t, false);
+    assert(!out.open_menu && !scene.hide_original());
+    t += std::chrono::milliseconds(50);
+    out = scene.update(m, false, t, true);
+    assert(!out.open_menu);
+    set(0x800E1228, -1);
+    t += std::chrono::milliseconds(50);
+    scene.update(m, false, t, false);
+    set(0x800E1228, 0);
+    t += std::chrono::milliseconds(50);
+    out = scene.update(m, false, t, true);
+    assert(out.open_menu);  // a real pause afterwards
     // Story and Hide & Seek restart the chapter, after asking; others the level.
     assert(restarts_chapter(1) && restarts_chapter(5) && !restarts_chapter(4));
     assert(pause_items(4, 0)[1].label == "Restart level" && pause_items(4, 0)[1].action == "command:pause_restart");
