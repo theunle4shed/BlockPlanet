@@ -6,7 +6,8 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 
 - **Show only what matters to the mode.** Each mode has its own set of elements; nothing is shown just because the original showed it.
 - **Less on screen.** The original takes too much space and splits attention between the two edges. Elements are compact and grouped.
-- **Survival and planning on the left, information on the right.** What the player needs mid-play (lives, magic, next pieces) is on the left; what is useful but not essential (stage, time, progress) is on the right.
+- **Priority 1 on the left, priority 2 on the right, in every mode.** Priority 1 is what the player needs mid-play (lives, the clock when it ends the game, magic, next pieces); priority 2 is useful but not essential (mode and stage, score, time, progress).
+- **Feedback where it happens.** Points, time gained and combo names float up from the spot on the sphere where they were earned, like damage numbers in RPGs, instead of appearing beside a counter. BlockPlanet draws the sphere, so it knows where each board cell is on screen.
 - **Messages and cards** use the menus' style (panels, the original's colours).
 - **The sphere** keeps the original's framing and the drop-timer zoom (see [ROADMAP.md](ROADMAP.md#decisions)).
 
@@ -31,9 +32,20 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 | Episode card (between episodes) | A full panel: "Episode 2" large, the message beneath (texts in [STORY_PROGRESSION.md](STORY_PROGRESSION.md)) |
 | Training instructor text | To be decided (paged lessons) |
 
+## Time Trial
+
+| Priority 1 (left, top to bottom) | Priority 2 (right) |
+| --- | --- |
+| Hearts | Mode and stage (text, top right) |
+| **Countdown clock**, below the hearts; turns red or pulses in the last 30 seconds | Score |
+| Magic item box and charge bar | Progress bar |
+| Next pieces | |
+
+**Time gained** ("+5 s") floats up from where it was earned on the sphere, not beside the clock.
+
 ## Other modes (to be decided)
 
-- **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it.
+- **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.
 - **VS:** the X count matters (it sets how many pieces are sent), so it is shown clearly.
 - **Time Trial**, **Puzzle** (drops, slides, timer), **Hide & Seek**, **Lines**, **VS**: next in the review.
 
@@ -42,4 +54,5 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 - The piece queue (for the sprites).
 - The core size each level needs, and where the game counts it (for the progress bar).
 - The magic charge and the stored magic type (for the item box and bar).
+- Where a combo or drop happened on the board (for the floating numbers), and the time and points each one earned.
 - Hiding the original HUD's 2D elements (done for the pause screen; the same technique) and the 3D piece queue and bowl.
