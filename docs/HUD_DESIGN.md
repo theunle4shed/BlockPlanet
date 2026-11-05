@@ -72,7 +72,7 @@ New compared with the original, which only states the goal at the start.
 
 - **All pictures needed** (CONNECT, DRILL's five, SHIFT's four parts, TOWER, CRYSTAL TOWER, UNIQUE): the total of blocks remaining above all the pictures ÷ the total above them at the start.
 - **Any one picture** (MULTI): the picture with the fewest blocks left, as Story's weakest point.
-- **BRICK** (a brick must fall to the core): to be decided once its rule is researched.
+- **BRICK** (a brick must fall to the core): **layers the lowest brick has dropped ÷ layers between its start and the core**. Research: where the bricks are and how far each has fallen.
 
 The bar may hint where hidden pictures are (it moves when a drop uncovers part of one); the owner accepted this for consistency.
 
