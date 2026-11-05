@@ -306,6 +306,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/graphics/pause_draw_hooks.cpp
+    src/graphics/audio_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
     include/tetrisphere/rt64_context.h
@@ -429,6 +430,7 @@ add_executable(tetrisphere_diag
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/graphics/pause_draw_hooks.cpp
+    src/graphics/audio_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
     src/platform/pc_settings_menu.cpp
@@ -1052,6 +1054,7 @@ if(TETRISPHERE_GAME_ENABLED)
     src/graphics/sphere_extended.cpp
         src/graphics/sphere_hooks.cpp
         src/graphics/pause_draw_hooks.cpp
+        src/graphics/audio_hooks.cpp
         src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp
         src/runtime/unsupported.cpp

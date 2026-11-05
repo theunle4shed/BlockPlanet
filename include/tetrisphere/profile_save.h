@@ -22,10 +22,22 @@ struct ControlPreferences {
     MagicControl magic = MagicControl::West;
 };
 
+// Audio: the PC-side volume and the game's own audio settings (its Audio
+// page: the music/effects balance and how music is chosen). Applied by
+// BlockPlanet (src/graphics/audio_hooks.cpp); docs/UI.md.
+struct AudioPreferences {
+    int volume = 100;     // percent, applied to the PC's audio output
+    int balance = 6;      // 0 music only .. 6 both full .. 12 effects only
+    int music = -2;       // -2 auto, -1 random, 0..22 a chosen track
+};
+
 struct ProfilePreferences {
     // Unset until the profile has controls of its own; the PC's defaults are
     // copied in on first use.
     std::optional<ControlPreferences> controls;
+    // Unset until the player changes an audio setting; the game's own (from
+    // its cartridge save) are used until then.
+    std::optional<AudioPreferences> audio;
 };
 
 struct ProfileStatistics {

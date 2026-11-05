@@ -38,6 +38,10 @@ nlohmann::json to_json(const ProfileSaveData& data) {
                           static_cast<int>(c.bindings.face_left), static_cast<int>(c.bindings.face_up)}},
             {"magic", static_cast<int>(c.magic)}};
     }
+    if (data.preferences.audio) {
+        const auto& a = *data.preferences.audio;
+        preferences["audio"] = {{"volume", a.volume}, {"balance", a.balance}, {"music", a.music}};
+    }
     nlohmann::json levels = nlohmann::json::object();
     for (const auto& [mode, chapters] : data.progress.levels_completed) {
         nlohmann::json by_chapter = nlohmann::json::object();
@@ -87,6 +91,17 @@ bool from_json(const std::string& text, ProfileSaveData& data) {
                                  static_cast<PhysicalButton>(buttons[2]), static_cast<PhysicalButton>(buttons[3])};
             controls.magic = static_cast<MagicControl>(magic);
             result.preferences.controls = controls;
+        }
+        if (preferences.contains("audio")) {
+            const auto& a = preferences.at("audio");
+            AudioPreferences audio;
+            audio.volume = a.value("volume", 100);
+            audio.balance = a.value("balance", 6);
+            audio.music = a.value("music", -2);
+            if (audio.volume < 0 || audio.volume > 100 || audio.balance < 0 || audio.balance > 12 ||
+                audio.music < -2 || audio.music > 22)
+                return false;
+            result.preferences.audio = audio;
         }
         const nlohmann::json progress = document.value("progress", nlohmann::json::object());
         const nlohmann::json levels = progress.value("levels_completed", nlohmann::json::object());

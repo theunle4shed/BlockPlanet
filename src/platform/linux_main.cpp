@@ -24,6 +24,7 @@
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/pause_draw.h"
+#include "tetrisphere/audio_settings.h"
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
 #include "tetrisphere/mode_launcher.h"
@@ -203,9 +204,33 @@ void poll_type47_experiment() {
     std::fflush(stdout);
 }
 
+// Research aid: with BLOCKPLANET_POKE_FILE set, lines "0xADDRESS:SIZE=VALUE"
+// written to that file are stored into guest memory, then the file is removed.
+void poll_pokes() {
+    static const char* path = std::getenv("BLOCKPLANET_POKE_FILE");
+    if (path == nullptr) return;
+    std::ifstream in(path);
+    if (!in) return;
+    auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
+    std::string line;
+    while (std::getline(in, line)) {
+        unsigned long address = 0, size = 0;
+        long value = 0;
+        if (std::sscanf(line.c_str(), "%lx:%lu=%ld", &address, &size, &value) != 3) continue;
+        if (size == 1) guest::store8(rdram, static_cast<std::uint32_t>(address), static_cast<std::uint8_t>(value));
+        else if (size == 2) guest::store16(rdram, static_cast<std::uint32_t>(address), static_cast<std::int16_t>(value));
+        else if (size == 4) guest::store32(rdram, static_cast<std::uint32_t>(address), static_cast<std::uint32_t>(value));
+        std::fprintf(stdout, "{\"event\":\"poke\",\"address\":\"0x%08lX\",\"value\":%ld}\n", address, value);
+    }
+    in.close();
+    std::remove(path);
+    std::fflush(stdout);
+}
+
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
     poll_watches();
+    poll_pokes();
     poll_type47_experiment();
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
     const auto state = read_game_state(guest_rdram);
@@ -493,6 +518,13 @@ void set_audio_frequency(std::uint32_t frequency) {
 void queue_audio(std::int16_t* samples, std::size_t count) {
     std::lock_guard lock(audio_mutex);
     std::string error;
+    // The Volume setting (Options), applied to the PC's output.
+    static std::vector<std::int16_t> scaled;
+    if (const int volume = blockplanet::audio_volume(); volume < 100) {
+        scaled.assign(samples, samples + count);
+        for (auto& sample : scaled) sample = static_cast<std::int16_t>(sample * volume / 100);
+        samples = scaled.data();
+    }
     if (!audio_output.queue(samples, count, error)) {
         diagnostic_log().error("audio_queue_failed");
         std::fprintf(stderr,
@@ -691,6 +723,11 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             save_profile();
         }
         profile_recording = !run_options.start_chapter;
+        // The profile's audio settings, kept applied over the game's own.
+        if (profile_data.preferences.audio) {
+            blockplanet::set_audio_volume(profile_data.preferences.audio->volume);
+            blockplanet::set_game_audio(profile_data.preferences.audio->balance, profile_data.preferences.audio->music);
+        }
     }
     persisted_settings=active_settings;
     initialize_pc_settings(persisted_settings);
@@ -862,6 +899,56 @@ void publish_menu_settings(const Settings& settings) {
     blockplanet::ui::set_setting("texture_filter", graphics_texture_filter_name(settings.graphics.three_point_filter));
     blockplanet::ui::set_setting("presentation_filter",
                                  graphics_presentation_filter_name(settings.graphics.presentation_filter));
+}
+
+// The audio rows (assets/ui/screens/options.rml): the profile's choice, or the
+// game's own values until the player changes one. Sent only when changed.
+void publish_audio_settings() {
+    static std::string last;
+    AudioPreferences audio;
+    if (profile_data.preferences.audio) {
+        audio = *profile_data.preferences.audio;
+    } else if (guest_rdram != nullptr) {
+        const auto game = blockplanet::read_game_audio(guest_rdram);
+        audio.balance = game.balance;
+        audio.music = game.music;
+    }
+    const std::string key = std::to_string(audio.volume) + "/" + std::to_string(audio.balance) + "/" +
+                            std::to_string(audio.music);
+    if (key == last) return;
+    last = key;
+    blockplanet::ui::set_setting("volume", std::to_string(audio.volume));
+    blockplanet::ui::set_setting("audio_balance", std::to_string(audio.balance));
+    blockplanet::ui::set_setting("music", std::to_string(audio.music));
+}
+
+// "setting:volume=…", "setting:audio_balance=…" and "setting:music=…": saved in
+// the profile (a guest's last the session) and applied.
+bool handle_audio_setting(const std::string& command) {
+    const auto equals = command.find('=');
+    if (command.rfind("setting:", 0) != 0 || equals == std::string::npos) return false;
+    const auto name = command.substr(8, equals - 8);
+    if (name != "volume" && name != "audio_balance" && name != "music") return false;
+    const int value = std::atoi(command.c_str() + equals + 1);
+    if (!profile_data.preferences.audio) {
+        AudioPreferences audio;
+        if (guest_rdram != nullptr) {
+            const auto game = blockplanet::read_game_audio(guest_rdram);
+            audio.balance = game.balance;
+            audio.music = game.music;
+        }
+        profile_data.preferences.audio = audio;
+    }
+    auto& audio = *profile_data.preferences.audio;
+    if (name == "volume") audio.volume = std::clamp(value, 0, 100);
+    if (name == "audio_balance") audio.balance = std::clamp(value, 0, 12);
+    if (name == "music") audio.music = std::clamp(value, -2, blockplanet::track_count - 1);
+    blockplanet::set_audio_volume(audio.volume);
+    blockplanet::set_game_audio(audio.balance, audio.music);
+    profile_dirty = true;
+    save_profile();
+    publish_audio_settings();
+    return true;
 }
 
 // "setting:NAME=VALUE" from the menus, as a settings change (field numbers
@@ -1317,6 +1404,7 @@ bool handle_profile_command(const std::string& command) {
             std::fprintf(stdout, "{\"event\":\"ui_command\",\"command\":\"%s\"}\n", command->c_str());
             std::fflush(stdout);
             if (*command == "exit") close_game();
+            if (handle_audio_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "pause") {
@@ -1405,6 +1493,7 @@ bool handle_profile_command(const std::string& command) {
         }
         pc_settings_release_guard(held);
         poll_game_events();
+        publish_audio_settings();
         // After a Chapter 0, the mode's next part starts once the game is back
         // at its menu (Story at Chapter 1, or the puzzles).
         static auto last_continue_try = std::chrono::steady_clock::time_point{};

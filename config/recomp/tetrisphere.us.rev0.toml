@@ -413,3 +413,11 @@ text = "if (blockplanet_draw_filter(rdram, ctx, 0x8007240Cu)) return;"
 [[patches.hook]]
 func = "func_8002D93C"
 text = "if (blockplanet_draw_filter(rdram, ctx, 0x8002D93Cu)) return;"
+
+# Audio settings from BlockPlanet's Options, applied from a game thread
+# (src/graphics/audio_hooks.cpp): the top of the controller and save thread's
+# loop in func_80029938, which runs continuously.
+[[patches.hook]]
+func = "func_80029938"
+before_vram = 0x800299A0
+text = "blockplanet_audio_frame(rdram, ctx);"

@@ -212,3 +212,20 @@ Research aids: `BLOCKPLANET_WATCH="0x800E44A8:2,…"` logs guest values as they 
 - **The squares** are the same in every mode (Story, Training, Puzzle) and do not show the board, so they are a fixed backdrop, not a copy of the game frame. They move, zoom and change colour while paused, keeping their spherical bulge, and the main menu uses the same kind of backdrop in blue. They are not drawn through any of the hooked 2D helpers (`0x8003396C`, `0x800353F4`, `0x80036FE4`, `0x80038478`, `0x80071DE8`, `0x8007240C`) and not by the board sphere's quadrant passes, so they are most likely a 3D model (a textured sphere) drawn by another routine, not yet found.
 - **The "paused" lettering** is slanted in perspective and disappears together with the instructor when the model helper `func_8002D93C` (object `0x801AC880`, second argument 2 to 12, which changes with time like an animation frame) is skipped. Skipping any single value of that argument leaves both visible. Separating the lettering from the instructor needs more work.
 - `BLOCKPLANET_PAUSE_KEEP_ALL=1` turns off the pause menu's hiding, for these experiments.
+
+### Audio settings (2026-11-05)
+
+The original Audio page (Options > Audio, or Audio in the pause menu) has three rows: a **music/fx** balance slider, **selection** (AUTO, RANDOM, CHOOSE) and **track**.
+
+| Address | Size | Meaning |
+| --- | --- | --- |
+| `0x800E0B1C` | s32 | Balance, 0 to 12 (6 is the middle). |
+| `0x800E0B20` | s32 | Selection: 0 Auto, 1 Random, 2 Choose. |
+| `0x800E0B24` | s32 | Track, 0 to 22. Names through the pointer table at `0x800E0B28`: Prophetic - Title, Azule Lux, Martist, Compliant Confuse, Faze, Flim Flam, Manicdrummix, Hallucid, Perpetuate303, Phony, T. Grey, Learn, Zyp Zyp, Extol, then Magic Fluter, Spooky Baby, Zooming Car, Cheddar Funk, Snowy Mushrooms, Dog Robot, Sappy, Skank Bowl Fight and Birthday Bumps (these nine end in `$` in the data, perhaps marking hidden tracks). |
+| `0x80102B08` | u8 | In the cartridge save data (base `0x80102918` + `0x1F0`): selection << 4 \| balance. |
+| `0x800E28E8` | u16 | Music volume, min(0x4FFF, 0xA008 − 3414 × balance): full up to 6, silent at 12. |
+| `0x800E28EC` | u16 | Effects volume, min(0x7FFF, 0x1556 × balance): silent at 0, full from 6. Written only. |
+
+Writing the balance alone changes nothing: the page's handler (around `0x800552E4`) also calls `func_80079B80(music volume, music player 0x80107290)`, which sets the player's volume (`+0x1578`, with `+0x2000` for track ids 14 to 99) and a changed flag (`+0x1583`), and `func_80079BD4(effects volume)`, which updates the playing voices. BlockPlanet does the same from a hook at the top of the controller and save thread's loop (`func_80029938` at `0x800299A0`, about 60 times a second in every scene). `func_8003FE3C` (the menu driver) and `func_8002B348` do not run at the title screen, so they cannot carry a per-frame hook.
+
+Research aid: with `BLOCKPLANET_POKE_FILE` set, lines `0xADDRESS:SIZE=VALUE` written to that file are stored into guest memory.
