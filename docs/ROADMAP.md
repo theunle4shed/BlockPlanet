@@ -65,7 +65,7 @@ A menu that lists every music track and sound effect and plays them. Research: f
 ### Variable screen sizes: ultrawide, vertical and any window shape (L)
 
 - **Wider than 16:9 (21:9, 32:9): done as the Picture setting's Fill window** (now the default): RT64's expand mode follows the window's shape, and Blocksphere's HUD anchors keep the HUD at the edges. Checked at 21:9, 32:9 and 16:10 on the title, in play and in the pause; other scenes still to be looked at on a real ultrawide screen.
-- **Taller than 4:3 (portrait or phone-like):** RT64 widens rather than heightens, so this needs a vertical field-of-view adjustment and new HUD anchoring for top and bottom edges.
+- **Taller than 4:3 (portrait or phone-like):** RT64 widens rather than heightens, so this needs a vertical field-of-view adjustment and new HUD anchoring for top and bottom edges. The sphere then moves closer (camera distance, player context `+0x2420`, × 4:3 ÷ the window's shape) so it keeps the original's share of the narrow side.
 - **Free resizing:** pick the projection from the actual window shape instead of fixed presets.
 
 Depends on: research on the game's background layer, which is a fixed 320×240 image drawn as 40 tiles and will need extending or replacing at other aspect ratios. Do this together with the HUD redesign.
@@ -222,6 +222,7 @@ Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, m
 - **Profile characters:** each profile picks a character to represent it, from the characters rescued in the game (with optional colour variants), with more added later.
 - **Board:** the board stays 32 × 32 cells with 9 layers, as in the game. Its limits are built into about 70 game functions (see [blockplanet-game-state.md](research/blockplanet-game-state.md#layers-core-size-and-stacking-2026-11-02)). Sphere changes are visual only: drawing more of it, and possibly a different core size.
 - **Story game over:** kept as the original: unlimited Try Agains, each restarting the chapter from its first level with full hearts and the score reset (tested: 11 retries in a row, never refused). Every mode with chapters whose game over goes back to the chapter's first level (Story, Hide & Seek) offers Restart chapter in its pause menu, after a confirmation, rather than Restart level; other modes offer Restart level: getting through a chapter without a game over is the challenge.
+- **Sphere framing:** as close to the original as possible. The sphere keeps the original's size relative to the screen's narrow side at rest, its growth with stage depth (about 55% of the height at 1:1, larger than the screen at 10:1) and the drop-timer zoom (up to about twice the size). With Fill window this already holds for every screen 4:3 or wider; portrait and squarish windows will get it with the portrait work, by moving the camera (player context `+0x2420`) closer by 4:3 ÷ the window's shape. No Sphere size setting.
 
 ## Open questions
 
