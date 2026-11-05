@@ -1,5 +1,7 @@
 #include "tetrisphere/profile_menu.h"
 
+#include <algorithm>
+
 namespace tetrisphere {
 
 const Profile* profile_by_id(const ProfileStore& store, const std::string& id) {
@@ -144,6 +146,27 @@ std::vector<blockplanet::ui::ListItem> NameEditor::keyboard() const {
     items.push_back({"keyspace", "Space", "", "command:name_key:space", true, 4});
     items.push_back({"delete", "Delete", "", "command:name_key:delete", true, 2});
     items.push_back({"done", "Done", "", "command:name_done", true, 2});
+    return items;
+}
+
+std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters) {
+    std::vector<blockplanet::ui::ListItem> items;
+    int last = 1;  // the next chapter to play
+    for (int chapter : completed)
+        if (chapter >= 1) last = std::max(last, chapter + 1);
+    last = std::min(last, chapters);
+    const bool fresh = completed.empty();
+    items.push_back({"chapter0", "Chapter 0: Training", completed.count(0) ? "completed" : "start here",
+                     "command:chapter:0", true, 1, fresh});
+    bool focused = fresh;
+    for (int chapter = 1; chapter <= last; ++chapter) {
+        const bool done = completed.count(chapter) != 0;
+        const bool next = !done && !focused;
+        items.push_back({"chapter" + std::to_string(chapter), "Chapter " + std::to_string(chapter),
+                         done ? "completed" : chapter == 1 && fresh ? "skip training" : next ? "next" : "",
+                         "command:chapter:" + std::to_string(chapter), true, 1, next});
+        focused = focused || next;
+    }
     return items;
 }
 

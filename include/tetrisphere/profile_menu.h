@@ -20,6 +20,7 @@
 #include "tetrisphere/profiles.h"
 #include "../../src/ui/ui_actions.h"
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -69,6 +70,12 @@ private:
     bool shift_ = false;
 };
 constexpr int keyboard_columns = 10;
+
+// Story's chapter list: Chapter 0 (Training Basics), then the chapters
+// completed and the next one (up to `chapters`). The focus starts on
+// Chapter 0 for a player who has done nothing yet, and otherwise on the
+// next chapter. `completed` holds Story chapter numbers (0 is Training).
+std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters);
 
 // "Player N" with the lowest N not already taken.
 std::string next_profile_name(const ProfileStore& store);

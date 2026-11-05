@@ -19,6 +19,7 @@
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/settings_store.h"
+#include "tetrisphere/guest_memory.h"
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/relaunch.h"
@@ -59,6 +60,7 @@
 #include <mutex>
 #include <memory>
 #include <string>
+#include <set>
 #include <vector>
 
 RspExitReason tetrisphere_audio_rsp(std::uint8_t*, std::uint32_t);
@@ -107,6 +109,10 @@ std::string character_profile_id;
 ProfileSaveData profile_data;
 bool profile_recording = false;
 bool profile_dirty = false;
+// Chapter 0 was started from Story: when Training Basics is finished,
+// carry on into Chapter 1 (story_continue is then set until it starts).
+bool story_training = false;
+bool story_continue = false;
 // The PC's default controls from settings.dat, for new profiles and guests.
 ControlPreferences pc_controls;
 std::chrono::steady_clock::time_point last_play_poll{};
@@ -128,8 +134,46 @@ void save_profile() {
     else std::fprintf(stderr, "Could not save the profile: %s\n", error.c_str());
 }
 
+// Research aid: BLOCKPLANET_WATCH="0x800E44A8:2,0x80103958:4" logs each
+// guest value (1, 2 or 4 bytes) when it changes, as a watch event.
+void poll_watches() {
+    struct Watch {
+        std::uint32_t address;
+        int size;
+        std::int64_t last;
+    };
+    static std::vector<Watch> watches = [] {
+        std::vector<Watch> list;
+        const char* spec = std::getenv("BLOCKPLANET_WATCH");
+        if (spec == nullptr) return list;
+        std::string text(spec);
+        std::size_t position = 0;
+        while (position < text.size()) {
+            const auto comma = std::min(text.find(',', position), text.size());
+            const auto item = text.substr(position, comma - position);
+            const auto colon = item.find(':');
+            const auto address = static_cast<std::uint32_t>(std::strtoul(item.c_str(), nullptr, 16));
+            const int size = colon == std::string::npos ? 4 : std::atoi(item.c_str() + colon + 1);
+            if (address != 0 && (size == 1 || size == 2 || size == 4)) list.push_back({address, size, INT64_MIN});
+            position = comma + 1;
+        }
+        return list;
+    }();
+    for (auto& watch : watches) {
+        const std::int64_t value = watch.size == 1 ? guest::load8(guest_rdram, watch.address)
+                                   : watch.size == 2 ? guest::load16(guest_rdram, watch.address)
+                                                     : guest::load32(guest_rdram, watch.address);
+        if (value == watch.last) continue;
+        watch.last = value;
+        std::fprintf(stdout, "{\"event\":\"watch\",\"address\":\"0x%08X\",\"value\":%lld}\n", watch.address,
+                     static_cast<long long>(value));
+        std::fflush(stdout);
+    }
+}
+
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
+    poll_watches();
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
     const auto state = read_game_state(guest_rdram);
     const auto now = std::chrono::steady_clock::now();
@@ -157,6 +201,10 @@ void poll_game_events() {
             std::fprintf(stdout, "{\"event\":\"game_event\",\"name\":\"%s\"%s}\n",
                          event.name.c_str(), fields.c_str());
             std::fflush(stdout);
+        }
+        if (event.name == "training_completed" && story_training) {
+            story_training = false;
+            story_continue = true;
         }
         post_game_event(event);
         if (profile_recording) {
@@ -803,22 +851,16 @@ bool queue_menu_setting(const std::string& command) {
     return true;
 }
 
-// The Story chapter select: the chapters this profile has completed, and the
-// next one. Empty when there is nothing to choose (a guest, or no chapter
-// completed yet), in which case Story starts Rescue directly.
+// The Story chapter select: Chapter 0 (Training Basics), the chapters this
+// profile has completed, and the next one. A guest gets Chapter 0 and 1.
 constexpr int rescue_chapters = 15;
 std::vector<blockplanet::ui::ListItem> chapter_choices() {
-    std::vector<blockplanet::ui::ListItem> items;
-    if (!profile_save) return items;
-    const auto found = profile_data.progress.chapters_completed.find("rescue");
-    if (found == profile_data.progress.chapters_completed.end() || found->second.empty()) return items;
-    const int last = std::min(*found->second.rbegin() + 1, rescue_chapters);
-    for (int chapter = 1; chapter <= last; ++chapter) {
-        const bool completed = found->second.count(chapter) != 0;
-        items.push_back({"chapter" + std::to_string(chapter), "Chapter " + std::to_string(chapter),
-                         completed ? "completed" : "next", "command:chapter:" + std::to_string(chapter), true});
+    std::set<int> completed;
+    if (profile_save) {
+        const auto found = profile_data.progress.chapters_completed.find("rescue");
+        if (found != profile_data.progress.chapters_completed.end()) completed = found->second;
     }
-    return items;
+    return story_chapters(completed, rescue_chapters);
 }
 
 void launch_mode(LaunchMode mode) {
@@ -1229,15 +1271,17 @@ bool handle_profile_command(const std::string& command) {
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "story") {
-                if (auto chapters = chapter_choices(); !chapters.empty()) {
-                    blockplanet::ui::set_list("chapters", std::move(chapters));
-                    blockplanet::ui::request_show("chapters");
-                    continue;
-                }
+                blockplanet::ui::set_list("chapters", chapter_choices());
+                blockplanet::ui::request_show("chapters");
+                continue;
             }
             if (command->rfind("chapter:", 0) == 0) {
                 const int chapter = std::atoi(command->c_str() + 8);
-                if (chapter >= 1 && chapter <= rescue_chapters && game_option_applier) {
+                story_training = chapter == 0;
+                story_continue = false;
+                if (chapter == 0) {
+                    launch_mode(LaunchMode::TrainingBasics);
+                } else if (chapter <= rescue_chapters && game_option_applier) {
                     game_option_applier->choose_chapter(chapter);
                     launch_mode(LaunchMode::Rescue);
                 }
@@ -1258,6 +1302,16 @@ bool handle_profile_command(const std::string& command) {
         }
         pc_settings_release_guard(held);
         poll_game_events();
+        // After Chapter 0, Chapter 1 starts once the game is back at its menu.
+        static auto last_continue_try = std::chrono::steady_clock::time_point{};
+        if (story_continue && !mode_launcher.active() && guest_rdram != nullptr && game_option_applier &&
+            read_game_state(guest_rdram).scene >= 0 &&
+            std::chrono::steady_clock::now() - last_continue_try > std::chrono::seconds(1)) {
+            last_continue_try = std::chrono::steady_clock::now();
+            game_option_applier->choose_chapter(1);
+            launch_mode(LaunchMode::Rescue);
+            if (mode_launcher.active()) story_continue = false;
+        }
         const auto now = std::chrono::steady_clock::now();
         if (perf_log_enabled && now - perf_window_start >= perf_interval) {
             auto& metrics = perf_metrics();

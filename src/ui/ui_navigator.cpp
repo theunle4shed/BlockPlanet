@@ -74,7 +74,15 @@ bool Navigator::push(const std::string& screen) {
     fill(stack_.back());
     document->SetClass("entering", true);  // CSS animates screens with this class
     document->Show();
-    set_focus(stack_.back(), 0);
+    // The first item, or a list item marked to be focused.
+    std::size_t first = 0;
+    const auto list = items(stack_.back());
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (list[i]->HasAttribute("data-focus")) {
+            first = i;
+            break;
+        }
+    set_focus(stack_.back(), first);
     return true;
 }
 
@@ -120,6 +128,7 @@ void Navigator::fill(Screen& screen) {
             element->SetClass("item", true);
             element->SetClass("disabled", !entry.enabled);
             element->SetAttribute("data-action", entry.action);
+            if (entry.focus) element->SetAttribute("data-focus", true);
             if (entry.span > 1) {
                 element->SetAttribute("data-span", entry.span);
                 element->SetClass("span" + std::to_string(entry.span), true);

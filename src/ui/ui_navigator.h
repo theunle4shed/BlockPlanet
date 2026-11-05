@@ -17,7 +17,8 @@
 // "setting:NAME=VALUE" as a command. Current values come from set_setting.
 //
 // Lists: an element with data-list="NAME" is filled with the items given to
-// set_list when its screen opens.
+// set_list when its screen opens. An item marked `focus` gets the focus
+// when the screen opens (otherwise the first item does).
 //
 // Grids: items directly inside an element with data-columns="N" form a
 // grid, filled row by row; an item with data-span="K" takes K columns.

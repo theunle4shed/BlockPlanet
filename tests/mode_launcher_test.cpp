@@ -66,5 +66,18 @@ int main() {
     assert(launcher.request(LaunchMode::Lines, m, t));
     assert(launcher.update(m, t + std::chrono::seconds(20), buttons) == ModeLauncher::Result::TimedOut);
     assert(!launcher.active());
+
+    // Training Basics: main menu row 4 (TRAINING), then BASICS (0) on the
+    // Training page.
+    assert(launch_mode_for_command("training") == LaunchMode::TrainingBasics);
+    set(0x800E121C, 0);
+    assert(launcher.request(LaunchMode::TrainingBasics, m, t));
+    launcher.update(m, t += std::chrono::milliseconds(50), buttons);
+    assert(load16(m, 0x800E121C) == 4);
+    set(0x800E1220, 2);
+    launcher.update(m, t += std::chrono::milliseconds(50), buttons);
+    assert(load16(m, 0x800E1220) == 0);
+    set(0x800E121C, -1);
+    assert(launcher.update(m, t += std::chrono::milliseconds(50), buttons) == ModeLauncher::Result::Started);
     return 0;
 }

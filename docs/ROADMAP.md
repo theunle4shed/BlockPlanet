@@ -176,7 +176,9 @@ Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, m
 5. The Story structure is in place: chapter map, unlocks, casual play.
 6. The see-through core and the rear and peek camera work.
 7. Options and accessibility are complete.
-8. The other solo modes (Time Trial, Puzzle, Lines, Custom, Training) are built on the result.
+8. The other solo modes (Time Trial, Puzzle, Lines, Custom) are built on the result.
+
+**Training is Chapter 0** (decided 2026-11-05): Training is not a menu item. Story's Chapter 0 is the game's Training Basics, shown in the chapter list and skippable. Modes that share Story's stages share its Chapter 0 (Hide & Seek uses the same chapters; Time Trial and Lines to be checked). Other level sets get their own Chapter 0: the game's Training Puzzle fits Puzzle, and Training Advanced (crystal pieces, X count, fuse combos) could become Chapter 0-2 later. New lessons (more Chapter 0 parts, or ones for other modes) need writing and design.
 
 **Multiplayer checklist,** reviewed whenever a shared piece is finished, so nothing is designed into a corner:
 

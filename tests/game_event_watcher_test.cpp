@@ -80,8 +80,11 @@ void reads_guest_memory_layout() {
     put32(game_state::p1_context + game_state::score_offset, 1040);
     put16(game_state::p1_context + game_state::hearts_offset, 2);
     rdram[(game_state::piece & 0xFFFFFF) ^ 3u] = 8;
+    put16(game_state::training_type, 1);
+    put32(game_state::training_page, static_cast<std::int32_t>(game_state::basics_last_page));
     const auto s = read_game_state(rdram.data());
     assert(s.scene == -1 && s.mode == 1 && s.score == 1040 && s.hearts == 2 && s.piece == 8);
+    assert(s.training_type == 1 && s.training_page == game_state::basics_last_page);
     assert(game_mode_name(1) == "rescue" && game_mode_name(4) == "puzzle" &&
            game_mode_name(5) == "hide_and_seek" && game_mode_name(99).empty());
 }
@@ -109,9 +112,49 @@ void vs_rounds() {
     assert(std::get<std::string>(events[0].fields.at("result")) == "win");
 }
 
+// Training Basics counts as finished only if its last page was shown before
+// the game left it (Story's Chapter 0).
+void training_basics() {
+    auto training = [](std::uint32_t page) {
+        GameStateSnapshot s;
+        s.scene = -1;
+        s.mode = game_state::mode_training;
+        s.training_type = 1;
+        s.training_page = page;
+        s.hearts = 3;
+        return s;
+    };
+    GameStateSnapshot menu;
+    menu.scene = 0;
+    auto has = [](const std::vector<GameEvent>& events, const char* name) {
+        for (const auto& e : events) if (e.name == name) return true;
+        return false;
+    };
+    GameEventWatcher quit;
+    quit.update(menu);
+    quit.update(training(0x800EE7A4));
+    quit.update(training(0x800EF198));  // the magic lesson, not its last page
+    assert(!has(quit.update(menu), "training_completed"));
+
+    GameEventWatcher done;
+    done.update(menu);
+    done.update(training(0x800EE7A4));
+    assert(!has(done.update(training(game_state::basics_last_page)), "training_completed"));
+    const auto events = done.update(menu);
+    assert(has(events, "training_completed"));
+    assert(!has(done.update(menu), "training_completed"));  // once
+
+    GameEventWatcher advanced;  // Advanced's text is past Basics' range
+    auto page = training(0x800EF44C);
+    page.training_type = 2;
+    advanced.update(page);
+    assert(!has(advanced.update(menu), "training_completed"));
+}
+
 } // namespace
 
 int main() {
+    training_basics();
     rescue_sequence();
     ignores_menus_and_transitions();
     reads_guest_memory_layout();

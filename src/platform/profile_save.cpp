@@ -131,6 +131,9 @@ bool read_file(const std::filesystem::path& path, std::string& text) {
 bool record_game_event(ProfileProgress& progress, const GameEvent& event) {
     auto& s = progress.statistics;
     const std::string mode = text(event, "mode");
+    // Training's lessons take lives and play demos on purpose; they are not
+    // play, so they do not count in the statistics.
+    if (mode == "training") return false;
     if (event.name == "mode_started") {
         ++s.games_started;
     } else if (event.name == "game_over") {
@@ -152,6 +155,10 @@ bool record_game_event(ProfileProgress& progress, const GameEvent& event) {
     } else if (event.name == "chapter_completed") {
         ++s.chapters_completed;
         if (!mode.empty()) progress.chapters_completed[mode].insert(static_cast<int>(number(event, "chapter")));
+        return true;
+    } else if (event.name == "training_completed") {
+        // Story's Chapter 0 is Training Basics.
+        if (text(event, "lesson") == "basics") progress.chapters_completed["rescue"].insert(0);
         return true;
     } else if (event.name == "puzzle_solved") {
         ++s.puzzles_solved;

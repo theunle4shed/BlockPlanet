@@ -12,7 +12,6 @@
         <div class="item" id="lines" data-action="command:lines">Lines</div>
         <div class="item" id="puzzle" data-action="command:puzzle">Puzzle</div>
         <div class="item" id="custom" data-action="command:custom">Custom</div>
-        <div class="item" id="training" data-action="command:training">Training</div>
         <div class="item" id="back" data-action="back">Back</div>
     </div>
 </body>

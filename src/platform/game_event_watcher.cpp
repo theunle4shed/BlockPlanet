@@ -43,6 +43,8 @@ GameStateSnapshot read_game_state(const std::uint8_t* rdram) {
     snapshot.piece = read_u8(rdram, piece);
     snapshot.chapter = read_s16(rdram, chapter);
     snapshot.level = read_s16(rdram, p1_context + level_offset);
+    snapshot.training_type = read_s16(rdram, training_type);
+    snapshot.training_page = static_cast<std::uint32_t>(read_s32(rdram, training_page));
     return snapshot;
 }
 
@@ -128,6 +130,15 @@ std::vector<GameEvent> GameEventWatcher::update(const GameStateSnapshot& now) {
             over.fields["score"] = static_cast<std::int64_t>(best_score_this_game_) * 10;
             events.push_back(std::move(over));
         }
+    }
+    // Training Basics, played to its last page; reported when the game
+    // leaves it (Story's Chapter 0).
+    if (playing && now.mode == game_state::mode_training && now.training_type == 1 &&
+        now.training_page >= game_state::basics_last_page && now.training_page < game_state::basics_text_end)
+        basics_finished_ = true;
+    if (!playing && basics_finished_) {
+        basics_finished_ = false;
+        events.push_back(GameEvent{"training_completed", {{"lesson", std::string("basics")}}});
     }
     if (playing) last_play_ = now;
     previous_ = now;

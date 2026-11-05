@@ -84,6 +84,20 @@ int main(int argc, char** argv) {
     editor.press("Q");
     assert(editor.text() == "SamQ");
 
+    // Story: Chapter 0 (Training) first; a new player starts on it with
+    // Chapter 1 as the skip; afterwards the focus is on the next chapter.
+    auto story = story_chapters({}, 15);
+    assert(story.size() == 2 && story[0].action == "command:chapter:0" && story[0].focus &&
+           story[0].note == "start here" && story[1].note == "skip training" && !story[1].focus);
+    story = story_chapters({0}, 15);
+    assert(story.size() == 2 && story[0].note == "completed" && story[1].focus && story[1].note == "next");
+    story = story_chapters({1, 2}, 15);
+    assert(story.size() == 4 && story[0].note == "start here" && !story[0].focus && story[3].focus &&
+           story[3].label == "Chapter 3");
+    story = story_chapters({0, 15}, 15);
+    assert(story.size() == 16 && story[1].focus && story[1].note == "next" && story[2].note.empty() &&
+           story[15].note == "completed");
+
     auto confirm = delete_confirmation(store, "1");
     assert(confirm.size() == 1 && confirm[0].action == "command:profile_delete_confirmed:1");
     assert(delete_confirmation(store, "99").empty());
