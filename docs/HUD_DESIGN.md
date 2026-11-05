@@ -43,11 +43,23 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 
 **Time gained** ("+5 s") floats up from where it was earned on the sphere, not beside the clock.
 
+## Puzzle
+
+The 100 puzzles are fixed designs (copied from stored data, the same every time), so personal bests per puzzle are fully fair.
+
+| Priority 1 (left, top to bottom) | Priority 2 (right) |
+| --- | --- |
+| **Drops left** | Puzzle number (text, top right) |
+| **Slides left** | **Timer**, with −/+ against the profile's best time for this puzzle |
+| | **Best moves** for this puzzle (fewest drops + slides used), e.g. "Best: 4 moves" |
+
+Not shown: score and multiplier. No hearts, piece queue or magic in Puzzle.
+
 ## Other modes (to be decided)
 
 - **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.
 - **VS:** the X count matters (it sets how many pieces are sent), so it is shown clearly.
-- **Puzzle** (drops, slides, timer), **Hide & Seek**, **Lines**, **VS**: next in the review.
+- **Hide & Seek**, **Lines**, **VS**: next in the review.
 
 ## Research needed
 
