@@ -12,7 +12,8 @@
 // 1 Hide & Seek, 2 Puzzle, 3 Time Trial, 4 VS CPU, 5 mode 9 (not listed in
 // the original menu; probably Lines).
 // Training is main menu row 4, then a page (0x800E1220) of BASICS 0,
-// ADVANCED 1 and PUZZLE 2. Story's Chapter 0 is Training Basics.
+// ADVANCED 1 and PUZZLE 2. Story's Chapter 0 is Training Basics;
+// Puzzle's Chapter 0 is Training Puzzle.
 
 #include <chrono>
 #include <cstdint>
@@ -21,7 +22,7 @@
 
 namespace tetrisphere {
 
-enum class LaunchMode { Rescue, HideAndSeek, Puzzle, TimeTrial, VsCpu, Lines, TrainingBasics };
+enum class LaunchMode { Rescue, HideAndSeek, Puzzle, TimeTrial, VsCpu, Lines, TrainingBasics, TrainingPuzzle };
 
 // The menu command (see assets/ui/screens) for a mode, if it is one.
 std::optional<LaunchMode> launch_mode_for_command(const std::string& command);

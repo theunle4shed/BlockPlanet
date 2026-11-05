@@ -36,6 +36,8 @@ int main(int argc, char** argv) {
     assert(!record_game_event(progress, event("life_lost", {{"mode", std::string("training")}})));
     assert(record_game_event(progress, event("training_completed", {{"lesson", std::string("basics")}})));
     assert(progress.chapters_completed["rescue"].count(0) == 1);  // Story's Chapter 0
+    assert(record_game_event(progress, event("training_completed", {{"lesson", std::string("puzzle")}})));
+    assert(progress.chapters_completed["puzzle"].count(0) == 1);  // Puzzle's Chapter 0
     assert(progress.levels_completed["rescue"][3].count(2) == 1);
     assert(progress.chapters_completed["rescue"].count(3) == 1);
     assert(progress.puzzles_solved.count(7) == 1);

@@ -144,6 +144,15 @@ void training_basics() {
     assert(has(events, "training_completed"));
     assert(!has(done.update(menu), "training_completed"));  // once
 
+    GameEventWatcher puzzle;  // Training Puzzle (type 3)
+    auto last = training(game_state::puzzle_last_page);
+    last.training_type = 3;
+    puzzle.update(last);
+    const auto puzzle_events = puzzle.update(menu);
+    assert(has(puzzle_events, "training_completed"));
+    for (const auto& e : puzzle_events)
+        if (e.name == "training_completed") assert(std::get<std::string>(e.fields.at("lesson")) == "puzzle");
+
     GameEventWatcher advanced;  // Advanced's text is past Basics' range
     auto page = training(0x800EF44C);
     page.training_type = 2;

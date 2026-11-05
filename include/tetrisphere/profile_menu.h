@@ -77,6 +77,10 @@ constexpr int keyboard_columns = 10;
 // next chapter. `completed` holds Story chapter numbers (0 is Training).
 std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters);
 
+// Puzzle's list: Chapter 0 (Training Puzzle), then the puzzles. A new
+// player starts on Chapter 0; once it is done, on the puzzles.
+std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done);
+
 // "Player N" with the lowest N not already taken.
 std::string next_profile_name(const ProfileStore& store);
 const Profile* profile_by_id(const ProfileStore& store, const std::string& id);

@@ -133,12 +133,16 @@ std::vector<GameEvent> GameEventWatcher::update(const GameStateSnapshot& now) {
     }
     // Training Basics, played to its last page; reported when the game
     // leaves it (Story's Chapter 0).
-    if (playing && now.mode == game_state::mode_training && now.training_type == 1 &&
-        now.training_page >= game_state::basics_last_page && now.training_page < game_state::basics_text_end)
-        basics_finished_ = true;
-    if (!playing && basics_finished_) {
-        basics_finished_ = false;
-        events.push_back(GameEvent{"training_completed", {{"lesson", std::string("basics")}}});
+    if (playing && now.mode == game_state::mode_training) {
+        const auto page = now.training_page;
+        if (now.training_type == 1 && page >= game_state::basics_last_page && page < game_state::basics_text_end)
+            training_finished_ = "basics";
+        if (now.training_type == 3 && page >= game_state::puzzle_last_page && page < game_state::puzzle_text_end)
+            training_finished_ = "puzzle";
+    }
+    if (!playing && !training_finished_.empty()) {
+        events.push_back(GameEvent{"training_completed", {{"lesson", training_finished_}}});
+        training_finished_.clear();
     }
     if (playing) last_play_ = now;
     previous_ = now;

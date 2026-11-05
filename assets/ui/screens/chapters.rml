@@ -5,7 +5,7 @@
 </head>
 <body>
     <div id="panel">
-        <div class="title">Story</div>
+        <div class="title" data-text="chapters_title">Story</div>
         <div class="subtitle">Choose a chapter</div>
         <div class="list" data-list="chapters"></div>
         <div class="item" id="back" data-action="back">Back</div>

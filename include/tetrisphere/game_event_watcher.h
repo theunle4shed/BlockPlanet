@@ -38,6 +38,9 @@ constexpr std::uint32_t training_page = 0x80103958;  // u32 start of the instruc
 // never shows it.
 constexpr std::uint32_t basics_last_page = 0x800EF2B4;
 constexpr std::uint32_t basics_text_end = 0x800EF318;  // the next lesson's text
+// The same for Training Puzzle (type 3), whose text starts at 0x800EF910.
+constexpr std::uint32_t puzzle_last_page = 0x800EFB00;
+constexpr std::uint32_t puzzle_text_end = 0x800EFB28;  // the next string
 }
 
 struct GameStateSnapshot {
@@ -71,7 +74,8 @@ private:
     std::optional<GameStateSnapshot> last_play_;
     std::int32_t best_score_this_game_ = 0;
     std::int64_t hearts_lost_this_level_ = 0;
-    bool basics_finished_ = false;  // the last page of Basics was shown
+    // The Training lesson whose last page was shown ("basics", "puzzle").
+    std::string training_finished_;
 };
 
 } // namespace tetrisphere

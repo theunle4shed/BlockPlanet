@@ -79,5 +79,15 @@ int main() {
     assert(load16(m, 0x800E1220) == 0);
     set(0x800E121C, -1);
     assert(launcher.update(m, t += std::chrono::milliseconds(50), buttons) == ModeLauncher::Result::Started);
+
+    // Training Puzzle: PUZZLE (2) on the Training page.
+    set(0x800E121C, 0);
+    set(0x800E1220, -1);
+    assert(launcher.request(LaunchMode::TrainingPuzzle, m, t));
+    launcher.update(m, t += std::chrono::milliseconds(50), buttons);
+    assert(load16(m, 0x800E121C) == 4);
+    set(0x800E1220, 0);
+    launcher.update(m, t += std::chrono::milliseconds(50), buttons);
+    assert(load16(m, 0x800E1220) == 2);
     return 0;
 }

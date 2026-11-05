@@ -98,6 +98,12 @@ int main(int argc, char** argv) {
     assert(story.size() == 16 && story[1].focus && story[1].note == "next" && story[2].note.empty() &&
            story[15].note == "completed");
 
+    auto puzzle = puzzle_chapters(false);
+    assert(puzzle.size() == 2 && puzzle[0].focus && puzzle[0].action == "command:puzzle_chapter:0" &&
+           puzzle[1].note == "skip training");
+    puzzle = puzzle_chapters(true);
+    assert(!puzzle[0].focus && puzzle[1].focus && puzzle[0].note == "completed");
+
     auto confirm = delete_confirmation(store, "1");
     assert(confirm.size() == 1 && confirm[0].action == "command:profile_delete_confirmed:1");
     assert(delete_confirmation(store, "99").empty());

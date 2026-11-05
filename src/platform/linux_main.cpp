@@ -109,10 +109,11 @@ std::string character_profile_id;
 ProfileSaveData profile_data;
 bool profile_recording = false;
 bool profile_dirty = false;
-// Chapter 0 was started from Story: when Training Basics is finished,
-// carry on into Chapter 1 (story_continue is then set until it starts).
-bool story_training = false;
-bool story_continue = false;
+// A Chapter 0 (a Training lesson) started from a chapter list: when it is
+// finished, carry on into that mode's next part (Story Chapter 1, or the
+// puzzles). continue_mode is then set until it starts.
+std::string chapter_zero_lesson;  // "basics" or "puzzle"
+std::optional<LaunchMode> continue_mode;
 // The PC's default controls from settings.dat, for new profiles and guests.
 ControlPreferences pc_controls;
 std::chrono::steady_clock::time_point last_play_poll{};
@@ -202,9 +203,10 @@ void poll_game_events() {
                          event.name.c_str(), fields.c_str());
             std::fflush(stdout);
         }
-        if (event.name == "training_completed" && story_training) {
-            story_training = false;
-            story_continue = true;
+        if (event.name == "training_completed" && !chapter_zero_lesson.empty() &&
+            std::get<std::string>(event.fields.at("lesson")) == chapter_zero_lesson) {
+            continue_mode = chapter_zero_lesson == "basics" ? LaunchMode::Rescue : LaunchMode::Puzzle;
+            chapter_zero_lesson.clear();
         }
         post_game_event(event);
         if (profile_recording) {
@@ -1271,14 +1273,31 @@ bool handle_profile_command(const std::string& command) {
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "story") {
+                blockplanet::ui::set_text("chapters_title", "Story");
                 blockplanet::ui::set_list("chapters", chapter_choices());
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
+            if (*command == "puzzle") {
+                const auto found = profile_data.progress.chapters_completed.find("puzzle");
+                const bool done = profile_save && found != profile_data.progress.chapters_completed.end() &&
+                                  found->second.count(0) != 0;
+                blockplanet::ui::set_text("chapters_title", "Puzzle");
+                blockplanet::ui::set_list("chapters", puzzle_chapters(done));
+                blockplanet::ui::request_show("chapters");
+                continue;
+            }
+            if (command->rfind("puzzle_chapter:", 0) == 0) {
+                const bool training = std::atoi(command->c_str() + 15) == 0;
+                chapter_zero_lesson = training ? "puzzle" : "";
+                continue_mode.reset();
+                launch_mode(training ? LaunchMode::TrainingPuzzle : LaunchMode::Puzzle);
+                continue;
+            }
             if (command->rfind("chapter:", 0) == 0) {
                 const int chapter = std::atoi(command->c_str() + 8);
-                story_training = chapter == 0;
-                story_continue = false;
+                chapter_zero_lesson = chapter == 0 ? "basics" : "";
+                continue_mode.reset();
                 if (chapter == 0) {
                     launch_mode(LaunchMode::TrainingBasics);
                 } else if (chapter <= rescue_chapters && game_option_applier) {
@@ -1302,15 +1321,16 @@ bool handle_profile_command(const std::string& command) {
         }
         pc_settings_release_guard(held);
         poll_game_events();
-        // After Chapter 0, Chapter 1 starts once the game is back at its menu.
+        // After a Chapter 0, the mode's next part starts once the game is back
+        // at its menu (Story at Chapter 1, or the puzzles).
         static auto last_continue_try = std::chrono::steady_clock::time_point{};
-        if (story_continue && !mode_launcher.active() && guest_rdram != nullptr && game_option_applier &&
+        if (continue_mode && !mode_launcher.active() && guest_rdram != nullptr && game_option_applier &&
             read_game_state(guest_rdram).scene >= 0 &&
             std::chrono::steady_clock::now() - last_continue_try > std::chrono::seconds(1)) {
             last_continue_try = std::chrono::steady_clock::now();
-            game_option_applier->choose_chapter(1);
-            launch_mode(LaunchMode::Rescue);
-            if (mode_launcher.active()) story_continue = false;
+            if (*continue_mode == LaunchMode::Rescue) game_option_applier->choose_chapter(1);
+            launch_mode(*continue_mode);
+            if (mode_launcher.active()) continue_mode.reset();
         }
         const auto now = std::chrono::steady_clock::now();
         if (perf_log_enabled && now - perf_window_start >= perf_interval) {

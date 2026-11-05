@@ -170,6 +170,13 @@ std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& compl
     return items;
 }
 
+std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done) {
+    return {{"chapter0", "Chapter 0: Puzzle Training", training_done ? "completed" : "start here",
+             "command:puzzle_chapter:0", true, 1, !training_done},
+            {"puzzles", "Puzzles", training_done ? "" : "skip training", "command:puzzle_chapter:1", true, 1,
+             training_done}};
+}
+
 std::string next_profile_name(const ProfileStore& store) {
     for (int number = 1;; ++number) {
         const auto name = "Player " + std::to_string(number);
