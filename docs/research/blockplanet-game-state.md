@@ -244,3 +244,22 @@ Experiments: scaling the `+0x1640` projection's extents (zoom out 1.5×, by hook
 **What does change the sphere's size: its mesh.** The mesh builder already supports a per-axis scale (player context `+0x2478` flag, `+0x247A/C/E`, `0x4000` = 1.0; the game only ever shrinks with it). Applying a uniform scale on top (BlockPlanet's renderer, `sphere::set_view_scale`, `BLOCKPLANET_SPHERE_SIZE` for testing) resizes the whole sphere around its centre, and everything placed on it (cursor, the falling piece's landing spot, effects) follows, because they all read the same mesh table. Checked at 0.8 and 1.15 in Rescue 1:1, including a drop: the piece lands correctly at both sizes. Limits: only with Sphere = Extended (BlockPlanet's renderer); the pieces in flight above the sphere and the background are not scaled.
 
 So framing (sphere size for the screen, the drop push, a zoom option) is done through the mesh scale, and a peek camera would be a rotation of the mesh rather than a camera move.
+
+### Between-chapter scenes, endings and credits (2026-11-05, from the code; not yet watched in play)
+
+**Messages.** After a chapter (the game says "episode"), `func_80063F1C` (called from the menu driver `func_8005907C` when the menu row `0x800E1228` is 100) shows a scene with two pictures and a message. Message tables by mode, indexed by the chapter number `0x800E44A0` (VS CPU: chapter − 1); pictures from the image ids at `0x800E0AC0` and `0x800E0AE8`, song from `0x800E1550` (ids 314–317).
+
+| Mode | Table | Messages |
+| --- | --- | --- |
+| Rescue | `0x800E150C`, 9 | 0 "Congratulations you passed the first episode. Ready to try the next one?" · 1 "Episode 2 down. It's not always going to be this easy." · 2 "Great! Have you tried gravity combos??? Keep playing for the victory." · 3 "Almost there! Beat this for a great ending!" · 4 "Still with me? There is an even greater reward ahead, but it gets real hard from here! Only fuse combos can help get your X count above 10" · 5 "If you do any gravity combo or fuse combo, it will triple your time return on power pieces! Finishing the bonus episodes will give you a code." · 6 "Final victory! Beat this and you will get the final victory, and access to the bonus episodes!" · 7 "Bonus episode. Only true Tetrisphere champions should try this episode. Did you know you can create power pieces with your shadow?…" · 8 "That was amazing! Enter your name as LINES for a hidden game! The ultimate challenge of episode 10 awaits." |
+| Hide & Seek | `0x800E14FC`, 4 | "…you finished the first episode. The real challenge awaits…" · "Now you understand. Have you tried advanced training?…" · "…you've made it this far!… enter your name as CR… to see who we are" · "O.K. now you're getting good! But this final challenge awaits… try pressing L, C-right and C-down when entering your name." |
+| Lines | `0x800E1530`, 4 | "…passed the first episode…" · "Episode 2 down…" · "Almost there, now it gets real tough." · "Way to go!! Try entering +;<>^ as your name for access to any level!" |
+| VS CPU | `0x800E1540`, 4 | "Congratulations, but we're just getting warmed up." · "Great! Finish this for a victory!" · "Good job! You've beaten us. Now you can challenge the master." · "Beat this episode to be the ultimate Tetrisphere champion!" |
+
+**Endings.** In `func_8005907C` (`0x800591D4`), when the last level of a chapter is finished, `func_80057128` (the ending, with the credits) runs if the chapter just finished is the mode's **first ending** chapter (`func_80089D04`: Rescue 5, Hide & Seek 3, VS CPU 3, Lines 3) or, except in Hide & Seek, its **final** chapter (`func_80089C40`: Rescue 8, VS CPU 5, Lines 5). Otherwise the message scene runs.
+
+So **Rescue has 10 episodes**: 1–5, then the first ending with credits ("great ending"), then "it gets real hard from here" for 6–8, the final victory (second ending) after 8, and **bonus episodes 9 and 10**. BlockPlanet's chapter list currently allows 15; to be capped at 10 once this is confirmed in play.
+
+**Levels per chapter** (`func_80089C9C`, by mode): Rescue 10, Hide & Seek 30, VS CPU 7, Lines 10, Puzzle 100 (its puzzle count). `0x800E4498` counts the chapter's levels completed this run (reset when the chapter advances), compared with that number − 1. Not yet confirmed in play.
+
+**Cheats in the messages:** name CR… (credits), LINES (the hidden Lines game), +;<>^ (any level), L + C-right + C-down at name entry; "finishing the bonus episodes will give you a code".

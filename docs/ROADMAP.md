@@ -188,7 +188,7 @@ Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, m
 2. Camera and screen sizes work, including ultrawide, as the base for the rear and peek camera. (Ultrawide done. The game has no sphere camera; the sphere's size on screen is set through its mesh, now adjustable: see the research notes.)
 3. The new menu layer exists, with the main menu, chapter select and profile screen. (Profiles done: choose, add, name, character, delete and guest.)
 4. The HUD has the new art and a layout that adapts to the screen.
-5. The Story structure is in place: chapter map, unlocks, casual play.
+5. The Story structure is in place: chapter map, unlocks, casual play. Research done on the original's structure (10 episodes, the first ending with credits after 5, harder episodes 6–8 and a final victory, bonus episodes 9–10, a message scene after each other chapter): see the research notes.
 6. The see-through core and the rear and peek camera work.
 7. Options and accessibility are complete.
 8. The other solo modes (Time Trial, Puzzle, Lines, Custom) are built on the result.
