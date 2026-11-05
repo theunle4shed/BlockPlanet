@@ -63,10 +63,18 @@ Each level has a goal type (MULTI, DRILL, SHIFT, UNIQUE, BRICK, CONNECT, TOWER, 
 | Priority 1 (left, top to bottom) | Priority 2 (right) |
 | --- | --- |
 | Hearts | Mode, stage and **goal type** (text, top right; e.g. "Hide & Seek" / "1:3" / "DRILL") |
-| Magic item box and charge bar | **Goal progress** for the type: e.g. "Drills found 2/5" for DRILL, a % bar like Story's for MULTI |
+| Magic item box and charge bar | **Goal progress**: a % bar, worked out the same way as Story's (below) |
 | Next pieces | Timer, with −/+ against the profile's best for the stage |
 
-New compared with the original, which only states the goal at the start. Each goal type needs research to count its progress.
+New compared with the original, which only states the goal at the start.
+
+**Progress, decided 2026-11-05:** every goal comes down to uncovering one or more pictures in the core (the game checks a rectangle of uncovered core for each). Progress is always **blocks left above what must be uncovered ÷ blocks there at the start of the level**, the same rule as Story:
+
+- **All pictures needed** (CONNECT, DRILL's five, SHIFT's four parts, TOWER, CRYSTAL TOWER, UNIQUE): the total of blocks remaining above all the pictures ÷ the total above them at the start.
+- **Any one picture** (MULTI): the picture with the fewest blocks left, as Story's weakest point.
+- **BRICK** (a brick must fall to the core): to be decided once its rule is researched.
+
+The bar may hint where hidden pictures are (it moves when a drop uncovers part of one); the owner accepted this for consistency.
 
 ## Lines
 
