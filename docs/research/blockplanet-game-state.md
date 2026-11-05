@@ -328,3 +328,15 @@ Found for the HUD's progress bar from the game's code (`func_800AB4C8`, `func_80
 - **Correction to the HUD inventory:** the orb in a brass casing above the bowl is **the drop timer**, not the magic item. Its dial turns from blue to green to yellow while a piece is held, and a heart is lost when it runs out (seen with no input). The magic model appears just above the bowl.
 
 **Research aid, the one-colour board:** a poke file setting every layer 1 cell (`0x801173F0` to `0x80117BEE` in Rescue 1:1; board pointer `0x800E44D0` + 2048) to 288 sets off one huge combo on the next frame and wins the level. With every fourth row set to 423 (type 47 walls) instead, the combo clears 768 cells and the level goes on. Only layer 1 (the top layer at the start) is drawn, so writing layer 2 shows nothing. Writing `+0x702` (0 to 5) gives a magic for testing.
+
+### Where things happen on the board, for floating numbers (2026-11-05)
+
+For the HUD's floating numbers (points, time and combo names rising from where they were earned):
+
+- **The cursor** (where the next piece will drop): player context **`+0x2B2A`** (column) and **`+0x2B2E`** (row), board cells, one step per D-pad press, wrapping round the 32 × 32 board. The same pair repeats at `+0x2B32`/`+0x2B36`, and two more pairs at `+0x2B1A`/`+0x2B1E` and `+0x2B22`/`+0x2B26` (probably the piece's other corners or previous positions; not checked).
+- **Where blocks cleared:** BlockPlanet can see this directly by comparing the board (`0x800E44D0`, 9 layers × 1,024 cells) from one frame to the next: cells that turn to 0 cleared in that frame. A combo clears over several frames, so the cells cleared between the combo counter (`+0x2AE0`) rising from 0 and returning to 0 are the combo; their centre is where the number rises from. BlockPlanet draws the sphere, so it can turn a cell into a screen position with the same mesh.
+- **Points earned:** the change in the score (`+0x2AF8`, shown × 10) over the same frames.
+- **Time Trial's clock:** player context **`+0x2B0C`** (s32), frames left at 60 per second (16,758 showed as 4:38 to 4:39; three seconds later 16,470). Time gained is a jump upwards; the HUD routine reads it at `0x8007611C`.
+- **Combo names** (fuse, gravity): the magic meter's +3 calls (`func_800C7FC4` and one in `func_800CD3B8`) mark them; telling fuse from gravity still needs a look at those two places.
+
+So the floating numbers need no hooks into the game: BlockPlanet reads the board, the combo counter, the score and the clock each frame.
