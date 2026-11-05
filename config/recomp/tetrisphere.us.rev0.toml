@@ -147,15 +147,15 @@ text = "tetrisphere_rescue_pause_snapshot_hook(rdram, ctx);"
 
 [[patches.hook]]
 func = "func_8003396C"
-text = "tetrisphere_probe_prompt_atlas(rdram, ctx, 0x8003396Cu);"
+text = "tetrisphere_probe_prompt_atlas(rdram, ctx, 0x8003396Cu); if (blockplanet_draw_filter(rdram, ctx, 0x8003396Cu)) return;"
 
 [[patches.hook]]
 func = "func_800353F4"
-text = "tetrisphere_probe_prompt_atlas(rdram, ctx, 0x800353F4u);"
+text = "tetrisphere_probe_prompt_atlas(rdram, ctx, 0x800353F4u); if (blockplanet_draw_filter(rdram, ctx, 0x800353F4u)) return;"
 
 [[patches.hook]]
 func = "func_80036FE4"
-text = "tetrisphere_probe_prompt_atlas(rdram, ctx, 0x80036FE4u);"
+text = "tetrisphere_probe_prompt_atlas(rdram, ctx, 0x80036FE4u); if (blockplanet_draw_filter(rdram, ctx, 0x80036FE4u)) return;"
 
 [[patches.hook]]
 func = "func_800743BC"
@@ -393,3 +393,23 @@ text = "tetrisphere_pc_settings_hook(rdram, ctx, 0x8004EE00u);"
 func = "func_8004C7E8"
 before_vram = 0x8004CF6C
 text = "if (tetrisphere_controls_view_hook(rdram, ctx)) goto L_8004FBE0;"
+
+# Pause screen: the draw filter can skip chosen 2D draws while the game's
+# pause is open (src/graphics/pause_draw_hooks.cpp).
+
+[[patches.hook]]
+func = "func_80071DE8"
+text = "if (blockplanet_draw_filter(rdram, ctx, 0x80071DE8u)) return;"
+
+[[patches.hook]]
+func = "func_80038478"
+text = "if (blockplanet_draw_filter(rdram, ctx, 0x80038478u)) return;"
+
+[[patches.hook]]
+func = "func_8007240C"
+text = "if (blockplanet_draw_filter(rdram, ctx, 0x8007240Cu)) return;"
+
+# Pause screen: the instructor model (three parts) is drawn through this helper.
+[[patches.hook]]
+func = "func_8002D93C"
+text = "if (blockplanet_draw_filter(rdram, ctx, 0x8002D93Cu)) return;"

@@ -2,6 +2,7 @@
 
 #include "ui_system.h"
 
+#include <atomic>
 #include <cstdlib>
 #include <map>
 #include <string>
@@ -22,6 +23,8 @@ SDL_GameControllerButton sdl_button(PhysicalButton button) {
     return SDL_CONTROLLER_BUTTON_INVALID;
 }
 
+std::atomic<bool> in_play{false};
+
 // Left stick direction per controller and axis, so a push counts once.
 std::map<std::pair<SDL_JoystickID, int>, int> stick;
 
@@ -30,6 +33,7 @@ std::map<std::pair<SDL_JoystickID, int>, int> stick;
 bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBindings& bindings) {
     if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_F1) {
         if (blockplanet::ui::menus_open()) blockplanet::ui::request_close();
+        else if (in_play.load()) blockplanet::ui::send_command("pause");
         else blockplanet::ui::request_open("main");
         return true;
     }
@@ -123,5 +127,7 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
     }
     return false;
 }
+
+void set_menu_play_state(bool playing) { in_play.store(playing); }
 
 } // namespace tetrisphere

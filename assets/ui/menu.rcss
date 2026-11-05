@@ -145,3 +145,6 @@ body.pad .for-keys { display: none; }
 .subtitle .for-pad, .subtitle .for-keys { display: inline; }
 .subtitle .for-pad { display: none; }
 body.pad .subtitle .for-pad { display: inline; }
+
+/* Over the game's own pause background, which already hides the board. */
+body.over-pause { background-color: #00000000; }

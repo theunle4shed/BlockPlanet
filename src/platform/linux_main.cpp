@@ -22,6 +22,8 @@
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
+#include "tetrisphere/pause_bridge.h"
+#include "tetrisphere/pause_draw.h"
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
 #include "tetrisphere/mode_launcher.h"
@@ -391,6 +393,9 @@ std::atomic<bool> menus_block_game{false};
 // Buttons the mode launcher presses on port 1 (bit 16 set while active).
 std::atomic<std::uint32_t> launcher_buttons{0};
 ModeLauncher mode_launcher;
+
+// BlockPlanet's pause menu over the game's pause.
+PauseBridge pause_bridge;
 
 // Settings changed in BlockPlanet's menus, applied like the PC settings menu.
 std::deque<PCSettingsRequest> menu_settings_requests;
@@ -1314,6 +1319,17 @@ bool handle_profile_command(const std::string& command) {
             if (*command == "exit") close_game();
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
+            if (*command == "pause") {
+                pause_bridge.request_pause(std::chrono::steady_clock::now());
+                continue;
+            }
+            if (*command == "pause_resume" || *command == "pause_skip" || *command == "pause_quit") {
+                pause_bridge.choose(*command == "pause_resume" ? PauseBridge::Choice::Resume
+                                    : *command == "pause_skip" ? PauseBridge::Choice::Skip
+                                                               : PauseBridge::Choice::Quit,
+                                    std::chrono::steady_clock::now());
+                continue;
+            }
             if (*command == "story") {
                 blockplanet::ui::set_text("chapters_title", "Story");
                 blockplanet::ui::set_list("chapters", chapter_choices());
@@ -1360,6 +1376,32 @@ bool handle_profile_command(const std::string& command) {
                              result == ModeLauncher::Result::Started ? "playing" : "timed_out");
                 std::fflush(stdout);
             }
+        }
+        if (!mode_launcher.active() && guest_rdram != nullptr) {
+            const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
+                                                   blockplanet::ui::menus_open(), std::chrono::steady_clock::now());
+            if (pause.open_menu) {
+                // Where the player is, for the pause screen's subtitle.
+                const auto state = read_game_state(guest_rdram);
+                std::string where;
+                switch (state.mode) {
+                case 1: where = "Story \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
+                case 2: where = "Time Trial"; break;
+                case 3: where = state.training_type == 3 ? "Puzzle \u00B7 Chapter 0" : "Story \u00B7 Chapter 0"; break;
+                case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
+                case 5: where = "Hide & Seek \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
+                case 6: where = "Versus"; break;
+                case 9: where = "Lines"; break;
+                default: break;
+                }
+                blockplanet::ui::set_text("pause_where", where);
+                blockplanet::ui::set_list("pause", pause.items);
+                blockplanet::ui::request_open("pause");
+            }
+            if (pause.close_menu) blockplanet::ui::request_close();
+            launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons) : 0u);
+            blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
+            set_menu_play_state(read_game_state(guest_rdram).scene == -1);
         }
         pc_settings_release_guard(held);
         poll_game_events();

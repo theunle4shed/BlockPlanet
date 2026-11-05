@@ -14,4 +14,8 @@ namespace tetrisphere {
 // Returns true if the event was used by the menus.
 bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBindings& bindings);
 
+// Whether the game is in play: then F1 pauses it (BlockPlanet's pause menu)
+// instead of opening the main menu.
+void set_menu_play_state(bool in_play);
+
 } // namespace tetrisphere

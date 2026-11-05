@@ -1,0 +1,13 @@
+<rml>
+<head>
+    <title>Paused</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body class="over-pause">
+    <div id="panel">
+        <div class="title">Paused</div>
+        <div class="subtitle" data-text="pause_where"></div>
+        <div class="list" data-list="pause"></div>
+    </div>
+</body>
+</rml>
