@@ -164,6 +164,7 @@ div { display: block; }
 /* Differences against best times: green ahead, red behind. */
 .ahead { color: #5ad46a; }
 .behind { color: #f05a4a; }
+#best { display: block; font-size: 22dp; color: #c8d0e8; margin-top: 6dp; }
 #net { display: block; font-size: 26dp; font-weight: bold; margin-top: -2dp; }
 /* Splits, LiveSplit style: stage, difference, time; the current one highlighted. */
 #splits { display: block; margin-top: 12dp; }

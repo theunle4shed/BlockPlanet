@@ -224,10 +224,11 @@ std::string hud_rml(const HudView& hud) {
         rml += "<div class='rule'><div class='line'/></div><div id='score-group' class='group'><div class='label'>Score</div><div id='score'>" +
                escape(hud.score) + "</div></div>";
     if (!hud.time.empty()) {
-        rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>Time</div><div id='time'>" +
-               escape(hud.time) + "</div>";
+        rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>" +
+               escape(hud.time_label.empty() ? std::string("Time") : hud.time_label) + "</div><div id='time'>" + escape(hud.time) + "</div>";
         if (!hud.time_delta.empty())
             rml += std::string("<div id='net' class='") + (hud.time_ahead ? "ahead" : "behind") + "'>" + escape(hud.time_delta) + "</div>";
+        if (!hud.best.empty()) rml += "<div id='best'>" + escape(hud.best) + "</div>";
         // Splits: the last few completed levels and the current one.
         rml += "<div id='splits'>";
         const std::size_t first = hud.splits.size() > 6 ? hud.splits.size() - 6 : 0;

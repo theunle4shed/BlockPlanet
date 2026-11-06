@@ -127,6 +127,13 @@ struct PendingLaunch {
     bool keep_music = false;  // keep the pause menu's track override (a restart)
 };
 std::optional<PendingLaunch> continue_mode;
+// A single Story stage being played on its own (Story > chapter > stage):
+// chapter and level; after it is completed the game returns to the menu.
+std::optional<std::pair<int, int>> single_stage;
+struct SingleStageResult { double time; double best_before; };
+std::optional<SingleStageResult> single_stage_result;
+std::optional<std::chrono::steady_clock::time_point> single_stage_quit_at;
+bool single_stage_quitting = false;
 // The PC's default controls from settings.dat, for new profiles and guests.
 ControlPreferences pc_controls;
 std::chrono::steady_clock::time_point last_play_poll{};
@@ -301,6 +308,7 @@ void update_hud() {
         auto& record = episode[finished->chapter];
         if (record.best_levels.size() < 10) record.best_levels.resize(10, 0.0);
         const auto i = std::size_t(std::clamp(finished->level, 1, 10) - 1);
+        const double best_before = record.best_levels[i];
         bool changed = false;
         if (finished->time > 0.5 && (record.best_levels[i] <= 0.0 || finished->time < record.best_levels[i]))
             record.best_levels[i] = finished->time, changed = true;
@@ -309,6 +317,11 @@ void update_hud() {
         if (changed) {
             profile_dirty = true;
             save_profile();
+        }
+        // A single stage: done; back to the menu shortly.
+        if (single_stage && finished->chapter == single_stage->first && finished->level == single_stage->second) {
+            single_stage_result = SingleStageResult{finished->time, best_before};
+            single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
         }
     }
 
@@ -335,7 +348,24 @@ void update_hud() {
         view.mode = "Rescue";
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
     }
-    if (state.mode == 1) {
+    const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
+    if (single) {
+        // One stage: your time, the best, and the difference (live).
+        const auto sv = splits.view();
+        std::vector<double> best = best_of(state.chapter);
+        const auto i = std::size_t(single_stage->second - 1);
+        const double b = single_stage_result ? single_stage_result->best_before : i < best.size() ? best[i] : 0.0;
+        const double mine = single_stage_result ? single_stage_result->time : sv.rows.empty() ? 0.0 : sv.rows.front().time;
+        view.time_label = single_stage_result ? "Your time" : "Stage time";
+        view.time = hud_time(mine);
+        if (b > 0.0) {
+            view.time_delta = hud_delta(mine - b);
+            view.time_ahead = mine < b;
+            view.best = "Best " + hud_time(b);
+        } else {
+            view.best = single_stage_result ? "First time" : "No best yet";
+        }
+    } else if (state.mode == 1) {
         const auto sv = splits.view();
         view.time = hud_time(sv.total);
         view.time_delta = sv.has_delta ? hud_delta(sv.net_delta) : "";
@@ -1879,7 +1909,36 @@ bool handle_profile_command(const std::string& command) {
                 }
                 continue;
             }
+            if (command->rfind("stages:", 0) == 0) {
+                const int chapter = std::atoi(command->c_str() + 7);
+                std::set<int> done;
+                if (const auto m = profile_data.progress.levels_completed.find("rescue"); m != profile_data.progress.levels_completed.end())
+                    if (const auto c = m->second.find(chapter); c != m->second.end()) done = c->second;
+                std::vector<double> best;
+                if (const auto m = profile_data.progress.episode_records.find("rescue"); m != profile_data.progress.episode_records.end())
+                    if (const auto c = m->second.find(chapter); c != m->second.end()) best = c->second.best_levels;
+                blockplanet::ui::set_text("stages_title", "Chapter " + std::to_string(chapter));
+                blockplanet::ui::set_list("stages", story_stages(chapter, done, best));
+                blockplanet::ui::request_show("stages");
+                continue;
+            }
+            if (command->rfind("stage:", 0) == 0) {
+                // stage:N:L: one Story stage on its own.
+                const int chapter = std::atoi(command->c_str() + 6);
+                const auto colon = command->find(':', 6);
+                const int level = colon == std::string::npos ? 1 : std::atoi(command->c_str() + colon + 1);
+                if (chapter >= 1 && chapter <= rescue_chapters && level >= 1 && game_option_applier) {
+                    continue_mode.reset();
+                    single_stage = std::pair{chapter, level};
+                    single_stage_quit_at.reset();
+                    single_stage_result.reset();
+                    game_option_applier->choose_start(chapter, level);
+                    launch_mode(LaunchMode::Rescue);
+                }
+                continue;
+            }
             if (command->rfind("chapter:", 0) == 0) {
+                single_stage.reset();
                 const int chapter = std::atoi(command->c_str() + 8);
                 chapter_zero_lesson = chapter == 0 ? "basics" : "";
                 continue_mode.reset();
@@ -1936,6 +1995,18 @@ bool handle_profile_command(const std::string& command) {
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
             update_hud();
+            // A single stage finished: pause, then quit to the menu.
+            if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
+                single_stage_quit_at.reset();
+                single_stage_quitting = true;
+                pause_bridge.request_pause(std::chrono::steady_clock::now());
+            }
+            if (single_stage_quitting && pause_bridge.hide_original()) {
+                single_stage_quitting = false;
+                single_stage.reset();
+                single_stage_result.reset();
+                pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
+            }
         }
         pc_settings_release_guard(held);
         poll_game_events();

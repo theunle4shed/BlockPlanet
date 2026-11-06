@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>Stages</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title" data-text="stages_title">Chapter</div>
+        <div class="subtitle">The whole episode, or one stage</div>
+        <div class="list" data-list="stages"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>

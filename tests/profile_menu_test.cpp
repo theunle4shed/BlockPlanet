@@ -89,6 +89,15 @@ int main(int argc, char** argv) {
     auto story = story_chapters({}, 15);
     assert(story.size() == 2 && story[0].action == "command:chapter:0" && story[0].focus &&
            story[0].note == "start here" && story[1].note == "skip training" && !story[1].focus);
+    assert(story[1].action == "command:stages:1");
+    {
+        // A chapter's stages: the whole episode, then the stages done and the next.
+        auto stages = story_stages(2, {1, 2}, {40.5, 0.0, 0.0});
+        assert(stages.size() == 4 && stages[0].action == "command:chapter:2" && stages[0].focus);
+        assert(stages[1].label == "Stage 2:1" && stages[1].action == "command:stage:2:1" && stages[1].note == "best 0:40");
+        assert(stages[3].label == "Stage 2:3" && stages[3].note == "next");
+        assert(story_stages(1, {}, {}).size() == 2);
+    }
     story = story_chapters({0}, 15);
     assert(story.size() == 2 && story[0].note == "completed" && story[1].focus && story[1].note == "next");
     story = story_chapters({1, 2}, 15);

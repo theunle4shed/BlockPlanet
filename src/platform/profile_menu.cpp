@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "tetrisphere/profile_menu.h"
 
 #include <algorithm>
@@ -166,8 +167,34 @@ std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& compl
         const bool next = !done && !focused;
         items.push_back({"chapter" + std::to_string(chapter), "Chapter " + std::to_string(chapter),
                          done ? "completed" : chapter == 1 && fresh ? "skip training" : next ? "next" : "",
-                         "command:chapter:" + std::to_string(chapter), true, 1, next});
+                         "command:stages:" + std::to_string(chapter), true, 1, next});
         focused = focused || next;
+    }
+    return items;
+}
+
+std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<int>& levels_done,
+                                                   const std::vector<double>& best_levels, int levels) {
+    std::vector<blockplanet::ui::ListItem> items;
+    const auto c = std::to_string(chapter);
+    items.push_back({"episode", "Whole episode", "", "command:chapter:" + c, true, 1, true});
+    int last = 1;
+    for (int level : levels_done)
+        if (level >= 1) last = std::max(last, level + 1);
+    last = std::min(last, levels);
+    for (int level = 1; level <= last; ++level) {
+        const auto i = std::size_t(level - 1);
+        std::string note;
+        if (i < best_levels.size() && best_levels[i] > 0.0) {
+            const int t = static_cast<int>(best_levels[i]);
+            char text[32];
+            std::snprintf(text, sizeof text, "best %d:%02d", t / 60, t % 60);
+            note = text;
+        } else if (levels_done.count(level) == 0) {
+            note = "next";
+        }
+        items.push_back({"stage" + std::to_string(level), "Stage " + c + ":" + std::to_string(level), note,
+                         "command:stage:" + c + ":" + std::to_string(level), true, 1, false});
     }
     return items;
 }

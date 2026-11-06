@@ -78,6 +78,13 @@ constexpr int keyboard_columns = 10;
 // next chapter. `completed` holds Story chapter numbers (0 is Training).
 std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters);
 
+// A Story chapter's stage list: "Whole episode", then each stage completed
+// and the next one (up to `levels`), with its best time as a note
+// (best_levels: seconds per stage, 0 = none). Actions: chapter:N (the whole
+// episode) and stage:N:L (one stage).
+std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<int>& levels_done,
+                                                   const std::vector<double>& best_levels, int levels = 10);
+
 // Puzzle's list: Chapter 0 (Training Puzzle), then the puzzles. A new
 // player starts on Chapter 0; once it is done, on the puzzles.
 std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done);
