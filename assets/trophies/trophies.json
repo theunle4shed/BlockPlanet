@@ -84,9 +84,39 @@
       "trigger": { "event": "puzzle_solved", "where": { "drops": { "at_most": 1 } } }
     },
     {
-      "id": "time_trial_100k", "name": "Against the Clock", "tier": "silver",
-      "description": "Score 100,000 points in Time Trial.",
-      "trigger": { "event": "game_over", "where": { "mode": "time_trial", "score": { "at_least": 100000 } } }
+      "id": "score_attack_overtime", "name": "Overtime", "tier": "silver",
+      "description": "Play three minutes in one stage of Score Attack.",
+      "trigger": { "event": "score_attack_overtime" }
+    },
+    {
+      "id": "score_attack_episode", "name": "Point Hunter", "tier": "silver",
+      "description": "Complete a whole episode in Score Attack.",
+      "trigger": { "event": "attack_episode", "where": { "mode": "score_attack" } }
+    },
+    {
+      "id": "score_attack_final", "name": "Last Stand", "tier": "gold",
+      "description": "Complete the final episode in Score Attack.",
+      "trigger": { "event": "attack_episode", "where": { "mode": "score_attack", "final": 1 } }
+    },
+    {
+      "id": "score_attack_developer", "name": "Out-Scored the Maker", "tier": "platinum",
+      "description": "Beat the developer's score on every stage in Score Attack.",
+      "trigger": { "event": "developer_all_beaten", "where": { "mode": "score_attack" } }
+    },
+    {
+      "id": "time_attack_episode", "name": "Speedrunner", "tier": "silver",
+      "description": "Complete a whole episode in Time Attack.",
+      "trigger": { "event": "attack_episode", "where": { "mode": "time_attack" } }
+    },
+    {
+      "id": "time_attack_final", "name": "Photo Finish", "tier": "gold",
+      "description": "Complete the final episode in Time Attack.",
+      "trigger": { "event": "attack_episode", "where": { "mode": "time_attack", "final": 1 } }
+    },
+    {
+      "id": "time_attack_developer", "name": "Out-Ran the Maker", "tier": "platinum",
+      "description": "Beat the developer's time on every stage in Time Attack.",
+      "trigger": { "event": "developer_all_beaten", "where": { "mode": "time_attack" } }
     },
     {
       "id": "vs_win", "name": "Challenger", "tier": "bronze",

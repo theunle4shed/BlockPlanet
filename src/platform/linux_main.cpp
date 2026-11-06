@@ -25,6 +25,7 @@
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
+#include "tetrisphere/developer_records.h"
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/relaunch.h"
@@ -225,6 +226,63 @@ std::string hud_delta(double seconds) {
     return text;
 }
 
+// The developer's records (assets/trophies/developer_records.json). With
+// BLOCKPLANET_RECORD_DEVELOPER=<file>, the owner's finished attack stages are
+// written to that file when they are the first or better (docs/HUD_DESIGN.md).
+tetrisphere::DeveloperRecords developer_records;
+std::filesystem::path developer_record_path;
+
+void load_developer_records_at_start(const std::filesystem::path& shipped) {
+    std::string error;
+    if (const char* path = std::getenv("BLOCKPLANET_RECORD_DEVELOPER"); path != nullptr && *path != '\0') {
+        developer_record_path = std::filesystem::u8path(path);
+        if (std::filesystem::exists(developer_record_path)) {
+            if (!tetrisphere::load_developer_records(developer_record_path, developer_records, error))
+                std::fprintf(stdout, "{\"event\":\"developer_records\",\"error\":\"%s\"}\n", error.c_str());
+            return;
+        }
+    }
+    if (!tetrisphere::load_developer_records(shipped, developer_records, error))
+        std::fprintf(stdout, "{\"event\":\"developer_records\",\"error\":\"%s\"}\n", error.c_str());
+}
+
+// A stage finished in Time Attack or Score Attack: the developer's record,
+// and the trophies' events.
+void attack_stage_done(const std::string& mode, int chapter, int stage, double value) {
+    value = std::round(value * 1000.0) / 1000.0;  // milliseconds (points stay whole)
+    const double developer = developer_records.value(mode, chapter, stage);
+    if (!developer_record_path.empty() && developer_records.record(mode, chapter, stage, value)) {
+        std::string error;
+        if (!tetrisphere::save_developer_records(developer_record_path, developer_records, error))
+            std::fprintf(stdout, "{\"event\":\"developer_records\",\"error\":\"%s\"}\n", error.c_str());
+        std::fprintf(stdout, "{\"event\":\"developer_record\",\"mode\":\"%s\",\"chapter\":%d,\"stage\":%d,\"value\":%.3f}\n",
+                     mode.c_str(), chapter, stage, value);
+        std::fflush(stdout);
+    }
+    tetrisphere::GameEvent event{"attack_stage", {}};
+    event.fields["mode"] = mode;
+    event.fields["chapter"] = std::int64_t{chapter};
+    event.fields["stage"] = std::int64_t{stage};
+    event.fields["developer_beaten"] = std::int64_t{tetrisphere::DeveloperRecords::beats(mode, value, developer) ? 1 : 0};
+    post_game_event(event);
+    std::map<int, std::vector<double>> bests;
+    if (const auto m = profile_data.progress.episode_records.find(mode); m != profile_data.progress.episode_records.end())
+        for (const auto& [c, record] : m->second) bests[c] = record.best_levels;
+    if (developer_records.all_beaten(mode, bests)) {
+        tetrisphere::GameEvent all{"developer_all_beaten", {}};
+        all.fields["mode"] = mode;
+        post_game_event(all);
+    }
+}
+
+void attack_episode_done(const std::string& mode, int chapter) {
+    tetrisphere::GameEvent event{"attack_episode", {}};
+    event.fields["mode"] = mode;
+    event.fields["chapter"] = std::int64_t{chapter};
+    event.fields["final"] = std::int64_t{chapter == tetrisphere::DeveloperRecords::chapters ? 1 : 0};
+    post_game_event(event);
+}
+
 void update_magic_box();
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
 
@@ -308,6 +366,8 @@ void update_hud() {
             profile_dirty = true;
             save_profile();
         }
+        if (play_variant == PlayVariant::TimeAttack && finished->time > 0.5)
+            attack_stage_done("time_attack", finished->chapter, finished->level, finished->time);
         // A single stage: done; back to the menu shortly.
         if (play_variant != PlayVariant::ScoreAttack && single_stage && finished->chapter == single_stage->first &&
             finished->level == single_stage->second) {
@@ -334,6 +394,17 @@ void update_hud() {
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
     }
     const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
+    // A whole episode in an attack mode is done when its last stage is
+    // cleared (the core opened; the final episode has no next one to start).
+    {
+        static int cleared_episode_key = -1;
+        if (play_variant != PlayVariant::Story && !single_stage && state.level >= 10 && state.progress >= 1.0f &&
+            cleared_episode_key != state.chapter) {
+            cleared_episode_key = state.chapter;
+            attack_episode_done(variant_records(play_variant), state.chapter);
+        }
+        if (state.level < 10) cleared_episode_key = -1;
+    }
     if (state.mode == 1 && play_variant == PlayVariant::ScoreAttack) {
         // Score Attack on Story's episodes: points per stage against the best
         // points of each stage (records "score_attack", stored as numbers).
@@ -353,6 +424,7 @@ void update_hud() {
                 profile_dirty = true;
                 save_profile();
             }
+            if (f.points > 0) attack_stage_done("score_attack", chapter, f.stage, double(f.points));
             if (single_stage && chapter == single_stage->first && f.stage == single_stage->second) {
                 single_stage_result = SingleStageResult{double(f.points), before};
                 single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
@@ -400,6 +472,14 @@ void update_hud() {
         const bool cleared = state.progress >= 1.0f;
         if (!paused && !cleared && !timed_out && !run_over && elapsed < 1.0) clock.tick(elapsed);
         if (combo_blocks_pending > 0) clock.add_combo(combo_blocks_pending), combo_blocks_pending = 0;
+        // A trophy: three minutes played in one stage (the clock starts at
+        // three minutes, so it takes the time combos add).
+        static bool overtime_posted = false;
+        if (clock.played() < 1.0) overtime_posted = false;
+        if (!overtime_posted && clock.played() >= tetrisphere::AttackClock::stage_seconds && !clock.out()) {
+            overtime_posted = true;
+            post_game_event(tetrisphere::GameEvent{"score_attack_overtime", {}});
+        }
         if (clock.out() && !cleared && !timed_out && !run_over) {
             timed_out = true;
             guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x2D7E, 0);  // the game's own game over
@@ -1216,6 +1296,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             ? std::filesystem::u8path(base) / "trophies.json" : std::filesystem::path("trophies.json");
         if (base != nullptr) SDL_free(base);
         if (!run_options.guest) initialize_trophies(definitions, profile_path / "trophies.json");
+        load_developer_records_at_start(definitions.parent_path() / "developer_records.json");
     }
     game_option_applier = std::make_unique<GameOptionApplier>(
         GameOptions{run_options.casual, run_options.start_chapter});

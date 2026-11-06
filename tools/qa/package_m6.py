@@ -108,6 +108,7 @@ def create_package(*, platform: str, binary: Path, configurator: Path,
     for name, source in {
         "gamecontrollerdb.txt": controller_root / "assets/controllers/gamecontrollerdb.txt",
         "trophies.json": controller_root / "assets/trophies/trophies.json",
+        "developer_records.json": controller_root / "assets/trophies/developer_records.json",
         "licenses/controller-db/LICENSE": controller_root / "licenses/controller-db/LICENSE",
         "licenses/controller-db/provenance.json": controller_root / "licenses/controller-db/provenance.json",
     }.items():

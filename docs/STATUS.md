@@ -33,12 +33,13 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 3. **The game's floating number** (parked): a grey 3D number after big combos ("6000", "48000"), not the points total; to hide in Story and possibly reuse in score modes. Real-drop combo tests need the matching blocks under the drop, not beside it.
 4. **Research loose ends:** how the original adds time for combos (Score Attack's rule is provisional); what each magic does and its name; magic crystals; fuse vs gravity combos; CONNECT and CRYSTAL TOWER goals; the two unseen piece shapes (IDs 3, 4).
 5. **Saved for later** (`docs/ROADMAP.md`): seeded stages for fair stage time trials, new block types, new modes (Escape, Multiphasic, Score Attack, Lines variants, VS and co-op), the scanner magic, arena walls, attract-mode demos, credits scripting, music (BGM) editing.
-6. **The owner to test on Windows**: much has changed since the last Windows test.
+6. **The owner to record developer times and scores** for every stage (`docs/HUD_DESIGN.md`, Developer records).
+7. **The owner to test on Windows**: much has changed since the last Windows test.
 
 ## Decisions to keep
 
 - Sphere framing as the original; Story's Try Again as the original.
 - Story shows no score pop-ups; Hide & Seek shows no progress bar (hints would spoil the search).
 - Any finished Story stage counts towards that stage's best, however the run started.
-- Competition (Time Attack, Score Attack) is on Story's episodes only; the original Time Trial's mode and stages are not offered. Its trophy ("Against the Clock") can no longer be earned: to replace.
+- Competition (Time Attack, Score Attack) is on Story's episodes only; the original Time Trial's mode and stages are not offered. Its trophy is replaced by attack-mode trophies; the developer records (`BLOCKPLANET_RECORD_DEVELOPER`) are for the owner to record.
 - No HD texture packs; sharpness through redesign and the game's own models. Nothing copied from the game is committed; anything derived from it is generated from the player's ROM.
