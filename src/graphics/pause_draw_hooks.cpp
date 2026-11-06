@@ -18,7 +18,8 @@
 //                                     made outside the game's HUD routine
 //   BLOCKPLANET_HUD_SKIP_MODEL=addr   skip model draws (0x8002D93C) whose matrix (a2) is addr
 // The HUD: while BlockPlanet's HUD is shown (set_original_hud_hidden), the 2D
-// draws made inside the game's HUD routine func_80075CD8 are skipped.
+// draws made inside the game's HUD routine func_80075CD8 are skipped, and so is
+// the held magic's model (func_800C78A0).
 // Recompiled calls do not keep return addresses, so draws are told apart by
 // their arguments.
 
@@ -86,6 +87,14 @@ void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
     if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) return true;
+    // The held magic's model above the bowl (func_800C78A0's model draw, told
+    // apart by its matrices); BlockPlanet's item box shows it instead. The
+    // launch is a different draw (inside the HUD routine) and stays.
+    if (helper == 0x8002D93Cu && static_cast<std::uint32_t>(ctx->r6) == 0x80161540u &&
+        static_cast<std::uint32_t>(ctx->r7) == 0x801309A8u && hud_hidden.load(std::memory_order_relaxed)) {
+        ctx->r2 = 0;  // "animation finished": no
+        return true;
+    }
     static const std::uint32_t skip_model = [] {  // research
         const char* v = std::getenv("BLOCKPLANET_HUD_SKIP_MODEL");
         return v ? static_cast<std::uint32_t>(std::strtoul(v, nullptr, 16)) : 0u;
