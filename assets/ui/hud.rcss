@@ -154,6 +154,18 @@ div { display: block; }
 #where .label { color: #e8b818; font-size: 22dp; }
 #stage { display: block; font-size: 64dp; font-weight: bold; }
 #time { display: block; font-size: 44dp; font-weight: bold; }
+/* Differences against best times: green ahead, red behind. */
+.ahead { color: #5ad46a; }
+.behind { color: #f05a4a; }
+#net { display: block; font-size: 26dp; font-weight: bold; margin-top: -2dp; }
+/* Splits, LiveSplit style: stage, difference, time; the current one highlighted. */
+#splits { display: block; margin-top: 12dp; }
+.split { display: block; font-size: 20dp; line-height: 28dp; color: #c8d0e8; white-space: nowrap; }
+.split .stage { display: inline-block; width: 52dp; text-align: left; color: #9aa6c8; }
+.split .delta { display: inline-block; width: 82dp; text-align: right; font-weight: bold; }
+.split .t { display: inline-block; width: 64dp; text-align: right; }
+.split.current { color: #f8f8f8; font-weight: bold; }
+.split.current .stage { color: #e8b818; }
 #progress { height: 20dp; }
 #progress .fill { background-color: #48d060; }
 
@@ -190,4 +202,9 @@ div { display: block; }
     #stage { font-size: 56dp; }
     #time { font-size: 40dp; }
     #progress { width: 170dp; margin-top: 18dp; }
+    #net { display: inline-block; margin-left: 12dp; }
+    #time { display: inline-block; }
+    #splits { margin-top: 2dp; }
+    .split { display: none; font-size: 18dp; line-height: 22dp; }
+    .split:last-child, .split.last-done { display: block; }
 }

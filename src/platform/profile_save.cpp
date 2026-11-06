@@ -52,12 +52,20 @@ nlohmann::json to_json(const ProfileSaveData& data) {
     }
     nlohmann::json chapters = nlohmann::json::object();
     for (const auto& [mode, done] : data.progress.chapters_completed) chapters[mode] = done;
+    nlohmann::json records = nlohmann::json::object();
+    for (const auto& [mode, chapters] : data.progress.episode_records) {
+        nlohmann::json by_chapter = nlohmann::json::object();
+        for (const auto& [chapter, r] : chapters)
+            by_chapter[std::to_string(chapter)] = {{"best_levels", r.best_levels}, {"best_total", r.best_total}};
+        records[mode] = by_chapter;
+    }
     const auto& s = data.progress.statistics;
     return {{"schema_version", schema_version},
             {"preferences", preferences},
             {"progress",
              {{"levels_completed", levels},
               {"chapters_completed", chapters},
+              {"episode_records", records},
               {"puzzles_solved", data.progress.puzzles_solved},
               {"statistics",
                {{"games_started", s.games_started},
@@ -119,6 +127,15 @@ bool from_json(const std::string& text, ProfileSaveData& data) {
         for (const auto& [mode, done] : chapters_done.items())
             result.progress.chapters_completed[mode] = done.get<std::set<int>>();
         result.progress.puzzles_solved = progress.value("puzzles_solved", std::set<int>{});
+        const nlohmann::json records = progress.value("episode_records", nlohmann::json::object());
+        for (const auto& [mode, chapters] : records.items()) {
+            for (const auto& [chapter, r] : chapters.items()) {
+                ProfileProgress::EpisodeRecord record;
+                record.best_levels = r.value("best_levels", std::vector<double>{});
+                record.best_total = r.value("best_total", 0.0);
+                result.progress.episode_records[mode][std::stoi(chapter)] = record;
+            }
+        }
         const nlohmann::json st = progress.value("statistics", nlohmann::json::object());
         auto& s = result.progress.statistics;
         s.games_started = st.value("games_started", std::int64_t{0});

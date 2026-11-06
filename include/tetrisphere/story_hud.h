@@ -90,6 +90,45 @@ private:
     int settling_ = 0;
 };
 
+// Episode splits, LiveSplit style (docs/HUD_DESIGN.md): game time per level
+// within an episode (chapter), compared with the best time of each level.
+struct SplitRow {
+    int level = 0;           // 1-based
+    double time = 0.0;       // seconds (running for the current level)
+    bool done = false;       // completed (else the current level)
+    bool has_best = false;   // a best time to compare with
+    double delta = 0.0;      // time - best (negative: ahead)
+};
+struct SplitsView {
+    int chapter = 0;
+    double total = 0.0;              // the episode so far
+    bool has_delta = false;          // any completed level had a best
+    double net_delta = 0.0;          // sum of the completed levels' deltas
+    std::vector<SplitRow> rows;      // completed levels, then the current one
+};
+
+class EpisodeSplits {
+public:
+    // Called each frame in play with the chapter and level shown and the
+    // play time that passed (0 while paused). Returns the completed level's
+    // number and time when a level has just finished (to save as a best).
+    struct Finished { int chapter, level; double time; bool episode_done; double episode_total; };
+    std::optional<Finished> update(int chapter, int level, double play_seconds, const std::vector<double>& best_levels);
+    // Compared with the best times as they were when the run started (a level
+    // finishing in this run updates the profile, not this comparison).
+    SplitsView view() const;
+    // Forget the run (a restart, or leaving the mode).
+    void reset() { chapter_ = -1; }
+
+private:
+    int chapter_ = -1;
+    int level_ = 0;
+    double current_ = 0.0;
+    std::vector<double> done_;  // completed levels' times, in order from level `first_`
+    int first_ = 1;
+    std::vector<double> bests_;  // the best level times when the run started
+};
+
 // Reads the HUD's values for player 1. Returns false when Story is not in play.
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out);
 

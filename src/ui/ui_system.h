@@ -60,6 +60,17 @@ struct HudView {
     std::string mode;          // e.g. "Rescue"
     std::string stage;         // e.g. "1:3"
     std::string time;          // the episode's time, e.g. "2:41"
+    std::string time_delta;    // the net difference so far, e.g. "-0:12", or empty
+    bool time_ahead = false;
+    // The episode's splits, LiveSplit style: completed levels, then the current.
+    struct Split {
+        std::string label;     // "1:3"
+        std::string time;      // "0:41"
+        std::string delta;     // "+3.2", or empty (no best yet, or current)
+        bool ahead = false;
+        bool current = false;
+    };
+    std::vector<Split> splits;
     float progress = -1.0f;    // 0 to 1, or -1 to hide the bar
     // Placement: the game's picture as fractions of the window (x, y, width,
     // height), and the sphere's radius on screen in picture heights.

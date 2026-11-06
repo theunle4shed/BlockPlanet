@@ -187,16 +187,29 @@ std::string hud_time(double seconds) {
     return text;
 }
 
+// A difference against a best time: "-3.4" or "+1:03".
+std::string hud_delta(double seconds) {
+    const double a = std::abs(seconds);
+    char text[32];
+    const char* sign = seconds < 0.0 ? "\u2212" : "+";
+    if (a < 60.0)
+        std::snprintf(text, sizeof text, "%s%.1f", sign, a);
+    else
+        std::snprintf(text, sizeof text, "%s%s", sign, hud_time(a).c_str());
+    return text;
+}
+
 void update_magic_box();
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
 
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
     static tetrisphere::ProgressTracker progress;
-    // The episode's time: counted while playing (not paused), from the
-    // chapter's first level; a new chapter or a restart begins it again.
-    static double episode_seconds = 0.0;
-    static int episode_chapter = -1, last_level = 0;
+    // The episode's splits (game time per level, LiveSplit style): counted
+    // while playing (not paused); a new chapter, Try Again or a new game
+    // (the score going back down) begins the run again.
+    static tetrisphere::EpisodeSplits splits;
+    static std::uint32_t last_score = 0;
     static auto last_tick = std::chrono::steady_clock::now();
     const auto now = std::chrono::steady_clock::now();
     const double elapsed = std::chrono::duration<double>(now - last_tick).count();
@@ -255,13 +268,29 @@ void update_hud() {
         return;
     }
     update_magic_box();
-    if (state.chapter != episode_chapter || state.level < last_level) {
-        episode_chapter = state.chapter;
-        episode_seconds = 0.0;
-    }
-    last_level = state.level;
+    if (state.score < last_score) splits.reset();
+    last_score = state.score;
     const bool paused = guest::load16(guest_rdram, 0x800E1228) >= 0;
-    if (!paused && elapsed < 1.0) episode_seconds += elapsed;
+    auto& episode = profile_data.progress.episode_records["rescue"];
+    const auto best_of = [&](int chapter) {
+        const auto it = episode.find(chapter);
+        return it == episode.end() ? std::vector<double>{} : it->second.best_levels;
+    };
+    if (const auto finished = splits.update(state.chapter, state.level, !paused && elapsed < 1.0 ? elapsed : 0.0,
+                                            best_of(state.chapter))) {
+        auto& record = episode[finished->chapter];
+        if (record.best_levels.size() < 10) record.best_levels.resize(10, 0.0);
+        const auto i = std::size_t(std::clamp(finished->level, 1, 10) - 1);
+        bool changed = false;
+        if (finished->time > 0.5 && (record.best_levels[i] <= 0.0 || finished->time < record.best_levels[i]))
+            record.best_levels[i] = finished->time, changed = true;
+        if (finished->episode_done && (record.best_total <= 0.0 || finished->episode_total < record.best_total))
+            record.best_total = finished->episode_total, changed = true;
+        if (changed) {
+            profile_dirty = true;
+            save_profile();
+        }
+    }
 
     blockplanet::ui::HudView view;
     view.hearts = state.hearts;
@@ -278,7 +307,20 @@ void update_hud() {
     }
     view.mode = "Rescue";
     view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
-    view.time = hud_time(episode_seconds);
+    {
+        const auto sv = splits.view();
+        view.time = hud_time(sv.total);
+        view.time_delta = sv.has_delta ? hud_delta(sv.net_delta) : "";
+        view.time_ahead = sv.net_delta < 0.0;
+        for (const auto& row : sv.rows) {
+            blockplanet::ui::HudView::Split split;
+            split.label = std::to_string(state.chapter) + ":" + std::to_string(row.level);
+            split.time = hud_time(row.time);
+            split.current = !row.done;
+            if (row.done && row.has_best) split.delta = hud_delta(row.delta), split.ahead = row.delta < 0.0;
+            view.splits.push_back(split);
+        }
+    }
     view.progress = state.progress;
     place_hud(view, state);
     // Each popup rises from its cells' place on the sphere: the cursor faces

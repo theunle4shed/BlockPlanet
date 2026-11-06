@@ -208,9 +208,23 @@ std::string hud_rml(const HudView& hud) {
     rml += "<div id='right' class='side'>";
     rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'>" +
            escape(hud.stage) + "</div></div>";
-    if (!hud.time.empty())
+    if (!hud.time.empty()) {
         rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>Time</div><div id='time'>" +
-               escape(hud.time) + "</div></div>";
+               escape(hud.time) + "</div>";
+        if (!hud.time_delta.empty())
+            rml += std::string("<div id='net' class='") + (hud.time_ahead ? "ahead" : "behind") + "'>" + escape(hud.time_delta) + "</div>";
+        // Splits: the last few completed levels and the current one.
+        rml += "<div id='splits'>";
+        const std::size_t first = hud.splits.size() > 6 ? hud.splits.size() - 6 : 0;
+        for (std::size_t i = first; i < hud.splits.size(); ++i) {
+            const auto& sp = hud.splits[i];
+            const bool last_done = !sp.current && i + 2 == hud.splits.size();
+            rml += std::string("<div class='split") + (sp.current ? " current" : "") + (last_done ? " last-done" : "") + "'><span class='stage'>" + escape(sp.label) +
+                   "</span><span class='delta " + (sp.delta.empty() ? "" : sp.ahead ? "ahead" : "behind") + "'>" + escape(sp.delta) +
+                   "</span><span class='t'>" + escape(sp.time) + "</span></div>";
+        }
+        rml += "</div></div>";
+    }
     if (hud.progress >= 0.0f)
         rml += "<div class='rule'><div class='line'/></div><div id='progress-group' class='group'><div class='label'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div></div>";
     rml += "</div>";

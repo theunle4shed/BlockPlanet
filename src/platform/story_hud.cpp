@@ -172,5 +172,69 @@ std::optional<ComboEvent> ComboTracker::update(const StoryHudState& state) {
     return done;
 }
 
+
+std::optional<EpisodeSplits::Finished> EpisodeSplits::update(int chapter, int level, double play_seconds,
+                                                             const std::vector<double>& best_levels) {
+    std::optional<Finished> finished;
+    if (chapter != chapter_ || level < level_) {
+        // A new episode, or Try Again / Restart (back to an earlier level).
+        const bool next_episode = chapter_ >= 0 && chapter == chapter_ + 1 && level == 1;
+        if (next_episode && level_ > 0) {
+            // The last level of the previous episode just finished.
+            done_.push_back(current_);
+            double total = 0.0;
+            for (double t : done_) total += t;
+            finished = Finished{chapter_, level_, current_, first_ == 1, total};
+        }
+        chapter_ = chapter;
+        level_ = level;
+        first_ = level;
+        bests_ = best_levels;
+        current_ = 0.0;
+        done_.clear();
+    } else if (level > level_) {
+        done_.push_back(current_);
+        finished = Finished{chapter_, level_, current_, false, 0.0};
+        // Levels skipped (should not happen) count as nothing.
+        for (int l = level_ + 1; l < level; ++l) done_.push_back(0.0);
+        level_ = level;
+        current_ = 0.0;
+    }
+    current_ += std::max(0.0, play_seconds);
+    return finished;
+}
+
+SplitsView EpisodeSplits::view() const {
+    const auto& best_levels = bests_;
+    SplitsView v;
+    v.chapter = chapter_;
+    const auto best = [&](int level) {
+        const auto i = std::size_t(level - 1);
+        return i < best_levels.size() ? best_levels[i] : 0.0;
+    };
+    for (std::size_t i = 0; i < done_.size(); ++i) {
+        SplitRow row;
+        row.level = first_ + int(i);
+        row.time = done_[i];
+        row.done = true;
+        const double b = best(row.level);
+        row.has_best = b > 0.0;
+        row.delta = row.has_best ? row.time - b : 0.0;
+        if (row.has_best) v.has_delta = true, v.net_delta += row.delta;
+        v.total += row.time;
+        v.rows.push_back(row);
+    }
+    if (chapter_ >= 0) {
+        SplitRow row;
+        row.level = level_;
+        row.time = current_;
+        const double b = best(level_);
+        row.has_best = b > 0.0;
+        row.delta = row.has_best ? row.time - b : 0.0;
+        v.total += current_;
+        v.rows.push_back(row);
+    }
+    return v;
+}
 } // namespace tetrisphere
 

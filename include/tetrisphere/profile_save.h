@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <vector>
 #include <optional>
 #include <set>
 #include <string>
@@ -64,6 +65,14 @@ struct ProfileProgress {
     std::map<std::string, std::set<int>> chapters_completed;
     std::set<int> puzzles_solved;
     ProfileStatistics statistics;
+    // Episode splits (the HUD's LiveSplit-style times, docs/HUD_DESIGN.md):
+    // per mode ("rescue"), chapter -> the best time of each level (seconds;
+    // 0 = none yet) and the best whole-episode time (0 = none yet).
+    struct EpisodeRecord {
+        std::vector<double> best_levels;
+        double best_total = 0.0;
+    };
+    std::map<std::string, std::map<int, EpisodeRecord>> episode_records;
 };
 
 struct ProfileSaveData {

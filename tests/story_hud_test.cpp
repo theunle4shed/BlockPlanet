@@ -74,6 +74,33 @@ int main() {
         assert(std::abs(event->dx - 2.5f) < 0.05f && std::abs(event->dy - 2.5f) < 0.05f);
     }
 
+    // Episode splits: levels' game times, against the best of each level.
+    {
+        EpisodeSplits splits;
+        const std::vector<double> none;
+        assert(!splits.update(1, 1, 0.0, none));
+        assert(!splits.update(1, 1, 30.0, none));
+        auto f = splits.update(1, 2, 0.5, none);  // level 1 done in 30 s
+        assert(f && f->level == 1 && f->time == 30.0 && !f->episode_done);
+        assert(!splits.update(1, 2, 20.0, none));
+        auto v = splits.view();
+        assert(v.rows.size() == 2 && v.rows[0].done && v.rows[0].time == 30.0 && !v.rows[0].has_best);
+        assert(!v.rows[1].done && v.rows[1].time == 20.5 && v.total == 50.5 && !v.has_delta);
+        // Try Again: back to level 1 starts a new run, compared with the bests then.
+        const std::vector<double> best{25.0, 30.0};
+        assert(!splits.update(1, 1, 3.0, best));
+        v = splits.view();
+        assert(v.rows.size() == 1 && v.total == 3.0 && v.rows[0].has_best);
+        splits.update(1, 1, 27.0, std::vector<double>{1.0, 1.0});  // later bests do not change this run's comparison
+        splits.update(1, 2, 20.5, std::vector<double>{1.0, 1.0});
+        v = splits.view();
+        assert(v.has_delta && v.net_delta == 5.0 && v.rows[0].delta == 5.0 && v.rows[1].has_best && v.rows[1].delta == -9.5);
+        // The episode's last level finishing: the next chapter starts at level 1.
+        for (int l = 2; l <= 10; ++l) splits.update(1, l, 10.0, none);
+        f = splits.update(2, 1, 0.0, none);
+        assert(f && f->chapter == 1 && f->level == 10 && f->episode_done && f->episode_total > 90.0);
+    }
+
     // Reading from game memory.
     std::vector<std::uint8_t> memory(0x800000);
     auto* m = memory.data();
