@@ -206,8 +206,12 @@ std::string hud_rml(const HudView& hud) {
     }
     rml += "</div></div>";
     rml += "<div id='right' class='side'>";
+    // Mode and stage, with the stage's progress bar beneath the stage number.
     rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'>" +
-           escape(hud.stage) + "</div></div>";
+           escape(hud.stage) + "</div>";
+    if (hud.progress >= 0.0f)
+        rml += "<div class='sublabel'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div>";
+    rml += "</div>";
     if (!hud.time.empty()) {
         rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>Time</div><div id='time'>" +
                escape(hud.time) + "</div>";
@@ -225,8 +229,6 @@ std::string hud_rml(const HudView& hud) {
         }
         rml += "</div></div>";
     }
-    if (hud.progress >= 0.0f)
-        rml += "<div class='rule'><div class='line'/></div><div id='progress-group' class='group'><div class='label'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div></div>";
     rml += "</div>";
     return rml;
 }

@@ -166,7 +166,8 @@ div { display: block; }
 .split .t { display: inline-block; width: 64dp; text-align: right; }
 .split.current { color: #f8f8f8; font-weight: bold; }
 .split.current .stage { color: #e8b818; }
-#progress { height: 20dp; }
+#progress { height: 18dp; }
+#where .sublabel { display: block; font-size: 17dp; font-weight: bold; color: #9aa6c8; font-effect: none; margin: 8dp 0dp 6dp 0dp; }
 #progress .fill { background-color: #48d060; }
 
 /* Portrait (taller than wide): the containers become rows, the groups side by
@@ -199,9 +200,10 @@ div { display: block; }
     #item { width: 116dp; height: 88dp; }
     #item .name { padding-top: 32dp; font-size: 18dp; }
     #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
-    #stage { font-size: 56dp; }
+    #stage { font-size: 40dp; line-height: 44dp; }
     #time { font-size: 40dp; }
-    #progress { width: 170dp; margin-top: 18dp; }
+    #where .sublabel { display: none; }
+    #progress { width: 120dp; margin-top: 8dp; height: 14dp; }
     #net { display: inline-block; margin-left: 12dp; }
     #time { display: inline-block; }
     #splits { margin-top: 2dp; }
