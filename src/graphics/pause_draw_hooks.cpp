@@ -17,6 +17,7 @@
 //   BLOCKPLANET_DRAW_LOG=1            log each distinct 2D draw (helper, image) anywhere
 //   BLOCKPLANET_HUD_LOG=1             while BlockPlanet's HUD is shown, log each distinct draw
 //                                     made outside the game's HUD routine
+//   BLOCKPLANET_HUD_SKIP_LOG=1        log each distinct 2D draw skipped in the game's HUD routine
 //   BLOCKPLANET_HUD_SKIP_MODEL=addr   skip model draws (0x8002D93C) whose matrix (a2) is addr
 // The HUD: while BlockPlanet's HUD is shown (set_original_hud_hidden), the 2D
 // draws made inside the game's HUD routine func_80075CD8 are skipped, and so is
@@ -36,6 +37,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 
 namespace {
@@ -89,7 +91,19 @@ void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
-    if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) return true;
+    if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) {
+        // Research: BLOCKPLANET_HUD_SKIP_LOG=1 logs each distinct 2D draw skipped here.
+        static const bool skip_log = std::getenv("BLOCKPLANET_HUD_SKIP_LOG") != nullptr;
+        if (skip_log) {
+            static std::mutex mutex;
+            static std::set<std::tuple<std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t>> seen;
+            std::lock_guard lock(mutex);
+            if (seen.insert({helper, std::uint32_t(ctx->r5), std::uint32_t(ctx->r6), std::uint32_t(ctx->r7)}).second)
+                std::fprintf(stdout, "{\"event\":\"hud_skip\",\"helper\":\"0x%08X\",\"a1\":\"0x%08X\",\"a2\":%d,\"a3\":%d}\n", helper,
+                             std::uint32_t(ctx->r5), int(ctx->r6), int(ctx->r7));
+        }
+        return true;
+    }
     // Research: BLOCKPLANET_MODEL_LOG=1 logs each distinct model drawn
     // (0x8002D93C's model, a0) the first time, with the time, scene and mode;
     // BLOCKPLANET_MODEL_ONLY=addr,addr draws only those models; BLOCKPLANET_MODEL_SKIP skips them.
