@@ -85,7 +85,7 @@ std::atomic<float> anchored_x{NAN};
 // half the picture's width beyond 4:3.
 std::atomic<float> anchor_shift{0.0f};
 // The held model sits this much right of where the numbers put it (measured).
-constexpr float box_correction = 0.06f;
+constexpr float box_correction = 0.0f;
 std::atomic<bool> enabled{false};
 
 // The flight: when the held magic is used, the offset from the bowl's spot to

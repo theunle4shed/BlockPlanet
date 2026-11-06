@@ -34,6 +34,12 @@ int main() {
     board.cells[2048 + 31 * 32 + 31] = 297;
     assert(weakest_square_blocks(board) == 0 || weakest_square_blocks(board) == 1);
 
+    // The highest layer holding a block.
+    board.cells.assign(9 * 1024, 0);
+    assert(top_layer(board) == 1);
+    board.cells[1024 * 5 + 7] = 288;
+    assert(top_layer(board) == 5);
+
     // Progress: the start count is 100%; the largest count in the first
     // updates of a level is kept as the start.
     ProgressTracker tracker;

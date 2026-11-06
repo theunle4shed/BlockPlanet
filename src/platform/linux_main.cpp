@@ -185,6 +185,7 @@ std::string hud_time(double seconds) {
 }
 
 void update_magic_box();
+void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
 
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
@@ -232,6 +233,7 @@ void update_hud() {
     view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
     view.time = hud_time(episode_seconds);
     view.progress = state.progress;
+    place_hud(view, state);
     blockplanet::ui::set_hud(std::move(view));
 }
 
@@ -380,39 +382,84 @@ std::atomic<ControllerFamily> active_family{ControllerFamily::Keyboard};
 std::atomic<ControllerFamily> active_p2_family{ControllerFamily::Keyboard};
 Settings active_settings{};
 
-// Places the held magic's 3D model in the HUD's item box: the box's centre
-// (from assets/ui/hud.rcss: 119 x 401 dp on a 1080-dp-high screen, landscape
-// only) in the game's picture, in picture heights from its centre.
-void update_magic_box() {
+// The game's picture in the window (pillarboxed or letterboxed by the
+// Picture setting): position and size in window pixels.
+struct PictureFrame {
+    float window_w = 0, window_h = 0;
+    float x = 0, y = 0, w = 0, h = 0;
+    float aspect = 4.0f / 3.0f;
+};
+std::optional<PictureFrame> picture_frame() {
     int width = 0, height = 0;
     if (window != nullptr) SDL_GetWindowSize(window, &width, &height);
-    if (width <= 0 || height <= 0 || width < height) {  // portrait: the box is above the picture
-        blockplanet::set_magic_box(true, NAN, NAN, 1.0f, NAN, 0.0f);
-        return;
-    }
-    const float window_aspect = float(width) / float(height);
-    float picture_aspect = window_aspect;
+    if (width <= 0 || height <= 0) return std::nullopt;
+    PictureFrame f;
+    f.window_w = float(width);
+    f.window_h = float(height);
+    const float window_aspect = f.window_w / f.window_h;
     switch (active_settings.graphics.aspect) {
-    case GraphicsAspect::Expand16x9: picture_aspect = 16.0f / 9.0f; break;
-    case GraphicsAspect::Original4x3: picture_aspect = 4.0f / 3.0f; break;
-    default: picture_aspect = std::max(window_aspect, 4.0f / 3.0f); break;
+    case GraphicsAspect::Expand16x9: f.aspect = 16.0f / 9.0f; break;
+    case GraphicsAspect::Original4x3: f.aspect = 4.0f / 3.0f; break;
+    default: f.aspect = std::max(window_aspect, 4.0f / 3.0f); break;
     }
-    // The picture's height in window pixels (pillarboxed or letterboxed).
-    const float picture_height = window_aspect >= picture_aspect ? float(height) : float(width) / picture_aspect;
-    const float dp = float(height) / 1080.0f;
-    const float x = (119.0f * dp - float(width) / 2.0f) / picture_height;
-    const float y = (401.0f * dp - float(height) / 2.0f) / picture_height;
-    // Outside the picture (a narrow picture setting in a wide window): keep the game's placement hidden.
-    if (std::abs(x) > picture_aspect / 2.0f || std::abs(y) > 0.5f) {
+    f.h = window_aspect >= f.aspect ? f.window_h : f.window_w / f.aspect;
+    f.w = f.h * f.aspect;
+    f.x = (f.window_w - f.w) / 2.0f;
+    f.y = (f.window_h - f.h) / 2.0f;
+    return f;
+}
+
+// Places the held magic's 3D model in the HUD's item box, wherever the HUD's
+// layout put it (ui::hud_item_box), in picture heights from the picture's
+// centre. The box must be inside the picture (not on portrait screens, where
+// the containers are above and below it).
+void update_magic_box() {
+    const auto frame = picture_frame();
+    const auto box = blockplanet::ui::hud_item_box();
+    if (!frame || !box || box->frame_width <= 0.0f || box->frame_height <= 0.0f) {
         blockplanet::set_magic_box(true, NAN, NAN, 1.0f, NAN, 0.0f);
         return;
     }
-    // The same distance from the 4:3 frame's left edge as from the picture's.
-    const float picture_left = (float(width) - picture_aspect * picture_height) / 2.0f;
-    const float x_anchored = -2.0f / 3.0f + (119.0f * dp - picture_left) / picture_height;
-    // Sized to sit inside the box as it turns (measured with the Magnet).
-    blockplanet::set_magic_box(true, x, y, 0.45f * (132.0f * dp / picture_height) / 0.13f, x_anchored,
-                               (picture_aspect - 4.0f / 3.0f) / 2.0f);
+    // The box's centre and height in window pixels.
+    const float sx = frame->window_w / box->frame_width, sy = frame->window_h / box->frame_height;
+    const float bx = (box->x + box->width / 2.0f) * sx, by = (box->y + box->height / 2.0f) * sy;
+    const float bh = box->height * sy;
+    const float x = (bx - (frame->x + frame->w / 2.0f)) / frame->h;
+    const float y = (by - (frame->y + frame->h / 2.0f)) / frame->h;
+    static const bool log_box = std::getenv("BLOCKPLANET_MAGIC_BOX_LOG") != nullptr;  // research
+    static int logged = 0;
+    if (log_box && logged++ % 120 == 0)
+        std::fprintf(stdout, "{\"event\":\"magic_box\",\"x\":%g,\"y\":%g,\"box\":[%g,%g,%g,%g],\"frame\":[%g,%g]}\n", x, y,
+                     box->x, box->y, box->width, box->height, box->frame_width, box->frame_height);
+    if (std::abs(x) > frame->aspect / 2.0f || std::abs(y) > 0.5f) {
+        blockplanet::set_magic_box(true, NAN, NAN, 1.0f, NAN, 0.0f);
+        return;
+    }
+    // The held draw is a left-anchored span, which RT64 moves left on wide
+    // pictures; measured: by about 0.73 of the picture's width beyond 4:3, halved.
+    const float shift = 0.73f * (frame->aspect - 4.0f / 3.0f) / 2.0f;
+    const float x_anchored = x + shift;
+    // Sized to sit inside the box as it turns (measured with the Magnet: about
+    // 0.13 picture heights tall at scale 1).
+    blockplanet::set_magic_box(true, x, y, 0.45f * (bh / frame->h) / 0.13f, x_anchored, shift);
+}
+
+// The sphere's radius on screen (picture heights), estimated from its highest
+// layer and the camera distance (the core's surface is at a third of the
+// grid's length and each layer adds 0.0875; calibrated so stage 1:1 at rest
+// fills 55% of the picture's height).
+float hud_sphere_radius(const tetrisphere::StoryHudState& state) {
+    return 1584.0f * (1.0f / 3.0f + 0.0875f * float(state.top_layer)) / state.camera_distance;
+}
+
+void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state) {
+    const auto frame = picture_frame();
+    if (!frame) return;
+    view.picture_x = frame->x / frame->window_w;
+    view.picture_y = frame->y / frame->window_h;
+    view.picture_w = frame->w / frame->window_w;
+    view.picture_h = frame->h / frame->window_h;
+    view.sphere_radius = hud_sphere_radius(state);
 }
 
 Settings persisted_settings{};

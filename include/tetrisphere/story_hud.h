@@ -25,6 +25,8 @@ struct StoryHudState {
     int chapter = 0;           // 1-based
     int level = 0;             // 1-based
     float progress = -1.0f;    // 0 to 1, or -1 before it is known
+    int top_layer = 1;         // the highest board layer holding a block (1 to 8)
+    float camera_distance = 2424.0f;  // player context +0x2420
 };
 
 // Board measures for the progress bar: blocks above the core in the S x S
@@ -34,6 +36,8 @@ struct BoardView {
     std::vector<std::int16_t> cells;
     int square = 4;  // S
 };
+// The highest layer (1 to 8) holding a block, or 1.
+int top_layer(const BoardView& board);
 // Blocks above the core in the square with the fewest.
 int weakest_square_blocks(const BoardView& board);
 

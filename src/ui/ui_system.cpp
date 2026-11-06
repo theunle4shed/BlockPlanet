@@ -8,6 +8,8 @@
 #include <RmlUi/Core.h>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -78,6 +80,8 @@ std::atomic<bool> open_flag{false};
 // The HUD (set_hud), under its own mutex.
 std::mutex hud_mutex;
 std::optional<HudView> hud_wanted;
+std::optional<std::array<float, 4>> hud_item;  // x, y, width, height in pixels
+std::array<float, 2> hud_item_frame{};          // the context's size then
 Rml::ElementDocument* hud_document = nullptr;
 std::string hud_shown_rml;
 
@@ -156,22 +160,27 @@ std::string escape(const std::string& text) {
     return out;
 }
 
-// The HUD's markup for these values (placeholder art).
+// The HUD's markup for these values (placeholder art): one tinted container
+// per side, its groups separated by dividers. The magic group leaves the item
+// box clear, so the game's 3D model drawn under the HUD shows through.
 std::string hud_rml(const HudView& hud) {
     std::string rml;
-    rml += "<div id='left'>";
-    rml += "<div id='lives' class='panel'><div id='hearts'>";
+    rml += "<div id='left' class='side'>";
+    rml += "<div id='lives' class='group'><div id='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
     rml += "</div>";
     const bool hurry = hud.drop_left < 0.35f;
-    rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div class='fill' style='width: " +
-           percent(hud.drop_left) + "'/></div></div>";
-    rml += "<div id='magic' class='panel'><div id='item'>";
+    // Bar fills are set on the elements each frame (set_hud_fills), so the
+    // markup only changes when something else does.
+    rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div id='drop-fill' class='fill'/></div></div>";
+    rml += "<div class='rule'/>";
+    rml += "<div id='magic'><div class='band'/><div class='window'><div class='edge'/><div id='item'>";
     // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
     // its name is shown only when it is not.
     rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
-    rml += "</div><div id='meter' class='bar'><div class='fill' style='width: " + percent(hud.meter) + "'/></div></div>";
-    rml += "<div id='next' class='panel'>";
+    rml += "</div><div class='edge'/></div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>";
+    rml += "<div class='rule'/>";
+    rml += "<div id='next' class='group'>";
     for (std::size_t i = 0; i < hud.next.size(); ++i) {
         const auto& piece = hud.next[i];
         const int cell = i == 0 ? 34 : 26;
@@ -190,15 +199,75 @@ std::string hud_rml(const HudView& hud) {
         rml += "</div>";
     }
     rml += "</div></div>";
-    rml += "<div id='right'>";
-    rml += "<div id='where' class='panel'><div id='mode'>" + escape(hud.mode) + "</div><div id='stage'>" +
+    rml += "<div id='right' class='side'>";
+    rml += "<div id='where' class='group'><div id='mode'>" + escape(hud.mode) + "</div><div id='stage'>" +
            escape(hud.stage) + "</div></div>";
-    rml += "<div id='middle' class='panel'>";
-    if (!hud.time.empty()) rml += "<div id='time'>" + escape(hud.time) + "</div>";
+    if (!hud.time.empty()) rml += "<div class='rule'/><div id='time' class='group'>" + escape(hud.time) + "</div>";
     if (hud.progress >= 0.0f)
-        rml += "<div id='progress' class='bar'><div class='fill' style='width: " + percent(hud.progress) + "'/></div>";
-    rml += "</div></div>";
+        rml += "<div class='rule'/><div id='progress-group' class='group'><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div></div>";
+    rml += "</div>";
     return rml;
+}
+
+void set_hud_fills(const HudView& hud) {
+    const std::pair<const char*, float> fills[] = {
+        {"drop-fill", hud.drop_left}, {"meter-fill", hud.meter}, {"progress-fill", hud.progress}};
+    for (const auto& [id, value] : fills)
+        if (auto* e = hud_document->GetElementById(id)) e->SetProperty("width", percent(value));
+}
+
+std::string px(float value) { return std::to_string(int(std::lround(value))) + "px"; }
+
+// Places the two containers (docs/HUD_DESIGN.md): where they would be on a 4:3
+// screen (3:4 on portrait screens, where they are rows above and below), so on
+// wider or taller screens they stay near the sphere; pushed out as the sphere
+// grows on screen, so they keep clear of it, but never past the screen's edge.
+// Sizes come from the last layout.
+void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2f& left_at) {
+    auto* left = hud_document->GetElementById("left");
+    auto* right = hud_document->GetElementById("right");
+    if (left == nullptr || right == nullptr) return;
+    const float dp = height / design_height;
+    const float margin = 24.0f * dp;
+    const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width;
+    const float cy = (hud.picture_y + hud.picture_h / 2.0f) * height;
+    // Sizes from the last layout (the border box).
+    const auto size_of = [](Rml::Element* e) { return e->GetBox().GetSize(Rml::BoxArea::Border); };
+    // Right after the markup is rebuilt the new elements have no size yet:
+    // keep the last measured sizes.
+    static Rml::Vector2f last_left{0, 0}, last_right{0, 0};
+    auto ls = size_of(left), rs = size_of(right);
+    if (ls.x > 0 && ls.y > 0) last_left = ls; else ls = last_left;
+    if (rs.x > 0 && rs.y > 0) last_right = rs; else rs = last_right;
+    const float lw = ls.x, lh = ls.y, rw = rs.x, rh = rs.y;
+    static int logged = 0;  // research: the measured sizes
+    if (std::getenv("BLOCKPLANET_HUD_LAYOUT_LOG") != nullptr && logged++ % 120 == 0)
+        std::fprintf(stdout, "{\"event\":\"hud_layout\",\"lw\":%g,\"lh\":%g,\"rw\":%g,\"rh\":%g,\"w\":%g,\"h\":%g}\n", lw, lh, rw, rh, width, height);
+    const float ph = hud.picture_h * height;
+    const float clear = hud.sphere_radius * ph + margin;  // from the centre, keeping clear of the sphere
+    if (width >= height) {
+        const float frame = ph * 2.0f / 3.0f;  // half a 4:3 frame's width
+        const float lx = std::max(margin, std::min(cx - frame + margin, cx - clear - lw));
+        const float rx = std::min(width - margin - rw, std::max(cx + frame - margin - rw, cx + clear));
+        const float ly = std::clamp(cy - lh / 2.0f, margin, std::max(margin, height - margin - lh));
+        left->SetProperty("left", px(lx));
+        left->SetProperty("top", px(ly));
+        left_at = {lx, ly};
+        if (std::getenv("BLOCKPLANET_HUD_LAYOUT_LOG") != nullptr && logged % 120 == 1)
+            std::fprintf(stdout, "{\"event\":\"hud_place\",\"lx\":%g,\"ly\":%g,\"cy\":%g,\"lh\":%g}\n", lx, ly, cy, lh);
+        right->SetProperty("left", px(rx));
+        right->SetProperty("top", px(std::clamp(cy - rh / 2.0f, margin, std::max(margin, height - margin - rh))));
+    } else {
+        const float frame = hud.picture_w * width * 2.0f / 3.0f;  // half a 3:4 frame's height
+        const float ly = std::max(margin, std::min(cy - frame + margin, cy - clear - lh));
+        const float ry = std::min(height - margin - rh, std::max(cy + frame - margin - rh, cy + clear));
+        const float lx = std::clamp(cx - lw / 2.0f, margin, std::max(margin, width - margin - lw));
+        left->SetProperty("left", px(lx));
+        left->SetProperty("top", px(ly));
+        left_at = {lx, ly};
+        right->SetProperty("left", px(std::clamp(cx - rw / 2.0f, margin, std::max(margin, width - margin - rw))));
+        right->SetProperty("top", px(ry));
+    }
 }
 
 // Shows, updates or hides the HUD document. Returns whether it is shown.
@@ -211,6 +280,8 @@ bool update_hud_document() {
     const bool show = hud.has_value() && !navigator->is_open();
     if (!show) {
         if (hud_document != nullptr) hud_document->Hide();
+        std::lock_guard lock(hud_mutex);
+        hud_item.reset();
         return false;
     }
     if (hud_document == nullptr) {
@@ -227,7 +298,25 @@ bool update_hud_document() {
         if (auto* root = hud_document->GetElementById("hud")) root->SetInnerRML(rml);
         hud_shown_rml = rml;
     }
+    set_hud_fills(*hud);
+    const auto size = context->GetDimensions();
+    Rml::Vector2f left_at{0, 0};
+    place_hud_sides(*hud, float(size.x), float(size.y), left_at);
     if (!hud_document->IsVisible()) hud_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
+    // Report where the item box is (from the last layout) for the magic's model.
+    // The box's offset inside the left container, plus where the container was
+    // just placed (absolute offsets lag behind the placement).
+    auto* left_side = hud_document->GetElementById("left");
+    if (auto* item = hud_document->GetElementById("item"); item != nullptr && left_side != nullptr) {
+        Rml::Vector2f offset = left_at;
+        for (auto* e = item; e != nullptr && e != left_side; e = e->GetParentNode()) offset += e->GetRelativeOffset(Rml::BoxArea::Border);
+        const auto item_size = item->GetBox().GetSize(Rml::BoxArea::Border);
+        if (item_size.x > 0 && item_size.y > 0) {  // not right after a rebuild
+            std::lock_guard lock(hud_mutex);
+            hud_item = std::array<float, 4>{offset.x, offset.y, item_size.x, item_size.y};
+            hud_item_frame = {float(size.x), float(size.y)};
+        }
+    }
     return true;
 }
 
@@ -342,6 +431,12 @@ std::string current_screen() {
 void set_hud(std::optional<HudView> hud) {
     std::lock_guard lock(hud_mutex);
     hud_wanted = std::move(hud);
+}
+
+std::optional<HudBox> hud_item_box() {
+    std::lock_guard lock(hud_mutex);
+    if (!hud_item) return std::nullopt;
+    return HudBox{(*hud_item)[0], (*hud_item)[1], (*hud_item)[2], (*hud_item)[3], hud_item_frame[0], hud_item_frame[1]};
 }
 
 bool menus_open() { return open_flag.load(); }

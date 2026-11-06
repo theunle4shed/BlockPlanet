@@ -1,6 +1,8 @@
 /* BlockPlanet's in-game HUD (docs/HUD_DESIGN.md): placeholder art until the
-   owner's designs are in. Priority 1 in a column on the left, priority 2 on
-   the right. Sizes in dp, laid out for a 1080-pixel-high screen. */
+   owner's designs are in. Priority 1 in a container on the left, priority 2 in
+   one on the right, each centred vertically beside the sphere (placed by
+   ui_system.cpp); on portrait screens they are rows above and below.
+   Sizes in dp, laid out for a 1080-pixel-high screen. */
 
 body {
     width: 100%;
@@ -14,33 +16,20 @@ body {
 div { display: block; }
 #hud { width: 100%; height: 100%; }
 
-/* Each group sits on a tinted, rounded panel (the menus' colours) so it stays
-   readable when the sphere or a bright background passes under it. */
-.panel {
-    background-color: #0b1020a8;
-    border: 2dp #f0f0f060;
-    border-radius: 22dp;
-    padding: 22dp 24dp;
-}
+/* The containers: tinted (the menus' colours), no border, round corners.
+   The tint is on the groups, not the container, so the magic group can leave
+   the item box clear. */
+.side { position: absolute; }
+#left { width: 232dp; }
+#right { width: 248dp; text-align: right; }
 
-#left {
-    position: absolute;
-    left: 40dp;
-    top: 190dp;
-    width: 232dp;
-}
-/* The left column is three cards; the magic card has a clear item box, so
-   the magic's 3D model (drawn by the game, under the HUD) shows through. */
-#left > .panel { margin-bottom: 14dp; }
-#right {
-    position: absolute;
-    right: 40dp;
-    top: 40dp;
-    width: 260dp;
-    height: 1000dp;
-    text-align: right;
-}
-#where { display: block; padding: 14dp 24dp 10dp 24dp; }
+.group, .rule, #magic .band, #magic .edge { background-color: #0b1020b0; }
+.group { padding: 18dp 24dp; }
+.side > :first-child { border-top-left-radius: 22dp; border-top-right-radius: 22dp; }
+.side > :last-child { border-bottom-left-radius: 22dp; border-bottom-right-radius: 22dp; }
+
+/* Dividers between groups: a thin light line across the tint. */
+.rule { height: 2dp; background-color: #343a52e0; }
 
 /* Hearts: three red tiles, a lost one dark. */
 #hearts { height: 48dp; }
@@ -59,8 +48,8 @@ div { display: block; }
 .bar {
     display: block;
     height: 16dp;
-    background-color: #0b1020c0;
-    border: 2dp #f0f0f0;
+    background-color: #05081080;
+    border: 2dp #f0f0f0a0;
     border-radius: 8dp;
 }
 .bar .fill {
@@ -75,33 +64,38 @@ div { display: block; }
 #drop .fill { background-color: #f5c21f; }
 #drop.hurry .fill { background-color: #f04030; }
 
-/* Magic: an item box with the charge bar beneath. */
-#magic { background-color: transparent; padding: 0dp; border-width: 0dp; }
+/* Magic: a clear window for the item (the game draws its 3D model there),
+   framed by tinted bands, with the meter beneath. */
+#magic .band { height: 14dp; }
+#magic .band:last-child { height: auto; padding: 10dp 24dp 18dp 24dp; }
+#magic .window { height: 136dp; }
+#magic .edge { display: inline-block; width: 24dp; height: 136dp; vertical-align: top; }
 #item {
-    width: 152dp;
+    display: inline-block;
+    vertical-align: top;
+    width: 184dp;
     height: 132dp;
-    border: 3dp #f0f0f0;
-    border-radius: 20dp;
+    border: 2dp #f0f0f040;
+    border-radius: 18dp;
 }
 #item .name {
     display: block;
-    padding-top: 44dp;
+    padding-top: 50dp;
     text-align: center;
     font-size: 22dp;
     font-weight: bold;
     color: #f5821f;
 }
-#meter { width: 152dp; margin-top: 10dp; }
+#meter { width: 184dp; }
 #meter .fill { background-color: #9c5cf0; }
 
 /* Next pieces: the next one first and larger. */
-
-#next .piece:last-child { margin-bottom: 0dp; }
 .piece {
     display: block;
     position: relative;
-    margin-bottom: 22dp;
+    margin-bottom: 18dp;
 }
+.piece:last-child { margin-bottom: 0dp; }
 .piece .cell {
     position: absolute;
     border-radius: 5dp;
@@ -114,47 +108,31 @@ div { display: block; }
     color: #f5821f;
 }
 
-/* Mode and stage, top right. */
+/* Right: mode and stage, the episode's time, progress. */
 #mode { display: block; font-size: 30dp; color: #e8b818; }
 #stage { display: block; font-size: 64dp; font-weight: bold; }
-
-/* Episode time and progress, right middle. */
-#middle { position: absolute; right: 0dp; top: 420dp; width: 212dp; }
-#progress { width: 212dp; }
-#time { display: block; font-size: 44dp; font-weight: bold; }
-#progress { margin-top: 12dp; height: 20dp; }
+#time { font-size: 44dp; font-weight: bold; }
+#progress { height: 20dp; }
 #progress .fill { background-color: #48d060; }
 
-/* Portrait (taller than wide): the columns become rows, priority 1 along the
-   top and priority 2 along the bottom, in the space above and below the
-   game's picture. */
+/* Portrait (taller than wide): the containers become rows, the groups side by
+   side with dividers between them. */
 @media (orientation: portrait) {
-    #left {
-        left: 24dp;
-        right: 24dp;
-        top: 24dp;
-        width: auto;
-        padding: 16dp 20dp;
-    }
-    #left > div {
-        display: inline-block;
-        vertical-align: top;
-        margin-top: 0dp;
-        margin-right: 40dp;
-    }
-    #drop { display: block; }
-    #item { width: 96dp; height: 96dp; }
-    #item .name { padding-top: 32dp; font-size: 18dp; }
-    #meter { width: 102dp; }
-    #next .piece { display: inline-block; vertical-align: top; margin-right: 22dp; }
-    #right {
-        top: auto;
-        bottom: 24dp;
-        right: 24dp;
-        left: 24dp;
-        width: auto;
-        height: 150dp;
-    }
-    #where { position: absolute; right: 0dp; bottom: 0dp; }
-    #middle { top: auto; bottom: 0dp; right: auto; left: 0dp; text-align: left; }
+    #left, #right { width: auto; text-align: left; }
+    .side > div { display: inline-block; vertical-align: top; }
+    .side > :first-child { border-radius: 0dp; border-top-left-radius: 22dp; border-bottom-left-radius: 22dp; }
+    .side > :last-child { border-radius: 0dp; border-top-right-radius: 22dp; border-bottom-right-radius: 22dp; }
+    .rule { width: 2dp; height: 120dp; padding: 18dp 0dp; }
+    #lives, #next { height: 120dp; padding: 18dp 20dp; }
+    #magic .band { height: 10dp; }
+    #magic .window { height: 100dp; }
+    #magic .edge { width: 16dp; height: 100dp; }
+    #item { width: 120dp; height: 96dp; }
+    #item .name { padding-top: 34dp; font-size: 18dp; }
+    #meter { width: 120dp; }
+    #magic .band:last-child { padding: 6dp 16dp 4dp 16dp; }
+    #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
+    #where, #time, #progress-group { height: 96dp; padding: 12dp 20dp; }
+    #progress { width: 160dp; margin-top: 36dp; }
+    #time { padding-top: 28dp; }
 }

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstring>
 
 namespace tetrisphere {
 namespace {
@@ -34,6 +35,14 @@ int weakest_square_blocks(const BoardView& board) {
         }
     }
     return best;
+}
+
+int top_layer(const BoardView& board) {
+    if (board.cells.size() < std::size_t(layers * layer_cells)) return 1;
+    for (int layer = layers - 1; layer >= 1; --layer)
+        for (int cell = 0; cell < layer_cells; ++cell)
+            if (board.cells[std::size_t(layer * layer_cells + cell)] != 0) return layer;
+    return 1;
 }
 
 float ProgressTracker::update(int level_key, int weakest_now) {
@@ -77,6 +86,10 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
         }
         out.next.push_back(piece);
     }
+    const std::uint32_t distance_bits = load32(rdram, player1 + 0x2420);
+    float distance = 0.0f;
+    std::memcpy(&distance, &distance_bits, 4);
+    if (distance > 100.0f && distance < 100000.0f) out.camera_distance = distance;
     out.chapter = load16(rdram, 0x800E44A0) + 1;
     out.level = load16(rdram, player1 + 0x23BA) + 1;
 
@@ -87,6 +100,7 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
         board.cells.resize(std::size_t(layers * layer_cells));
         for (int i = 0; i < layers * layer_cells; ++i) board.cells[std::size_t(i)] = load16(rdram, board_address + 2u * i);
         out.progress = progress.update(out.chapter * 100 + out.level, weakest_square_blocks(board));
+        out.top_layer = top_layer(board);
     }
     return true;
 }

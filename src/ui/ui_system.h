@@ -61,9 +61,21 @@ struct HudView {
     std::string stage;         // e.g. "1:3"
     std::string time;          // the episode's time, e.g. "2:41"
     float progress = -1.0f;    // 0 to 1, or -1 to hide the bar
+    // Placement: the game's picture as fractions of the window (x, y, width,
+    // height), and the sphere's radius on screen in picture heights.
+    float picture_x = 0.0f, picture_y = 0.0f, picture_w = 1.0f, picture_h = 1.0f;
+    float sphere_radius = 0.275f;
 };
 // Shows the HUD with these values, or hides it (nullopt). Applied at the next frame.
 void set_hud(std::optional<HudView> hud);
+
+// Where the HUD's magic item box is, as last laid out (pixels in a frame of
+// frame_width x frame_height), while the HUD is shown.
+struct HudBox {
+    float x, y, width, height;
+    float frame_width, frame_height;
+};
+std::optional<HudBox> hud_item_box();
 
 // True while a menu screen is open (or about to open).
 bool menus_open();
