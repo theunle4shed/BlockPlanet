@@ -377,3 +377,9 @@ For the HUD's goal progress. Levels started with `launch:hide_and_seek:0:L` and 
 Type 7 (two per playfield layer, also in Rescue from 1:2) is probably the guides' 1×1 **magic crystal**; not confirmed.
 
 **For the HUD** ([HUD_DESIGN.md](../HUD_DESIGN.md#hide--seek)): picture cells are the layer 0 cells that are not plain core (types 10–25; in MULTI, each 3 × 3 tile). Blocks above a picture are the non-zero cells in layers 1–8 over its cells, not counting drill (2, 5) and tower (31) blocks, which the player does not have to remove. A brick's height is the layer it is in; it has reached the core at layer 1.
+
+### The title screen's artwork (2026-11-06)
+
+Found for a sharper title on large screens. The title screen is mostly 2D: the Nintendo 64 logo and the intro are 3D models, but the title's logo, character art, oval and copyright lines are **one 270 × 205 image** (16-bit RGBA5551, 1-bit transparency), drawn by the image helper `0x8003396C` at (24, 21) in the 320 × 240 frame (`0x8019D250` in the sample, a header of width, height and format 0, then the pixels), over a 280 × 188 one-byte-per-pixel soft shadow (`0x801B82D0`, format 2). Image headers: s16 width, s16 height, s16 format (0 RGBA16, 2 one byte per pixel), then the pixel data from +8. Logged with `BLOCKPLANET_DRAW_LOG=1` (every distinct 2D draw, its image and position).
+
+**Redraw test** (private files only, generated from the ROM's image): tracing the 1-bit outline into smooth vectors (potrace) and upscaling the painted inside smoothly gives sharp outer edges at any size with the painting softened but intact; tracing each colour area as well makes the letters' inner edges sharp too but flattens the shading into bands. Small details (the ™) are lost by the trace and need care. Extruding the letters into 3D is not practical: the logo's bevels, sides and shadow are painted into the picture.

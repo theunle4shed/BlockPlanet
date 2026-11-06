@@ -14,6 +14,7 @@
 //                                     seen while paused
 //   BLOCKPLANET_PAUSE_SKIP=a1,a1..    skip draws whose second argument (the image, for
 //                                     the image helpers) is one of these while paused
+//   BLOCKPLANET_DRAW_LOG=1            log each distinct 2D draw (helper, image) anywhere
 //   BLOCKPLANET_HUD_LOG=1             while BlockPlanet's HUD is shown, log each distinct draw
 //                                     made outside the game's HUD routine
 //   BLOCKPLANET_HUD_SKIP_MODEL=addr   skip model draws (0x8002D93C) whose matrix (a2) is addr
@@ -88,6 +89,16 @@ void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
     if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) return true;
+    static const bool draw_log = std::getenv("BLOCKPLANET_DRAW_LOG") != nullptr;  // research: every distinct 2D draw
+    if (draw_log) {
+        static std::mutex mutex;
+        static std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
+        std::lock_guard lock(mutex);
+        if (seen.insert({helper, static_cast<std::uint32_t>(ctx->r5)}).second)
+            std::fprintf(stdout, "{\"event\":\"draw\",\"helper\":\"0x%08X\",\"a0\":\"0x%08X\",\"a1\":\"0x%08X\",\"a2\":%d,\"a3\":%d,\"scene\":%d}\n",
+                         helper, static_cast<std::uint32_t>(ctx->r4), static_cast<std::uint32_t>(ctx->r5), static_cast<int>(ctx->r6),
+                         static_cast<int>(ctx->r7), static_cast<int>(guest16(rdram, 0x800E121Cu)));
+    }
     if (helper == 0x8002D93Cu) blockplanet_magic_flight(rdram, ctx);
     // The held magic's model above the bowl (func_800C78A0's model draw, told
     // apart by its matrices), only while held (player 1's +0x702 >= 0) and
