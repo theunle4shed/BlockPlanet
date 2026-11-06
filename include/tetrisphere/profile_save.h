@@ -73,10 +73,10 @@ struct ProfileProgress {
         double best_total = 0.0;
     };
     std::map<std::string, std::map<int, EpisodeRecord>> episode_records;
-    // Time Attack (the game's Time Trial: score as much as possible against
+    // Score Attack (the game's Time Trial: score as much as possible against
     // the clock): the best score (as shown) and the longest time survived.
-    std::int64_t time_attack_best_score = 0;
-    double time_attack_best_seconds = 0.0;
+    std::int64_t score_attack_best_score = 0;
+    double score_attack_best_seconds = 0.0;
 };
 
 struct ProfileSaveData {

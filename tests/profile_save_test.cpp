@@ -58,14 +58,14 @@ int main(int argc, char** argv) {
     data.preferences.controls = controls;
     data.preferences.audio = AudioPreferences{60, 30, true};
     data.preferences.hud_distance = "follow";
-    data.progress.time_attack_best_score = 482000;
-    data.progress.time_attack_best_seconds = 371.5;
+    data.progress.score_attack_best_score = 482000;
+    data.progress.score_attack_best_seconds = 371.5;
     data.progress.episode_records["rescue"][2] = {{41.5, 0.0, 38.25}, 512.0};
     assert(store.save(data, error));
     ProfileSaveData read;
     assert(store.load(read, error));
     assert(read.preferences.hud_distance && *read.preferences.hud_distance == "follow");
-    assert(read.progress.time_attack_best_score == 482000 && read.progress.time_attack_best_seconds == 371.5);
+    assert(read.progress.score_attack_best_score == 482000 && read.progress.score_attack_best_seconds == 371.5);
     {
         const auto& r = read.progress.episode_records["rescue"][2];
         assert(r.best_levels.size() == 3 && r.best_levels[0] == 41.5 && r.best_levels[2] == 38.25 && r.best_total == 512.0);

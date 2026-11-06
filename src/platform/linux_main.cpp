@@ -238,7 +238,7 @@ void update_hud() {
     struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
     static std::vector<LivePopup> popups;
     static tetrisphere::ComboTracker combos;
-    // Story shows no score pop-ups (decided 2026-11-06); Time Attack shows the
+    // Story shows no score pop-ups (decided 2026-11-06); Score Attack shows the
     // time a combo gained ("+5 s") rising from where it cleared; score modes
     // will use points (BLOCKPLANET_POPUPS=1 shows points in Story for testing).
     static const bool popups_on = std::getenv("BLOCKPLANET_POPUPS") != nullptr;
@@ -287,7 +287,7 @@ void update_hud() {
                      popups.end());
     }
     if (!story) popups.clear();
-    // Time Attack records: the run's score and time survived (play time),
+    // Score Attack records: the run's score and time survived (play time),
     // saved when the run ends (leaving play) or a new one starts.
     static long long attack_score = 0;
     static double attack_seconds = 0.0;
@@ -297,8 +297,8 @@ void update_hud() {
         attack_running = false;
         auto& p = profile_data.progress;
         bool changed = false;
-        if (attack_score > p.time_attack_best_score) p.time_attack_best_score = attack_score, changed = true;
-        if (attack_seconds > p.time_attack_best_seconds) p.time_attack_best_seconds = attack_seconds, changed = true;
+        if (attack_score > p.score_attack_best_score) p.score_attack_best_score = attack_score, changed = true;
+        if (attack_seconds > p.score_attack_best_seconds) p.score_attack_best_seconds = attack_seconds, changed = true;
         if (changed) {
             profile_dirty = true;
             save_profile();
@@ -365,12 +365,12 @@ void update_hud() {
         view.next.push_back(std::move(p));
     }
     if (state.mode == 2) {
-        view.mode = "Time Attack";
+        view.mode = "Score Attack";
         view.stage = std::to_string(state.level);
         view.score = hud_number(static_cast<long long>(state.score) * 10);
         const auto& p = profile_data.progress;
-        if (p.time_attack_best_score > 0 || p.time_attack_best_seconds > 0.0)
-            view.score_best = "Best " + hud_number(p.time_attack_best_score) + " \u00B7 " + hud_time(p.time_attack_best_seconds);
+        if (p.score_attack_best_score > 0 || p.score_attack_best_seconds > 0.0)
+            view.score_best = "Best " + hud_number(p.score_attack_best_score) + " \u00B7 " + hud_time(p.score_attack_best_seconds);
         view.clock = hud_time(std::max(0, state.clock_frames) / 60.0);
         view.clock_low = state.clock_frames < 30 * 60;
     } else {
@@ -2007,7 +2007,7 @@ bool handle_profile_command(const std::string& command) {
                 std::string where;
                 switch (state.mode) {
                 case 1: where = "Story \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
-                case 2: where = "Time Attack"; break;
+                case 2: where = "Score Attack"; break;
                 case 3: where = state.training_type == 3 ? "Puzzle \u00B7 Chapter 0" : "Story \u00B7 Chapter 0"; break;
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
                 case 5: where = "Hide & Seek \u00B7 Level " + std::to_string(state.level + 1); break;  // its chapter is not the Rescue one
