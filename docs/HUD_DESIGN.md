@@ -123,7 +123,7 @@ Not shown in VS: mode and stage text, timer, score.
 ## Other modes (to be decided)
 
 - **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.
-- Online VS, Collaborate, Custom: when those modes are designed.
+- Online VS, Cooperative, Custom: when those modes are designed.
 
 ## Research needed
 

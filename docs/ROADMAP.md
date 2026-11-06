@@ -162,7 +162,7 @@ Puzzle limits its play area with a border of type 47 blocks (the purple "out of 
 
 **Multiphasic.** Several levels stitched together seamlessly through visual trickery. It starts with stage 1, which looks the same as usual: dig down to the core. But the core looks like a different sphere with a different block combination (purely representative, the core picture design) and is faded. The core cannot be destroyed, and anything dropped on top of it follows the normal core rules. Once the target core size is reached (4 × 4 etc.), there is a detonation and all remaining blocks are thrown off the sphere. The trick (the transition): what remains is the core, decorated to look exactly like the next stage. It grows to match the next phase's (level's) starting size and is replaced by the actual next level, and play continues with the new block set. As it is a long game, it needs a way to earn lives.
 
-**Lines variants (later).** Lines could also get Time Attack, Score Attack, VS and co-op (Collaborate) versions.
+**Lines variants (later).** Lines could also get Time Attack, Score Attack, VS and co-op (Cooperative) versions.
 
 **Endless Score Attack** (was "Score Attack" before the game's Time Trial took that name, 2026-11-06). Score is the whole goal: the core cannot break and the sphere regenerates, so play goes on and only the points count. The score is shown prominently (in Story it is not; see the HUD notes). Multiphasic, as a long game, would also show a score.
 
@@ -193,7 +193,7 @@ Goal: list BlockPlanet in [Quiver Launcher](https://github.com/tgeorgiadis/quive
 
 ## Phase 5: online multiplayer (XL)
 
-**Collaborate** (two players, one sphere, drop and support roles) is specified in [REDESIGN.md](REDESIGN.md#8-collaborate-new). Local Collaborate can come before online play; it depends on the sphere mapping from the culling research and on the magic research.
+**Cooperative** (two players, one sphere, drop and support roles) is specified in [REDESIGN.md](REDESIGN.md#8-cooperative-new). Local Cooperative can come before online play; it depends on the sphere mapping from the culling research and on the magic research.
 
 Online play for up to 4 players, where each player's actions affect the other players' spheres.
 
@@ -232,7 +232,7 @@ Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, m
 - Two spheres at once (Versus): the extended sphere and the performance budget must cover both; the extended patch currently switches itself off with two players.
 - Split-screen camera, aspect ratios and HUD space for two to four players.
 - Controls and profiles per player (designed for this already).
-- One sphere with several cursors (Collaborate): outlines, highlights, the see-through core and the peek camera must allow more than one player.
+- One sphere with several cursors (Cooperative): outlines, highlights, the see-through core and the peek camera must allow more than one player.
 
 ## Suggested order
 

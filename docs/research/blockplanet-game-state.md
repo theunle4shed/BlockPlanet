@@ -93,7 +93,7 @@ Started 2026-11-02 to understand why blocks near the edge of the view go missing
 | Option | Work | Result |
 | --- | --- | --- |
 | Extended, for example 20 × 20 points (about 200°) | Reimplement the table builder and the drawing passes with larger loops; move their buffers into memory above 8 MB | Boundary moves behind the silhouette, fixing the edge artifacts. About 1.6 × the vertices. |
-| Full, 32 × 32 | Replace the game's sphere drawing with BlockPlanet's own, built from the block grid | Edge fix, rear and peek cameras, the far side visible through an opened core (darkened), and Collaborate outlines and halos. About 4 × the vertices. |
+| Full, 32 × 32 | Replace the game's sphere drawing with BlockPlanet's own, built from the block grid | Edge fix, rear and peek cameras, the far side visible through an opened core (darkened), and Cooperative outlines and halos. About 4 × the vertices. |
 
 **Stage 1 progress:** the table builder is reimplemented in `src/graphics/sphere_mesh.cpp` and verified identical to the original (`BLOCKPLANET_SPHERE=verify`). The table is rebuilt every frame, not only while rotating. Two paths are not yet exercised in a verify run: the per-axis scale (`+0x2478` set) and the two-player offset.
 

@@ -87,19 +87,22 @@ CONTINUE        only while a Story or Casual game was left unfinished
 SOLO            Story · Hide & Seek · Puzzle · Lines · Multiphasic (later)
   Story         Campaign · Time Attack · Score Attack · Casual
                   then an episode, then Whole episode or one stage
-LOCAL           Versus · Collaborate (later) · Custom (later)
-  then player 2: a second player or the computer
+LOCAL           Story · Lines (later) · Custom (later)
+  Story         Versus · Cooperative (later)
+  Lines         Versus · Cooperative (both later)
+                  then player 2: a second player or the computer
 ONLINE          Host a game · Join with a code (later)
 PROFILES · MEDIA PLAYER · TROPHIES · OPTIONS · CREDITS · EXIT
 ```
 
 - **Archetypes:** Story, Lines and Multiphasic are the games that can grow multiplayer and sub-modes. Puzzle and Hide & Seek are archetypes with their own level sets, seen under Solo only for now.
-- **Local is two players for now** (as the original, which had two): player 1 is already in the game, and player 2 is a person on a second controller or the computer. Every local game offers the computer as player 2, though some will only gain it later (a computer partner for Collaborate needs designing). Four local players can come later if wanted.
+- **Versus and Cooperative are sub-modes** of an archetype under Local (and Online), as Campaign and the attacks are under Solo: Story's Versus is the original's VS; Cooperative (renamed from Collaborate, 2026-11-06) is two players on one sphere (section 8).
+- **Local is two players for now** (as the original, which had two): player 1 is already in the game, and player 2 is a person on a second controller or the computer. Every local game offers the computer as player 2, though some will only gain it later (a computer partner for Cooperative needs designing). Four local players can come later if wanted.
 - **Casual** is a sub-mode chosen from the menu: Story without a game over (hearts come back), no records or trophies.
 - **Continue** resumes an interrupted game: the Story or Casual stage being played when the player quit or the game closed, kept until a game over. Not for Time Attack or Score Attack (a resumed run would not be a fair run).
 - **Join codes (online, later):** shown hidden (`••••••`) with a button to reveal them and a **Copy** button that works while hidden, and a **streamer mode** setting that hides codes everywhere by default (lobby, notifications), perhaps friends' names too.
 
-The earlier proposal (SOLO: Story, Time Trial, Lines, Puzzle, Custom, Training; MULTIPLAYER: Versus, Collaborate, Custom) is replaced. Training is each archetype's Chapter 0; Practice's settings become Custom later.
+The earlier proposal (SOLO: Story, Time Trial, Lines, Puzzle, Custom, Training; MULTIPLAYER: Versus, Cooperative, Custom) is replaced. Training is each archetype's Chapter 0; Practice's settings become Custom later.
 
 **Changes to the original intention.** Make the push subtle (a few percent of zoom, eased) and switch it off with "Reduce camera motion". Zooming on every drop can cause motion sickness and makes repeated fast play harder to read. Consider zooming only on the final part of a long fall, or only on large combos.
 
@@ -137,7 +140,7 @@ The earlier proposal (SOLO: Story, Time Trial, Lines, Puzzle, Custom, Training; 
 
 ```
 SOLO            Story · Time Trial · Lines · Puzzle · Custom · Training
-MULTIPLAYER     Versus · Collaborate · Custom    (local or online)
+MULTIPLAYER     Versus · Cooperative · Custom    (local or online)
 MEDIA PLAYER
 TROPHIES
 OPTIONS
@@ -148,11 +151,11 @@ EXIT
 **Changes to the original intention.**
 - Keep **Puzzle**. It is the original's most distinctive mode after Rescue, and it suits short sessions.
 - Fold **Practice** into Custom (choose chapter, depth, speed, no fail), and keep **Training** as the onboarding path rather than a menu destination players must find.
-- **Hide & Seek** becomes a Story level type and a rule set for multiplayer: in **Collaborate**, two players uncover one picture together; in **Versus**, both race to uncover the same picture (shared seed) or the most of it before time runs out.
+- **Hide & Seek** becomes a Story level type and a rule set for multiplayer: in **Cooperative**, two players uncover one picture together; in **Versus**, both race to uncover the same picture (shared seed) or the most of it before time runs out.
 
 **Player benefit.** Every activity is one or two steps from the main menu, and the names say what each mode is.
 
-**Feasibility.** The new menus sit on the planned RmlUi layer and drive the original modes through their mode numbers (1 to 6, already mapped). Collaborate needs new systems on top of the game (see section 8).
+**Feasibility.** The new menus sit on the planned RmlUi layer and drive the original modes through their mode numbers (1 to 6, already mapped). Cooperative needs new systems on top of the game (see section 8).
 
 ## 5. Time Trial
 
@@ -211,7 +214,7 @@ EXIT
 
 **Feasibility.** This needs the original VS attack mechanics mapped first, then game-side hooks to queue, place and mark junk. The cracked look is texture work.
 
-## 8. Collaborate (new)
+## 8. Cooperative (new)
 
 Two players work on one shared sphere at the same time, with no split screen, no minimap and minimal UI. Players should always know where their teammate is, what they are doing, and what they intend next, without voice chat.
 
@@ -263,16 +266,16 @@ Ordered by importance, as in the original notes:
 - **Support needs real actions:** magic aiming and the hold or swap piece make the role active rather than advisory.
 - **Identity by shape as well as colour.**
 
-### Collaborate tutorial
+### Cooperative tutorial
 
-Collaborate adds roles and signals that solo players have never seen, so it needs its own short, hands-on tutorial that both players play together:
+Cooperative adds roles and signals that solo players have never seen, so it needs its own short, hands-on tutorial that both players play together:
 
 1. **Roles:** the drop player places a piece; the support player moves their cursor and sees where the drop player is.
 2. **Signals:** each player pings a block and watches the other's outline, halo and edge marker.
 3. **Support actions:** the support player fires magic at their cursor and swaps the next piece.
 4. **A first shared level:** a small sphere cleared together, with hints only when needed.
 
-Each step is short, can be skipped, and can be replayed from the Collaborate menu. Hide & Seek levels suit the first shared level, since the goal is visible to both players.
+Each step is short, can be skipped, and can be replayed from the Cooperative menu. Hide & Seek levels suit the first shared level, since the goal is visible to both players.
 
 ### Player benefit
 
@@ -285,9 +288,9 @@ A cooperative mode that keeps the original's single, focused sphere, gives two p
 - **Falling piece highlight:** needs the falling piece's draw call identified, then a tint or outline. Medium.
 - **Magic at the support cursor:** needs the magic system mapped (not yet found), then a hook that fires magic at a chosen cell rather than the drop cursor. Research first.
 - **Hold or swap piece:** the piece queue is game state; needs mapping, then a hook. Medium.
-- **Online play:** both players share one simulation. The practical route is host-authoritative: the host runs the game, the remote player's support inputs are sent as small messages (support actions are infrequent, so latency matters less than for the drop player), and the remote player's view is kept in step from the host's state. This is different from Versus, where each player runs their own game, and should come after local Collaborate works.
-- **Order:** local Collaborate with the support cursor, outlines, pings and edge indicators first; then magic aiming and hold or swap; then activity halos and polish; then the tutorial; online last.
-- **Hide & Seek levels** already exist as level records with goal text, so a Collaborate or Versus Hide & Seek level can reuse them.
+- **Online play:** both players share one simulation. The practical route is host-authoritative: the host runs the game, the remote player's support inputs are sent as small messages (support actions are infrequent, so latency matters less than for the drop player), and the remote player's view is kept in step from the host's state. This is different from Versus, where each player runs their own game, and should come after local Cooperative works.
+- **Order:** local Cooperative with the support cursor, outlines, pings and edge indicators first; then magic aiming and hold or swap; then activity halos and polish; then the tutorial; online last.
+- **Hide & Seek levels** already exist as level records with goal text, so a Cooperative or Versus Hide & Seek level can reuse them.
 
 ## 9. Media Player
 
@@ -356,12 +359,12 @@ Not in the original brief, but essential for a modern release.
 | Junk counterplay | **Add** | Combos cancel incoming junk. |
 | Media player as a visualiser | **Keep** | Add a presentation mode and earned preset packs. |
 | Mobile-style grids | **Change** | Controller-first grid design. |
-| Collaborate: shared sphere, drop and support roles | **Keep** | The drop player is the original game's player, so it does not need two simultaneous droppers. |
-| Collaborate: colour identity | **Change** | Add shape and line style so it never relies on colour alone. |
-| Collaborate: support role | **Add** | Magic aiming and a hold or swap piece, so support is active, not advisory. |
-| Collaborate: camera | **Decide** | The camera follows the drop player; the support player relies on edge indicators. |
-| Collaborate tutorial | **Add** | Roles and signals are new to everyone; teach them by playing together. |
-| Hide & Seek in Collaborate and Versus | **Add** | A shared picture suits co-operation, and a race on the same picture is a fair duel. |
+| Cooperative: shared sphere, drop and support roles | **Keep** | The drop player is the original game's player, so it does not need two simultaneous droppers. |
+| Cooperative: colour identity | **Change** | Add shape and line style so it never relies on colour alone. |
+| Cooperative: support role | **Add** | Magic aiming and a hold or swap piece, so support is active, not advisory. |
+| Cooperative: camera | **Decide** | The camera follows the drop player; the support player relies on edge indicators. |
+| Cooperative tutorial | **Add** | Roles and signals are new to everyone; teach them by playing together. |
+| Hide & Seek in Cooperative and Versus | **Add** | A shared picture suits co-operation, and a race on the same picture is a fair duel. |
 | See through an opened core | **Add** | The far side's undersides, dark but visible, make the sphere feel solid. |
 
 ## Risks and constraints
@@ -369,7 +372,7 @@ Not in the original brief, but essential for a modern release.
 - **Trademarks.** "Tetris" and Tetris trade dress are strictly enforced by The Tetris Company. Keep the BlockPlanet name and avoid Tetris branding in a public release.
 - **Original game material.** BlockPlanet runs the original code and needs the player's own ROM. New art, music support and modes are fine; redistributing original assets is not.
 - **Determinism.** Ghosts, replays and lockstep online play need the game to replay exactly the same way from the same inputs. The current runtime is not proven deterministic. Seeds and attack messages are safer foundations.
-- **Engine limits.** The original game logic has one player per sphere, one cursor, and a fixed draw patch. Collaborate works around this with fixed roles; letting both players drop, or a full free camera, may need replacing parts of the game rather than hooking them.
+- **Engine limits.** The original game logic has one player per sphere, one cursor, and a fixed draw patch. Cooperative works around this with fixed roles; letting both players drop, or a full free camera, may need replacing parts of the game rather than hooking them.
 - **Photosensitivity.** Audio-reactive visuals need flash limits and testing before release.
 
 ## Suggested order
@@ -380,7 +383,7 @@ Not in the original brief, but essential for a modern release.
 4. Media Player, from the jukebox and visualiser research.
 5. Time Trial records and seeds, then the daily challenge.
 6. Versus formats and the junk system, local first, then online.
-7. Collaborate: local first, online last.
+7. Cooperative: local first, online last.
 
 ## Open questions
 
@@ -388,5 +391,5 @@ Not in the original brief, but essential for a modern release.
 - How many chapters should Story have? The original's real chapter count is still being measured.
 - Should Hide & Seek stay as its own mode or become a Story level type?
 - What reward does finishing Story give: Media Player, Lines, Custom, or all three?
-- Collaborate: which support actions feel best in play (magic aiming, hold or swap piece, others)? Needs a playable prototype.
+- Cooperative: which support actions feel best in play (magic aiming, hold or swap piece, others)? Needs a playable prototype.
 - Should online leaderboards be friends-only, matching the friend-code decision?

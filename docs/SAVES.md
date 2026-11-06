@@ -83,7 +83,7 @@ What is in it, from comparing saves after different test sessions (not yet decod
 
 Agreed layout (2026-11-02):
 
-- **`save.json` (done, first version):** later additions are unlocks, tutorials, casual mode as a preference, HUD and accessibility options, and the Collaborate colour and shape.
+- **`save.json` (done, first version):** later additions are unlocks, tutorials, casual mode as a preference, HUD and accessibility options, and the Cooperative colour and shape.
 - **More statistics** (each needs a new game event, see [TROPHIES.md](TROPHIES.md#events)):
 
   | Statistic | Needs |
@@ -91,7 +91,7 @@ Agreed layout (2026-11-02):
   | Blocks destroyed (lifetime) | `blocks_destroyed`: finding where the game counts cleared blocks |
   | Largest combo | `combo`: the combo counter |
   | Pieces sent to other players in VS | `junk_sent`: the junk the game sends |
-  | Largest combo contributed in Collaborate | `collab_combo` (Collaborate mode) |
+  | Largest combo contributed in Cooperative | `coop_combo` (Cooperative mode) |
   | Local and online battles won and lost | `battle_result` (local VS with people now; online later) |
   | Magic (power weapons) used | `magic_used` |
   | Blocks destroyed by magic | `blocks_destroyed` with `by_magic` |
