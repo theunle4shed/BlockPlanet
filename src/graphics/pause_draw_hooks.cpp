@@ -14,6 +14,11 @@
 //                                     seen while paused
 //   BLOCKPLANET_PAUSE_SKIP=a1,a1..    skip draws whose second argument (the image, for
 //                                     the image helpers) is one of these while paused
+//   BLOCKPLANET_HUD_LOG=1             while BlockPlanet's HUD is shown, log each distinct draw
+//                                     made outside the game's HUD routine
+//   BLOCKPLANET_HUD_SKIP_MODEL=addr   skip model draws (0x8002D93C) whose matrix (a2) is addr
+// The HUD: while BlockPlanet's HUD is shown (set_original_hud_hidden), the 2D
+// draws made inside the game's HUD routine func_80075CD8 are skipped.
 // Recompiled calls do not keep return addresses, so draws are told apart by
 // their arguments.
 
@@ -64,14 +69,40 @@ const Settings& settings() {
 }
 
 std::atomic<bool> menu_shown{false};
+std::atomic<bool> hud_hidden{false};
+// Set while func_80075CD8 runs (game thread only).
+bool in_hud = false;
+
+bool is_2d_helper(std::uint32_t helper) {
+    return helper == 0x8003396Cu || helper == 0x800353F4u || helper == 0x80036FE4u || helper == 0x80071DE8u || helper == 0x80038478u || helper == 0x8007240Cu;
+}
 
 } // namespace
 
 namespace blockplanet {
 void set_pause_menu_shown(bool shown) { menu_shown.store(shown); }
+void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) return true;
+    static const std::uint32_t skip_model = [] {  // research
+        const char* v = std::getenv("BLOCKPLANET_HUD_SKIP_MODEL");
+        return v ? static_cast<std::uint32_t>(std::strtoul(v, nullptr, 16)) : 0u;
+    }();
+    if (skip_model != 0 && helper == 0x8002D93Cu && static_cast<std::uint32_t>(ctx->r6) == skip_model) {
+        ctx->r2 = 0;
+        return true;
+    }
+    static const bool hud_log = std::getenv("BLOCKPLANET_HUD_LOG") != nullptr;  // research: draws outside the HUD routine
+    if (hud_log && !in_hud && hud_hidden.load(std::memory_order_relaxed)) {
+        static std::mutex mutex;
+        static std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
+        std::lock_guard lock(mutex);
+        if (seen.insert({helper, static_cast<std::uint32_t>(ctx->r5)}).second)
+            std::fprintf(stdout, "{\"event\":\"hud_draw\",\"helper\":\"0x%08X\",\"a1\":\"0x%08X\",\"a2\":%d,\"a3\":%d}\n",
+                         helper, static_cast<std::uint32_t>(ctx->r5), static_cast<int>(ctx->r6), static_cast<int>(ctx->r7));
+    }
     const auto& s = settings();
     const bool shown = menu_shown.load(std::memory_order_relaxed);
     if (!shown && !s.log && s.skip.empty()) return false;
@@ -94,4 +125,11 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     static const bool keep_all = std::getenv("BLOCKPLANET_PAUSE_KEEP_ALL") != nullptr;  // research
     if (shown && !keep_all && helper != 0x800353F4u) return true;  // keep only the background
     return s.skip.count(a1) != 0;
+}
+
+extern "C" void blockplanet_hud_begin(std::uint8_t*, recomp_context*) { in_hud = true; }
+extern "C" void blockplanet_hud_end(std::uint8_t*, recomp_context*) { in_hud = false; }
+
+extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
+    return hud_hidden.load(std::memory_order_relaxed);
 }

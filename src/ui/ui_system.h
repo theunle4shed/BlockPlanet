@@ -43,6 +43,27 @@ void send_command(const std::string& command);
 // The screen on top, as of the last frame; empty when the menus are closed.
 std::string current_screen();
 
+// BlockPlanet's in-game HUD (docs/HUD_DESIGN.md), drawn over the game while
+// no menu is open. Placeholder art until the owner's designs are in.
+struct HudPieceView {
+    std::string colour;                        // CSS colour, e.g. "#e8c020"
+    std::vector<std::pair<int, int>> cells;    // cell positions (column, row)
+    bool mystery = false;                      // the "?" piece
+};
+struct HudView {
+    int hearts = 3;            // 0 to 3
+    float drop_left = 1.0f;    // the drop timer, 1 (full) to 0
+    int magic = -1;            // -1 none, 0 to 5
+    float meter = 0.0f;        // the magic meter, 0 to 1
+    std::vector<HudPieceView> next;  // next first
+    std::string mode;          // e.g. "Rescue"
+    std::string stage;         // e.g. "1:3"
+    std::string time;          // the episode's time, e.g. "2:41"
+    float progress = -1.0f;    // 0 to 1, or -1 to hide the bar
+};
+// Shows the HUD with these values, or hides it (nullopt). Applied at the next frame.
+void set_hud(std::optional<HudView> hud);
+
 // True while a menu screen is open (or about to open).
 bool menus_open();
 

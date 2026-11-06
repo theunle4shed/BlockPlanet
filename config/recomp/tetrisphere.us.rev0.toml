@@ -433,3 +433,20 @@ text = "blockplanet_scale_music_volume(rdram, ctx);"
 [[patches.hook]]
 func = "func_80079BD4"
 text = "blockplanet_scale_effects_volume(rdram, ctx);"
+
+# BlockPlanet's HUD (src/graphics/pause_draw_hooks.cpp): while the game's
+# single-player HUD routine runs, its 2D draws can be skipped so BlockPlanet's
+# own HUD replaces them; its logic (magic launch, jingles) still runs.
+[[patches.hook]]
+func = "func_80075CD8"
+text = "blockplanet_hud_begin(rdram, ctx);"
+
+[[patches.hook]]
+func = "func_80075CD8"
+before_vram = 0x8007850C
+text = "blockplanet_hud_end(rdram, ctx);"
+
+# The 3D piece queue models (one call per slot).
+[[patches.hook]]
+func = "func_800A3E6C"
+text = "if (blockplanet_skip_queue_model(rdram, ctx)) return;"

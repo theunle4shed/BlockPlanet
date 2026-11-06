@@ -344,6 +344,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/profile_save.cpp
     src/platform/profile_menu.cpp
     src/platform/pause_bridge.cpp
+    src/platform/story_hud.cpp
     src/platform/relaunch.cpp
     src/platform/data_directory.cpp
     src/platform/window_mode_controller.cpp
@@ -562,6 +563,15 @@ else()
     target_compile_options(pause_bridge_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME pause_bridge COMMAND pause_bridge_test)
+
+add_executable(story_hud_test tests/story_hud_test.cpp src/platform/story_hud.cpp)
+target_include_directories(story_hud_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(story_hud_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(story_hud_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME story_hud COMMAND story_hud_test)
 
 add_executable(profile_menu_test tests/profile_menu_test.cpp src/platform/profile_menu.cpp
     src/platform/profiles.cpp src/platform/relaunch.cpp)
@@ -1001,6 +1011,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/profile_save.cpp
         src/platform/profile_menu.cpp
         src/platform/pause_bridge.cpp
+        src/platform/story_hud.cpp
         src/platform/relaunch.cpp
         src/platform/data_directory.cpp
         src/platform/window_mode_controller.cpp

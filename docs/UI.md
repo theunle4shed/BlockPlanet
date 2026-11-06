@@ -98,3 +98,9 @@ Requests are refused during play and inside other original pages such as Options
 1. More options (audio, controls); showing the profile's character and unlocking characters as they are rescued (needs research).
 2. Camera and screen sizes: portrait windows, and the sphere's framing at every shape (docs/REDESIGN.md).
 3. Replacing the original title and mode-select menus with these screens.
+
+## In-game HUD
+
+BlockPlanet's HUD (design in [HUD_DESIGN.md](HUD_DESIGN.md)) is a separate RmlUi document, `assets/ui/hud.rml` with `hud.rcss`, in the same context as the menus. The game thread fills `blockplanet::ui::HudView` each frame (`update_hud` in `linux_main.cpp`, values from `src/platform/story_hud.cpp`) and calls `ui::set_hud`; the presentation thread rebuilds the HUD's markup only when it changes. The HUD is hidden while a menu is open and outside Story play. It takes no input. A media query (`orientation: portrait`) turns the two columns into rows above and below the game's picture.
+
+Hiding the original HUD: hooks mark the game's single-player HUD routine (`func_80075CD8`), and while BlockPlanet's HUD is shown the draw filter skips the 2D helpers called inside it; the 3D piece queue (`func_800A3E6C`) is skipped too. Checked at 16:9, 4:3, 21:9 and portrait (600 × 840).

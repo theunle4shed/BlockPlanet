@@ -24,6 +24,7 @@
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/pause_draw.h"
+#include "tetrisphere/story_hud.h"
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
@@ -144,6 +145,88 @@ void save_profile() {
     std::string error;
     if (profile_save->save(profile_data, error)) profile_dirty = false;
     else std::fprintf(stderr, "Could not save the profile: %s\n", error.c_str());
+}
+
+// BlockPlanet's HUD (docs/HUD_DESIGN.md): in Story play the original HUD's 2D
+// parts and piece queue are hidden and BlockPlanet's own HUD is drawn
+// (placeholder art). BLOCKPLANET_ORIGINAL_HUD=1 keeps the original.
+std::string hud_material_colour(int material) {
+    switch (material) {
+    case 32: return "#e8c020";  // yellow
+    case 33: return "#3050d8";  // blue
+    case 34: return "#30b048";  // green
+    case 35: return "#d83838";
+    case 36: return "#a048d8";
+    case 37: return "#f08020";
+    default: return "#a0a0a0";
+    }
+}
+
+// Cell layouts for the sprites, by shape ID (docs/research/blockplanet-game-state.md,
+// the piece queue). Only the bar (1) and the square (2) are known; others are
+// drawn as their cell count in rows of two until the layouts are decoded.
+std::vector<std::pair<int, int>> hud_piece_cells(int shape, int cells) {
+    if (shape == 1) return {{0, 0}, {1, 0}, {2, 0}};
+    if (shape == 2) return {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+    std::vector<std::pair<int, int>> out;
+    for (int i = 0; i < std::clamp(cells, 1, 9); ++i) out.push_back({i % 2, i / 2});
+    return out;
+}
+
+std::string hud_time(double seconds) {
+    const int total = static_cast<int>(seconds);
+    char text[32];
+    if (total >= 3600)
+        std::snprintf(text, sizeof text, "%d:%02d:%02d", total / 3600, total / 60 % 60, total % 60);
+    else
+        std::snprintf(text, sizeof text, "%d:%02d", total / 60, total % 60);
+    return text;
+}
+
+void update_hud() {
+    static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
+    static tetrisphere::ProgressTracker progress;
+    // The episode's time: counted while playing (not paused), from the
+    // chapter's first level; a new chapter or a restart begins it again.
+    static double episode_seconds = 0.0;
+    static int episode_chapter = -1, last_level = 0;
+    static auto last_tick = std::chrono::steady_clock::now();
+    const auto now = std::chrono::steady_clock::now();
+    const double elapsed = std::chrono::duration<double>(now - last_tick).count();
+    last_tick = now;
+
+    tetrisphere::StoryHudState state;
+    const bool story = !original && tetrisphere::read_story_hud(guest_rdram, progress, state);
+    blockplanet::set_original_hud_hidden(story);
+    if (!story) {
+        blockplanet::ui::set_hud(std::nullopt);
+        return;
+    }
+    if (state.chapter != episode_chapter || state.level < last_level) {
+        episode_chapter = state.chapter;
+        episode_seconds = 0.0;
+    }
+    last_level = state.level;
+    const bool paused = guest::load16(guest_rdram, 0x800E1228) >= 0;
+    if (!paused && elapsed < 1.0) episode_seconds += elapsed;
+
+    blockplanet::ui::HudView view;
+    view.hearts = state.hearts;
+    view.drop_left = state.drop_left;
+    view.magic = state.magic;
+    view.meter = state.meter;
+    for (const auto& piece : state.next) {
+        blockplanet::ui::HudPieceView p;
+        p.mystery = piece.mystery;
+        p.colour = hud_material_colour(piece.material);
+        p.cells = hud_piece_cells(piece.shape, piece.cells);
+        view.next.push_back(std::move(p));
+    }
+    view.mode = "Rescue";
+    view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
+    view.time = hud_time(episode_seconds);
+    view.progress = state.progress;
+    blockplanet::ui::set_hud(std::move(view));
 }
 
 // Research aid: BLOCKPLANET_WATCH="0x800E44A8:2,0x80103958:4" logs each
@@ -1611,6 +1694,7 @@ bool handle_profile_command(const std::string& command) {
             launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons) : 0u);
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
+            update_hud();
         }
         pc_settings_release_guard(held);
         poll_game_events();

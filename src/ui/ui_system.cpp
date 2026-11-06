@@ -75,6 +75,12 @@ std::deque<std::string> commands;
 std::string shown_screen;  // under requests_mutex
 std::atomic<bool> open_flag{false};
 
+// The HUD (set_hud), under its own mutex.
+std::mutex hud_mutex;
+std::optional<HudView> hud_wanted;
+Rml::ElementDocument* hud_document = nullptr;
+std::string hud_shown_rml;
+
 std::string asset(const char* name) { return (assets_path / name).string(); }
 
 // Starts RmlUi on the presentation thread, when a menu first opens.
@@ -130,6 +136,98 @@ void apply_requests() {
                     }));
 }
 
+const char* magic_name(int magic) {
+    static const char* names[] = {"Firecracker", "Dynamite", "Magnet", "Atom", "Rocket", "Ray Gun"};
+    return magic >= 0 && magic < 6 ? names[magic] : "";
+}
+
+std::string percent(float value) {
+    return std::to_string(int(std::clamp(value, 0.0f, 1.0f) * 1000.0f) / 10.0f) + "%";
+}
+
+std::string escape(const std::string& text) {
+    std::string out;
+    for (char c : text) {
+        if (c == '<') out += "&lt;";
+        else if (c == '>') out += "&gt;";
+        else if (c == '&') out += "&amp;";
+        else out += c;
+    }
+    return out;
+}
+
+// The HUD's markup for these values (placeholder art).
+std::string hud_rml(const HudView& hud) {
+    std::string rml;
+    rml += "<div id='left'>";
+    rml += "<div id='lives'><div id='hearts'>";
+    for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
+    rml += "</div>";
+    const bool hurry = hud.drop_left < 0.35f;
+    rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div class='fill' style='width: " +
+           percent(hud.drop_left) + "'/></div></div>";
+    rml += "<div id='magic'><div id='item'>";
+    rml += hud.magic >= 0 ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
+    rml += "</div><div id='meter' class='bar'><div class='fill' style='width: " + percent(hud.meter) + "'/></div></div>";
+    rml += "<div id='next'>";
+    for (std::size_t i = 0; i < hud.next.size(); ++i) {
+        const auto& piece = hud.next[i];
+        const int cell = i == 0 ? 34 : 26;
+        int width = 1, height = 1;
+        for (const auto& [x, y] : piece.cells) width = std::max(width, x + 1), height = std::max(height, y + 1);
+        rml += "<div class='piece' style='width: " + std::to_string(width * cell) + "dp; height: " +
+               std::to_string(height * cell) + "dp;'>";
+        if (piece.mystery) {
+            rml += "<div class='mystery'>?</div>";
+        } else {
+            for (const auto& [x, y] : piece.cells)
+                rml += "<div class='cell' style='left: " + std::to_string(x * cell) + "dp; top: " +
+                       std::to_string(y * cell) + "dp; width: " + std::to_string(cell - 3) + "dp; height: " +
+                       std::to_string(cell - 3) + "dp; background-color: " + piece.colour + ";'/>";
+        }
+        rml += "</div>";
+    }
+    rml += "</div></div>";
+    rml += "<div id='right'>";
+    rml += "<div id='mode'>" + escape(hud.mode) + "</div><div id='stage'>" + escape(hud.stage) + "</div>";
+    rml += "<div id='middle'>";
+    if (!hud.time.empty()) rml += "<div id='time'>" + escape(hud.time) + "</div>";
+    if (hud.progress >= 0.0f)
+        rml += "<div id='progress' class='bar'><div class='fill' style='width: " + percent(hud.progress) + "'/></div>";
+    rml += "</div></div>";
+    return rml;
+}
+
+// Shows, updates or hides the HUD document. Returns whether it is shown.
+bool update_hud_document() {
+    std::optional<HudView> hud;
+    {
+        std::lock_guard lock(hud_mutex);
+        hud = hud_wanted;
+    }
+    const bool show = hud.has_value() && !navigator->is_open();
+    if (!show) {
+        if (hud_document != nullptr) hud_document->Hide();
+        return false;
+    }
+    if (hud_document == nullptr) {
+        hud_document = context->LoadDocument(asset("hud.rml"));
+        if (hud_document == nullptr) {
+            std::fprintf(stderr, "{\"event\":\"ui_screen_missing\",\"screen\":\"hud\"}\n");
+            std::lock_guard lock(hud_mutex);
+            hud_wanted.reset();
+            return false;
+        }
+    }
+    const auto rml = hud_rml(*hud);
+    if (rml != hud_shown_rml) {
+        if (auto* root = hud_document->GetElementById("hud")) root->SetInnerRML(rml);
+        hud_shown_rml = rml;
+    }
+    if (!hud_document->IsVisible()) hud_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
+    return true;
+}
+
 void hook_init(plume::RenderInterface* render_interface, plume::RenderDevice* device) {
     renderer = std::make_unique<Renderer>(render_interface, device);
 }
@@ -139,8 +237,9 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
     if (!started) {
         // Start RmlUi only once a menu is wanted.
         std::lock_guard lock(requests_mutex);
-        if (std::none_of(requests.begin(), requests.end(),
-                         [](const Request& r) { return std::holds_alternative<OpenRequest>(r); }))
+        std::lock_guard hud_lock(hud_mutex);
+        if (!hud_wanted && std::none_of(requests.begin(), requests.end(),
+                                        [](const Request& r) { return std::holds_alternative<OpenRequest>(r); }))
             return;
     }
     const std::uint32_t width = framebuffer->getWidth();
@@ -153,7 +252,8 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
         return;
     }
     apply_requests();
-    if (navigator->is_open()) {
+    const bool hud_visible = update_hud_document();
+    if (navigator->is_open() || hud_visible) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
             context->SetDensityIndependentPixelRatio(float(height) / design_height);
@@ -165,6 +265,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
 }
 
 void hook_deinit() {
+    hud_document = nullptr;
     navigator.reset();
     if (started) {
         if (context != nullptr) Rml::RemoveContext("main");
@@ -233,6 +334,11 @@ void send_command(const std::string& command) {
 std::string current_screen() {
     std::lock_guard lock(requests_mutex);
     return open_flag.load() ? shown_screen : std::string();
+}
+
+void set_hud(std::optional<HudView> hud) {
+    std::lock_guard lock(hud_mutex);
+    hud_wanted = std::move(hud);
 }
 
 bool menus_open() { return open_flag.load(); }

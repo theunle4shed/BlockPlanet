@@ -1,0 +1,144 @@
+/* BlockPlanet's in-game HUD (docs/HUD_DESIGN.md): placeholder art until the
+   owner's designs are in. Priority 1 in a column on the left, priority 2 on
+   the right. Sizes in dp, laid out for a 1080-pixel-high screen. */
+
+body {
+    width: 100%;
+    height: 100%;
+    font-family: LatoLatin;
+    color: #f8f8f8;
+    font-effect: outline(2dp #1a0c04);
+    pointer-events: none;
+}
+
+div { display: block; }
+#hud { width: 100%; height: 100%; }
+
+#left {
+    position: absolute;
+    left: 48dp;
+    top: 200dp;
+    width: 200dp;
+}
+#right {
+    position: absolute;
+    right: 48dp;
+    top: 40dp;
+    width: 260dp;
+    height: 1000dp;
+    text-align: right;
+}
+
+/* Hearts: three red tiles, a lost one dark. */
+#hearts { height: 48dp; }
+.heart {
+    display: inline-block;
+    width: 40dp;
+    height: 40dp;
+    margin-right: 10dp;
+    border-radius: 12dp;
+    background-color: #e02838;
+    border: 3dp #f8f8f8;
+}
+.heart.lost { background-color: #20202880; border-color: #808080; }
+
+/* Bars: a dark track with a fill. */
+.bar {
+    display: block;
+    height: 16dp;
+    background-color: #0b1020c0;
+    border: 2dp #f0f0f0;
+    border-radius: 8dp;
+}
+.bar .fill {
+    display: block;
+    height: 100%;
+    border-radius: 6dp;
+    background-color: #38c8f0;
+}
+
+/* The drop timer, below the hearts; it turns red when time is short. */
+#drop { width: 150dp; margin-top: 14dp; }
+#drop .fill { background-color: #f5c21f; }
+#drop.hurry .fill { background-color: #f04030; }
+
+/* Magic: an item box with the charge bar beneath. */
+#magic { margin-top: 36dp; }
+#item {
+    width: 120dp;
+    height: 120dp;
+    background-color: #0b1020c0;
+    border: 3dp #f0f0f0;
+    border-radius: 20dp;
+}
+#item .name {
+    display: block;
+    padding-top: 44dp;
+    text-align: center;
+    font-size: 22dp;
+    font-weight: bold;
+    color: #f5821f;
+}
+#meter { width: 126dp; margin-top: 10dp; }
+#meter .fill { background-color: #9c5cf0; }
+
+/* Next pieces: the next one first and larger. */
+#next { margin-top: 40dp; }
+.piece {
+    display: block;
+    position: relative;
+    margin-bottom: 22dp;
+}
+.piece .cell {
+    position: absolute;
+    border-radius: 5dp;
+    border: 2dp #00000060;
+}
+.piece .mystery {
+    display: block;
+    font-size: 48dp;
+    font-weight: bold;
+    color: #f5821f;
+}
+
+/* Mode and stage, top right. */
+#mode { display: block; font-size: 30dp; color: #e8b818; }
+#stage { display: block; font-size: 64dp; font-weight: bold; }
+
+/* Episode time and progress, right middle. */
+#middle { position: absolute; right: 0dp; top: 420dp; width: 260dp; }
+#time { display: block; font-size: 44dp; font-weight: bold; }
+#progress { margin-top: 12dp; height: 20dp; }
+#progress .fill { background-color: #48d060; }
+
+/* Portrait (taller than wide): the columns become rows, priority 1 along the
+   top and priority 2 along the bottom, in the space above and below the
+   game's picture. */
+@media (orientation: portrait) {
+    #left {
+        left: 32dp;
+        right: 32dp;
+        top: 32dp;
+        width: auto;
+    }
+    #left > div {
+        display: inline-block;
+        vertical-align: top;
+        margin-top: 0dp;
+        margin-right: 40dp;
+    }
+    #drop { display: block; }
+    #item { width: 96dp; height: 96dp; }
+    #item .name { padding-top: 32dp; font-size: 18dp; }
+    #meter { width: 102dp; }
+    #next .piece { display: inline-block; vertical-align: top; margin-right: 22dp; }
+    #right {
+        top: auto;
+        bottom: 32dp;
+        right: 32dp;
+        left: 32dp;
+        width: auto;
+        height: 150dp;
+    }
+    #middle { top: 0dp; right: auto; left: 0dp; text-align: left; }
+}

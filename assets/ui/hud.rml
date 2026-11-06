@@ -1,0 +1,9 @@
+<rml>
+<head>
+    <title>HUD</title>
+    <link type="text/rcss" href="hud.rcss"/>
+</head>
+<body>
+    <div id="hud"></div>
+</body>
+</rml>

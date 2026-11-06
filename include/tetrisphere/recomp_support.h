@@ -48,6 +48,9 @@ void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_scale_music_volume(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_scale_effects_volume(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, uint32_t helper);
+void blockplanet_hud_begin(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_hud_end(std::uint8_t* rdram, recomp_context* ctx);
+bool blockplanet_skip_queue_model(std::uint8_t* rdram, recomp_context* ctx);
 void tetrisphere_rescue_pause_snapshot_hook(std::uint8_t* rdram,
                                             recomp_context* ctx);
 void tetrisphere_ui_span_begin(std::uint8_t* rdram, recomp_context* ctx,
