@@ -291,7 +291,7 @@ Found for the HUD's piece sprites (Rescue 1:1 and 6:1, memory dumps after each d
 | `+8` | u8 | **Shape ID**, the same in every level (1 the bar, 2 the square, 5 and 6 two four-cell shapes) | 2 | 1 | 5, 6 |
 | `+0xC` on | s16s | Cell layout data, not yet decoded | | | |
 
-For sprites, the shape ID (`+8`) picks the picture and the material (`+2`) its colour. Which picture each shape ID is (beyond 1 and 2) can be read off screenshots as levels with more shapes come up, or by decoding the layout data.
+For sprites, the shape ID (`+8`) picks the picture and the material (`+2`) its colour. Matched against the original's queue (Rescue 6:1, 2026-11-06): **1 the bar (3 cells), 2 the square, 5 the S (4 cells, 2 × 3), 6 the T (4 cells, 3 × 2)**. IDs 3 and 4 (probably the L shapes) are still to see. The layout data from +0xC is not yet decoded.
 
 ### The core opening a level needs (2026-11-05)
 

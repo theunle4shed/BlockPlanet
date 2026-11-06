@@ -164,11 +164,14 @@ std::string hud_material_colour(int material) {
 }
 
 // Cell layouts for the sprites, by shape ID (docs/research/blockplanet-game-state.md,
-// the piece queue). Only the bar (1) and the square (2) are known; others are
-// drawn as their cell count in rows of two until the layouts are decoded.
+// the piece queue), matched against the original's queue: 1 the bar, 2 the
+// square, 5 the S, 6 the T. Others (later stages) are drawn as their cell
+// count in rows of two until seen.
 std::vector<std::pair<int, int>> hud_piece_cells(int shape, int cells) {
     if (shape == 1) return {{0, 0}, {1, 0}, {2, 0}};
     if (shape == 2) return {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+    if (shape == 5) return {{1, 0}, {1, 1}, {0, 1}, {0, 2}};
+    if (shape == 6) return {{0, 0}, {1, 0}, {2, 0}, {1, 1}};
     std::vector<std::pair<int, int>> out;
     for (int i = 0; i < std::clamp(cells, 1, 9); ++i) out.push_back({i % 2, i / 2});
     return out;
