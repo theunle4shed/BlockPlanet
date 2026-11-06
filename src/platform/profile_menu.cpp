@@ -202,7 +202,7 @@ std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<
 std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done) {
     return {{"chapter0", "Chapter 0: Puzzle Training", training_done ? "completed" : "start here",
              "command:puzzle_chapter:0", true, 1, !training_done},
-            {"puzzles", "Puzzles", training_done ? "" : "skip training", "command:puzzle_chapter:1", true, 1,
+            {"puzzles", "Puzzles", training_done ? "" : "skip training", "command:puzzles", true, 1,
              training_done}};
 }
 
@@ -211,6 +211,34 @@ std::string next_profile_name(const ProfileStore& store) {
         const auto name = "Player " + std::to_string(number);
         if (store.find(name) == nullptr) return name;
     }
+}
+
+std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
+                                                   const std::vector<double>& best_moves, int count) {
+    std::vector<blockplanet::ui::ListItem> items;
+    int last = 1;
+    for (int n : solved)
+        if (n >= 1) last = std::max(last, n + 1);
+    last = std::min(last, count);
+    for (int n = 1; n <= last; ++n) {
+        const auto i = std::size_t(n - 1);
+        std::string note;
+        if (i < best_times.size() && best_times[i] > 0.0) {
+            const int t = static_cast<int>(best_times[i]);
+            char text[48];
+            std::snprintf(text, sizeof text, "best %d:%02d", t / 60, t % 60);
+            note = text;
+            if (i < best_moves.size() && best_moves[i] > 0.0)
+                note += " \u00B7 " + std::to_string(int(best_moves[i])) + (best_moves[i] == 1.0 ? " move" : " moves");
+        } else if (solved.count(n) != 0) {
+            note = "solved";
+        } else if (n == last) {
+            note = "next";
+        }
+        items.push_back({"puzzle" + std::to_string(n), "Puzzle " + std::to_string(n), note,
+                         "command:puzzle:" + std::to_string(n), true, 1, n == last});
+    }
+    return items;
 }
 
 } // namespace tetrisphere

@@ -72,7 +72,7 @@ The earlier Score Attack build on the original Time Trial (its own stages and cl
 
 The 100 puzzles are fixed designs (copied from stored data, the same every time), so personal bests per puzzle are fully fair.
 
-**Built (2026-11-06):** left, **Drops left** and **Slides left** (context `+0x25C6`, `+0x25C8`, found by comparing memory before and after a drop); right, "Puzzle", the number, and the time (the game's own clock, `+0x2B0C`, counting up in Puzzle) with ± against the best for that puzzle and "Best 0:42 · 2 moves" (the fewest drops and slides it was solved in). Bests in `progress.episode_records.puzzle` and `puzzle_moves` (chapter key 0, index = puzzle − 1). **Open:** with the original HUD hidden, a dark band shows across the bottom of the screen in Puzzle (below about y 191 of 240); not yet traced. Also, Puzzle's chapter select only starts puzzle 1.
+**Built (2026-11-06):** left, **Drops left** and **Slides left** (context `+0x25C6`, `+0x25C8`, found by comparing memory before and after a drop); right, "Puzzle", the number, and the time (the game's own clock, `+0x2B0C`, counting up in Puzzle) with ± against the best for that puzzle and "Best 0:42 · 2 moves" (the fewest drops and slides it was solved in). Bests in `progress.episode_records.puzzle` and `puzzle_moves` (chapter key 0, index = puzzle − 1). **Open:** with the original HUD hidden, a dark band shows across the bottom of the screen in Puzzle (below about y 191 of 240); not yet traced.
 
 | Priority 1 (left, top to bottom) | Priority 2 (right) |
 | --- | --- |

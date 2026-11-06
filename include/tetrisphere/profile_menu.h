@@ -88,6 +88,10 @@ std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<
 // Puzzle's list: Chapter 0 (Training Puzzle), then the puzzles. A new
 // player starts on Chapter 0; once it is done, on the puzzles.
 std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done);
+// The puzzles to choose from: each solved one (with its best time and fewest
+// moves, when known) and the next unsolved, up to `count`; the next is focused.
+std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
+                                                   const std::vector<double>& best_moves, int count = 100);
 
 // "Player N" with the lowest N not already taken.
 std::string next_profile_name(const ProfileStore& store);

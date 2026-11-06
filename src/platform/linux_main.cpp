@@ -2369,6 +2369,27 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
+            if (*command == "puzzles") {
+                auto& records = profile_data.progress.episode_records;
+                const auto& times = records["puzzle"][0].best_levels;
+                const auto& moves = records["puzzle_moves"][0].best_levels;
+                blockplanet::ui::set_text("stages_title", "Puzzles");
+                blockplanet::ui::set_text("stages_subtitle", "Choose a puzzle");
+                blockplanet::ui::set_list("stages", puzzle_list(profile_data.progress.puzzles_solved, times, moves));
+                blockplanet::ui::request_show("stages");
+                continue;
+            }
+            if (command->rfind("puzzle:", 0) == 0) {
+                // puzzle:N: one puzzle, chosen from the list.
+                const int number = std::atoi(command->c_str() + 7);
+                if (number >= 1 && number <= 100 && game_option_applier) {
+                    chapter_zero_lesson.clear();
+                    continue_mode.reset();
+                    game_option_applier->choose_start(0, number);
+                    launch_mode(LaunchMode::Puzzle);
+                }
+                continue;
+            }
             if (command->rfind("puzzle_chapter:", 0) == 0) {
                 const bool training = std::atoi(command->c_str() + 15) == 0;
                 chapter_zero_lesson = training ? "puzzle" : "";
@@ -2400,6 +2421,7 @@ bool handle_profile_command(const std::string& command) {
                     if (const auto c = m->second.find(chapter); c != m->second.end()) best = c->second.best_levels;
                 if (menu_variant == PlayVariant::ScoreAttack) best.clear();  // points, not times: not shown as times
                 blockplanet::ui::set_text("stages_title", "Chapter " + std::to_string(chapter));
+                blockplanet::ui::set_text("stages_subtitle", "The whole episode, or one stage");
                 blockplanet::ui::set_list("stages", story_stages(chapter, done, best));
                 blockplanet::ui::request_show("stages");
                 continue;

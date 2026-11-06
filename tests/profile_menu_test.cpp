@@ -100,6 +100,12 @@ int main(int argc, char** argv) {
         const auto gaps = story_stages(1, {5}, {});
         assert(gaps.size() == 7 && gaps[1].note.empty() && gaps[5].note.empty() && gaps[6].note == "next");
         assert(story_stages(1, {}, {}).size() == 2);
+        // Puzzles: the solved ones and the next.
+        const auto puzzles = puzzle_list({1, 2}, {12.0}, {2.0});
+        assert(puzzles.size() == 3 && puzzles[0].note == "best 0:12 \u00B7 2 moves" && puzzles[1].note == "solved");
+        assert(puzzles[2].label == "Puzzle 3" && puzzles[2].note == "next" && puzzles[2].focus &&
+               puzzles[2].action == "command:puzzle:3");
+        assert(puzzle_list({}, {}, {}).size() == 1);
     }
     story = story_chapters({0}, 15);
     assert(story.size() == 2 && story[0].note == "completed" && story[1].focus && story[1].note == "next");

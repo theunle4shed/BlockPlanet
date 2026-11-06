@@ -58,7 +58,7 @@ void GameOptionApplier::apply(std::uint8_t* rdram) {
             // counted on), so the chosen level really starts there and the
             // next one follows it. Written until the set-up has taken it
             // (the counter then reads the level after it).
-            if (chosen_level_ && *chosen_chapter_ > 0 && !level_count_taken_) {
+            if (chosen_level_ && !level_count_taken_) {  // Story; Puzzle and Hide & Seek too
                 if (level_count_written_ && get16(rdram, game_state::next_level) == *chosen_level_) {
                     level_count_taken_ = true;
                 } else {
