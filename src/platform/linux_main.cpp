@@ -208,8 +208,11 @@ void update_hud() {
     struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
     static std::vector<LivePopup> popups;
     static tetrisphere::ComboTracker combos;
+    // Story shows no score pop-ups (decided 2026-11-06); score modes will use
+    // them (BLOCKPLANET_POPUPS=1 shows them in Story for testing).
+    static const bool popups_on = std::getenv("BLOCKPLANET_POPUPS") != nullptr;
     const bool paused_now = story && guest::load16(guest_rdram, 0x800E1228) >= 0;
-    if (story && !paused_now) {
+    if (story && !paused_now && popups_on) {
         if (const auto combo = combos.update(state)) {
             // Waves of the same chain (gravity, follow-on clears) join the
             // last popup if it is still young.

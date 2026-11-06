@@ -391,3 +391,7 @@ Found for a sharper title on large screens. The title screen is mostly 2D: the N
 Objects can be shown alone with `BLOCKPLANET_OBJECT_ONLY=scene:i,j` (hook on `func_800321D4`, the per-object draw in the LightWave player; its a3 is the object index). `BLOCKPLANET_FN_PROBE=1` logs when candidate scene routines run.
 
 **The copyright lines are not text in the game:** the credits list (`0x800EBF00` to `0x800ECC00` in memory, names and roles) does not contain them, and neither does the ROM as plain text; they exist only painted in the title image. Replacing them with text would mean reading them from that image at install (the font is a clean pixel font, so matching characters is reliable) rather than writing them into the repository.
+
+### The game's floating number (2026-11-06, in progress)
+
+After a combo the game shows a large grey 3D number at the sphere's centre for about a second ("6000" for a combo worth about 59,000 points, so it is not the total; probably a bonus). It is not one of the 2D helpers' draws, and no new model appears for it in the model log. Skipping the scene `0x801EEB80` (`BLOCKPLANET_MODEL_SKIP`) stops combos from playing out at all (the game waits for that scene's animation), so the number is probably one of its objects; finding which (with `BLOCKPLANET_OBJECT_ONLY`, as for the title letters) is the next step, to hide it in Story and to reuse it in other modes. `0x801E3B00` is the tunnel background.

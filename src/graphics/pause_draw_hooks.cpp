@@ -92,7 +92,7 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) return true;
     // Research: BLOCKPLANET_MODEL_LOG=1 logs each distinct model drawn
     // (0x8002D93C's model, a0) the first time, with the time, scene and mode;
-    // BLOCKPLANET_MODEL_ONLY=addr,addr draws only those models.
+    // BLOCKPLANET_MODEL_ONLY=addr,addr draws only those models; BLOCKPLANET_MODEL_SKIP skips them.
     if (helper == 0x8002D93Cu) {
         static const bool model_log = std::getenv("BLOCKPLANET_MODEL_LOG") != nullptr;
         static const std::set<std::uint32_t> only = [] {
@@ -120,7 +120,20 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
                              static_cast<int>(guest16(rdram, 0x800E121Cu)), static_cast<int>(guest16(rdram, 0x800E44A8u)),
                              static_cast<std::uint32_t>(ctx->r7));
         }
-        if (!only.empty() && only.count(model) == 0) {
+        static const std::set<std::uint32_t> skip = [] {
+            std::set<std::uint32_t> list;
+            if (const char* v = std::getenv("BLOCKPLANET_MODEL_SKIP")) {
+                std::string text(v);
+                std::size_t position = 0;
+                while (position < text.size()) {
+                    const auto comma = std::min(text.find(',', position), text.size());
+                    list.insert(static_cast<std::uint32_t>(std::strtoul(text.substr(position, comma - position).c_str(), nullptr, 16)));
+                    position = comma + 1;
+                }
+            }
+            return list;
+        }();
+        if (skip.count(model) != 0 || (!only.empty() && only.count(model) == 0)) {
             ctx->r2 = 0;
             return true;
         }
