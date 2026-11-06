@@ -101,7 +101,7 @@
     },
     {
       "id": "score_attack_final", "name": "Last Stand", "tier": "gold",
-      "description": "Complete the final episode in Score Attack.",
+      "description": "Complete the final episode (10) in Score Attack.",
       "trigger": { "event": "attack_episode", "where": { "mode": "score_attack", "final": 1 } }
     },
     {
@@ -116,7 +116,7 @@
     },
     {
       "id": "time_attack_final", "name": "Photo Finish", "tier": "gold",
-      "description": "Complete the final episode in Time Attack.",
+      "description": "Complete the final episode (10) in Time Attack.",
       "trigger": { "event": "attack_episode", "where": { "mode": "time_attack", "final": 1 } }
     },
     {

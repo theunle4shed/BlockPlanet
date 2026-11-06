@@ -1,7 +1,8 @@
 #pragma once
 
 // The developer's records for Time Attack and Score Attack (docs/HUD_DESIGN.md):
-// a time or a score for each stage of Story's 15 episodes, set by the owner
+// a time or a score for each stage of Story's 10 episodes (8, then bonus
+// episodes 9 and 10), set by the owner
 // playing with BLOCKPLANET_RECORD_DEVELOPER, shipped as
 // assets/trophies/developer_records.json, and beaten for trophies.
 
@@ -13,7 +14,7 @@
 namespace tetrisphere {
 
 struct DeveloperRecords {
-    static constexpr int chapters = 15;
+    static constexpr int chapters = 10;
     static constexpr int stages = 10;
     // "time_attack" (seconds, lower is better) or "score_attack" (points,
     // higher is better) -> chapter (1-based) -> a value per stage (0: none).

@@ -40,7 +40,11 @@ public:
     // The same with a level in the chapter (1-based; for Puzzle, the puzzle
     // number), for Restart level. A chapter of 0 sets the level only: Hide &
     // Seek has its own chapter, not the Rescue chapter (0x800E44A0).
-    void choose_start(int chapter, int level) { chosen_chapter_ = chapter; chosen_level_ = level; }
+    void choose_start(int chapter, int level) {
+        chosen_chapter_ = chapter;
+        chosen_level_ = level;
+        level_count_written_ = level_count_taken_ = false;
+    }
     // Casual chosen in the menus (Story > Casual): no game over, as --casual,
     // for the game being started.
     void set_menu_casual(bool on) { menu_casual_ = on; }
@@ -52,6 +56,7 @@ private:
     bool menu_casual_ = false;
     std::optional<int> chosen_chapter_;
     std::optional<int> chosen_level_;
+    bool level_count_written_ = false, level_count_taken_ = false;
 };
 
 } // namespace tetrisphere

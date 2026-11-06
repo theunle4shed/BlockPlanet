@@ -30,6 +30,7 @@ constexpr std::uint32_t piece = 0x801127FB;         // u8 current piece; 8 while
 constexpr std::uint8_t piece_dropping = 8;
 constexpr std::uint32_t chapter = 0x800E44A0;       // s16 Rescue / Hide & Seek chapter, 0-based
 constexpr std::uint32_t level_offset = 0x23BA;      // s16 level within chapter, or puzzle number; 0-based
+constexpr std::uint32_t next_level = 0x800E449C;    // s16 Story's next level (0-based), taken at each level's set-up
 constexpr std::int16_t mode_training = 3;
 constexpr std::uint32_t training_type = 0x800E44AC;  // s16 1 Basics, 2 Advanced, 3 Puzzle
 constexpr std::uint32_t training_page = 0x80103958;  // u32 start of the instructor's current page

@@ -15,6 +15,12 @@ void set16(std::uint8_t* rdram, std::uint32_t address, std::int16_t value) {
     std::memcpy(at(rdram, address, 2), &value, 2);
 }
 
+std::int16_t get16(std::uint8_t* rdram, std::uint32_t address) {
+    std::int16_t value;
+    std::memcpy(&value, at(rdram, address, 2), 2);
+    return value;
+}
+
 std::int32_t get32(std::uint8_t* rdram, std::uint32_t address) {
     std::int32_t value;
     std::memcpy(&value, at(rdram, address, 0), 4);
@@ -42,10 +48,24 @@ void GameOptionApplier::apply(std::uint8_t* rdram) {
         if (playing) {
             chosen_chapter_.reset();
             chosen_level_.reset();
+            level_count_written_ = level_count_taken_ = false;
         } else {
             // Chapter 0 or less: the level only (Hide & Seek keeps its own chapter).
             if (*chosen_chapter_ > 0)
                 set16(rdram, game_state::chapter, static_cast<std::int16_t>(*chosen_chapter_ - 1));
+            // Story: the game's next-level counter (0x800E449C, copied to
+            // 0x800E4498 and the shown level as each level is set up, then
+            // counted on), so the chosen level really starts there and the
+            // next one follows it. Written until the set-up has taken it
+            // (the counter then reads the level after it).
+            if (chosen_level_ && *chosen_chapter_ > 0 && !level_count_taken_) {
+                if (level_count_written_ && get16(rdram, game_state::next_level) == *chosen_level_) {
+                    level_count_taken_ = true;
+                } else {
+                    set16(rdram, game_state::next_level, static_cast<std::int16_t>(*chosen_level_ - 1));
+                    level_count_written_ = true;
+                }
+            }
             if (chosen_level_)
                 set16(rdram, game_state::p1_context + game_state::level_offset,
                       static_cast<std::int16_t>(*chosen_level_ - 1));
