@@ -29,6 +29,7 @@
 #include "tetrisphere/recomp_support.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -89,6 +90,56 @@ void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
     if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) return true;
+    // Research: BLOCKPLANET_MODEL_LOG=1 logs each distinct model drawn
+    // (0x8002D93C's model, a0) the first time, with the time, scene and mode;
+    // BLOCKPLANET_MODEL_ONLY=addr,addr draws only those models.
+    if (helper == 0x8002D93Cu) {
+        static const bool model_log = std::getenv("BLOCKPLANET_MODEL_LOG") != nullptr;
+        static const std::set<std::uint32_t> only = [] {
+            std::set<std::uint32_t> list;
+            if (const char* v = std::getenv("BLOCKPLANET_MODEL_ONLY")) {
+                std::string text(v);
+                std::size_t position = 0;
+                while (position < text.size()) {
+                    const auto comma = std::min(text.find(',', position), text.size());
+                    list.insert(static_cast<std::uint32_t>(std::strtoul(text.substr(position, comma - position).c_str(), nullptr, 16)));
+                    position = comma + 1;
+                }
+            }
+            return list;
+        }();
+        const auto model = static_cast<std::uint32_t>(ctx->r4);
+        if (model_log) {
+            static std::mutex mutex;
+            static std::set<std::uint32_t> seen;
+            static const auto start = std::chrono::steady_clock::now();
+            std::lock_guard lock(mutex);
+            if (seen.insert(model).second)
+                std::fprintf(stdout, "{\"event\":\"model\",\"model\":\"0x%08X\",\"ms\":%lld,\"scene\":%d,\"mode\":%d,\"mtx\":\"0x%08X\"}\n", model,
+                             (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(),
+                             static_cast<int>(guest16(rdram, 0x800E121Cu)), static_cast<int>(guest16(rdram, 0x800E44A8u)),
+                             static_cast<std::uint32_t>(ctx->r7));
+        }
+        if (!only.empty() && only.count(model) == 0) {
+            ctx->r2 = 0;
+            return true;
+        }
+    }
+    // Research: BLOCKPLANET_IMAGE_SKIP=addr,addr skips 2D draws of those images anywhere.
+    static const std::set<std::uint32_t> image_skip = [] {
+        std::set<std::uint32_t> list;
+        if (const char* v = std::getenv("BLOCKPLANET_IMAGE_SKIP")) {
+            std::string text(v);
+            std::size_t position = 0;
+            while (position < text.size()) {
+                const auto comma = std::min(text.find(',', position), text.size());
+                list.insert(static_cast<std::uint32_t>(std::strtoul(text.substr(position, comma - position).c_str(), nullptr, 16)));
+                position = comma + 1;
+            }
+        }
+        return list;
+    }();
+    if (helper != 0x8002D93Cu && image_skip.count(static_cast<std::uint32_t>(ctx->r5)) != 0) return true;
     static const bool draw_log = std::getenv("BLOCKPLANET_DRAW_LOG") != nullptr;  // research: every distinct 2D draw
     if (draw_log) {
         static std::mutex mutex;
@@ -159,4 +210,58 @@ extern "C" void blockplanet_hud_end(std::uint8_t*, recomp_context*) { in_hud = f
 
 extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
     return hud_hidden.load(std::memory_order_relaxed);
+}
+
+// Research: objects inside LightWave scenes (func_800321D4's a0 = scene,
+// a3 = object index).
+//   BLOCKPLANET_OBJECT_LOG=1           log each scene's highest object index as it grows
+//   BLOCKPLANET_OBJECT_ONLY=scene:i,j  in that scene draw only objects i, j (others in it skipped)
+//   BLOCKPLANET_OBJECT_CYCLE=scene:ms  in that scene draw one object at a time, the next every ms
+extern "C" bool blockplanet_scene_object(std::uint8_t*, recomp_context* ctx) {
+    const auto scene = static_cast<std::uint32_t>(ctx->r4);
+    const int object = static_cast<int>(ctx->r7);
+    static const bool log = std::getenv("BLOCKPLANET_OBJECT_LOG") != nullptr;
+    if (log) {
+        static std::mutex mutex;
+        static std::set<std::pair<std::uint32_t, int>> seen;
+        std::lock_guard lock(mutex);
+        if (seen.insert({scene, object}).second)
+            std::fprintf(stdout, "{\"event\":\"scene_object\",\"scene\":\"0x%08X\",\"object\":%d}\n", scene, object);
+    }
+    struct Filter { std::uint32_t scene = 0; std::set<int> only; int cycle_ms = 0; };
+    static const Filter filter = [] {
+        Filter f;
+        if (const char* v = std::getenv("BLOCKPLANET_OBJECT_ONLY")) {
+            std::string text(v);
+            const auto colon = text.find(':');
+            f.scene = static_cast<std::uint32_t>(std::strtoul(text.substr(0, colon).c_str(), nullptr, 16));
+            std::size_t position = colon + 1;
+            while (colon != std::string::npos && position < text.size()) {
+                const auto comma = std::min(text.find(',', position), text.size());
+                f.only.insert(std::atoi(text.substr(position, comma - position).c_str()));
+                position = comma + 1;
+            }
+        }
+        if (const char* v = std::getenv("BLOCKPLANET_OBJECT_CYCLE")) {
+            std::string text(v);
+            const auto colon = text.find(':');
+            f.scene = static_cast<std::uint32_t>(std::strtoul(text.substr(0, colon).c_str(), nullptr, 16));
+            f.cycle_ms = std::atoi(text.c_str() + colon + 1);
+        }
+        return f;
+    }();
+    if (filter.scene == 0 || scene != filter.scene) return false;
+    if (filter.cycle_ms > 0) {
+        static const auto start = std::chrono::steady_clock::now();
+        static int shown = -1;
+        const int index = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() / filter.cycle_ms) % 64;
+        if (index != shown) {
+            shown = index;
+            std::fprintf(stdout, "{\"event\":\"object_cycle\",\"object\":%d,\"ms\":%lld}\n", index,
+                         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+            std::fflush(stdout);
+        }
+        return object != index;
+    }
+    return filter.only.count(object) == 0;
 }

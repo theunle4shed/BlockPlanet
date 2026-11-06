@@ -477,3 +477,10 @@ text = "tetrisphere_ui_span_end(rdram, ctx, 0x800CFF64u);"
 func = "func_8002D93C"
 before_vram = 0x8002DEA0
 text = "blockplanet_model_draw_end(rdram, ctx);"
+
+# Research (src/graphics/pause_draw_hooks.cpp): each object of a LightWave
+# scene (func_800321D4: scene, ?, geometry, object index) can be logged or
+# filtered, to find the models inside a scene (BLOCKPLANET_OBJECT_*).
+[[patches.hook]]
+func = "func_800321D4"
+text = "if (blockplanet_scene_object(rdram, ctx)) return;"
