@@ -195,7 +195,7 @@ std::string hud_time(double seconds) {
 }
 
 // A number with thousands separators: "12,340".
-std::string hud_number(long long value) {
+[[maybe_unused]] std::string hud_number(long long value) {  // for score modes
     std::string digits = std::to_string(value < 0 ? -value : value), out;
     for (std::size_t i = 0; i < digits.size(); ++i) {
         if (i > 0 && (digits.size() - i) % 3 == 0) out += ',';
