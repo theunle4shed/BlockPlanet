@@ -71,10 +71,10 @@ New compared with the original, which only states the goal at the start.
 **Progress, decided 2026-11-05:** every goal comes down to uncovering one or more pictures in the core (the game checks a rectangle of uncovered core for each). Progress is always **blocks left above what must be uncovered ÷ blocks there at the start of the level**, the same rule as Story:
 
 - **All pictures needed** (CONNECT, DRILL's five, SHIFT's four parts, TOWER, CRYSTAL TOWER, UNIQUE): the total of blocks remaining above all the pictures ÷ the total above them at the start.
-- **Any one picture** (MULTI): the picture with the fewest blocks left, as Story's weakest point.
-- **BRICK** (a brick must fall to the core): **layers the lowest brick has dropped ÷ layers between its start and the core**. Research: where the bricks are and how far each has fallen.
+- **Any one picture** (MULTI): the picture with the fewest blocks left, as Story's weakest point. MULTI's pictures are the core's 3 × 3 tiles.
+- **BRICK** (a brick must fall to the core): **layers the lowest brick has dropped ÷ layers between its start and the core**. Bricks start in layer 3 (two layers to fall).
 
-The bar may hint where hidden pictures are (it moves when a drop uncovers part of one); the owner accepted this for consistency.
+Where each goal's pictures, drills, towers and bricks are: [research notes](research/blockplanet-game-state.md#hide--seek-goals-and-their-pictures-2026-11-05). The bar may hint where hidden pictures are (it moves when a drop uncovers part of one); the owner accepted this for consistency.
 
 ## Lines
 

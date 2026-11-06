@@ -340,3 +340,38 @@ For the HUD's floating numbers (points, time and combo names rising from where t
 - **Combo names** (fuse, gravity): the magic meter's +3 calls (`func_800C7FC4` and one in `func_800CD3B8`) mark them; telling fuse from gravity still needs a look at those two places.
 
 So the floating numbers need no hooks into the game: BlockPlanet reads the board, the combo counter, the score and the clock each frame.
+
+### Hide & Seek goals and their pictures (2026-11-05)
+
+For the HUD's goal progress. Levels started with `launch:hide_and_seek:0:L` and played past the goal card (the board is only built then).
+
+**Goal number:** the level structure's `0x8013D248` (the record's group byte through the table at `0x800E4520`), copied to **`0x800E44A4`**. The card text is picked by `func_800890B8` (jump table `0x800F0EC4`) and the win check by `func_800AB4C8` (jump table `0x800F1068`):
+
+| Goal | Name | Levels seen (stage 1) |
+| --- | --- | --- |
+| 1 | MULTI | 1, 6, 11 |
+| 2 | DRILL | 2, 7 |
+| 3 | Core opening (Rescue's rule; the card says HIDE AND SEEK) | 5, 10 |
+| 4 | SHIFT | 9 |
+| 5 | UNIQUE | 8 |
+| 7 | BRICK | 3 |
+| 9 | CONNECT | not yet seen |
+| 10 | TOWER | 4 |
+| 11 | CRYSTAL TOWER | not yet seen |
+
+**Every goal is won by uncovering core:** each branch ends in `func_800AA3A4`, the count of fully uncovered rows in a rectangle of the exposed-core map (see the core opening above); only the rectangles differ.
+
+**Where the pictures are:** in **layer 0**, plain core is type 9 (Hide & Seek) and **pictures are other types**:
+
+| Goal | Pictures in layer 0 | Objects above |
+| --- | --- | --- |
+| MULTI | The whole core is type 8 in **3 × 3 tiles** (cell values 0–8 within each tile, tiles starting at x, y = 1, 4, 7, …): 100 small pictures, any one wins. A type 9 border runs round the board's edge | — |
+| DRILL | One **5 × 5** picture, types 14–17 | Five drills: type 5 (the tip poking out, top layer) over type 2 (layers below). Only one drill has the picture under it |
+| TOWER | One **5 × 5** picture, types 14–17 | A cross-shaped tower of type 31 standing on the picture through every layer; "uncover all the pieces around the tower" |
+| SHIFT | Four **2 × 2** parts, types 10–13 | A drill over each part; the parts are then slid together |
+| UNIQUE | One shape of 32 cells, types 18–25 | One drill |
+| BRICK | None (all plain core) | Five red **bricks** (type 38, three cells each, L-shaped) resting in **layer 3**; one must fall to the core |
+
+Type 7 (two per playfield layer, also in Rescue from 1:2) is probably the guides' 1×1 **magic crystal**; not confirmed.
+
+**For the HUD** ([HUD_DESIGN.md](../HUD_DESIGN.md#hide--seek)): picture cells are the layer 0 cells that are not plain core (types 10–25; in MULTI, each 3 × 3 tile). Blocks above a picture are the non-zero cells in layers 1–8 over its cells, not counting drill (2, 5) and tower (31) blocks, which the player does not have to remove. A brick's height is the layer it is in; it has reached the core at layer 1.
