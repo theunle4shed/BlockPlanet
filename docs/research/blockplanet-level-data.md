@@ -20,8 +20,9 @@ python3 -m tools.analysis.level_table .local/m0/tetrisphere-us.z64 --all --csv >
 | 0–3 | Header or sub-tables, not records | Values do not follow the record format. |
 | 4–153 | **Rescue: 15 chapters × 10 levels.** Entry = 4 + (chapter − 1) × 10 + (level − 1). | Layer counts match the boards of chapters 1–15 level 1, and chapter 1 level 9 (set through memory) built the 3 layers its record specifies. |
 | 154–160 | Seven records in the Rescue format with group byte 7 and byte 12 rising from 4 to 10 | Starting "chapter 16" loads entry 154. Starting chapters 17 and 18 crashed and chapters 21 and above built broken spheres, because they read into the next section. So the game has 15 regular Rescue chapters; what these seven records are for is not known yet. |
-| 161–195 | Hide & Seek and goal levels, with text such as "UNCOVER MULTIPLE CORES FOR A HUGE BONUS", "LOOK UNDER THE TOWERS TO FIND A CORE", "FIND ALL 4 PARTS OF THE CORE" and "MAKE A BRICK FALL TO THE CORE" | Goal text and the extra flags. Not yet matched to stages in play. |
-| 196–345 | Further records with non-zero bytes 9 and 10 and group values 0 to 10 | Probably other modes (Puzzle, VS, Time Trial). Not yet identified. |
+| 161–180 | **Probably Score Attack** (the game's Time Trial; 2026-11-06): the record loaded for Score Attack's first sphere matched this group's pattern (layers 3, colours 2, "UNCOVER MULTIPLE CORES FOR A HUGE BONUS" every third record), and Score Attack's goal type reads 1 (MULTI). So about 20 spheres, MULTI goals; whether the run continues past 20 (repeating) is still to check. | Matched in memory; not yet followed through a run |
+| 161–195 (earlier reading) | Hide & Seek and goal levels, with text such as "UNCOVER MULTIPLE CORES FOR A HUGE BONUS", "LOOK UNDER THE TOWERS TO FIND A CORE", "FIND ALL 4 PARTS OF THE CORE" and "MAKE A BRICK FALL TO THE CORE" | Goal text and the extra flags. Not yet matched to stages in play. |
+| 196–345 | Further records with group values 0 to 10 | **Probably Hide & Seek** (150 = 5 stages of 30): the group byte matches Hide & Seek's goal numbers (1 MULTI, 2 DRILL, 3 core, 4 SHIFT, 6, 8, 9 CONNECT, 10 TOWER, …). Not yet confirmed by a match in memory. |
 
 ## Record fields (20-byte format)
 
