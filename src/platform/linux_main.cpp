@@ -150,6 +150,10 @@ struct SingleStageResult { double time; double best_before; };
 std::optional<SingleStageResult> single_stage_result;
 std::optional<std::chrono::steady_clock::time_point> single_stage_quit_at;
 bool single_stage_quitting = false;
+// After leaving play from BlockPlanet (a single stage done, or Quit to menu),
+// open BlockPlanet's menus once the game is back at its own menu: at the
+// stage list for a single stage (0: the main menu).
+std::optional<int> return_to_menu_chapter;
 // The PC's default controls from settings.dat, for new profiles and guests.
 ControlPreferences pc_controls;
 std::chrono::steady_clock::time_point last_play_poll{};
@@ -2319,7 +2323,7 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "pause_resume" || *command == "pause_skip" || *command == "pause_quit") {
-                if (*command == "pause_quit") end_track_override();
+                if (*command == "pause_quit") end_track_override(), return_to_menu_chapter = 0;
                 pause_bridge.choose(*command == "pause_resume" ? PauseBridge::Choice::Resume
                                     : *command == "pause_skip" ? PauseBridge::Choice::Skip
                                                                : PauseBridge::Choice::Quit,
@@ -2483,6 +2487,7 @@ bool handle_profile_command(const std::string& command) {
             }
             if (single_stage_quitting && pause_bridge.hide_original()) {
                 single_stage_quitting = false;
+                if (single_stage) return_to_menu_chapter = single_stage->first;
                 single_stage.reset();
                 single_stage_result.reset();
                 pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
@@ -2492,6 +2497,23 @@ bool handle_profile_command(const std::string& command) {
         poll_game_events();
         publish_audio_settings();
         publish_hud_settings();
+        // Back at the game's menu after leaving play from BlockPlanet: open
+        // BlockPlanet's menus (the stage list after a single stage).
+        if (return_to_menu_chapter && !continue_mode && !mode_launcher.active() && guest_rdram != nullptr &&
+            read_game_state(guest_rdram).scene >= 0) {
+            const int chapter = *return_to_menu_chapter;
+            return_to_menu_chapter.reset();
+            blockplanet::ui::request_open("main");
+            if (chapter > 0) {
+                blockplanet::ui::request_show("solo");
+                blockplanet::ui::request_show("story");
+                const char* list = menu_variant == PlayVariant::TimeAttack ? "time_attack"
+                                   : menu_variant == PlayVariant::ScoreAttack ? "score_attack"
+                                   : menu_variant == PlayVariant::Casual ? "casual" : "story";
+                blockplanet::ui::send_command(list);
+                blockplanet::ui::send_command("stages:" + std::to_string(chapter));
+            }
+        }
         // A pending launch (after a Chapter 0, or Restart level) starts once
         // the game is back at its menu.
         static auto last_continue_try = std::chrono::steady_clock::time_point{};

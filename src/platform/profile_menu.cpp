@@ -190,8 +190,8 @@ std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<
             char text[32];
             std::snprintf(text, sizeof text, "best %d:%02d", t / 60, t % 60);
             note = text;
-        } else if (levels_done.count(level) == 0) {
-            note = "next";
+        } else if (levels_done.count(level) == 0 && level == last) {
+            note = "next";  // only the furthest stage open (others may simply not be played yet)
         }
         items.push_back({"stage" + std::to_string(level), "Stage " + c + ":" + std::to_string(level), note,
                          "command:stage:" + c + ":" + std::to_string(level), true, 1, false});

@@ -96,6 +96,9 @@ int main(int argc, char** argv) {
         assert(stages.size() == 4 && stages[0].action == "command:chapter:2" && stages[0].focus);
         assert(stages[1].label == "Stage 2:1" && stages[1].action == "command:stage:2:1" && stages[1].note == "best 0:40");
         assert(stages[3].label == "Stage 2:3" && stages[3].note == "next");
+        // Only the furthest open stage is "next", not every stage not yet played.
+        const auto gaps = story_stages(1, {5}, {});
+        assert(gaps.size() == 7 && gaps[1].note.empty() && gaps[5].note.empty() && gaps[6].note == "next");
         assert(story_stages(1, {}, {}).size() == 2);
     }
     story = story_chapters({0}, 15);
