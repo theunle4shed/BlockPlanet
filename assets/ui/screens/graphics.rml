@@ -17,6 +17,8 @@
              data-options="three-point:Three-point,linear:Linear">Textures<span class="value"></span></div>
         <div class="item value" id="presentation_filter" data-setting="presentation_filter"
              data-options="pixel:Pixel,linear:Smooth,nearest:Sharp">Scaling<span class="value"></span></div>
+        <div class="item value" id="hud_distance" data-setting="hud_distance"
+             data-options="near:Near the sphere,edges:Screen edges,follow:Follow the sphere">HUD panels<span class="value"></span></div>
         <div class="item" id="back" data-action="back">Back</div>
     </div>
 </body>

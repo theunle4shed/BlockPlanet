@@ -70,17 +70,19 @@ div { display: block; }
 #magic .band:last-child { height: auto; padding: 10dp 24dp 18dp 24dp; }
 #magic .window { height: 136dp; }
 #magic .edge { display: inline-block; width: 24dp; height: 136dp; vertical-align: top; }
-/* 24 + 184 (180 + a 2dp border each side) + 24 = the container's 232dp. A
-   light tint ties the window to the container; the model still shows. */
+/* 24 + 184 (180 + a 2dp border each side) + 24 = the container's 232dp. The
+   box's tint is drawn by the game behind the magic's model (magic_hooks.cpp),
+   so the box itself is clear; square corners there, so only a small radius. */
 #item {
     display: inline-block;
     vertical-align: top;
     width: 180dp;
     height: 132dp;
     border: 2dp #f0f0f040;
-    border-radius: 18dp;
-    background-color: #0b102038;
+    border-radius: 4dp;
+    background-color: #0b1020b0;
 }
+#item.held { background-color: transparent; }
 #item .name {
     display: block;
     padding-top: 50dp;

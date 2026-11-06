@@ -43,6 +43,7 @@ nlohmann::json to_json(const ProfileSaveData& data) {
         preferences["audio"] = {{"music", a.music}, {"effects", a.effects},
                                 {"random_music", a.random_music}};
     }
+    if (data.preferences.hud_distance) preferences["hud"] = {{"distance", *data.preferences.hud_distance}};
     nlohmann::json levels = nlohmann::json::object();
     for (const auto& [mode, chapters] : data.progress.levels_completed) {
         nlohmann::json by_chapter = nlohmann::json::object();
@@ -102,6 +103,11 @@ bool from_json(const std::string& text, ProfileSaveData& data) {
             const auto percent = [](int v) { return v >= 0 && v <= 100; };
             if (!percent(audio.music) || !percent(audio.effects)) return false;
             result.preferences.audio = audio;
+        }
+        if (preferences.contains("hud")) {
+            const auto distance = preferences.at("hud").value("distance", std::string("near"));
+            if (distance != "near" && distance != "edges" && distance != "follow") return false;
+            result.preferences.hud_distance = distance;
         }
         const nlohmann::json progress = document.value("progress", nlohmann::json::object());
         const nlohmann::json levels = progress.value("levels_completed", nlohmann::json::object());

@@ -38,6 +38,10 @@ struct ProfilePreferences {
     // Unset until the player changes an audio setting; the game's own (from
     // its cartridge save) are used until then.
     std::optional<AudioPreferences> audio;
+    // The in-game HUD's panels (Graphics > HUD panels, docs/HUD_DESIGN.md):
+    // "near" (where they would be on a 4:3 screen), "edges" (the screen's
+    // edges) or "follow" (near, moving out as the sphere grows). Unset: "near".
+    std::optional<std::string> hud_distance;
 };
 
 struct ProfileStatistics {

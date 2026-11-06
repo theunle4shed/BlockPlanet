@@ -84,6 +84,7 @@ std::atomic<float> anchored_x{NAN};
 // How far a left-anchored span moves things on this picture (screen heights):
 // half the picture's width beyond 4:3.
 std::atomic<float> anchor_shift{0.0f};
+std::atomic<float> box_w{0.0f}, box_h{0.0f}, shift_2d{0.0f};
 // The held model sits this much right of where the numbers put it (measured).
 constexpr float box_correction = 0.0f;
 std::atomic<bool> enabled{false};
@@ -103,7 +104,11 @@ std::int8_t held(const std::uint8_t* rdram) {
 
 namespace blockplanet {
 
-void set_magic_box(bool shown, float x, float y, float scale, float x_anchored, float shift) {
+void set_magic_box(bool shown, float x, float y, float scale, float x_anchored, float shift, float width,
+                   float height, float shift_flat) {
+    shift_2d.store(shift_flat);
+    box_w.store(width);
+    box_h.store(height);
     enabled.store(shown);
     anchored_x.store(x_anchored - box_correction);
     anchor_shift.store(shift);
@@ -119,6 +124,45 @@ bool magic_box_active() {
 } // namespace blockplanet
 
 extern "C" bool blockplanet_magic_box_active() { return blockplanet::magic_box_active(); }
+
+namespace {
+
+void store_word(std::uint8_t* rdram, std::uint32_t address, std::uint32_t value) {
+    std::memcpy(rdram + (address & 0x00FFFFFFu), &value, 4);  // words are kept in host order
+}
+
+// The item box's tint, drawn by the game (its rectangle routine
+// func_8006FA28: x0, y0, x1, y1 in the 320 x 240 frame, then red, green, blue
+// and alpha on the stack) just before the model, inside the same left-anchored
+// span, so it is part of the game's picture and truly behind the model. The
+// HUD's own tint would sit in front of the model and dim it.
+void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, float centre_y) {
+    const float w = box_w.load(), h = box_h.load();
+    if (w <= 0.0f || h <= 0.0f) return;
+    static const int alpha = [] {  // research: BLOCKPLANET_MAGIC_TINT (0 to 255)
+        const char* v = std::getenv("BLOCKPLANET_MAGIC_TINT");
+        return v ? std::atoi(v) : 0xB0;
+    }();
+    if (alpha <= 0) return;
+    // Picture heights to the 320 x 240 frame (240 units per picture height).
+    const auto to_x = [](float v) { return static_cast<int>(std::lround(160.0f + v * 240.0f)); };
+    const auto to_y = [](float v) { return static_cast<int>(std::lround(120.0f + v * 240.0f)); };
+    const recomp_context saved = *ctx;
+    ctx->r29 = static_cast<gpr>(static_cast<std::int32_t>(saved.r29) - 0x40);  // a fresh area for the arguments
+    const std::uint32_t sp = static_cast<std::uint32_t>(ctx->r29);
+    store_word(rdram, sp + 0x10, 0x0B);
+    store_word(rdram, sp + 0x14, 0x10);
+    store_word(rdram, sp + 0x18, 0x20);
+    store_word(rdram, sp + 0x1C, static_cast<std::uint32_t>(std::clamp(alpha, 0, 255)));
+    ctx->r4 = to_x(centre_x - w / 2.0f);
+    ctx->r5 = to_y(centre_y - h / 2.0f);
+    ctx->r6 = to_x(centre_x + w / 2.0f);
+    ctx->r7 = to_y(centre_y + h / 2.0f);
+    func_8006FA28(rdram, ctx);
+    *ctx = saved;
+}
+
+} // namespace
 
 extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context* ctx) {
     const auto& r = research();
@@ -144,6 +188,7 @@ extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context*
     }();
     const float bx = anchored_x.load() + extra_x, by = box_y.load() + extra_y;
     if (std::isnan(bx) || std::isnan(by)) return;
+    draw_box_tint(rdram, ctx, box_x.load() + shift_2d.load(), by);
     // The model's own position (model units), the turn and the size.
     static const float pz_set = [] {  // research: the model's own depth offset
         const char* v = std::getenv("BLOCKPLANET_MAGIC_PZ");

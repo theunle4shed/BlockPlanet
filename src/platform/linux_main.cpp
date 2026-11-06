@@ -441,7 +441,8 @@ void update_magic_box() {
     const float x_anchored = x + shift;
     // Sized to sit inside the box as it turns (measured with the Magnet: about
     // 0.13 picture heights tall at scale 1).
-    blockplanet::set_magic_box(true, x, y, 0.45f * (bh / frame->h) / 0.13f, x_anchored, shift);
+    blockplanet::set_magic_box(true, x, y, 0.45f * (bh / frame->h) / 0.13f, x_anchored, shift,
+                               box->width * sx / frame->h, bh / frame->h, 0.8f * (frame->aspect - 4.0f / 3.0f) / 2.0f);
 }
 
 // The sphere's radius on screen (picture heights), estimated from its highest
@@ -460,6 +461,8 @@ void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState&
     view.picture_w = frame->w / frame->window_w;
     view.picture_h = frame->h / frame->window_h;
     view.sphere_radius = hud_sphere_radius(state);
+    const auto distance = profile_data.preferences.hud_distance.value_or("near");
+    view.distance_mode = distance == "edges" ? 1 : distance == "follow" ? 2 : 0;
 }
 
 Settings persisted_settings{};
@@ -1168,6 +1171,27 @@ bool handle_audio_setting(const std::string& command) {
     return true;
 }
 
+// Graphics > HUD panels, saved in the profile.
+bool handle_hud_setting(const std::string& command) {
+    const std::string prefix = "setting:hud_distance=";
+    if (command.rfind(prefix, 0) != 0) return false;
+    const auto value = command.substr(prefix.size());
+    if (value != "near" && value != "edges" && value != "follow") return true;
+    profile_data.preferences.hud_distance = value;
+    profile_dirty = true;
+    save_profile();
+    blockplanet::ui::set_setting("hud_distance", value);
+    return true;
+}
+
+void publish_hud_settings() {
+    static std::string last;
+    const auto value = profile_data.preferences.hud_distance.value_or("near");
+    if (value == last) return;
+    last = value;
+    blockplanet::ui::set_setting("hud_distance", value);
+}
+
 // "setting:NAME=VALUE" from the menus, as a settings change (field numbers
 // as in the PC settings menu). False if the command is not a known setting.
 bool queue_menu_setting(const std::string& command) {
@@ -1635,6 +1659,7 @@ bool handle_profile_command(const std::string& command) {
             std::fflush(stdout);
             if (*command == "exit") close_game();
             if (handle_audio_setting(*command)) continue;
+            if (handle_hud_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "audio_screen") {
@@ -1788,6 +1813,7 @@ bool handle_profile_command(const std::string& command) {
         pc_settings_release_guard(held);
         poll_game_events();
         publish_audio_settings();
+        publish_hud_settings();
         // A pending launch (after a Chapter 0, or Restart level) starts once
         // the game is back at its menu.
         static auto last_continue_try = std::chrono::steady_clock::time_point{};

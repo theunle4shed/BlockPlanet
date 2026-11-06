@@ -65,6 +65,9 @@ struct HudView {
     // height), and the sphere's radius on screen in picture heights.
     float picture_x = 0.0f, picture_y = 0.0f, picture_w = 1.0f, picture_h = 1.0f;
     float sphere_radius = 0.275f;
+    // 0 near (as on a 4:3 screen, still), 1 the screen's edges, 2 near and
+    // pushed out as the sphere grows on screen.
+    int distance_mode = 0;
 };
 // Shows the HUD with these values, or hides it (nullopt). Applied at the next frame.
 void set_hud(std::optional<HudView> hud);

@@ -174,7 +174,11 @@ std::string hud_rml(const HudView& hud) {
     // markup only changes when something else does.
     rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div id='drop-fill' class='fill'/></div></div>";
     rml += "<div class='rule'/>";
-    rml += "<div id='magic'><div class='band'/><div class='window'><div class='edge'/><div id='item'>";
+    // While the game draws the magic's model in the box it draws the box's tint
+    // too, behind the model (magic_hooks.cpp); otherwise the HUD tints it.
+    const bool model = hud.magic >= 0 && hud.magic_model;
+    rml += std::string("<div id='magic'><div class='band'/><div class='window'><div class='edge'/><div id='item'") +
+           (model ? " class='held'" : "") + ">";
     // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
     // its name is shown only when it is not.
     rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
@@ -244,9 +248,11 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
     if (std::getenv("BLOCKPLANET_HUD_LAYOUT_LOG") != nullptr && logged++ % 120 == 0)
         std::fprintf(stdout, "{\"event\":\"hud_layout\",\"lw\":%g,\"lh\":%g,\"rw\":%g,\"rh\":%g,\"w\":%g,\"h\":%g}\n", lw, lh, rw, rh, width, height);
     const float ph = hud.picture_h * height;
-    const float clear = hud.sphere_radius * ph + margin;  // from the centre, keeping clear of the sphere
+    // From the centre, keeping clear of the sphere (Follow the sphere only).
+    const float clear = hud.distance_mode == 2 ? hud.sphere_radius * ph + margin : 0.0f;
     if (width >= height) {
-        const float frame = ph * 2.0f / 3.0f;  // half a 4:3 frame's width
+        // Half a 4:3 frame's width; Screen edges: the window's.
+        const float frame = hud.distance_mode == 1 ? width : ph * 2.0f / 3.0f;
         const float lx = std::max(margin, std::min(cx - frame + margin, cx - clear - lw));
         const float rx = std::min(width - margin - rw, std::max(cx + frame - margin - rw, cx + clear));
         const float ly = std::clamp(cy - lh / 2.0f, margin, std::max(margin, height - margin - lh));
@@ -258,7 +264,7 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         right->SetProperty("left", px(rx));
         right->SetProperty("top", px(std::clamp(cy - rh / 2.0f, margin, std::max(margin, height - margin - rh))));
     } else {
-        const float frame = hud.picture_w * width * 2.0f / 3.0f;  // half a 3:4 frame's height
+        const float frame = hud.distance_mode == 1 ? height : hud.picture_w * width * 2.0f / 3.0f;  // half a 3:4 frame's height
         const float ly = std::max(margin, std::min(cy - frame + margin, cy - clear - lh));
         const float ry = std::min(height - margin - rh, std::max(cy + frame - margin - rh, cy + clear));
         const float lx = std::clamp(cx - lw / 2.0f, margin, std::max(margin, width - margin - lw));

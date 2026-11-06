@@ -57,7 +57,7 @@ Names are 1 to 24 printable characters and are unique regardless of case.
 
 Written by BlockPlanet: atomically, with the previous version kept as `save.json.bak` (used if the main file is damaged).
 
-- **Preferences:** the profile's controls (controller family, button layout, magic button). A profile without controls of its own starts from the PC's defaults in `settings.dat`, which are then copied in. Changing controls in the game saves them to the profile, not to `settings.dat`; `tetrisphere-config bind` and `family` change the PC's defaults. A guest uses the defaults, and changes last only for the session.
+- **Preferences:** the profile's controls (controller family, button layout, magic button), audio (music and effects levels, Auto or Random music) and HUD panels (`hud.distance`: near, edges or follow; Graphics > HUD panels). A profile without controls of its own starts from the PC's defaults in `settings.dat`, which are then copied in. Changing controls in the game saves them to the profile, not to `settings.dat`; `tetrisphere-config bind` and `family` change the PC's defaults. A guest uses the defaults, and changes last only for the session.
 - **Progress:** levels completed per mode and chapter, chapters completed per mode, puzzles solved.
 - **Statistics:** games started and over, pieces placed, lives lost, levels, chapters and puzzles completed, Versus rounds won and lost, and seconds in play (not in menus).
 
