@@ -90,6 +90,8 @@ Each level has a goal type (MULTI, DRILL, SHIFT, UNIQUE, BRICK, CONNECT, TOWER, 
 | Magic item box and charge bar | Timer, with −/+ against the profile's best for the stage |
 | Next pieces | |
 
+**Built (2026-11-06):** the Story HUD's left side (health and drop timer, magic, next); on the right "Hide & Seek", the level number (its own chapter is not found yet), **Goal** in BlockPlanet's own words (Find any picture, Under a drill, Open the core, Four parts, One shape, Drop a brick, Connect, Around the tower, Crystal tower), and the level's time with ± against the profile's best for that level (`progress.episode_records.hide_and_seek`, chapter key 0 until the chapter is found). To check: the time also runs while the goal card is up at the level's start.
+
 **No progress bar in Hide & Seek** (decided 2026-11-06). Finding the pictures is the mode's challenge, and any bar that moves as pictures are uncovered hints where they are, which purists would not want. The goal type stays on screen as text, which is new compared with the original (it only states the goal on the card at the start).
 
 The progress rules worked out earlier are kept here in case a mode or an assist option wants them later: blocks left above what must be uncovered ÷ blocks there at the start (all the pictures for most goals; the picture with the fewest blocks left for MULTI, whose pictures are the core's 3 × 3 tiles); for BRICK, layers the furthest-fallen brick has dropped ÷ the two layers to the core. Where each goal's pictures, drills, towers and bricks are: [research notes](research/blockplanet-game-state.md#hide--seek-goals-and-their-pictures-2026-11-05).

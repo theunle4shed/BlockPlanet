@@ -66,7 +66,7 @@ float ProgressTracker::update(int level_key, int weakest_now) {
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out) {
     using namespace guest;
     const int mode = load16(rdram, 0x800E44A8);
-    if (load16(rdram, 0x800E121C) != -1 || mode != 1) return false;
+    if (load16(rdram, 0x800E121C) != -1 || (mode != 1 && mode != 5)) return false;  // Story, Hide & Seek
     out = {};
     out.mode = mode;
     const int hearts = load16(rdram, player1 + 0x2D7E);
@@ -114,6 +114,7 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
         out.top_layer = top_layer(board);
         out.cells = std::move(board.cells);
     }
+    if (mode == 5) out.progress = -1.0f;  // Hide & Seek: no progress bar (it would hint where the pictures are)
     return true;
 }
 

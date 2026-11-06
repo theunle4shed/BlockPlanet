@@ -309,6 +309,23 @@ void refresh_continue() {
     blockplanet::ui::set_list("continue", std::move(items));
 }
 
+// Hide & Seek's goal (0x800E44A4), in BlockPlanet's own words
+// (docs/research/blockplanet-game-state.md, Hide & Seek goals).
+std::string hide_and_seek_goal(int goal) {
+    switch (goal) {
+    case 1: return "Find any picture";
+    case 2: return "Under a drill";
+    case 3: return "Open the core";
+    case 4: return "Four parts";
+    case 5: return "One shape";
+    case 7: return "Drop a brick";
+    case 9: return "Connect";
+    case 10: return "Around the tower";
+    case 11: return "Crystal tower";
+    default: return "";
+    }
+}
+
 void update_magic_box();
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
 
@@ -350,7 +367,7 @@ void update_hud() {
             combo_blocks_pending += combo->blocks;  // Score Attack's clock gains time
             // For trophies (Story, Time Attack and Score Attack): the blocks a
             // whole combo cleared, as measured from the board.
-            if (combo->blocks > 0) {
+            if (combo->blocks > 0 && state.mode == 1) {
                 tetrisphere::GameEvent event{"story_combo", {}};
                 event.fields["mode"] = std::string(variant_records(play_variant) == std::string("rescue") ? "story" : variant_records(play_variant));
                 event.fields["blocks"] = std::int64_t{combo->blocks};
@@ -380,7 +397,7 @@ void update_hud() {
             profile_dirty = true;
             save_profile();
             refresh_continue();
-        } else if (story && state.chapter >= 1 && state.level >= 1 && !single_stage &&
+        } else if (story && state.mode == 1 && state.chapter >= 1 && state.level >= 1 && !single_stage &&
                    (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual)) {
             const std::string submode = play_variant == PlayVariant::Casual ? "casual" : "campaign";
             if (last.submode != submode || last.chapter != state.chapter || last.level != state.level) {
@@ -446,7 +463,11 @@ void update_hud() {
         p.cells = hud_piece_cells(piece.shape, piece.cells);
         view.next.push_back(std::move(p));
     }
-    {
+    if (state.mode == 5) {
+        view.mode = "Hide & Seek";
+        view.stage = std::to_string(state.level);  // its own chapter is not found yet
+        view.goal = hide_and_seek_goal(guest::load16(guest_rdram, 0x800E44A4));
+    } else {
         view.mode = variant_title(play_variant);
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
     }
@@ -610,6 +631,37 @@ void update_hud() {
     } else if (state.mode == 1) {
         // Story: the episode's time only (the speedrun timing is Time Attack's).
         view.time = hud_time(splits.view().total);
+    } else if (state.mode == 5) {
+        // Hide & Seek: the level's time against the best for it (-/+), no
+        // progress bar (it would hint where the pictures are). Bests per
+        // level in records "hide_and_seek" (chapter key 0 until its own
+        // chapter is found).
+        static int level_now = -1;
+        static double level_time = 0.0;
+        auto& record = profile_data.progress.episode_records["hide_and_seek"][0];
+        if (state.level != level_now) {
+            if (level_now >= 1 && state.level == level_now + 1 && level_time > 0.5) {
+                if (record.best_levels.size() < std::size_t(level_now)) record.best_levels.resize(std::size_t(level_now), 0.0);
+                double& best = record.best_levels[std::size_t(level_now - 1)];
+                if (best <= 0.0 || level_time < best) {
+                    best = level_time;
+                    profile_dirty = true;
+                    save_profile();
+                }
+            }
+            level_now = state.level;
+            level_time = 0.0;
+        }
+        if (!paused && elapsed < 1.0) level_time += elapsed;
+        view.time_label = "Time";
+        view.time = hud_time(level_time);
+        const auto i = std::size_t(state.level - 1);
+        const double best = i < record.best_levels.size() ? record.best_levels[i] : 0.0;
+        if (best > 0.0) {
+            view.time_delta = hud_delta(level_time - best);
+            view.time_ahead = level_time < best;
+            view.best = "Best " + hud_time(best);
+        }
     }
     view.progress = state.progress;
     place_hud(view, state);
@@ -1627,6 +1679,7 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     if (game_option_applier) {
         // Casual (Story without a game over) applies to Story's launches only,
         // and pauses trophies as --casual does.
+        if (mode != LaunchMode::Rescue) play_variant = PlayVariant::Story;  // the variants are Story's
         const bool casual = mode == LaunchMode::Rescue && play_variant == PlayVariant::Casual;
         game_option_applier->set_menu_casual(casual);
         trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());

@@ -217,6 +217,7 @@ std::string hud_rml(const HudView& hud) {
     // Mode and stage, with the stage's progress bar beneath the stage number.
     rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'>" +
            escape(hud.stage) + "</div>";
+    if (!hud.goal.empty()) rml += "<div class='sublabel'>Goal</div><div id='goal'>" + escape(hud.goal) + "</div>";
     if (hud.progress >= 0.0f)
         rml += "<div class='sublabel'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div>";
     rml += "</div>";

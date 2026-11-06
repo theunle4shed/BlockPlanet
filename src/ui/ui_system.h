@@ -59,6 +59,7 @@ struct HudView {
     std::vector<HudPieceView> next;  // next first
     std::string mode;          // e.g. "Rescue"
     std::string stage;         // e.g. "1:3"
+    std::string goal;          // Hide & Seek: the level's goal, in words (empty: none)
     std::string time;          // the episode's time, e.g. "2:41"
     std::string clock;         // Score Attack: the time left, e.g. "4:37" (empty: none)
     bool clock_low = false;    // the last 30 seconds

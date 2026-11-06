@@ -178,6 +178,8 @@ div { display: block; }
 #progress { height: 18dp; }
 #where .sublabel { display: block; font-size: 17dp; font-weight: bold; color: #9aa6c8; font-effect: none; margin: 8dp 0dp 6dp 0dp; }
 #progress .fill { background-color: #48d060; }
+/* Hide & Seek: the level's goal, in words. */
+#goal { display: block; font-size: 26dp; font-weight: bold; color: #f8f8f8; }
 
 /* Portrait (taller than wide): the containers become rows, the groups side by
    side with dividers between them. */
@@ -212,6 +214,7 @@ div { display: block; }
     #stage { font-size: 40dp; line-height: 44dp; }
     #time { font-size: 40dp; }
     #where .sublabel { display: none; }
+    #goal { font-size: 22dp; margin-top: 4dp; }
     #progress { width: 120dp; margin-top: 8dp; height: 14dp; }
     #net { display: inline-block; margin-left: 12dp; }
     #time { display: inline-block; }
