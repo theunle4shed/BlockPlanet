@@ -11,6 +11,7 @@ extern "C" {
 bool tetrisphere_controls_view_hook(std::uint8_t*,recomp_context*);
 void recomp_entrypoint(std::uint8_t* rdram, recomp_context* ctx);
 void func_8006FA28(std::uint8_t* rdram, recomp_context* ctx);
+void func_8002D93C(std::uint8_t* rdram, recomp_context* ctx);
 void func_80029510(std::uint8_t* rdram, recomp_context* ctx);
 void func_800295D4(std::uint8_t* rdram, recomp_context* ctx);
 void func_80029674(std::uint8_t* rdram, recomp_context* ctx);
@@ -56,6 +57,10 @@ void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_magic_box_active();
 bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_title_letters(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_title_letters_end(std::uint8_t* rdram, recomp_context* ctx);
+bool blockplanet_title_skip_object(std::uint32_t scene, int object);
+void blockplanet_title_watch(std::uint8_t* rdram);
 void blockplanet_fn_probe(std::uint8_t* rdram, recomp_context* ctx, uint32_t fn);
 void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx);
 void tetrisphere_rescue_pause_snapshot_hook(std::uint8_t* rdram,

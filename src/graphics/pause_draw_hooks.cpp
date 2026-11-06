@@ -150,7 +150,10 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
                          helper, static_cast<std::uint32_t>(ctx->r4), static_cast<std::uint32_t>(ctx->r5), static_cast<int>(ctx->r6),
                          static_cast<int>(ctx->r7), static_cast<int>(guest16(rdram, 0x800E121Cu)));
     }
-    if (helper == 0x8002D93Cu) blockplanet_magic_flight(rdram, ctx);
+    if (helper == 0x8002D93Cu) {
+        blockplanet_magic_flight(rdram, ctx);
+        blockplanet_title_watch(rdram);
+    }
     // The held magic's model above the bowl (func_800C78A0's model draw, told
     // apart by its matrices), only while held (player 1's +0x702 >= 0) and
     // only when it cannot be drawn in BlockPlanet's item box (magic_hooks.cpp
@@ -220,6 +223,7 @@ extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
 extern "C" bool blockplanet_scene_object(std::uint8_t*, recomp_context* ctx) {
     const auto scene = static_cast<std::uint32_t>(ctx->r4);
     const int object = static_cast<int>(ctx->r7);
+    if (blockplanet_title_skip_object(scene, object)) return true;
     static const bool log = std::getenv("BLOCKPLANET_OBJECT_LOG") != nullptr;
     if (log) {
         static std::mutex mutex;

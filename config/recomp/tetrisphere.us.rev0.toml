@@ -558,3 +558,16 @@ text = "blockplanet_fn_probe(rdram, ctx, 0x800685FCu);"
 func = "func_80070118"
 text = "blockplanet_fn_probe(rdram, ctx, 0x80070118u);"
 
+
+# The title (func_800685FC) draws the letters scene (0x800E1670) until its
+# animation ends, then clears the pointer. BlockPlanet can keep it there,
+# held at a frame, letters only (src/graphics/title_hooks.cpp).
+[[patches.hook]]
+func = "func_800685FC"
+before_vram = 0x8006942C
+text = "blockplanet_title_letters(rdram, ctx);"
+
+[[patches.hook]]
+func = "func_800685FC"
+before_vram = 0x80069478
+text = "blockplanet_title_letters_end(rdram, ctx);"
