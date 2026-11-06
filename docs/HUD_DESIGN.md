@@ -63,18 +63,12 @@ Each level has a goal type (MULTI, DRILL, SHIFT, UNIQUE, BRICK, CONNECT, TOWER, 
 | Priority 1 (left, top to bottom) | Priority 2 (right) |
 | --- | --- |
 | Hearts | Mode, stage and **goal type** (text, top right; e.g. "Hide & Seek" / "1:3" / "DRILL") |
-| Magic item box and charge bar | **Goal progress**: a % bar, worked out the same way as Story's (below) |
-| Next pieces | Timer, with −/+ against the profile's best for the stage |
+| Magic item box and charge bar | Timer, with −/+ against the profile's best for the stage |
+| Next pieces | |
 
-New compared with the original, which only states the goal at the start.
+**No progress bar in Hide & Seek** (decided 2026-11-06). Finding the pictures is the mode's challenge, and any bar that moves as pictures are uncovered hints where they are, which purists would not want. The goal type stays on screen as text, which is new compared with the original (it only states the goal on the card at the start).
 
-**Progress, decided 2026-11-05:** every goal comes down to uncovering one or more pictures in the core (the game checks a rectangle of uncovered core for each). Progress is always **blocks left above what must be uncovered ÷ blocks there at the start of the level**, the same rule as Story:
-
-- **All pictures needed** (CONNECT, DRILL's five, SHIFT's four parts, TOWER, CRYSTAL TOWER, UNIQUE): the total of blocks remaining above all the pictures ÷ the total above them at the start.
-- **Any one picture** (MULTI): the picture with the fewest blocks left, as Story's weakest point. MULTI's pictures are the core's 3 × 3 tiles.
-- **BRICK** (a brick must fall to the core): **layers the lowest brick has dropped ÷ layers between its start and the core**. Bricks start in layer 3 (two layers to fall).
-
-Where each goal's pictures, drills, towers and bricks are: [research notes](research/blockplanet-game-state.md#hide--seek-goals-and-their-pictures-2026-11-05). The bar may hint where hidden pictures are (it moves when a drop uncovers part of one); the owner accepted this for consistency.
+The progress rules worked out earlier are kept here in case a mode or an assist option wants them later: blocks left above what must be uncovered ÷ blocks there at the start (all the pictures for most goals; the picture with the fewest blocks left for MULTI, whose pictures are the core's 3 × 3 tiles); for BRICK, layers the furthest-fallen brick has dropped ÷ the two layers to the core. Where each goal's pictures, drills, towers and bricks are: [research notes](research/blockplanet-game-state.md#hide--seek-goals-and-their-pictures-2026-11-05).
 
 ## Lines
 
