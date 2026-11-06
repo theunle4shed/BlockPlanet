@@ -131,6 +131,9 @@ div { display: block; }
 #magic .window { white-space: nowrap; }
 #meter .fill { background-color: #9c5cf0; }
 
+/* Puzzle: drops and slides left, large. */
+.count { display: block; font-size: 64dp; font-weight: bold; line-height: 68dp; }
+
 /* Next pieces: the next one first and larger. */
 .piece {
     display: block;
@@ -215,6 +218,7 @@ div { display: block; }
     #time { font-size: 40dp; }
     #where .sublabel { display: none; }
     #goal { font-size: 22dp; margin-top: 4dp; }
+    .count { font-size: 48dp; line-height: 52dp; }
     #progress { width: 120dp; margin-top: 8dp; height: 14dp; }
     #net { display: inline-block; margin-left: 12dp; }
     #time { display: inline-block; }

@@ -67,7 +67,7 @@ Mode names are reported for modes 1 to 6. Practice, two-player VS and Lines (mod
 - The number of chapters, to report `final` on the last one.
 - Combo size and multiplier.
 - Magic use and magic type.
-- Puzzle drops and slides.
+- ~~Puzzle drops and slides.~~ Found (2026-11-06): drops left context `+0x25C6`, slides left `+0x25C8` (s16; puzzle 1 starts with 1 and 1, a drop took drops to 0). Puzzle's time is `+0x2B0C`, counting up in frames (modes 4, 5 and 7 count up there; `0x800CEC38`).
 - Game over for modes without hearts: Puzzle, and Time Trial when the clock runs out.
 
 ## How the sphere is drawn (culling research, in progress)

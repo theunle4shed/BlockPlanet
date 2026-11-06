@@ -166,6 +166,13 @@ std::string escape(const std::string& text) {
 std::string hud_rml(const HudView& hud) {
     std::string rml;
     rml += "<div id='left' class='side'>";
+    if (hud.drops_left >= 0) {
+        // Puzzle: the moves left, nothing else (no hearts, magic or queue).
+        rml += "<div id='drops' class='group'><div class='label'>Drops left</div><div class='count'>" +
+               std::to_string(hud.drops_left) + "</div></div><div class='rule'><div class='line'/></div>"
+               "<div id='slides' class='group'><div class='label'>Slides left</div><div class='count'>" +
+               std::to_string(std::max(0, hud.slides_left)) + "</div></div></div>";
+    } else {
     rml += "<div id='lives' class='group'><div class='label'>Health</div><div id='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
     rml += "</div>";
@@ -213,6 +220,7 @@ std::string hud_rml(const HudView& hud) {
         rml += "</div>";
     }
     rml += "</div></div>";
+    }
     rml += "<div id='right' class='side'>";
     // Mode and stage, with the stage's progress bar beneath the stage number.
     rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'>" +

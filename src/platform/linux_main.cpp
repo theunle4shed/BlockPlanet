@@ -329,6 +329,71 @@ std::string hide_and_seek_goal(int goal) {
 void update_magic_box();
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
 
+int& last_drops_seen() { static int v = 0; return v; }
+int& last_slides_seen() { static int v = 0; return v; }
+
+// Puzzle's HUD: drops and slides left (context +0x25C6, +0x25C8), the puzzle
+// number, its time (the game's clock, +0x2B0C, counting up in frames) against
+// the best for that puzzle, and the fewest moves (drops + slides) it has been
+// solved in. Bests in records "puzzle" (times) and "puzzle_moves", chapter 0,
+// index = puzzle number - 1.
+void update_puzzle_hud() {
+    constexpr std::uint32_t p1 = 0x80110220u;
+    const int number = guest::load16(guest_rdram, p1 + 0x23BA) + 1;
+    const int drops = guest::load16(guest_rdram, p1 + 0x25C6);
+    const int slides = guest::load16(guest_rdram, p1 + 0x25C8);
+    const double seconds = static_cast<std::int32_t>(guest::load32(guest_rdram, p1 + 0x2B0C)) / 60.0;
+    static int puzzle = -1, start_drops = 0, start_slides = 0;
+    static double last_seconds = 0.0;
+    auto& times = profile_data.progress.episode_records["puzzle"][0].best_levels;
+    auto& moves = profile_data.progress.episode_records["puzzle_moves"][0].best_levels;
+    if (number != puzzle) {
+        // Solved (the next puzzle has started): keep the best time and moves.
+        if (puzzle >= 1 && number == puzzle + 1 && last_seconds > 0.5) {
+            const auto i = std::size_t(puzzle - 1);
+            if (times.size() <= i) times.resize(i + 1, 0.0);
+            if (moves.size() <= i) moves.resize(i + 1, 0.0);
+            const double used = double(start_drops - last_drops_seen() + start_slides - last_slides_seen());
+            bool changed = false;
+            if (times[i] <= 0.0 || last_seconds < times[i]) times[i] = last_seconds, changed = true;
+            if (used > 0.0 && (moves[i] <= 0.0 || used < moves[i])) moves[i] = used, changed = true;
+            if (changed) {
+                profile_dirty = true;
+                save_profile();
+            }
+        }
+        puzzle = number;
+        start_drops = drops;
+        start_slides = slides;
+    }
+    // The counts at a puzzle's start are its allowance (a restart sets them again).
+    start_drops = std::max(start_drops, drops);
+    start_slides = std::max(start_slides, slides);
+    last_drops_seen() = drops;
+    last_slides_seen() = slides;
+    last_seconds = seconds;
+
+    blockplanet::ui::HudView view;
+    view.drops_left = std::max(0, drops);
+    view.slides_left = std::max(0, slides);
+    view.mode = "Puzzle";
+    view.stage = std::to_string(number);
+    view.time = hud_time(seconds);
+    const auto i = std::size_t(number - 1);
+    const double best_time = i < times.size() ? times[i] : 0.0;
+    const double best_moves = i < moves.size() ? moves[i] : 0.0;
+    if (best_time > 0.0) {
+        view.time_delta = hud_delta(seconds - best_time);
+        view.time_ahead = seconds < best_time;
+        view.best = "Best " + hud_time(best_time);
+        if (best_moves > 0.0)
+            view.best += " \u00B7 " + std::to_string(int(best_moves)) + (best_moves == 1.0 ? " move" : " moves");
+    }
+    tetrisphere::StoryHudState state;
+    place_hud(view, state);
+    blockplanet::ui::set_hud(view);
+}
+
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
     static tetrisphere::ProgressTracker progress;
@@ -407,6 +472,14 @@ void update_hud() {
                 refresh_continue();
             }
         }
+    }
+    // Puzzle (mode 4): its own HUD (docs/HUD_DESIGN.md, Puzzle).
+    if (!story && !original && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+        guest::load16(guest_rdram, 0x800E44A8) == 4) {
+        blockplanet::set_original_hud_hidden(true);
+        blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
+        update_puzzle_hud();
+        return;
     }
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
