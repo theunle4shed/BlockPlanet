@@ -61,13 +61,14 @@ int main(int argc, char** argv) {
     data.progress.score_attack_best_score = 482000;
     data.progress.score_attack_best_seconds = 371.5;
     data.progress.episode_records["rescue"][2] = {{41.5, 0.0, 38.25}, 512.0};
-    data.progress.last_play = {"casual", 3, 4};
+    data.progress.last_play = {"casual", 3, 1, 4200, 2, 3};
     assert(store.save(data, error));
     ProfileSaveData read;
     assert(store.load(read, error));
     assert(read.preferences.hud_distance && *read.preferences.hud_distance == "follow");
     assert(read.progress.last_play.submode == "casual" && read.progress.last_play.chapter == 3 &&
-           read.progress.last_play.level == 4);
+           read.progress.last_play.level == 1 && read.progress.last_play.score == 4200 &&
+           read.progress.last_play.hearts == 2 && read.progress.last_play.magic == 3);
     assert(read.progress.score_attack_best_score == 482000 && read.progress.score_attack_best_seconds == 371.5);
     {
         const auto& r = read.progress.episode_records["rescue"][2];

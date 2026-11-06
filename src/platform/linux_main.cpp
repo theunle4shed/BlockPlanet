@@ -154,6 +154,8 @@ bool single_stage_quitting = false;
 // open BlockPlanet's menus once the game is back at its own menu: at the
 // stage list for a single stage (0: the main menu).
 std::optional<int> return_to_menu_chapter;
+// Continue: the checkpoint to put back once its episode starts.
+std::optional<tetrisphere::ProfileProgress::LastPlay> pending_restore;
 // The PC's default controls from settings.dat, for new profiles and guests.
 ControlPreferences pc_controls;
 std::chrono::steady_clock::time_point last_play_poll{};
@@ -302,11 +304,10 @@ void refresh_continue() {
         blockplanet::ui::ListItem item;
         item.id = "continue";
         item.label = "Continue";
-        const std::string where = std::to_string(last.chapter) + ":" + std::to_string(last.level);
-        item.note = std::string(last.submode == "casual" ? "Casual " : "Story ") + where;
+        item.note = std::string(last.submode == "casual" ? "Casual" : "Story") + ", episode " + std::to_string(last.chapter);
         item.action = "command:continue";
-        item.description = "Carry on from episode " + std::to_string(last.chapter) + ", stage " +
-                           std::to_string(last.level) + ", where your last game stopped.";
+        item.description = "Carry on from the start of episode " + std::to_string(last.chapter) +
+                           ", with the score and hearts you had when it began.";
         item.focus = true;
         items.push_back(std::move(item));
     }
@@ -456,21 +457,32 @@ void update_hud() {
                      popups.end());
     }
     if (!story) popups.clear();
-    // Continue (the main menu): the Story or Casual stage being played, kept
-    // until a game over.
+    // Continue (the main menu): a checkpoint as each Story or Casual episode
+    // starts (its first stage), with the score and hearts then; a
+    // stage left part-way is not resumed (it cannot be restored exactly).
+    // Cleared at a game over.
     {
         auto& last = profile_data.progress.last_play;
         const bool in_play = guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E44A8) == 1;
+        const bool campaign = story && state.mode == 1 && state.chapter >= 1 && !single_stage &&
+                              (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual);
         if (in_play && guest::load16(guest_rdram, 0x80110220u + 0x2D7E) < 0 && !last.submode.empty()) {
             last = {};
             profile_dirty = true;
             save_profile();
             refresh_continue();
-        } else if (story && state.mode == 1 && state.chapter >= 1 && state.level >= 1 && !single_stage &&
-                   (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual)) {
+        } else if (campaign && pending_restore && state.chapter == pending_restore->chapter && state.level == 1) {
+            // Continuing: put back the score and hearts of the checkpoint. (Not
+            // the magic: writing the held magic skips the game's own set-up for
+            // it, and its model came out broken.)
+            auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
+            guest::store32(rdram, 0x80110220u + 0x2AF8, std::uint32_t(pending_restore->score / 10));
+            guest::store16(rdram, 0x80110220u + 0x2D7E, std::int16_t(std::clamp(pending_restore->hearts, 1, 3)));
+            pending_restore.reset();
+        } else if (campaign && !pending_restore && state.level == 1) {
             const std::string submode = play_variant == PlayVariant::Casual ? "casual" : "campaign";
-            if (last.submode != submode || last.chapter != state.chapter || last.level != state.level) {
-                last = {submode, state.chapter, state.level};
+            if (last.submode != submode || last.chapter != state.chapter) {
+                last = {submode, state.chapter, 1, static_cast<std::int64_t>(state.score) * 10, state.hearts, state.magic};
                 profile_dirty = true;
                 save_profile();
                 refresh_continue();
@@ -2339,7 +2351,8 @@ bool handle_profile_command(const std::string& command) {
                     single_stage_result.reset();
                     menu_variant = play_variant = last.submode == "casual" ? PlayVariant::Casual : PlayVariant::Story;
                     chapter_zero_lesson.clear();
-                    game_option_applier->choose_start(last.chapter, last.level);
+                    game_option_applier->choose_start(last.chapter, 1);
+                    pending_restore = last;
                     launch_mode(LaunchMode::Rescue);
                 }
                 continue;
