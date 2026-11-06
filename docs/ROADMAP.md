@@ -208,6 +208,8 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 
 **Lines as a multiplayer mode.** Lines, the hidden mode, is a candidate for local and online VS. Research: how Lines' rules and win conditions differ from the modes VS already supports, and whether VS can run with Lines rules.
 
+**VS on Story's episodes (idea, saved for later, 2026-11-06).** VS CPU has its own ladder (5 episodes of 7 rounds, endings after 3 and 5). The idea: play Story's episodes in VS instead (whole episode or one stage against the computer), so stages are the same in every mode. To research first: which level records VS loads, where it counts rounds per episode (overriding `func_80089C9C` did not change Rescue's count), whether its start uses Story's next-level counter (`0x800E449C`), how the computer's skill follows the episode, and VS's core-size addition. Kept as the original for now.
+
 **Join codes for streamers (idea, 2026-11-06).** Friend and lobby codes shown hidden (`••••••`) with a reveal button and a **Copy** button that works while hidden; a **streamer mode** setting hides codes everywhere by default (lobby, notifications) and perhaps friends' names. See REDESIGN.md, section 4.
 
 ## Single player first
