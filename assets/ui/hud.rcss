@@ -69,7 +69,7 @@ div { display: block; }
 .rule .line { height: 2dp; background-color: #3a4260; }
 
 /* Hearts: three red tiles, a lost one dark. */
-#hearts { height: 48dp; }
+#hearts, .hearts { height: 48dp; }
 .heart {
     display: inline-block;
     width: 40dp;
@@ -185,6 +185,24 @@ div { display: block; }
 #progress .fill { background-color: #48d060; }
 /* Hide & Seek: the level's goal, in words. */
 #goal { display: block; font-size: 26dp; font-weight: bold; color: #f8f8f8; }
+
+/* VS: a narrower column per player at the outer edges. */
+.side.versus { width: 176dp; }
+.versus .group { padding: 12dp 18dp 14dp 18dp; }
+.versus .label { font-size: 17dp; margin-bottom: 6dp; }
+.versus .heart { width: 32dp; height: 32dp; margin-right: 8dp; border-radius: 10dp; }
+.versus .hearts { height: 38dp; }
+.versus .count { font-size: 44dp; line-height: 48dp; }
+.versus .rule { padding: 6dp 14dp; }
+#right.versus { text-align: right; }
+.vs-drop { width: 128dp; margin-top: 8dp; }
+#right .vs-drop { margin-left: auto; }
+.vs-drop .fill { background-color: #f5c21f; }
+.vs-drop.hurry .fill { background-color: #f04030; }
+.vs-item { display: block; height: 30dp; font-size: 24dp; font-weight: bold; color: #f5821f; }
+.vs-meter { margin-top: 8dp; }
+.vs-meter .fill { background-color: #9c5cf0; }
+#right.versus .piece { margin-left: auto; }
 
 /* Portrait (taller than wide): the containers become rows, the groups side by
    side with dividers between them. */

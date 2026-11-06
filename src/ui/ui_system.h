@@ -97,6 +97,18 @@ struct HudView {
         float age = 0.0f;
     };
     std::vector<Popup> popups;
+    // VS (docs/HUD_DESIGN.md, VS): one column per player at their half's
+    // outer edge (rows above and below on tall screens), only what is needed.
+    struct VersusPlayer {
+        int hearts = 3;
+        float drop_left = 1.0f;
+        int multiplier = 1;    // the X count (attack strength)
+        int magic = -1;
+        float meter = 0.0f;
+        std::vector<HudPieceView> next;  // the next one or two
+    };
+    bool versus = false;
+    VersusPlayer players[2];
     // 0 near (as on a 4:3 screen, still), 1 the screen's edges, 2 near and
     // pushed out as the sphere grows on screen.
     int distance_mode = 0;

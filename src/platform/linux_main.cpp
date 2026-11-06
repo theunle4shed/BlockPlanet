@@ -473,6 +473,48 @@ void update_hud() {
             }
         }
     }
+    // VS CPU (mode 6): a column per player (docs/HUD_DESIGN.md, VS).
+    if (!story && !original && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+        guest::load16(guest_rdram, 0x800E44A8) == 6) {
+        const bool card = guest::load16(guest_rdram, 0x801033AC) != 0;
+        blockplanet::set_original_hud_hidden(!card);
+        blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
+        if (card) {
+            blockplanet::ui::set_hud(std::nullopt);
+            return;
+        }
+        blockplanet::ui::HudView view;
+        view.versus = true;
+        view.distance_mode = 1;  // each column at its half's outer edge
+        for (int i = 0; i < 2; ++i) {
+            const std::uint32_t ctx = i == 0 ? 0x80110220u : 0x80113488u;
+            auto& p = view.players[i];
+            p.hearts = std::clamp<int>(guest::load16(guest_rdram, ctx + 0x2D7E), 0, 3);
+            p.drop_left = std::clamp(1.0f - float(guest::load16(guest_rdram, ctx + 0x2B10)) / 600.0f, 0.0f, 1.0f);
+            p.multiplier = guest::load16(guest_rdram, ctx + 0x2AE6) + guest::load16(guest_rdram, ctx + 0x2AE8) + 1;
+            p.magic = static_cast<std::int8_t>(guest::load8(guest_rdram, ctx + 0x702));
+            if (p.magic > 5) p.magic = 5;
+            const int full = guest::load16(guest_rdram, ctx + 0x2AEE);
+            p.meter = full > 0 ? std::clamp(float(static_cast<std::uint16_t>(guest::load16(guest_rdram, ctx + 0x2AEC))) / float(full), 0.0f, 1.0f) : 0.0f;
+            for (int slot = 0; slot < 2; ++slot) {
+                const int index = guest::load16(guest_rdram, ctx + 0x2374 + 2u * slot);
+                if (index < 0 || index >= 48) continue;
+                blockplanet::ui::HudPieceView piece;
+                piece.mystery = index == 22;
+                const std::uint32_t record = guest::load32(guest_rdram, 0x8014CBC8u + 4u * index);
+                if (record >= 0x80000000u && record < 0x80800000u) {
+                    piece.colour = hud_material_colour(guest::load16(guest_rdram, record + 2));
+                    piece.cells = hud_piece_cells(guest::load8(guest_rdram, record + 8), guest::load16(guest_rdram, record + 4));
+                }
+                p.next.push_back(std::move(piece));
+            }
+        }
+        tetrisphere::StoryHudState state;
+        place_hud(view, state);
+        view.distance_mode = 1;  // VS: always at the outer edges
+        blockplanet::ui::set_hud(view);
+        return;
+    }
     // Puzzle (mode 4): its own HUD (docs/HUD_DESIGN.md, Puzzle).
     if (!story && !original && guest::load16(guest_rdram, 0x800E121C) == -1 &&
         guest::load16(guest_rdram, 0x800E44A8) == 4) {

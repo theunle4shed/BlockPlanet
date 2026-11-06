@@ -128,6 +128,8 @@ Per player, in order:
 
 Not shown in VS: mode and stage text, timer, score.
 
+**Built, first version (2026-11-06), VS CPU:** a slim column per player at the outer edges (rows above and below on tall screens): "Player 1" / "Player 2", hearts with the drop timer, **Attack** (the X count, `+0x2AE6` + `+0x2AE8` + 1, the same value the original shows as "1x"), Magic (the held magic's name and the meter; the 3D models are not placed in VS yet) and the next two pieces. Player 2's values are at the same offsets in its context (`0x80113488`). **Still to do:** the shared tug-of-war progress bar (player 2's board or exposed-core map is not found yet: in VS `0x800E44C8` and `0x800E44CC` point at two 32-word maps, both empty early in a round, so possibly one per player), the incoming junk marker (the original's purple balls between the spheres still show, drawn as models), and the columns overlap the large VS spheres on 16:9 (tinted, so the sphere shows through).
+
 ## Other modes (to be decided)
 
 - **Score-based modes** (Score Attack, Multiphasic): score on the right, middle; X count with it. Points from each move and combo float up from where the blocks broke.

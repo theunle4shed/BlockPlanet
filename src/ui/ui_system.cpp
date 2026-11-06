@@ -163,8 +163,53 @@ std::string escape(const std::string& text) {
 // The HUD's markup for these values (placeholder art): one tinted container
 // per side, its groups separated by dividers. The magic group leaves the item
 // box clear, so the game's 3D model drawn under the HUD shows through.
+std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count);
+
+std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count) {
+    std::string rml;
+    for (std::size_t i = 0; i < std::min(count, next.size()); ++i) {
+        const auto& piece = next[i];
+        const int cell = i == 0 ? 34 : 26;
+        int width = 1, height = 1;
+        for (const auto& [x, y] : piece.cells) width = std::max(width, x + 1), height = std::max(height, y + 1);
+        rml += "<div class='piece' style='width: " + std::to_string(width * cell) + "dp; height: " +
+               std::to_string(height * cell) + "dp;'>";
+        if (piece.mystery) {
+            rml += "<div class='mystery'>?</div>";
+        } else {
+            for (const auto& [x, y] : piece.cells)
+                rml += "<div class='cell' style='left: " + std::to_string(x * cell) + "dp; top: " +
+                       std::to_string(y * cell) + "dp; width: " + std::to_string(cell - 3) + "dp; height: " +
+                       std::to_string(cell - 3) + "dp; background-color: " + piece.colour + ";'/>";
+        }
+        rml += "</div>";
+    }
+    return rml;
+}
+
+// One player's VS column: hearts and drop timer, X count, magic, next.
+std::string versus_column(const HudView::VersusPlayer& p, const char* id, const char* name) {
+    std::string rml = std::string("<div id='") + id + "' class='side versus'>";
+    rml += std::string("<div class='group'><div class='label'>") + name + "</div><div class='hearts'>";
+    for (int i = 0; i < 3; ++i) rml += i < p.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
+    rml += std::string("</div><div class='bar vs-drop") + (p.drop_left < 0.35f ? " hurry" : "") +
+           "'><div class='fill' style='width: " + std::to_string(int(std::clamp(p.drop_left, 0.0f, 1.0f) * 100)) + "%;'/></div></div>";
+    rml += "<div class='rule'><div class='line'/></div>";
+    rml += "<div class='group'><div class='label'>Attack</div><div class='count'>" + std::to_string(p.multiplier) + "x</div></div>";
+    rml += "<div class='rule'><div class='line'/></div>";
+    rml += std::string("<div class='group'><div class='label'>Magic</div><div class='vs-item'>") +
+           (p.magic >= 0 ? magic_name(p.magic) : "") + "</div><div class='bar vs-meter'><div class='fill' style='width: " +
+           std::to_string(int(std::clamp(p.meter, 0.0f, 1.0f) * 100)) + "%;'/></div></div>";
+    rml += "<div class='rule'><div class='line'/></div>";
+    rml += "<div class='group vs-next'><div class='label'>Next</div>" + pieces_rml(p.next, 2) + "</div>";
+    rml += "</div>";
+    return rml;
+}
+
 std::string hud_rml(const HudView& hud) {
     std::string rml;
+    if (hud.versus)
+        return versus_column(hud.players[0], "left", "Player 1") + versus_column(hud.players[1], "right", "Player 2");
     rml += "<div id='left' class='side'>";
     if (hud.drops_left >= 0) {
         // Puzzle: the moves left, nothing else (no hearts, magic or queue).
@@ -203,23 +248,7 @@ std::string hud_rml(const HudView& hud) {
     if (hud.show_next) {
     rml += "<div class='rule'><div class='line'/></div>";
     rml += "<div id='next' class='group'><div class='label'>Next</div>";
-    for (std::size_t i = 0; i < hud.next.size(); ++i) {
-        const auto& piece = hud.next[i];
-        const int cell = i == 0 ? 34 : 26;
-        int width = 1, height = 1;
-        for (const auto& [x, y] : piece.cells) width = std::max(width, x + 1), height = std::max(height, y + 1);
-        rml += "<div class='piece' style='width: " + std::to_string(width * cell) + "dp; height: " +
-               std::to_string(height * cell) + "dp;'>";
-        if (piece.mystery) {
-            rml += "<div class='mystery'>?</div>";
-        } else {
-            for (const auto& [x, y] : piece.cells)
-                rml += "<div class='cell' style='left: " + std::to_string(x * cell) + "dp; top: " +
-                       std::to_string(y * cell) + "dp; width: " + std::to_string(cell - 3) + "dp; height: " +
-                       std::to_string(cell - 3) + "dp; background-color: " + piece.colour + ";'/>";
-        }
-        rml += "</div>";
-    }
+    rml += pieces_rml(hud.next, hud.next.size());
     rml += "</div>";
     }
     rml += "</div>";
