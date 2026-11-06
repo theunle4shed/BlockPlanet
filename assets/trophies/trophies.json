@@ -10,7 +10,8 @@
     { "id": "vs_wins", "event": "vs_round", "where": { "result": "win" } },
     { "id": "puzzles_solved", "event": "puzzle_solved" },
     { "id": "pictures_uncovered", "event": "level_completed", "where": { "mode": "hide_and_seek" } },
-    { "id": "best_score", "event": "game_over", "add_field": "score", "combine": "max" }
+    { "id": "best_score", "event": "game_over", "add_field": "score", "combine": "max" },
+    { "id": "biggest_story_combo", "event": "story_combo", "add_field": "blocks", "combine": "max" }
   ],
   "trophies": [
     {
@@ -82,6 +83,11 @@
       "id": "puzzle_one_drop", "name": "One and Done", "tier": "silver",
       "description": "Solve a puzzle with a single drop.",
       "trigger": { "event": "puzzle_solved", "where": { "drops": { "at_most": 1 } } }
+    },
+    {
+      "id": "story_combo_blocks", "name": "Core Quake", "tier": "gold",
+      "description": "Clear 40 blocks in one combo in Story, Time Attack or Score Attack.",
+      "trigger": { "event": "story_combo", "where": { "blocks": { "at_least": 40 } } }
     },
     {
       "id": "score_attack_overtime", "name": "Overtime", "tier": "silver",

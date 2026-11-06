@@ -322,6 +322,15 @@ void update_hud() {
         };
         if (const auto combo = combos.update(state)) {
             combo_blocks_pending += combo->blocks;  // Score Attack's clock gains time
+            // For trophies (Story, Time Attack and Score Attack): the blocks a
+            // whole combo cleared, as measured from the board.
+            if (combo->blocks > 0) {
+                tetrisphere::GameEvent event{"story_combo", {}};
+                event.fields["mode"] = std::string(variant_records(play_variant) == std::string("rescue") ? "story" : variant_records(play_variant));
+                event.fields["blocks"] = std::int64_t{combo->blocks};
+                event.fields["score"] = std::int64_t{combo->points};
+                post_game_event(event);
+            }
             if (popups_on && combo->points > 0) {
                 char text[32];
                 const long long points = combo->points;

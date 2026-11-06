@@ -63,6 +63,11 @@ The trophy list depends on these events. `GameEventWatcher` (`include/tetrispher
 | `game_over` | `mode`, `score` | The last heart is lost (not Puzzle or VS). | Working |
 | `vs_round` | `mode`, `result` (`win` or `loss`) | A VS CPU round ends. | Loss recorded in play; win inferred |
 | `combo` | `mode`, `size`, `score`, `multiplier` | A combo scores. | Not yet |
+| `story_combo` | `mode` (`story`, `time_attack`, `score_attack`), `blocks`, `score` | A whole combo ends in Story's modes; blocks cleared, measured from the board (`tetrisphere::ComboTracker`). | Working |
+| `attack_stage` | `mode`, `chapter`, `stage`, `developer_beaten` | A Time Attack or Score Attack stage is finished. | Working |
+| `attack_episode` | `mode`, `chapter`, `final` (1 for episode 15) | A whole episode's last stage is cleared in an attack mode. | Working |
+| `score_attack_overtime` | none | Three minutes played in one Score Attack stage. | Working |
+| `developer_all_beaten` | `mode` | Every stage's developer record beaten. | Working (needs the records) |
 | `magic_used` | `mode`, `type` | Magic is launched. | Not yet |
 | `level_completed` | `mode`, `chapter`, `level`, `score`, `hearts_lost` | A Rescue or Hide & Seek level is cleared. | Working |
 | `chapter_completed` | `mode`, `chapter`, `final` (1 for the last chapter) | A chapter is cleared. | Working; `final` not yet |
@@ -84,7 +89,9 @@ Trophies should cover every mode. Status of the first list (19 trophies), 2026-1
 | --- | --- | --- |
 | Rescue | first level, chapter 1, all chapters, flawless level | — |
 | Puzzle | first solved, solved in one drop | — |
-| Time Trial | 100,000 points | More goals (times, survival) need the Time Trial clock and results |
+| Story's modes | a 40-block combo (Core Quake; the number to tune with play) | Statistic `biggest_story_combo` keeps the largest so far |
+| Score Attack | Overtime, a whole episode, the final episode, beat the developer | See HUD_DESIGN.md |
+| Time Attack | a whole episode, the final episode, beat the developer | See HUD_DESIGN.md |
 | Hide & Seek | none | Needs Hide & Seek trophies (finding cores, clearing chapters) |
 | Lines | none | Needs Lines detected and its own trophies |
 | VS CPU | win one, win 50 | Needs a reliable win event |
