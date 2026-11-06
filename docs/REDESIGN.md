@@ -88,11 +88,13 @@ SOLO            Story · Hide & Seek · Puzzle · Lines · Multiphasic (later)
   Story         Campaign · Time Attack · Score Attack · Casual
                   then an episode, then Whole episode or one stage
 LOCAL           Versus · Collaborate (later) · Custom (later)
+  then player 2: a second player or the computer
 ONLINE          Host a game · Join with a code (later)
 PROFILES · MEDIA PLAYER · TROPHIES · OPTIONS · CREDITS · EXIT
 ```
 
 - **Archetypes:** Story, Lines and Multiphasic are the games that can grow multiplayer and sub-modes. Puzzle and Hide & Seek are archetypes with their own level sets, seen under Solo only for now.
+- **Local is two players for now** (as the original, which had two): player 1 is already in the game, and player 2 is a person on a second controller or the computer. Every local game offers the computer as player 2, though some will only gain it later (a computer partner for Collaborate needs designing). Four local players can come later if wanted.
 - **Casual** is a sub-mode chosen from the menu: Story without a game over (hearts come back), no records or trophies.
 - **Continue** resumes an interrupted game: the Story or Casual stage being played when the player quit or the game closed, kept until a game over. Not for Time Attack or Score Attack (a resumed run would not be a fair run).
 - **Join codes (online, later):** shown hidden (`••••••`) with a button to reveal them and a **Copy** button that works while hidden, and a **streamer mode** setting that hides codes everywhere by default (lobby, notifications), perhaps friends' names too.
@@ -178,7 +180,7 @@ EXIT
 **Limitations.** Two players only, local only, little control over rules, and attacks that can feel random or overwhelming.
 
 **What changes and what is added.**
-- Local split screen and online play, with friend-code rooms (already decided), up to four players.
+- Local split screen (two players for now, player 2 a person or the computer) and online play, with friend-code rooms (already decided), possibly up to four players later.
 - The host selects chapter or difficulty, and the format: best of 1, 3 or 5.
 - Random level selection from chosen pools, using shared seeds so every player gets an equal sphere.
 - Handicaps per player (depth, speed or junk received), so mixed-skill groups stay competitive.
