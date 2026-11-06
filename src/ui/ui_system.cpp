@@ -226,7 +226,38 @@ void set_hud_fills(const HudView& hud) {
     if (auto* e = hud_document->GetElementById("meter-v-fill")) e->SetProperty("height", percent(hud.meter));
 }
 
+std::string px_text(float value);
+
+// Floating numbers: a layer of their own, rebuilt each frame (there are few).
+void place_popups(const HudView& hud) {
+    auto* layer = hud_document->GetElementById("popups");
+    if (layer == nullptr) return;
+    static std::string shown;
+    std::string rml;
+    const auto size = context->GetDimensions();
+    const float width = float(size.x), height = float(size.y);
+    const float ph = hud.picture_h * height;
+    const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width;
+    const float cy = (hud.picture_y + hud.picture_h / 2.0f) * height;
+    const float dp = height / design_height;
+    for (const auto& p : hud.popups) {
+        const float t = std::clamp(p.age / 1.4f, 0.0f, 1.0f);
+        const float rise = 90.0f * dp * (1.0f - (1.0f - t) * (1.0f - t));
+        const float alpha = t < 0.7f ? 1.0f : 1.0f - (t - 0.7f) / 0.3f;
+        const float scale = t < 0.12f ? 0.6f + t / 0.12f * 0.4f : 1.0f;
+        const float x = cx + p.x * ph, y = cy + p.y * ph - rise;
+        rml += "<div class='popup' style='left: " + px_text(x - 200.0f * dp) + "; top: " + px_text(y - 30.0f * dp) +
+               "; opacity: " + std::to_string(alpha) + "; transform: scale(" + std::to_string(scale) + ");'><div class='points'>" +
+               escape(p.text) + "</div>" + (p.note.empty() ? "" : "<div class='note'>" + escape(p.note) + "</div>") + "</div>";
+    }
+    if (rml != shown) {
+        layer->SetInnerRML(rml);
+        shown = rml;
+    }
+}
+
 std::string px(float value) { return std::to_string(int(std::lround(value))) + "px"; }
+std::string px_text(float value) { return px(value); }
 
 // Places the two containers (docs/HUD_DESIGN.md): where they would be on a 4:3
 // screen (3:4 on portrait screens, where they are rows above and below), so on
@@ -311,6 +342,7 @@ bool update_hud_document() {
         hud_shown_rml = rml;
     }
     set_hud_fills(*hud);
+    place_popups(*hud);
     const auto size = context->GetDimensions();
     Rml::Vector2f left_at{0, 0};
     place_hud_sides(*hud, float(size.x), float(size.y), left_at);

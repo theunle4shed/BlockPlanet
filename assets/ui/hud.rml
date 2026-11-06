@@ -4,6 +4,7 @@
     <link type="text/rcss" href="hud.rcss"/>
 </head>
 <body>
+    <div id="popups"></div>
     <div id="hud"></div>
 </body>
 </rml>

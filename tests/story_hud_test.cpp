@@ -3,6 +3,7 @@
 #include "tetrisphere/guest_memory.h"
 
 #include <cassert>
+#include <cmath>
 #include <vector>
 
 using namespace tetrisphere;
@@ -50,6 +51,28 @@ int main() {
     assert(tracker.update(101, 50) == 0.0f);   // more blocks than at the start: 0, not negative
     assert(tracker.update(101, 10) == 0.75f);
     assert(tracker.update(102, 30) == 0.0f);   // a new level starts again
+
+    // Combos: cells that empty are counted until nothing clears for a while;
+    // their place is the mean offset from the cursor (wrapping round the board).
+    {
+        ComboTracker tracker(3);
+        StoryHudState frame;
+        frame.cells.assign(9 * 1024, 288);
+        for (int c = 0; c < 1024; ++c) frame.cells[std::size_t(2048 + c)] = 0;
+        frame.score = 100;
+        assert(!tracker.update(frame));
+        // A square lands at (29-30, 9-10): the front is (29.5, 9.5).
+        for (int y : {9, 10})
+            for (int x : {29, 30}) frame.cells[std::size_t(2048 + y * 32 + x)] = 297;
+        assert(!tracker.update(frame));
+        for (int x : {31, 0, 1}) frame.cells[std::size_t(1024 + 12 * 32 + x)] = 0;  // 3 cells, 2.5 right and 2.5 along
+        frame.score = 225;
+        assert(!tracker.update(frame));
+        assert(!tracker.update(frame) && !tracker.update(frame));
+        const auto event = tracker.update(frame);
+        assert(event && event->blocks == 3 && event->points == 1250);
+        assert(std::abs(event->dx - 2.5f) < 0.05f && std::abs(event->dy - 2.5f) < 0.05f);
+    }
 
     // Reading from game memory.
     std::vector<std::uint8_t> memory(0x800000);

@@ -26,6 +26,29 @@ div { display: block; }
 .group, .rule, #magic .band, #magic .edge { background-color: #0b1020b0; }
 .group { padding: 16dp 24dp 20dp 24dp; }
 
+/* Floating numbers: points rising from where blocks cleared. */
+#popups { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.popup {
+    position: absolute;
+    width: 400dp;
+    text-align: center;
+    transform-origin: 50% 50%;
+}
+.popup .points {
+    display: block;
+    font-size: 44dp;
+    font-weight: bold;
+    color: #ffd84a;
+    font-effect: outline(3dp #3a1a04);
+}
+.popup .note {
+    display: block;
+    font-size: 24dp;
+    font-weight: bold;
+    color: #f8f8f8;
+    font-effect: outline(2dp #1a0c04);
+}
+
 /* Section titles, for new and returning players. */
 .label {
     display: block;

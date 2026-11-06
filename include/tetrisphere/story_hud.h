@@ -4,6 +4,7 @@
 // (docs/HUD_DESIGN.md; addresses in docs/research/blockplanet-game-state.md).
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,41 @@ struct StoryHudState {
     float progress = -1.0f;    // 0 to 1, or -1 before it is known
     int top_layer = 1;         // the highest board layer holding a block (1 to 8)
     float camera_distance = 2424.0f;  // player context +0x2420
+    std::vector<std::int16_t> cells;  // the board (9 layers x 1024), for ComboTracker
+    std::uint32_t score = 0;          // player context +0x2AF8 (shown x 10)
+    int combo = 0;                    // the running combo count (+0x2AE0)
+    int cursor_x = 0, cursor_y = 0;   // the drop cursor (+0x2B2A, +0x2B2E)
+};
+
+// A finished combo, for the floating numbers (docs/HUD_DESIGN.md): the points
+// it earned (as shown, x 10), how many blocks it cleared, and where its
+// cleared cells are, as their mean offset from the cursor in cells around the
+// sphere from the front (where the last piece landed, which faces the camera),
+// along the board's columns (dx) and rows (dy; rows run upwards on screen).
+struct ComboEvent {
+    std::int64_t points = 0;
+    int blocks = 0;
+    float dx = 0.0f, dy = 0.0f;
+};
+
+// Watches the board from frame to frame: cells that empty are cleared blocks.
+// A combo ends when nothing has cleared for `quiet_frames` updates.
+class ComboTracker {
+public:
+    explicit ComboTracker(int quiet_frames = 45) : quiet_frames_(quiet_frames) {}
+    // Returns a combo when one has just ended.
+    std::optional<ComboEvent> update(const StoryHudState& state);
+
+private:
+    int quiet_frames_;
+    std::vector<std::int16_t> last_;
+    bool active_ = false;
+    int quiet_ = 0;
+    std::uint32_t score_at_start_ = 0;
+    std::uint32_t last_score_ = 0;
+    double front_x_ = 7.5, front_y_ = 7.5;  // the board cell facing the camera (a 2 x 2 at the start lands at 7-8)
+    int blocks_ = 0;
+    double sx_ = 0, sy_ = 0, cx_ = 0, cy_ = 0;  // sums of the angles' sines and cosines
 };
 
 // Board measures for the progress bar: blocks above the core in the S x S

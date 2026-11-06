@@ -65,6 +65,16 @@ struct HudView {
     // height), and the sphere's radius on screen in picture heights.
     float picture_x = 0.0f, picture_y = 0.0f, picture_w = 1.0f, picture_h = 1.0f;
     float sphere_radius = 0.275f;
+    // Floating numbers (docs/HUD_DESIGN.md): text rising from a point on the
+    // sphere, given as offsets from the picture's centre in picture heights,
+    // with their age in seconds (they rise and fade over about 1.4 s).
+    struct Popup {
+        std::string text;
+        std::string note;  // a second, smaller line (e.g. "21 blocks"), or empty
+        float x = 0.0f, y = 0.0f;
+        float age = 0.0f;
+    };
+    std::vector<Popup> popups;
     // 0 near (as on a 4:3 screen, still), 1 the screen's edges, 2 near and
     // pushed out as the sphere grows on screen.
     int distance_mode = 0;

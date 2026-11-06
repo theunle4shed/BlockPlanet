@@ -204,6 +204,47 @@ void update_hud() {
 
     tetrisphere::StoryHudState state;
     const bool story = !original && tetrisphere::read_story_hud(guest_rdram, progress, state);
+    // Floating numbers: finished combos, aged here (the HUD only draws them).
+    struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
+    static std::vector<LivePopup> popups;
+    static tetrisphere::ComboTracker combos;
+    const bool paused_now = story && guest::load16(guest_rdram, 0x800E1228) >= 0;
+    if (story && !paused_now) {
+        if (const auto combo = combos.update(state)) {
+            // Waves of the same chain (gravity, follow-on clears) join the
+            // last popup if it is still young.
+            static long long merged_points = 0;
+            static int merged_blocks = 0;
+            if (!popups.empty() && popups.back().popup.age < 0.8f) {
+                merged_points += combo->points;
+                merged_blocks += combo->blocks;
+                popups.pop_back();
+            } else {
+                merged_points = combo->points;
+                merged_blocks = combo->blocks;
+            }
+            auto merged = *combo;
+            merged.points = merged_points;
+            merged.blocks = merged_blocks;
+            const auto* combo_ptr = &merged;
+            LivePopup live;
+            char text[32];
+            const long long points = combo_ptr->points;
+            if (points >= 1000)
+                std::snprintf(text, sizeof text, "+%lld,%03lld", points / 1000, points % 1000);
+            else
+                std::snprintf(text, sizeof text, "+%lld", points);
+            live.popup.text = points > 0 ? text : "";
+            live.popup.note = combo_ptr->blocks >= 3 ? std::to_string(combo_ptr->blocks) + " blocks" : "";
+            live.cell_dx = combo_ptr->dx;
+            live.cell_dy = combo_ptr->dy;
+            if (!live.popup.text.empty() || !live.popup.note.empty()) popups.push_back(live);
+        }
+        for (auto& p : popups) p.popup.age += float(std::min(elapsed, 0.1));
+        popups.erase(std::remove_if(popups.begin(), popups.end(), [](const LivePopup& p) { return p.popup.age > 1.4f; }),
+                     popups.end());
+    }
+    if (!story) popups.clear();
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
         blockplanet::ui::set_hud(std::nullopt);
@@ -237,6 +278,16 @@ void update_hud() {
     view.time = hud_time(episode_seconds);
     view.progress = state.progress;
     place_hud(view, state);
+    // Each popup rises from its cells' place on the sphere: the cursor faces
+    // the camera, so a cell dx cells away sits at radius x sin(dx x 2pi/32).
+    for (const auto& p : popups) {
+        auto popup = p.popup;
+        constexpr float step = 6.2831853f / 32.0f;
+        const float a = std::clamp(p.cell_dx * step, -1.4f, 1.4f), b = std::clamp(p.cell_dy * step, -1.4f, 1.4f);
+        popup.x = view.sphere_radius * std::sin(a);
+        popup.y = -view.sphere_radius * std::sin(b);  // the board's rows run upwards on screen
+        view.popups.push_back(popup);
+    }
     blockplanet::ui::set_hud(std::move(view));
 }
 

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <cstring>
 
 namespace tetrisphere {
@@ -90,6 +91,10 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
     float distance = 0.0f;
     std::memcpy(&distance, &distance_bits, 4);
     if (distance > 100.0f && distance < 100000.0f) out.camera_distance = distance;
+    out.score = load32(rdram, player1 + 0x2AF8);
+    out.combo = load16(rdram, player1 + 0x2AE0);
+    out.cursor_x = load16(rdram, player1 + 0x2B2A);
+    out.cursor_y = load16(rdram, player1 + 0x2B2E);
     out.chapter = load16(rdram, 0x800E44A0) + 1;
     out.level = load16(rdram, player1 + 0x23BA) + 1;
 
@@ -101,8 +106,71 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
         for (int i = 0; i < layers * layer_cells; ++i) board.cells[std::size_t(i)] = load16(rdram, board_address + 2u * i);
         out.progress = progress.update(out.chapter * 100 + out.level, weakest_square_blocks(board));
         out.top_layer = top_layer(board);
+        out.cells = std::move(board.cells);
     }
     return true;
 }
 
+std::optional<ComboEvent> ComboTracker::update(const StoryHudState& state) {
+    std::optional<ComboEvent> done;
+    if (state.cells.size() != std::size_t(layers * layer_cells)) return done;
+    int cleared = 0;
+    constexpr double step = 6.283185307179586 / board_size;
+    if (last_.size() == state.cells.size()) {
+        // A piece landing (cells filling, outside a combo) marks the front of
+        // the sphere: the drop lands at the cursor, which faces the camera.
+        double lsx = 0, lcx = 0, lsy = 0, lcy = 0;
+        int landed = 0;
+        for (int layer = 1; layer < layers && !active_; ++layer) {
+            for (int cell = 0; cell < layer_cells; ++cell) {
+                const auto i = std::size_t(layer * layer_cells + cell);
+                if (last_[i] != 0 || state.cells[i] == 0) continue;
+                ++landed;
+                lsx += std::sin((cell % board_size) * step);
+                lcx += std::cos((cell % board_size) * step);
+                lsy += std::sin((cell / board_size) * step);
+                lcy += std::cos((cell / board_size) * step);
+            }
+        }
+        if (landed > 0 && landed <= 6) {
+            front_x_ = std::atan2(lsx, lcx) / step;
+            front_y_ = std::atan2(lsy, lcy) / step;
+        }
+        for (int layer = 1; layer < layers; ++layer) {
+            for (int cell = 0; cell < layer_cells; ++cell) {
+                const auto i = std::size_t(layer * layer_cells + cell);
+                if (last_[i] == 0 || state.cells[i] != 0) continue;
+                ++cleared;
+                const int x = cell % board_size, y = cell / board_size;
+                const double ax = (x - front_x_) * step, ay = (y - front_y_) * step;
+                sx_ += std::sin(ax);
+                cx_ += std::cos(ax);
+                sy_ += std::sin(ay);
+                cy_ += std::cos(ay);
+            }
+        }
+    }
+    last_ = state.cells;
+    const std::uint32_t previous_score = last_score_;
+    last_score_ = state.score;
+    if (cleared > 0 && !active_) score_at_start_ = previous_score;
+    if (cleared > 0) {
+        active_ = true;
+        quiet_ = 0;
+        blocks_ += cleared;
+    } else if (active_ && ++quiet_ >= quiet_frames_) {
+        ComboEvent event;
+        event.blocks = blocks_;
+        event.points = (static_cast<std::int64_t>(state.score) - static_cast<std::int64_t>(score_at_start_)) * 10;
+        event.dx = static_cast<float>(std::atan2(sx_, cx_) / step);
+        event.dy = static_cast<float>(std::atan2(sy_, cy_) / step);
+        done = event;
+        active_ = false;
+        blocks_ = 0;
+        sx_ = sy_ = cx_ = cy_ = 0;
+    }
+    return done;
+}
+
 } // namespace tetrisphere
+
