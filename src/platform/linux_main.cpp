@@ -460,7 +460,7 @@ void update_hud() {
             run_over = true;
         } else if (new_run) {
             score_splits.reset();
-            clock.start();
+            clock.start(state.layers > 0 ? state.layers : 1);
             timed_out = run_over = false;
             combo_blocks_pending = 0;
         }
@@ -479,13 +479,16 @@ void update_hud() {
         // The clock runs in play, stops once the stage is cleared, and gains
         // time for combos; at zero the run ends (a game over, as in Story).
         const bool cleared = state.progress >= 1.0f;
+        // The stage's layers load as it starts: its own time (2:00 for one
+        // layer, 10 s more a layer), set in its first seconds.
+        if (state.layers > 0 && clock.played() < 3.0 && !cleared) clock.set_layers(state.layers);
         if (!paused && !cleared && !timed_out && !run_over && elapsed < 1.0) clock.tick(elapsed);
         if (combo_blocks_pending > 0) clock.add_combo(combo_blocks_pending), combo_blocks_pending = 0;
-        // A trophy: three minutes played in one stage (the clock starts at
-        // three minutes, so it takes the time combos add).
+        // A trophy: two minutes past the stage's own time played in one
+        // stage (it takes the time combos add).
         static bool overtime_posted = false;
         if (clock.played() < 1.0) overtime_posted = false;
-        if (!overtime_posted && clock.played() >= tetrisphere::AttackClock::stage_seconds && !clock.out()) {
+        if (!overtime_posted && clock.played() >= clock.stage() + tetrisphere::AttackClock::overtime_seconds && !clock.out()) {
             overtime_posted = true;
             post_game_event(tetrisphere::GameEvent{"score_attack_overtime", {}});
         }

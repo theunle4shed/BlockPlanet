@@ -101,6 +101,7 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
     out.cursor_x = load16(rdram, player1 + 0x2B2A);
     out.cursor_y = load16(rdram, player1 + 0x2B2E);
     out.chapter = load16(rdram, 0x800E44A0) + 1;
+    if (const int layers = load16(rdram, 0x8013D17C); layers >= 1 && layers <= 8) out.layers = layers;
     out.level = load16(rdram, player1 + 0x23BA) + 1;
 
     const std::uint32_t board_address = load32(rdram, 0x800E44D0);
@@ -286,7 +287,7 @@ std::optional<ScoreSplits::Finished> ScoreSplits::finish() {
 std::int64_t AttackClock::clear(bool next_stage) {
     const double carry = next_stage ? std::floor(left_ / 60.0) * 60.0 : 0.0;
     const double bonus = std::floor(std::max(0.0, left_ - carry));  // whole seconds
-    left_ = stage_seconds + carry;
+    left_ = stage_ + carry;
     played_ = 0.0;
     return static_cast<std::int64_t>(std::lround(bonus * points_per_second));
 }

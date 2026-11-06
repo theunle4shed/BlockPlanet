@@ -66,7 +66,7 @@ The trophy list depends on these events. `GameEventWatcher` (`include/tetrispher
 | `story_combo` | `mode` (`story`, `time_attack`, `score_attack`), `blocks`, `score` | A whole combo ends in Story's modes; blocks cleared, measured from the board (`tetrisphere::ComboTracker`). | Working |
 | `attack_stage` | `mode`, `chapter`, `stage`, `developer_beaten` | A Time Attack or Score Attack stage is finished. | Working |
 | `attack_episode` | `mode`, `chapter`, `final` (1 for episode 15) | A whole episode's last stage is cleared in an attack mode. | Working |
-| `score_attack_overtime` | none | Three minutes played in one Score Attack stage. | Working |
+| `score_attack_overtime` | none | Two minutes past the stage's own time played in one Score Attack stage. | Working |
 | `developer_all_beaten` | `mode` | Every stage's developer record beaten. | Working (needs the records) |
 | `magic_used` | `mode`, `type` | Magic is launched. | Not yet |
 | `level_completed` | `mode`, `chapter`, `level`, `score`, `hearts_lost` | A Rescue or Hide & Seek level is cleared. | Working |

@@ -134,20 +134,27 @@ int main() {
         assert(!run.update(2, 1800, best) && run.view().rows.size() == 2 && run.view().total == 1800);
     }
     {
-        // Score Attack's clock: 3:00 a stage, whole minutes carry, the rest is bonus.
-        tetrisphere::AttackClock clock;
-        clock.start();
-        clock.tick(47.0);  // 2:13 left
-        assert(clock.clear(true) == 13000 && clock.left() == 300.0);  // 3:00 + the 2 minutes carried
+        // Score Attack's clock: 2:00 for one layer, 10 s a layer more; whole
+        // minutes carry, the rest is bonus.
+        using tetrisphere::AttackClock;
+        assert(AttackClock::stage_seconds(1) == 120.0 && AttackClock::stage_seconds(6) == 170.0);
+        AttackClock clock;
+        clock.start(1);
+        clock.set_layers(3);  // the layers load: 2:20
+        assert(clock.left() == 140.0);
+        clock.tick(47.0);  // 1:33 left
+        assert(clock.clear(true) == 33000 && clock.left() == 200.0);  // 2:20 + the minute carried
+        clock.set_layers(4);  // the next stage has 4 layers: 2:30 + 1:00
+        assert(clock.left() == 210.0 && clock.played() == 0.0);
         clock.tick(10.0);
         clock.add_combo(5);  // 10 s into the stage: all 3 seconds
-        assert(clock.left() == 293.0 && tetrisphere::AttackClock::combo_seconds(40, 0.0) == 10.0);
+        assert(clock.left() == 203.0 && AttackClock::combo_seconds(40, 0.0) == 10.0);
         // Diminishing: full in the first minute, 2/3 in the second, 1/4 in the third, then none.
-        assert(tetrisphere::AttackClock::combo_seconds(8, 59.0) == 6.0);
-        assert(tetrisphere::AttackClock::combo_seconds(8, 60.0) == 4.0);
-        assert(tetrisphere::AttackClock::combo_seconds(8, 150.0) == 1.5);
-        assert(tetrisphere::AttackClock::combo_seconds(8, 180.0) == 0.0);
-        assert(clock.clear(false) == 293000 && clock.left() == 180.0);  // no next stage: all of it
+        assert(AttackClock::combo_seconds(8, 59.0) == 6.0);
+        assert(AttackClock::combo_seconds(8, 60.0) == 4.0);
+        assert(AttackClock::combo_seconds(8, 150.0) == 1.5);
+        assert(AttackClock::combo_seconds(8, 180.0) == 0.0);
+        assert(clock.clear(false) == 203000 && clock.left() == 150.0);  // no next stage: all of it
         clock.tick(500.0);
         assert(clock.out() && clock.left() == 0.0);
     }

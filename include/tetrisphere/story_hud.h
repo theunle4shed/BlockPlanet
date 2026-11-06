@@ -29,6 +29,7 @@ struct StoryHudState {
     int level = 0;             // 1-based
     float progress = -1.0f;    // 0 to 1, or -1 before it is known
     int top_layer = 1;         // the highest board layer holding a block (1 to 8)
+    int layers = 0;            // the stage's playfield layers (level structure 0x8013D17C), 0 if unknown
     float camera_distance = 2424.0f;  // player context +0x2420
     std::vector<std::int16_t> cells;  // the board (9 layers x 1024), for ComboTracker
     std::uint32_t score = 0;          // player context +0x2AF8 (shown x 10)
@@ -172,14 +173,27 @@ private:
     std::vector<std::int64_t> bests_;
 };
 
-// Score Attack's clock (docs/HUD_DESIGN.md): three minutes per stage. A
-// cleared stage carries its whole minutes left to the next stage (in a whole
+// Score Attack's clock (docs/HUD_DESIGN.md): two minutes per stage for the
+// thinnest spheres and ten seconds more for each further layer. A cleared
+// stage carries its whole minutes left to the next stage (in a whole
 // episode) and turns the remaining seconds into bonus points; combos add time.
 class AttackClock {
 public:
-    static constexpr double stage_seconds = 180.0;
+    static constexpr double base_seconds = 120.0;   // a one-layer sphere (Story's thinnest)
+    static constexpr double layer_seconds = 10.0;   // each layer more
+    static constexpr double overtime_seconds = 120.0;  // the Overtime trophy: this long past the stage's time
     static constexpr std::int64_t points_per_second = 1000;  // as shown (the game's score x 10)
-    void start() { left_ = stage_seconds, played_ = 0.0; }
+    // A stage's own time for its playfield layers (1 to 8).
+    static double stage_seconds(int layers) { return base_seconds + layer_seconds * std::clamp(layers - 1, 0, 7); }
+    void start(int layers) { stage_ = stage_seconds(layers), left_ = stage_, played_ = 0.0; }
+    // The stage's layers, once known (they load as it starts): changes the
+    // clock by the difference from the time it was given.
+    void set_layers(int layers) {
+        const double now = stage_seconds(layers);
+        left_ = std::max(0.0, left_ + now - stage_);
+        stage_ = now;
+    }
+    double stage() const { return stage_; }
     void tick(double seconds) {
         left_ = std::max(0.0, left_ - std::max(0.0, seconds));
         played_ += std::max(0.0, seconds);
@@ -188,7 +202,8 @@ public:
     double left() const { return left_; }
     bool out() const { return left_ <= 0.0; }
     // The stage is cleared: returns the bonus points (whole seconds), and sets the next
-    // stage's clock (three minutes plus the carried minutes).
+    // stage's clock (this stage's time plus the carried minutes, until
+    // set_layers gives the next stage's own).
     std::int64_t clear(bool next_stage);
     // Play time in the current stage.
     double played() const { return played_; }
@@ -203,7 +218,8 @@ public:
     void add_combo(int blocks) { add(combo_seconds(blocks, played_)); }
 
 private:
-    double left_ = stage_seconds;
+    double stage_ = base_seconds;
+    double left_ = base_seconds;
     double played_ = 0.0;
 };
 

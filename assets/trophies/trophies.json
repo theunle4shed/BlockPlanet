@@ -91,7 +91,7 @@
     },
     {
       "id": "score_attack_overtime", "name": "Overtime", "tier": "silver",
-      "description": "Play three minutes in one stage of Score Attack.",
+      "description": "Play two minutes past a stage's time in Score Attack.",
       "trigger": { "event": "score_attack_overtime" }
     },
     {
