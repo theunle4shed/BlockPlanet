@@ -14,20 +14,30 @@ body {
 div { display: block; }
 #hud { width: 100%; height: 100%; }
 
+/* Each group sits on a tinted, rounded panel (the menus' colours) so it stays
+   readable when the sphere or a bright background passes under it. */
+.panel {
+    background-color: #0b1020a8;
+    border: 2dp #f0f0f060;
+    border-radius: 22dp;
+    padding: 22dp 24dp;
+}
+
 #left {
     position: absolute;
-    left: 48dp;
-    top: 200dp;
+    left: 40dp;
+    top: 190dp;
     width: 200dp;
 }
 #right {
     position: absolute;
-    right: 48dp;
+    right: 40dp;
     top: 40dp;
     width: 260dp;
     height: 1000dp;
     text-align: right;
 }
+#where { display: block; padding: 14dp 24dp 10dp 24dp; }
 
 /* Hearts: three red tiles, a lost one dark. */
 #hearts { height: 48dp; }
@@ -83,7 +93,8 @@ div { display: block; }
 #meter .fill { background-color: #9c5cf0; }
 
 /* Next pieces: the next one first and larger. */
-#next { margin-top: 40dp; }
+#next { margin-top: 36dp; }
+#next .piece:last-child { margin-bottom: 0dp; }
 .piece {
     display: block;
     position: relative;
@@ -106,7 +117,8 @@ div { display: block; }
 #stage { display: block; font-size: 64dp; font-weight: bold; }
 
 /* Episode time and progress, right middle. */
-#middle { position: absolute; right: 0dp; top: 420dp; width: 260dp; }
+#middle { position: absolute; right: 0dp; top: 420dp; width: 212dp; }
+#progress { width: 212dp; }
 #time { display: block; font-size: 44dp; font-weight: bold; }
 #progress { margin-top: 12dp; height: 20dp; }
 #progress .fill { background-color: #48d060; }
@@ -116,10 +128,11 @@ div { display: block; }
    game's picture. */
 @media (orientation: portrait) {
     #left {
-        left: 32dp;
-        right: 32dp;
-        top: 32dp;
+        left: 24dp;
+        right: 24dp;
+        top: 24dp;
         width: auto;
+        padding: 16dp 20dp;
     }
     #left > div {
         display: inline-block;
@@ -134,11 +147,12 @@ div { display: block; }
     #next .piece { display: inline-block; vertical-align: top; margin-right: 22dp; }
     #right {
         top: auto;
-        bottom: 32dp;
-        right: 32dp;
-        left: 32dp;
+        bottom: 24dp;
+        right: 24dp;
+        left: 24dp;
         width: auto;
         height: 150dp;
     }
-    #middle { top: 0dp; right: auto; left: 0dp; text-align: left; }
+    #where { position: absolute; right: 0dp; bottom: 0dp; }
+    #middle { top: auto; bottom: 0dp; right: auto; left: 0dp; text-align: left; }
 }

@@ -159,7 +159,7 @@ std::string escape(const std::string& text) {
 // The HUD's markup for these values (placeholder art).
 std::string hud_rml(const HudView& hud) {
     std::string rml;
-    rml += "<div id='left'>";
+    rml += "<div id='left' class='panel'>";
     rml += "<div id='lives'><div id='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
     rml += "</div>";
@@ -189,8 +189,9 @@ std::string hud_rml(const HudView& hud) {
     }
     rml += "</div></div>";
     rml += "<div id='right'>";
-    rml += "<div id='mode'>" + escape(hud.mode) + "</div><div id='stage'>" + escape(hud.stage) + "</div>";
-    rml += "<div id='middle'>";
+    rml += "<div id='where' class='panel'><div id='mode'>" + escape(hud.mode) + "</div><div id='stage'>" +
+           escape(hud.stage) + "</div></div>";
+    rml += "<div id='middle' class='panel'>";
     if (!hud.time.empty()) rml += "<div id='time'>" + escape(hud.time) + "</div>";
     if (hud.progress >= 0.0f)
         rml += "<div id='progress' class='bar'><div class='fill' style='width: " + percent(hud.progress) + "'/></div>";
