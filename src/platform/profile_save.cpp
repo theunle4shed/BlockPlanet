@@ -67,7 +67,8 @@ nlohmann::json to_json(const ProfileSaveData& data) {
               {"chapters_completed", chapters},
               {"episode_records", records},
               {"score_attack", {{"best_score", data.progress.score_attack_best_score},
-                               {"best_seconds", data.progress.score_attack_best_seconds}}},
+                               {"best_seconds", data.progress.score_attack_best_seconds},
+                               {"best_stages", data.progress.score_attack_best_stages}}},
               {"puzzles_solved", data.progress.puzzles_solved},
               {"statistics",
                {{"games_started", s.games_started},
@@ -132,6 +133,7 @@ bool from_json(const std::string& text, ProfileSaveData& data) {
         const nlohmann::json attack = progress.value("score_attack", nlohmann::json::object());
         result.progress.score_attack_best_score = attack.value("best_score", std::int64_t{0});
         result.progress.score_attack_best_seconds = attack.value("best_seconds", 0.0);
+        result.progress.score_attack_best_stages = attack.value("best_stages", std::vector<std::int64_t>{});
         const nlohmann::json records = progress.value("episode_records", nlohmann::json::object());
         for (const auto& [mode, chapters] : records.items()) {
             for (const auto& [chapter, r] : chapters.items()) {

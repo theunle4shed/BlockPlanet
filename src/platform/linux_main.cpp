@@ -367,12 +367,34 @@ void update_hud() {
     if (state.mode == 2) {
         view.mode = "Score Attack";
         view.stage = std::to_string(state.level);
-        view.score = hud_number(static_cast<long long>(state.score) * 10);
-        const auto& p = profile_data.progress;
+        // Splits by points: the score, the net difference, and each stage.
+        static tetrisphere::ScoreSplits score_splits;
+        auto& p = profile_data.progress;
+        const long long score = static_cast<long long>(state.score) * 10;
+        if (const auto f = score_splits.update(state.level, score, p.score_attack_best_stages)) {
+            if (p.score_attack_best_stages.size() < std::size_t(f->stage)) p.score_attack_best_stages.resize(std::size_t(f->stage), 0);
+            auto& b = p.score_attack_best_stages[std::size_t(f->stage - 1)];
+            if (f->points > b) {
+                b = f->points;
+                profile_dirty = true;
+                save_profile();
+            }
+        }
+        const auto sv = score_splits.view();
+        const auto signed_points = [](long long d) { return (d < 0 ? std::string("\u2212") : std::string("+")) + hud_number(d < 0 ? -d : d); };
+        view.time_label = "Score";
+        view.time = hud_number(sv.total);
+        if (sv.has_delta) view.time_delta = signed_points(sv.net_delta), view.time_ahead = sv.net_delta >= 0;
+        for (const auto& row : sv.rows) {
+            blockplanet::ui::HudView::Split split;
+            split.label = std::to_string(row.stage);
+            split.time = hud_number(row.points);
+            split.current = !row.done;
+            if (row.done && row.has_best) split.delta = signed_points(row.delta), split.ahead = row.delta >= 0;
+            view.splits.push_back(split);
+        }
         if (p.score_attack_best_score > 0 || p.score_attack_best_seconds > 0.0)
-            view.score_best = "Best " + hud_number(p.score_attack_best_score) + " \u00B7 " + hud_time(p.score_attack_best_seconds);
-        view.clock = hud_time(std::max(0, state.clock_frames) / 60.0);
-        view.clock_low = state.clock_frames < 30 * 60;
+            view.best = "Best " + hud_number(p.score_attack_best_score) + " \u00B7 " + hud_time(p.score_attack_best_seconds);
     } else {
         view.mode = "Rescue";
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);

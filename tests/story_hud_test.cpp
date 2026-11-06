@@ -101,6 +101,22 @@ int main() {
         assert(f && f->chapter == 1 && f->level == 10 && f->episode_done && f->episode_total > 90.0);
     }
 
+    // Score Attack splits: points per stage against the best per stage.
+    {
+        ScoreSplits sc;
+        const std::vector<std::int64_t> best{1000, 5000};
+        assert(!sc.update(1, 0, best));
+        assert(!sc.update(1, 1500, best));
+        auto f = sc.update(2, 1500, best);
+        assert(f && f->stage == 1 && f->points == 1500);
+        sc.update(2, 4000, best);
+        auto v = sc.view();
+        assert(v.total == 4000 && v.rows.size() == 2 && v.rows[0].delta == 500 && v.has_delta && v.net_delta == 500);
+        assert(!v.rows[1].done && v.rows[1].points == 2500);
+        sc.update(1, 0, best);  // a new run
+        assert(sc.view().rows.size() == 1 && sc.view().total == 0);
+    }
+
     // Reading from game memory.
     std::vector<std::uint8_t> memory(0x800000);
     auto* m = memory.data();

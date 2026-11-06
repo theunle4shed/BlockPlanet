@@ -170,9 +170,9 @@ div { display: block; }
 /* Splits, LiveSplit style: stage, difference, time; the current one highlighted. */
 #splits { display: block; margin-top: 12dp; }
 .split { display: block; font-size: 20dp; line-height: 28dp; color: #c8d0e8; white-space: nowrap; }
-.split .stage { display: inline-block; width: 52dp; text-align: left; color: #9aa6c8; }
-.split .delta { display: inline-block; width: 82dp; text-align: right; font-weight: bold; }
-.split .t { display: inline-block; width: 64dp; text-align: right; }
+.split .stage { display: inline-block; width: 52dp; white-space: nowrap; text-align: left; color: #9aa6c8; }
+.split .delta { display: inline-block; width: 70dp; text-align: right; font-weight: bold; }
+.split .t { display: inline-block; width: 80dp; text-align: right; }
 .split.current { color: #f8f8f8; font-weight: bold; }
 .split.current .stage { color: #e8b818; }
 #progress { height: 18dp; }

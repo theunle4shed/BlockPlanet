@@ -131,6 +131,37 @@ private:
     std::vector<double> bests_;  // the best level times when the run started
 };
 
+// Score Attack splits: points scored in each stage of a run, compared with
+// the best points scored in that stage (more is better).
+struct ScoreRow {
+    int stage = 0;
+    std::int64_t points = 0;
+    bool done = false;
+    bool has_best = false;
+    std::int64_t delta = 0;  // points - best (positive: ahead)
+};
+struct ScoreSplitsView {
+    std::int64_t total = 0;
+    bool has_delta = false;
+    std::int64_t net_delta = 0;
+    std::vector<ScoreRow> rows;
+};
+class ScoreSplits {
+public:
+    struct Finished { int stage; std::int64_t points; };
+    // Each frame in play: the stage shown and the score (as shown). A new run
+    // starts when the score goes down or the stage goes back.
+    std::optional<Finished> update(int stage, std::int64_t score, const std::vector<std::int64_t>& best_stages);
+    ScoreSplitsView view() const;
+
+private:
+    int stage_ = -1;
+    std::int64_t stage_start_ = 0, score_ = 0;
+    std::vector<std::int64_t> done_;
+    int first_ = 1;
+    std::vector<std::int64_t> bests_;
+};
+
 // Reads the HUD's values for player 1. Returns false unless Story or its Time
 // Trial is in play.
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out);

@@ -239,5 +239,52 @@ SplitsView EpisodeSplits::view() const {
     }
     return v;
 }
+
+std::optional<ScoreSplits::Finished> ScoreSplits::update(int stage, std::int64_t score,
+                                                         const std::vector<std::int64_t>& best_stages) {
+    std::optional<Finished> finished;
+    if (stage_ < 0 || stage < stage_ || score < score_) {
+        stage_ = stage;
+        first_ = stage;
+        stage_start_ = score < score_ || stage_ < 0 ? 0 : score;
+        if (score < score_) stage_start_ = 0;
+        done_.clear();
+        bests_ = best_stages;
+    } else if (stage > stage_) {
+        done_.push_back(score_ - stage_start_);
+        finished = Finished{stage_, score_ - stage_start_};
+        stage_ = stage;
+        stage_start_ = score_;
+    }
+    score_ = score;
+    return finished;
+}
+
+ScoreSplitsView ScoreSplits::view() const {
+    ScoreSplitsView v;
+    const auto best = [&](int stage) {
+        const auto i = std::size_t(stage - 1);
+        return i < bests_.size() ? bests_[i] : std::int64_t{0};
+    };
+    for (std::size_t i = 0; i < done_.size(); ++i) {
+        ScoreRow row;
+        row.stage = first_ + int(i);
+        row.points = done_[i];
+        row.done = true;
+        const auto b = best(row.stage);
+        row.has_best = b > 0;
+        row.delta = row.has_best ? row.points - b : 0;
+        if (row.has_best) v.has_delta = true, v.net_delta += row.delta;
+        v.rows.push_back(row);
+    }
+    if (stage_ >= 0) {
+        ScoreRow row;
+        row.stage = stage_;
+        row.points = score_ - stage_start_;
+        v.rows.push_back(row);
+    }
+    v.total = score_;
+    return v;
+}
 } // namespace tetrisphere
 
