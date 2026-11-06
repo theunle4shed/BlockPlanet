@@ -102,6 +102,10 @@ The progress rules worked out earlier are kept here in case a mode or an assist 
 
 Pieces are removed by lining up three in a row (horizontal or vertical); the goal is a big enough opening in the core. 10 levels per stage. The same layout as Story:
 
+**Built (2026-11-06):** as Story, without Next (Lines shows no queue in the original); on the right "Lines", the stage, the progress bar and the stage's time with ± against the best (`progress.episode_records.lines`). Magic is kept (the original shows the bowl in Lines).
+
+**The game's cards** (Lines' rules at the start, Hide & Seek's goal card) are drawn by its HUD routine. While one is up (`0x801033AC` ≠ 0, found by comparing memory with the card up and gone) BlockPlanet shows the original HUD and not its own, so the card is not hidden.
+
 | Priority 1 (left, top to bottom) | Priority 2 (right) |
 | --- | --- |
 | Hearts | Mode and stage (text, top right) |

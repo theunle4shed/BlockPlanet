@@ -481,6 +481,14 @@ void update_hud() {
         update_puzzle_hud();
         return;
     }
+    // A card of the game's own (Lines' rules, Hide & Seek's goal) is drawn by
+    // its HUD routine: while one is up, show the original HUD and not ours.
+    if (story && guest::load16(guest_rdram, 0x801033AC) != 0) {
+        blockplanet::set_original_hud_hidden(false);
+        blockplanet::ui::set_hud(std::nullopt);
+        blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
+        return;
+    }
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
         blockplanet::ui::set_hud(std::nullopt);
@@ -536,7 +544,11 @@ void update_hud() {
         p.cells = hud_piece_cells(piece.shape, piece.cells);
         view.next.push_back(std::move(p));
     }
-    if (state.mode == 5) {
+    if (state.mode == 9) {
+        view.show_next = false;  // Lines shows no queue
+        view.mode = "Lines";
+        view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
+    } else if (state.mode == 5) {
         view.mode = "Hide & Seek";
         view.stage = std::to_string(state.level);  // its own chapter is not found yet
         view.goal = hide_and_seek_goal(guest::load16(guest_rdram, 0x800E44A4));
@@ -704,6 +716,36 @@ void update_hud() {
     } else if (state.mode == 1) {
         // Story: the episode's time only (the speedrun timing is Time Attack's).
         view.time = hud_time(splits.view().total);
+    } else if (state.mode == 9) {
+        // Lines: the stage's play time against the best for it (records
+        // "lines", by chapter).
+        static int key_now = -1;
+        static double stage_time = 0.0;
+        auto& record = profile_data.progress.episode_records["lines"][state.chapter];
+        const int key = state.chapter * 100 + state.level;
+        if (key != key_now) {
+            if (key_now >= 0 && key == key_now + 1 && stage_time > 0.5) {
+                const int done = key_now % 100;
+                if (record.best_levels.size() < std::size_t(done)) record.best_levels.resize(std::size_t(done), 0.0);
+                double& best = record.best_levels[std::size_t(done - 1)];
+                if (best <= 0.0 || stage_time < best) {
+                    best = stage_time;
+                    profile_dirty = true;
+                    save_profile();
+                }
+            }
+            key_now = key;
+            stage_time = 0.0;
+        }
+        if (!paused && elapsed < 1.0 && state.progress < 1.0f) stage_time += elapsed;
+        view.time = hud_time(stage_time);
+        const auto i = std::size_t(state.level - 1);
+        const double best = i < record.best_levels.size() ? record.best_levels[i] : 0.0;
+        if (best > 0.0) {
+            view.time_delta = hud_delta(stage_time - best);
+            view.time_ahead = stage_time < best;
+            view.best = "Best " + hud_time(best);
+        }
     } else if (state.mode == 5) {
         // Hide & Seek: the level's time against the best for it (-/+), no
         // progress bar (it would hint where the pictures are). Bests per
@@ -711,6 +753,9 @@ void update_hud() {
         // chapter is found).
         static int level_now = -1;
         static double level_time = 0.0;
+        // The game's own Hide & Seek clock (+0x2B0C counts up in frames), which
+        // stands still while the goal card is shown.
+        const double clock_now = static_cast<std::int32_t>(guest::load32(guest_rdram, 0x80110220u + 0x2B0C)) / 60.0;
         auto& record = profile_data.progress.episode_records["hide_and_seek"][0];
         if (state.level != level_now) {
             if (level_now >= 1 && state.level == level_now + 1 && level_time > 0.5) {
@@ -723,9 +768,8 @@ void update_hud() {
                 }
             }
             level_now = state.level;
-            level_time = 0.0;
         }
-        if (!paused && elapsed < 1.0) level_time += elapsed;
+        level_time = std::max(0.0, clock_now);
         view.time_label = "Time";
         view.time = hud_time(level_time);
         const auto i = std::size_t(state.level - 1);

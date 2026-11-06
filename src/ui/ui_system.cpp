@@ -200,6 +200,7 @@ std::string hud_rml(const HudView& hud) {
     // The meter sits under the box; on portrait screens, as a column beside it.
     rml += "</div><div class='edge side-meter'><div id='meter-v' class='bar'><div id='meter-v-fill' class='fill'/></div></div>"
            "</div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>";
+    if (hud.show_next) {
     rml += "<div class='rule'><div class='line'/></div>";
     rml += "<div id='next' class='group'><div class='label'>Next</div>";
     for (std::size_t i = 0; i < hud.next.size(); ++i) {
@@ -219,7 +220,9 @@ std::string hud_rml(const HudView& hud) {
         }
         rml += "</div>";
     }
-    rml += "</div></div>";
+    rml += "</div>";
+    }
+    rml += "</div>";
     }
     rml += "<div id='right' class='side'>";
     // Mode and stage, with the stage's progress bar beneath the stage number.

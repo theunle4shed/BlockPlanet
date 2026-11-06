@@ -19,7 +19,7 @@ struct HudPiece {
 };
 
 struct StoryHudState {
-    int mode = 1;              // 1 Story (Rescue; Story's sub-modes all run it), 5 Hide & Seek
+    int mode = 1;              // 1 Story (Rescue; Story's sub-modes all run it), 5 Hide & Seek, 9 Lines
     int hearts = 0;            // 0 to 3
     float drop_left = 1.0f;    // the drop timer's time left, 1 (full) to 0
     int magic = -1;            // -1 none, 0 to 5 the held magic
@@ -224,7 +224,7 @@ private:
 };
 
 // Reads the HUD's values for player 1. Returns false unless Story (mode 1) or
-// Hide & Seek (mode 5) is in play.
+// Hide & Seek (mode 5) or Lines (mode 9) is in play.
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out);
 
 } // namespace tetrisphere
