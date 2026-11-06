@@ -395,3 +395,14 @@ Objects can be shown alone with `BLOCKPLANET_OBJECT_ONLY=scene:i,j` (hook on `fu
 ### The game's floating number (2026-11-06, in progress)
 
 After a combo the game shows a large grey 3D number at the sphere's centre for about a second ("6000" for a combo worth about 59,000 points, so it is not the total; probably a bonus). It is not one of the 2D helpers' draws, and no new model appears for it in the model log. Skipping the scene `0x801EEB80` (`BLOCKPLANET_MODEL_SKIP`) stops combos from playing out at all (the game waits for that scene's animation), so the number is probably one of its objects; finding which (with `BLOCKPLANET_OBJECT_ONLY`, as for the title letters) is the next step, to hide it in Story and to reuse it in other modes. `0x801E3B00` is the tunnel background.
+
+## The original Time Trial's clock and bonuses (2026-11-06)
+
+Read from the generated code while moving Score Attack onto Story's stages:
+
+- **Start:** `0x800AE950` sets the clock (`+0x2B0C`) to 18,059 (0x468B, frames: about 5:01) when mode 2 starts.
+- **Each frame:** `0x800CED54` subtracts the frame step (`0x80160C60`) in mode 2; modes 4, 5 and 7 add it instead (`0x800CEC38`, a count-up timer). In mode 1 (Rescue) the clock is not touched.
+- **Time out:** at 0 in mode 2, `func_800AA4B0(0)` is called and the clock set to 0x4F1A00 with a flag at `0x8013FAD4` (`0x800CEDBC`).
+- **Game over by hearts:** `0x800CEDE8`: hearts (`+0x2D7E`) at 0 become -1, the game over. BlockPlanet's Score Attack ends a run by setting hearts to 0 (checked: the game over and the scores screen follow).
+- **Sphere bonus:** `func_800C7C90` (mode 2 only, clock above 0, once per sphere): `func_800C7AF8(n)` is 1 for the first sphere and doubles each sphere (2, 4, 8...), capped at 32; the score gains that × 100 × the multiplier (`+0x2AE6` + `+0x2AE8` + 1), shown × 10, and the same value goes to the floating number routine `func_800B363C`.
+- **Time gained by combos:** no other store to `+0x2B0C` was found, so how combos add time is still open (perhaps through the frame step or a copy of the context).

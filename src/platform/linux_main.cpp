@@ -247,6 +247,7 @@ void update_hud() {
     struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
     static std::vector<LivePopup> popups;
     static tetrisphere::ComboTracker combos;
+    static int combo_blocks_pending = 0;
     // Story shows no score pop-ups (decided 2026-11-06); BLOCKPLANET_POPUPS=1
     // shows points for testing (score modes may use them later).
     static const bool popups_on = std::getenv("BLOCKPLANET_POPUPS") != nullptr;
@@ -262,6 +263,7 @@ void update_hud() {
             popups.push_back(live);
         };
         if (const auto combo = combos.update(state)) {
+            combo_blocks_pending += combo->blocks;  // Score Attack's clock gains time
             if (popups_on && combo->points > 0) {
                 char text[32];
                 const long long points = combo->points;
@@ -328,7 +330,6 @@ void update_hud() {
         view.next.push_back(std::move(p));
     }
     {
-        view.mode = play_variant    } else {
         view.mode = play_variant == PlayVariant::TimeAttack ? "Time Attack" : play_variant == PlayVariant::ScoreAttack ? "Score Attack" : "Story";
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
     }
@@ -337,27 +338,76 @@ void update_hud() {
         // Score Attack on Story's episodes: points per stage against the best
         // points of each stage (records "score_attack", stored as numbers).
         static tetrisphere::ScoreSplits score_splits;
-        static int score_chapter = -1;
+        static tetrisphere::AttackClock clock;
+        static int score_chapter = -1, score_level = 0;
         static std::uint32_t last_score_attack = 0;
-        if (state.chapter != score_chapter || state.score < last_score_attack) score_splits.reset(), score_chapter = state.chapter;
-        last_score_attack = state.score;
-        auto& records = profile_data.progress.episode_records["score_attack"][state.chapter];
-        std::vector<std::int64_t> bests;
-        for (double v : records.best_levels) bests.push_back(static_cast<std::int64_t>(v));
-        const long long score = static_cast<long long>(state.score) * 10;
-        if (const auto f = score_splits.update(state.level, score, bests)) {
-            if (records.best_levels.size() < 10) records.best_levels.resize(10, 0.0);
-            const auto i = std::size_t(std::clamp(f->stage, 1, 10) - 1);
-            const double before = records.best_levels[i];
-            if (double(f->points) > before) {
-                records.best_levels[i] = double(f->points);
+        static bool timed_out = false, run_over = false;
+        auto& records = profile_data.progress.episode_records["score_attack"];
+        const auto save_stage = [&](int chapter, const tetrisphere::ScoreSplits::Finished& f) {
+            auto& r = records[chapter];
+            if (r.best_levels.size() < 10) r.best_levels.resize(10, 0.0);
+            const auto i = std::size_t(std::clamp(f.stage, 1, 10) - 1);
+            const double before = r.best_levels[i];
+            if (double(f.points) > before) {
+                r.best_levels[i] = double(f.points);
                 profile_dirty = true;
                 save_profile();
             }
-            if (single_stage && f->stage == single_stage->second) {
-                single_stage_result = SingleStageResult{double(f->points), before};
+            if (single_stage && chapter == single_stage->first && f.stage == single_stage->second) {
+                single_stage_result = SingleStageResult{double(f.points), before};
                 single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
             }
+        };
+        // Bonus points for the time left: into the game's score, credited to
+        // the stage just finished.
+        const auto bank = [&](bool next_stage) {
+            const std::int64_t bonus = clock.clear(next_stage);
+            if (bonus <= 0) return std::int64_t{0};
+            guest::store32(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x2AF8,
+                           guest::load32(guest_rdram, 0x80110220u + 0x2AF8) + std::uint32_t(bonus / 10));
+            score_splits.credit_finished(bonus);
+            return bonus;
+        };
+        const bool new_run = state.chapter != score_chapter || state.score < last_score_attack || state.level < score_level;
+        if (new_run && score_chapter >= 0 && state.chapter == score_chapter + 1 && state.level == 1 && score_level >= 10) {
+            // The episode's last stage is done: bank its time, and the run is over.
+            if (auto f = score_splits.finish()) {
+                f->points += bank(false);
+                save_stage(score_chapter, *f);
+            }
+            if (!single_stage) single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(3000);
+            run_over = true;
+        } else if (new_run) {
+            score_splits.reset();
+            clock.start();
+            timed_out = run_over = false;
+            combo_blocks_pending = 0;
+        }
+        score_chapter = state.chapter;
+        score_level = state.level;
+        last_score_attack = state.score;
+        std::vector<std::int64_t> bests;
+        if (const auto r = records.find(state.chapter); r != records.end())
+            for (double v : r->second.best_levels) bests.push_back(static_cast<std::int64_t>(v));
+        const long long score = static_cast<long long>(state.score) * 10;
+        if (auto f = run_over ? std::nullopt : score_splits.update(state.level, score, bests)) {
+            const bool next = !(single_stage && f->stage == single_stage->second) && f->stage < 10;
+            f->points += bank(next);
+            save_stage(state.chapter, *f);
+        }
+        // The clock runs in play, stops once the stage is cleared, and gains
+        // time for combos; at zero the run ends (a game over, as in Story).
+        const bool cleared = state.progress >= 1.0f;
+        if (!paused && !cleared && !timed_out && !run_over && elapsed < 1.0) clock.tick(elapsed);
+        if (combo_blocks_pending > 0) clock.add(tetrisphere::AttackClock::combo_seconds(combo_blocks_pending)), combo_blocks_pending = 0;
+        if (clock.out() && !cleared && !timed_out && !run_over) {
+            timed_out = true;
+            guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x2D7E, 0);  // the game's own game over
+        }
+        {
+            const int left = int(std::ceil(clock.left()));
+            view.clock = std::to_string(left / 60) + ":" + (left % 60 < 10 ? "0" : "") + std::to_string(left % 60);
+            view.clock_low = left <= 30;
         }
         const auto sv = score_splits.view();
         const auto signed_points = [](long long d) { return (d < 0 ? std::string("\u2212") : std::string("+")) + hud_number(d < 0 ? -d : d); };

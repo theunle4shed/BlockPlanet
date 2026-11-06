@@ -68,7 +68,9 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
     if (load16(rdram, 0x800E121C) != -1 || mode != 1) return false;
     out = {};
     out.mode = mode;
-    out.hearts = std::clamp<int>(load16(rdram, player1 + 0x2D7E), 0, 3);
+    const int hearts = load16(rdram, player1 + 0x2D7E);
+    if (hearts < 0) return false;  // game over (-1): the game's own screens follow
+    out.hearts = std::clamp(hearts, 0, 3);
     const int drop = load16(rdram, player1 + 0x2B10);
     out.drop_left = std::clamp(1.0f - float(drop) / 600.0f, 0.0f, 1.0f);
     out.magic = static_cast<std::int8_t>(load8(rdram, player1 + 0x702));
@@ -242,7 +244,12 @@ SplitsView EpisodeSplits::view() const {
 std::optional<ScoreSplits::Finished> ScoreSplits::update(int stage, std::int64_t score,
                                                          const std::vector<std::int64_t>& best_stages) {
     std::optional<Finished> finished;
+    if (ended_ && stage_ >= 0 && stage >= stage_ && score >= score_) {
+        score_ = score;
+        return finished;  // the run is over; wait for a new one
+    }
     if (stage_ < 0 || stage < stage_ || score < score_) {
+        ended_ = false;
         // A new run: count from the score it starts with (Story's score runs
         // on across episodes; a restart may keep or reset it).
         stage_ = stage;
@@ -259,6 +266,30 @@ std::optional<ScoreSplits::Finished> ScoreSplits::update(int stage, std::int64_t
     score_ = score;
     return finished;
 }
+
+void ScoreSplits::credit_finished(std::int64_t points) {
+    if (done_.empty()) return;
+    done_.back() += points;
+    stage_start_ += points;
+}
+
+std::optional<ScoreSplits::Finished> ScoreSplits::finish() {
+    if (stage_ < 0 || ended_) return std::nullopt;
+    ended_ = true;
+    done_.push_back(score_ - stage_start_);
+    const Finished f{stage_, score_ - stage_start_};
+    stage_start_ = score_;
+    return f;
+}
+
+std::int64_t AttackClock::clear(bool next_stage) {
+    const double carry = next_stage ? std::floor(left_ / 60.0) * 60.0 : 0.0;
+    const double bonus = std::floor(std::max(0.0, left_ - carry));  // whole seconds
+    left_ = stage_seconds + carry;
+    return static_cast<std::int64_t>(std::lround(bonus * points_per_second));
+}
+
+double AttackClock::combo_seconds(int blocks) { return std::clamp(blocks - 2, 0, 10); }
 
 ScoreSplitsView ScoreSplits::view() const {
     ScoreSplitsView v;
@@ -277,7 +308,7 @@ ScoreSplitsView ScoreSplits::view() const {
         if (row.has_best) v.has_delta = true, v.net_delta += row.delta;
         v.rows.push_back(row);
     }
-    if (stage_ >= 0) {
+    if (stage_ >= 0 && !ended_) {
         ScoreRow row;
         row.stage = stage_;
         row.points = score_ - stage_start_;

@@ -178,7 +178,7 @@ std::string hud_rml(const HudView& hud) {
         rml += std::string("<div class='clock-inline") + (hud.clock_low ? " low" : "") + "'>" + escape(hud.clock) + "</div>";
     rml += "</div>";
     rml += "<div class='rule'><div class='line'/></div>";
-    // Time Trial: the clock, below health (it ends the game when it runs out).
+    // Score Attack: the clock, below health (the run ends when it runs out).
     if (!hud.clock.empty())
         rml += std::string("<div id='clock-group' class='group'><div class='label'>Time left</div><div id='clock'") +
                (hud.clock_low ? " class='low'" : "") + ">" + escape(hud.clock) + "</div></div><div id='clock-rule' class='rule'><div class='line'/></div>";

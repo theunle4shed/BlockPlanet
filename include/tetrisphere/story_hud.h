@@ -3,6 +3,7 @@
 // What BlockPlanet's Story HUD shows, read from game memory
 // (docs/HUD_DESIGN.md; addresses in docs/research/blockplanet-game-state.md).
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -155,13 +156,42 @@ public:
     void reset() { stage_ = -1; }
     std::optional<Finished> update(int stage, std::int64_t score, const std::vector<std::int64_t>& best_stages);
     ScoreSplitsView view() const;
+    // Bonus points for the stage just finished (added to the game's score
+    // too, so they are kept out of the next stage's points).
+    void credit_finished(std::int64_t points);
+    // The current stage finished with no next stage to start (an episode's
+    // last stage).
+    std::optional<Finished> finish();
 
 private:
+    bool ended_ = false;
     int stage_ = -1;
     std::int64_t stage_start_ = 0, score_ = 0, run_start_ = 0;
     std::vector<std::int64_t> done_;
     int first_ = 1;
     std::vector<std::int64_t> bests_;
+};
+
+// Score Attack's clock (docs/HUD_DESIGN.md): three minutes per stage. A
+// cleared stage carries its whole minutes left to the next stage (in a whole
+// episode) and turns the remaining seconds into bonus points; combos add time.
+class AttackClock {
+public:
+    static constexpr double stage_seconds = 180.0;
+    static constexpr std::int64_t points_per_second = 1000;  // as shown (the game's score x 10)
+    void start() { left_ = stage_seconds; }
+    void tick(double seconds) { left_ = std::max(0.0, left_ - std::max(0.0, seconds)); }
+    void add(double seconds) { left_ += std::max(0.0, seconds); }
+    double left() const { return left_; }
+    bool out() const { return left_ <= 0.0; }
+    // The stage is cleared: returns the bonus points (whole seconds), and sets the next
+    // stage's clock (three minutes plus the carried minutes).
+    std::int64_t clear(bool next_stage);
+    // Seconds a finished combo adds (provisional: one a block past two, up to ten).
+    static double combo_seconds(int blocks);
+
+private:
+    double left_ = stage_seconds;
 };
 
 // Reads the HUD's values for player 1. Returns false unless Story mode is in play.

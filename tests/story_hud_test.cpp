@@ -120,6 +120,31 @@ int main() {
         mid.update(3, 9000, best);
         mid.update(3, 9700, best);
         assert(mid.view().total == 700 && mid.view().rows.back().points == 700);
+        // Bonus points go to the finished stage; finishing the last stage ends the run.
+        tetrisphere::ScoreSplits run;
+        run.update(1, 0, best);
+        run.update(1, 1000, best);
+        run.update(2, 1000, best);
+        run.credit_finished(500);
+        run.update(2, 1500, best);  // the game's score with the bonus
+        assert(run.view().rows[0].points == 1500 && run.view().rows[1].points == 0);
+        run.update(2, 1800, best);
+        const auto last = run.finish();
+        assert(last && last->stage == 2 && last->points == 300 && !run.finish());
+        assert(!run.update(2, 1800, best) && run.view().rows.size() == 2 && run.view().total == 1800);
+    }
+    {
+        // Score Attack's clock: 3:00 a stage, whole minutes carry, the rest is bonus.
+        tetrisphere::AttackClock clock;
+        clock.start();
+        clock.tick(47.0);  // 2:13 left
+        assert(clock.clear(true) == 13000 && clock.left() == 300.0);  // 3:00 + the 2 minutes carried
+        clock.tick(10.0);
+        clock.add(tetrisphere::AttackClock::combo_seconds(5));
+        assert(clock.left() == 293.0 && tetrisphere::AttackClock::combo_seconds(40) == 10.0);
+        assert(clock.clear(false) == 293000 && clock.left() == 180.0);  // no next stage: all of it
+        clock.tick(500.0);
+        assert(clock.out() && clock.left() == 0.0);
     }
 
     // Reading from game memory.

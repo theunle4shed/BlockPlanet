@@ -60,7 +60,7 @@ struct HudView {
     std::string mode;          // e.g. "Rescue"
     std::string stage;         // e.g. "1:3"
     std::string time;          // the episode's time, e.g. "2:41"
-    std::string clock;         // Time Trial: the time left, e.g. "4:37" (empty: none)
+    std::string clock;         // Score Attack: the time left, e.g. "4:37" (empty: none)
     bool clock_low = false;    // the last 30 seconds
     std::string score;         // e.g. "12,340" (empty: not shown)
     std::string score_best;    // e.g. "Best 482,000 · 6:11" (empty: none)
