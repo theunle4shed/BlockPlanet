@@ -70,13 +70,16 @@ div { display: block; }
 #magic .band:last-child { height: auto; padding: 10dp 24dp 18dp 24dp; }
 #magic .window { height: 136dp; }
 #magic .edge { display: inline-block; width: 24dp; height: 136dp; vertical-align: top; }
+/* 24 + 184 (180 + a 2dp border each side) + 24 = the container's 232dp. A
+   light tint ties the window to the container; the model still shows. */
 #item {
     display: inline-block;
     vertical-align: top;
-    width: 184dp;
+    width: 180dp;
     height: 132dp;
     border: 2dp #f0f0f040;
     border-radius: 18dp;
+    background-color: #0b102038;
 }
 #item .name {
     display: block;
@@ -87,6 +90,7 @@ div { display: block; }
     color: #f5821f;
 }
 #meter { width: 184dp; }
+#magic .window { white-space: nowrap; }
 #meter .fill { background-color: #9c5cf0; }
 
 /* Next pieces: the next one first and larger. */
@@ -127,7 +131,7 @@ div { display: block; }
     #magic .band { height: 10dp; }
     #magic .window { height: 100dp; }
     #magic .edge { width: 16dp; height: 100dp; }
-    #item { width: 120dp; height: 96dp; }
+    #item { width: 116dp; height: 96dp; }
     #item .name { padding-top: 34dp; font-size: 18dp; }
     #meter { width: 120dp; }
     #magic .band:last-child { padding: 6dp 16dp 4dp 16dp; }
