@@ -221,17 +221,18 @@ extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
 //   BLOCKPLANET_OBJECT_LOG=1           log each scene's highest object index as it grows
 //   BLOCKPLANET_OBJECT_ONLY=scene:i,j  in that scene draw only objects i, j (others in it skipped)
 //   BLOCKPLANET_OBJECT_CYCLE=scene:ms  in that scene draw one object at a time, the next every ms
-extern "C" bool blockplanet_scene_object(std::uint8_t*, recomp_context* ctx) {
+extern "C" bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ctx) {
     const auto scene = static_cast<std::uint32_t>(ctx->r4);
     const int object = static_cast<int>(ctx->r7);
-    if (blockplanet_title_skip_object(scene, object)) return true;
+    if (blockplanet_title_object(rdram, scene, object, static_cast<std::uint32_t>(ctx->r6))) return true;
     static const bool log = std::getenv("BLOCKPLANET_OBJECT_LOG") != nullptr;
     if (log) {
         static std::mutex mutex;
         static std::set<std::pair<std::uint32_t, int>> seen;
         std::lock_guard lock(mutex);
         if (seen.insert({scene, object}).second)
-            std::fprintf(stdout, "{\"event\":\"scene_object\",\"scene\":\"0x%08X\",\"object\":%d}\n", scene, object);
+            std::fprintf(stdout, "{\"event\":\"scene_object\",\"scene\":\"0x%08X\",\"object\":%d,\"geometry\":%d,\"parts\":\"0x%08X\"}\n", scene,
+                         object, static_cast<int>(ctx->r5), static_cast<std::uint32_t>(ctx->r6));
     }
     struct Filter { std::uint32_t scene = 0; std::set<int> only; int cycle_ms = 0; };
     static const Filter filter = [] {
