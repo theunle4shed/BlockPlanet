@@ -33,8 +33,9 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 3. **The game's floating number** (parked): a grey 3D number after big combos ("6000", "48000"), not the points total; to hide in Story and possibly reuse in score modes. Real-drop combo tests need the matching blocks under the drop, not beside it.
 4. **Research loose ends:** how the original adds time for combos (Score Attack's rule is provisional); what each magic does and its name; magic crystals; fuse vs gravity combos; CONNECT and CRYSTAL TOWER goals; the two unseen piece shapes (IDs 3, 4).
 5. **Saved for later** (`docs/ROADMAP.md`): seeded stages for fair stage time trials, new block types, new modes (Escape, Multiphasic, Score Attack, Lines variants, VS and co-op), the scanner magic, arena walls, attract-mode demos, credits scripting, music (BGM) editing.
-6. **The owner to record developer times and scores** for every stage (`docs/HUD_DESIGN.md`, Developer records).
-7. **The owner to test on Windows**: much has changed since the last Windows test.
+6. **Tuning after play testing** (Score Attack): the combo time's diminishing steps (all, 2/3, 1/4, none after 3:00 of a stage), the full time a combo gives (a second a block past two, up to ten), Overtime's two minutes past, and Core Quake's 40 blocks (`biggest_story_combo` keeps the largest seen).
+7. **The owner to record developer times and scores** for every stage (`docs/HUD_DESIGN.md`, Developer records).
+8. **The owner to test on Windows**: much has changed since the last Windows test.
 
 ## Decisions to keep
 
