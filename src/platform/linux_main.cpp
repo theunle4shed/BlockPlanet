@@ -399,7 +399,7 @@ void update_hud() {
         // time for combos; at zero the run ends (a game over, as in Story).
         const bool cleared = state.progress >= 1.0f;
         if (!paused && !cleared && !timed_out && !run_over && elapsed < 1.0) clock.tick(elapsed);
-        if (combo_blocks_pending > 0) clock.add(tetrisphere::AttackClock::combo_seconds(combo_blocks_pending)), combo_blocks_pending = 0;
+        if (combo_blocks_pending > 0) clock.add_combo(combo_blocks_pending), combo_blocks_pending = 0;
         if (clock.out() && !cleared && !timed_out && !run_over) {
             timed_out = true;
             guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x2D7E, 0);  // the game's own game over

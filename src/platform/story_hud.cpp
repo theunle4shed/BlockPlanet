@@ -6,6 +6,7 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
+#include <iterator>
 
 namespace tetrisphere {
 namespace {
@@ -286,10 +287,20 @@ std::int64_t AttackClock::clear(bool next_stage) {
     const double carry = next_stage ? std::floor(left_ / 60.0) * 60.0 : 0.0;
     const double bonus = std::floor(std::max(0.0, left_ - carry));  // whole seconds
     left_ = stage_seconds + carry;
+    played_ = 0.0;
     return static_cast<std::int64_t>(std::lround(bonus * points_per_second));
 }
 
-double AttackClock::combo_seconds(int blocks) { return std::clamp(blocks - 2, 0, 10); }
+double AttackClock::combo_scale(double played) {
+    // Minute by minute of the stage (docs/HUD_DESIGN.md has the table).
+    static constexpr double scale[] = {1.0, 2.0 / 3.0, 1.0 / 4.0};
+    const auto minute = static_cast<std::size_t>(std::max(0.0, played) / 60.0);
+    return minute < std::size(scale) ? scale[minute] : 0.0;
+}
+
+double AttackClock::combo_seconds(int blocks, double played) {
+    return std::clamp(blocks - 2, 0, 10) * combo_scale(played);
+}
 
 ScoreSplitsView ScoreSplits::view() const {
     ScoreSplitsView v;

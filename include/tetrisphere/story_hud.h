@@ -179,19 +179,32 @@ class AttackClock {
 public:
     static constexpr double stage_seconds = 180.0;
     static constexpr std::int64_t points_per_second = 1000;  // as shown (the game's score x 10)
-    void start() { left_ = stage_seconds; }
-    void tick(double seconds) { left_ = std::max(0.0, left_ - std::max(0.0, seconds)); }
+    void start() { left_ = stage_seconds, played_ = 0.0; }
+    void tick(double seconds) {
+        left_ = std::max(0.0, left_ - std::max(0.0, seconds));
+        played_ += std::max(0.0, seconds);
+    }
     void add(double seconds) { left_ += std::max(0.0, seconds); }
     double left() const { return left_; }
     bool out() const { return left_ <= 0.0; }
     // The stage is cleared: returns the bonus points (whole seconds), and sets the next
     // stage's clock (three minutes plus the carried minutes).
     std::int64_t clear(bool next_stage);
-    // Seconds a finished combo adds (provisional: one a block past two, up to ten).
-    static double combo_seconds(int blocks);
+    // Play time in the current stage.
+    double played() const { return played_; }
+    // Seconds a finished combo adds: one a block past two, up to ten, scaled
+    // down the longer the stage has been played (combo_scale).
+    static double combo_seconds(int blocks, double played);
+    // The share of a combo's time still given after `played` seconds of the
+    // stage: all of it in the first minute, two thirds in the second, a
+    // quarter in the third, none after.
+    static double combo_scale(double played);
+    // Adds a finished combo's time, scaled by this stage's play time.
+    void add_combo(int blocks) { add(combo_seconds(blocks, played_)); }
 
 private:
     double left_ = stage_seconds;
+    double played_ = 0.0;
 };
 
 // Reads the HUD's values for player 1. Returns false unless Story mode is in play.

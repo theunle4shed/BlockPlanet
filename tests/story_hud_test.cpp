@@ -140,8 +140,13 @@ int main() {
         clock.tick(47.0);  // 2:13 left
         assert(clock.clear(true) == 13000 && clock.left() == 300.0);  // 3:00 + the 2 minutes carried
         clock.tick(10.0);
-        clock.add(tetrisphere::AttackClock::combo_seconds(5));
-        assert(clock.left() == 293.0 && tetrisphere::AttackClock::combo_seconds(40) == 10.0);
+        clock.add_combo(5);  // 10 s into the stage: all 3 seconds
+        assert(clock.left() == 293.0 && tetrisphere::AttackClock::combo_seconds(40, 0.0) == 10.0);
+        // Diminishing: full in the first minute, 2/3 in the second, 1/4 in the third, then none.
+        assert(tetrisphere::AttackClock::combo_seconds(8, 59.0) == 6.0);
+        assert(tetrisphere::AttackClock::combo_seconds(8, 60.0) == 4.0);
+        assert(tetrisphere::AttackClock::combo_seconds(8, 150.0) == 1.5);
+        assert(tetrisphere::AttackClock::combo_seconds(8, 180.0) == 0.0);
         assert(clock.clear(false) == 293000 && clock.left() == 180.0);  // no next stage: all of it
         clock.tick(500.0);
         assert(clock.out() && clock.left() == 0.0);

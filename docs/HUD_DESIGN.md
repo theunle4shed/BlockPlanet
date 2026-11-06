@@ -51,7 +51,16 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 
 - **Story:** the episode's time only (no ± or splits). A finished stage still counts towards Story's stage bests (`progress.episode_records.rescue`).
 - **Time Attack:** LiveSplit-style timing: the episode's time, the net ± so far against the best stage times, a row per stage (time and ±; green ahead). A single stage shows its time, the best and ±, then returns to the menu. Records in `progress.episode_records.time_attack`.
-- **Score Attack:** Story's stages and clear condition, with a **clock**: 3:00 per stage (decided 2026-11-06, down from the original's five minutes since an episode has ten stages). Combos add time (provisional rule: a second a block past two, up to ten a combo; the original's rule is still to find). When a stage is cleared, its whole minutes left carry to the next stage (in a whole episode) and the remaining seconds become bonus points (1,000 a second, added to the game's score and to that stage's split); a single stage or the episode's last stage turns all its time into points. At 0:00 the run ends with the game's own game over. HUD: "Time left" under Health (red and pulsing in the last 30 seconds); on the right the same template as Time Attack by points: points in the run, the net ± against the best points of each stage (more is better, so green when ahead), a row per stage. A single stage shows its points, the best and ±. Points count from the score the run starts with, since Story's score runs on. Best points per stage in `progress.episode_records.score_attack` (stored where times are, as numbers). A whole episode returns to the menu when it is done.
+- **Score Attack:** Story's stages and clear condition, with a **clock**: 3:00 per stage (decided 2026-11-06, down from the original's five minutes since an episode has ten stages). Combos add time, less the longer the stage has been played (decided 2026-11-06), so a stage cannot be stretched forever:
+
+  | Play time in the stage | Share of a combo's time |
+  | --- | --- |
+  | 0:00 to 0:59 | all |
+  | 1:00 to 1:59 | two thirds |
+  | 2:00 to 2:59 | a quarter |
+  | 3:00 on | none |
+
+  A combo's full time is a second a block past two, up to ten (provisional; the original's rule is still to find). The table is `AttackClock::combo_scale` in `src/platform/story_hud.cpp`. When a stage is cleared, its whole minutes left carry to the next stage (in a whole episode) and the remaining seconds become bonus points (1,000 a second, added to the game's score and to that stage's split); a single stage or the episode's last stage turns all its time into points. At 0:00 the run ends with the game's own game over. HUD: "Time left" under Health (red and pulsing in the last 30 seconds); on the right the same template as Time Attack by points: points in the run, the net ± against the best points of each stage (more is better, so green when ahead), a row per stage. A single stage shows its points, the best and ±. Points count from the score the run starts with, since Story's score runs on. Best points per stage in `progress.episode_records.score_attack` (stored where times are, as numbers). A whole episode returns to the menu when it is done.
 
 The earlier Score Attack build on the original Time Trial (its own stages and clear condition, "+N s" pop-ups, best score and longest time survived) is removed; old profiles keep their `progress.score_attack` values, unused. ("Furthest stage reached" is kept as an idea for the Multiphasic mode.)
 
