@@ -10,6 +10,7 @@
 
 #include "tetrisphere/recomp_support.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
@@ -87,3 +88,31 @@ extern "C" void blockplanet_title_letters(std::uint8_t* rdram, recomp_context*) 
 }
 
 extern "C" void blockplanet_title_letters_end(std::uint8_t*, recomp_context*) { drawing.store(false); }
+
+// BLOCKPLANET_TITLE_FREEZE=frame: just before the title advances and draws the
+// letters scene (0x80069460, a1 = frames elapsed, from 0x800E1208 - 0x800E1210),
+// the scene's frame is set so that after advancing it lands on that frame, so
+// the animation never ends and the game keeps drawing the letters.
+extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ctx) {
+    static const int freeze = [] {
+        const char* v = std::getenv("BLOCKPLANET_TITLE_FREEZE");
+        return v ? std::atoi(v) : -1;
+    }();
+    if (freeze < 0) return;
+    const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r4);
+    if (scene < 0x80000000u || scene >= 0x80800000u) return;
+    const int frame = static_cast<int>(load32(rdram, scene + 0x24));
+    const int elapsed = static_cast<int>(load32(rdram, 0x800E1208u) - load32(rdram, 0x800E1210u));
+    if (frame + elapsed < freeze) return;  // not there yet
+    const std::uint32_t target = static_cast<std::uint32_t>(std::max(0, freeze - std::max(elapsed, 0)));
+    std::memcpy(rdram + ((scene + 0x24) & 0x00FFFFFFu), &target, 4);
+}
+
+// With the letters held (BLOCKPLANET_TITLE_FREEZE), the title picture is drawn
+// fully opaque (its alpha argument, on the stack at +0x1C).
+extern "C" void blockplanet_title_picture(std::uint8_t* rdram, recomp_context* ctx) {
+    static const bool freeze = std::getenv("BLOCKPLANET_TITLE_FREEZE") != nullptr;
+    if (!freeze) return;
+    const std::uint32_t alpha = 0xFF;
+    std::memcpy(rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x1C) & 0x00FFFFFFu), &alpha, 4);
+}

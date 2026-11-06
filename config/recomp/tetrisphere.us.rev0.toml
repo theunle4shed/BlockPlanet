@@ -571,3 +571,17 @@ text = "blockplanet_title_letters(rdram, ctx);"
 func = "func_800685FC"
 before_vram = 0x80069478
 text = "blockplanet_title_letters_end(rdram, ctx);"
+
+# The title's own draw of the letters scene: holding its animation at a frame
+# before the end keeps the game drawing the 3D letters (title_hooks.cpp).
+[[patches.hook]]
+func = "func_800685FC"
+before_vram = 0x80069460
+text = "blockplanet_title_freeze(rdram, ctx);"
+
+# The title picture's opacity (its fade-in is tied to the letters' animation);
+# with the letters held, BlockPlanet draws it fully opaque (title_hooks.cpp).
+[[patches.hook]]
+func = "func_800685FC"
+before_vram = 0x8006923C
+text = "blockplanet_title_picture(rdram, ctx);"
