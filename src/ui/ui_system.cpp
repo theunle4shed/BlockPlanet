@@ -222,7 +222,8 @@ std::string hud_rml(const HudView& hud) {
     rml += "</div>";
     if (!hud.score.empty())
         rml += "<div class='rule'><div class='line'/></div><div id='score-group' class='group'><div class='label'>Score</div><div id='score'>" +
-               escape(hud.score) + "</div></div>";
+               escape(hud.score) + "</div>" + (hud.score_best.empty() ? "" : "<div id='score-best'>" + escape(hud.score_best) + "</div>") +
+               "</div>";
     if (!hud.time.empty()) {
         rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>" +
                escape(hud.time_label.empty() ? std::string("Time") : hud.time_label) + "</div><div id='time'>" + escape(hud.time) + "</div>";

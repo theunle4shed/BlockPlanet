@@ -8,7 +8,7 @@
         <div class="title">Solo</div>
         <div class="subtitle">Play on your own</div>
         <div class="item" id="story" data-action="command:story">Story</div>
-        <div class="item" id="time_trial" data-action="command:time_trial">Time Trial</div>
+        <div class="item" id="time_trial" data-action="command:time_trial">Time Attack</div>
         <div class="item" id="lines" data-action="command:lines">Lines</div>
         <div class="item" id="puzzle" data-action="command:puzzle">Puzzle</div>
         <div class="item" id="custom" data-action="command:custom">Custom</div>

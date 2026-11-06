@@ -45,7 +45,9 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 | Episode card (between episodes) | A full panel: "Episode 2" large, the message beneath (texts in [STORY_PROGRESSION.md](STORY_PROGRESSION.md)) |
 | Training instructor text | To be decided (paged lessons) |
 
-## Time Trial
+## Time Attack (the original's Time Trial)
+
+**Renamed and decided 2026-11-06:** the game's Time Trial (score as much as possible against a five-minute clock that combos extend) is called **Time Attack** in BlockPlanet; **Time Trial** is kept for a new mode (Story's stages beaten as fast as possible, ROADMAP). Time Attack shows the **score** with the clock, and records the **best score** and the **longest time survived** (`progress.time_attack`), shown under the score ("Best 482,000 · 6:11").
 
 **Built for Story's Time Trial (2026-11-06)**, labelled "Time Trial · Story" (other modes may get their own time trials later). The game's Time Trial is mode 2: Story's stages against a clock (`+0x2B0C`, frames left), the stage shown as a count. Left: Health, **Time left** (red and pulsing in the last 30 seconds; on portrait screens under the hearts), Magic, Next. Right: mode and stage with the progress bar. **No score** (decided 2026-11-06: Time Trial is about the clock). Time gained shows as "+N s" rising from where the combo cleared (or the centre if no combo is found). No splits in Time Trial. No records for now (decided 2026-11-06): players here are speedrunning, having finished the main game, so "furthest stage" is not useful; it is kept as an idea for the Multiphasic mode.
 

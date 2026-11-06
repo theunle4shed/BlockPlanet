@@ -136,6 +136,10 @@ Levels are generated: the game fills a 32×32 grid per layer with random pieces 
 - **The credits:** how the credits sequence is scripted (the text is in memory as a list of names and roles, around `0x800EBF00`; see [research](research/blockplanet-game-state.md#the-title-screens-artwork-2026-11-06)), what drives the order, timing and layout, and whether it can be changed (adding BlockPlanet's credits after the original's, as the fork's own).
 - **The music (BGM):** what the 23 tracks are (names in [audio research](research/blockplanet-game-state.md#audio-settings-2026-11-05)), what format the game uses (sequences played on its own instruments, like MIDI, or recorded audio), and how to edit them or write new ones with the game's own instruments ("the soundscape"), as an alternative or complement to playing the player's own music files (below).
 
+### Time Trial: Story's stages, as fast as possible (new mode, idea 2026-11-06)
+
+A speedrun mode, separate from Story: Story's stages beaten as fast as possible, timed per stage and per episode (LiveSplit-style splits against the bests, as Story's HUD already does; single stages from a list, as Story's stage select already does). To decide: whether it has lives or a game over, whether it shares Story's stage bests or keeps its own, its menu place, and whether it waits for seeded stages so times are fair. (The game's own "Time Trial" is now called Time Attack.)
+
 ### Furthest stage reached as a record (idea, 2026-11-06)
 
 Not for Time Trial (its players are speedrunning, having finished the game), but a good record for the **Multiphasic** mode: the furthest stage reached in a run, shown on its HUD and in the records.

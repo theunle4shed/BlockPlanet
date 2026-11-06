@@ -63,6 +63,7 @@ struct HudView {
     std::string clock;         // Time Trial: the time left, e.g. "4:37" (empty: none)
     bool clock_low = false;    // the last 30 seconds
     std::string score;         // e.g. "12,340" (empty: not shown)
+    std::string score_best;    // e.g. "Best 482,000 · 6:11" (empty: none)
     std::string time_label;    // the Time section's title (default "Time")
     std::string best;          // a single stage: "Best 0:42" (empty: not shown)
     std::string time_delta;    // the net difference so far, e.g. "-0:12", or empty

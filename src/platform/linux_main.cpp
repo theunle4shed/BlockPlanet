@@ -195,7 +195,7 @@ std::string hud_time(double seconds) {
 }
 
 // A number with thousands separators: "12,340".
-[[maybe_unused]] std::string hud_number(long long value) {  // for score modes
+std::string hud_number(long long value) {
     std::string digits = std::to_string(value < 0 ? -value : value), out;
     for (std::size_t i = 0; i < digits.size(); ++i) {
         if (i > 0 && (digits.size() - i) % 3 == 0) out += ',';
@@ -238,7 +238,7 @@ void update_hud() {
     struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
     static std::vector<LivePopup> popups;
     static tetrisphere::ComboTracker combos;
-    // Story shows no score pop-ups (decided 2026-11-06); Time Trial shows the
+    // Story shows no score pop-ups (decided 2026-11-06); Time Attack shows the
     // time a combo gained ("+5 s") rising from where it cleared; score modes
     // will use points (BLOCKPLANET_POPUPS=1 shows points in Story for testing).
     static const bool popups_on = std::getenv("BLOCKPLANET_POPUPS") != nullptr;
@@ -287,6 +287,32 @@ void update_hud() {
                      popups.end());
     }
     if (!story) popups.clear();
+    // Time Attack records: the run's score and time survived (play time),
+    // saved when the run ends (leaving play) or a new one starts.
+    static long long attack_score = 0;
+    static double attack_seconds = 0.0;
+    static bool attack_running = false;
+    const auto commit_attack = [&] {
+        if (!attack_running) return;
+        attack_running = false;
+        auto& p = profile_data.progress;
+        bool changed = false;
+        if (attack_score > p.time_attack_best_score) p.time_attack_best_score = attack_score, changed = true;
+        if (attack_seconds > p.time_attack_best_seconds) p.time_attack_best_seconds = attack_seconds, changed = true;
+        if (changed) {
+            profile_dirty = true;
+            save_profile();
+        }
+    };
+    if (story && state.mode == 2) {
+        const long long score = static_cast<long long>(state.score) * 10;
+        if (attack_running && score < attack_score) commit_attack();  // a new run
+        if (!attack_running) attack_running = true, attack_score = 0, attack_seconds = 0.0;
+        attack_score = std::max(attack_score, score);
+        if (guest::load16(guest_rdram, 0x800E1228) < 0 && elapsed < 1.0) attack_seconds += elapsed;
+    } else if (attack_running && guest::load16(guest_rdram, 0x800E121C) != -1) {
+        commit_attack();
+    }
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
         blockplanet::ui::set_hud(std::nullopt);
@@ -339,8 +365,12 @@ void update_hud() {
         view.next.push_back(std::move(p));
     }
     if (state.mode == 2) {
-        view.mode = "Time Trial \u00B7 Story";
+        view.mode = "Time Attack";
         view.stage = std::to_string(state.level);
+        view.score = hud_number(static_cast<long long>(state.score) * 10);
+        const auto& p = profile_data.progress;
+        if (p.time_attack_best_score > 0 || p.time_attack_best_seconds > 0.0)
+            view.score_best = "Best " + hud_number(p.time_attack_best_score) + " \u00B7 " + hud_time(p.time_attack_best_seconds);
         view.clock = hud_time(std::max(0, state.clock_frames) / 60.0);
         view.clock_low = state.clock_frames < 30 * 60;
     } else {
@@ -1977,7 +2007,7 @@ bool handle_profile_command(const std::string& command) {
                 std::string where;
                 switch (state.mode) {
                 case 1: where = "Story \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
-                case 2: where = "Time Trial"; break;
+                case 2: where = "Time Attack"; break;
                 case 3: where = state.training_type == 3 ? "Puzzle \u00B7 Chapter 0" : "Story \u00B7 Chapter 0"; break;
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
                 case 5: where = "Hide & Seek \u00B7 Level " + std::to_string(state.level + 1); break;  // its chapter is not the Rescue one
