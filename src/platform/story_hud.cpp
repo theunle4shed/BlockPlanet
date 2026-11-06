@@ -65,10 +65,9 @@ float ProgressTracker::update(int level_key, int weakest_now) {
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out) {
     using namespace guest;
     const int mode = load16(rdram, 0x800E44A8);
-    if (load16(rdram, 0x800E121C) != -1 || (mode != 1 && mode != 2)) return false;
+    if (load16(rdram, 0x800E121C) != -1 || mode != 1) return false;
     out = {};
     out.mode = mode;
-    if (mode == 2) out.clock_frames = static_cast<int>(load32(rdram, player1 + 0x2B0C));
     out.hearts = std::clamp<int>(load16(rdram, player1 + 0x2D7E), 0, 3);
     const int drop = load16(rdram, player1 + 0x2B10);
     out.drop_left = std::clamp(1.0f - float(drop) / 600.0f, 0.0f, 1.0f);
@@ -244,10 +243,11 @@ std::optional<ScoreSplits::Finished> ScoreSplits::update(int stage, std::int64_t
                                                          const std::vector<std::int64_t>& best_stages) {
     std::optional<Finished> finished;
     if (stage_ < 0 || stage < stage_ || score < score_) {
+        // A new run: count from the score it starts with (Story's score runs
+        // on across episodes; a restart may keep or reset it).
         stage_ = stage;
         first_ = stage;
-        stage_start_ = score < score_ || stage_ < 0 ? 0 : score;
-        if (score < score_) stage_start_ = 0;
+        stage_start_ = run_start_ = score;
         done_.clear();
         bests_ = best_stages;
     } else if (stage > stage_) {
@@ -283,7 +283,7 @@ ScoreSplitsView ScoreSplits::view() const {
         row.points = score_ - stage_start_;
         v.rows.push_back(row);
     }
-    v.total = score_;
+    v.total = score_ - run_start_;
     return v;
 }
 } // namespace tetrisphere

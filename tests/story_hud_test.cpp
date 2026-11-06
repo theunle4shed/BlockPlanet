@@ -115,6 +115,11 @@ int main() {
         assert(!v.rows[1].done && v.rows[1].points == 2500);
         sc.update(1, 0, best);  // a new run
         assert(sc.view().rows.size() == 1 && sc.view().total == 0);
+        // A run that starts with points already scored (Story's score runs on).
+        tetrisphere::ScoreSplits mid;
+        mid.update(3, 9000, best);
+        mid.update(3, 9700, best);
+        assert(mid.view().total == 700 && mid.view().rows.back().points == 700);
     }
 
     // Reading from game memory.

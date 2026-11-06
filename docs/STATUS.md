@@ -22,7 +22,7 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 
 - **Story HUD** (`docs/HUD_DESIGN.md`): one tinted container per side, section titles, placed as on 4:3 (Graphics > HUD panels: near, edges, follow). Left: health and drop timer, magic (the game's own 3D model turning in the item box, its flight starting from the box; the box's tint drawn by the game behind it), next pieces (bar, square, S, T). Right: mode, stage and progress bar; LiveSplit-style episode splits against per-stage bests saved in the profile. Portrait: rows above and below.
 - **Story stage select:** whole episode or one stage; a single stage shows stage time, best and ±, then returns to the menu.
-- **Score Attack** (the game's Time Trial, renamed): clock, score splits per stage (± against the best per stage), best score and longest time survived, "+N s" pop-ups. **Time Attack** is a planned new mode (Story's stages as fast as possible; ROADMAP). No records yet.
+- **Time Attack and Score Attack** on Story's episodes only (whole episode or one stage, from Solo): Time Attack has the LiveSplit timing, Score Attack the same by points; their own records. Story shows the episode time only. The original Time Trial is no longer offered (`docs/HUD_DESIGN.md`).
 - **Title screen:** the game's own 3D letters held on screen; the painted picture hidden until replaced (`src/graphics/title_hooks.cpp`).
 - Profiles, Chapter 0 (Training), pause menu, audio and options, restart level/chapter (earlier in the session; see `CHANGES-SINCE-BLOCKSPHERE.md`).
 
@@ -40,4 +40,5 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 - Sphere framing as the original; Story's Try Again as the original.
 - Story shows no score pop-ups; Hide & Seek shows no progress bar (hints would spoil the search).
 - Any finished Story stage counts towards that stage's best, however the run started.
+- Competition (Time Attack, Score Attack) is on Story's episodes only; the original Time Trial's mode and stages are not offered. Its trophy ("Against the Clock") can no longer be earned: to replace.
 - No HD texture packs; sharpness through redesign and the game's own models. Nothing copied from the game is committed; anything derived from it is generated from the player's ROM.

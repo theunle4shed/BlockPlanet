@@ -18,8 +18,7 @@ struct HudPiece {
 };
 
 struct StoryHudState {
-    int mode = 1;              // 1 Story (Rescue), 2 Time Trial (Story's stages, against the clock)
-    int clock_frames = 0;      // Time Trial: the clock, frames left at 60 a second (+0x2B0C)
+    int mode = 1;              // 1 Story (Rescue); Story, Time Attack and Score Attack all run it
     int hearts = 0;            // 0 to 3
     float drop_left = 1.0f;    // the drop timer's time left, 1 (full) to 0
     int magic = -1;            // -1 none, 0 to 5 the held magic
@@ -131,8 +130,9 @@ private:
     std::vector<double> bests_;  // the best level times when the run started
 };
 
-// Score Attack splits: points scored in each stage of a run, compared with
-// the best points scored in that stage (more is better).
+// Score Attack splits: points scored in each stage of a run (an episode of
+// Story, or one stage), compared with the best points scored in that stage
+// (more is better).
 struct ScoreRow {
     int stage = 0;
     std::int64_t points = 0;
@@ -150,20 +150,21 @@ class ScoreSplits {
 public:
     struct Finished { int stage; std::int64_t points; };
     // Each frame in play: the stage shown and the score (as shown). A new run
-    // starts when the score goes down or the stage goes back.
+    // starts when the score goes down or the stage goes back; its points count
+    // from the score it started with.
+    void reset() { stage_ = -1; }
     std::optional<Finished> update(int stage, std::int64_t score, const std::vector<std::int64_t>& best_stages);
     ScoreSplitsView view() const;
 
 private:
     int stage_ = -1;
-    std::int64_t stage_start_ = 0, score_ = 0;
+    std::int64_t stage_start_ = 0, score_ = 0, run_start_ = 0;
     std::vector<std::int64_t> done_;
     int first_ = 1;
     std::vector<std::int64_t> bests_;
 };
 
-// Reads the HUD's values for player 1. Returns false unless Story or its Time
-// Trial is in play.
+// Reads the HUD's values for player 1. Returns false unless Story mode is in play.
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out);
 
 } // namespace tetrisphere

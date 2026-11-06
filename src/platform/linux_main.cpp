@@ -130,6 +130,15 @@ std::optional<PendingLaunch> continue_mode;
 // A single Story stage being played on its own (Story > chapter > stage):
 // chapter and level; after it is completed the game returns to the menu.
 std::optional<std::pair<int, int>> single_stage;
+// Story's episodes played three ways (docs/HUD_DESIGN.md): the story, Time
+// Attack (as fast as possible) and Score Attack (as many points as possible).
+// All run the game's Story mode; this picks the HUD and the records.
+enum class PlayVariant { Story, TimeAttack, ScoreAttack };
+PlayVariant play_variant = PlayVariant::Story;  // the run in progress
+PlayVariant menu_variant = PlayVariant::Story;  // the chapter list on screen
+const char* variant_records(PlayVariant v) {
+    return v == PlayVariant::TimeAttack ? "time_attack" : v == PlayVariant::ScoreAttack ? "score_attack" : "rescue";
+}
 struct SingleStageResult { double time; double best_before; };
 std::optional<SingleStageResult> single_stage_result;
 std::optional<std::chrono::steady_clock::time_point> single_stage_quit_at;
@@ -238,17 +247,10 @@ void update_hud() {
     struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
     static std::vector<LivePopup> popups;
     static tetrisphere::ComboTracker combos;
-    // Story shows no score pop-ups (decided 2026-11-06); Score Attack shows the
-    // time a combo gained ("+5 s") rising from where it cleared; score modes
-    // will use points (BLOCKPLANET_POPUPS=1 shows points in Story for testing).
+    // Story shows no score pop-ups (decided 2026-11-06); BLOCKPLANET_POPUPS=1
+    // shows points for testing (score modes may use them later).
     static const bool popups_on = std::getenv("BLOCKPLANET_POPUPS") != nullptr;
-    static int last_clock = 0;
-    static double pending_gain = 0.0, pending_age = 0.0;
     const bool paused_now = story && guest::load16(guest_rdram, 0x800E1228) >= 0;
-    if (story && state.mode == 2) {
-        if (state.clock_frames > last_clock + 30 && last_clock > 0) pending_gain += (state.clock_frames - last_clock) / 60.0;
-        last_clock = state.clock_frames;
-    }
     if (story && !paused_now) {
         const auto make = [&](const std::string& text, const std::string& note, float dx, float dy) {
             if (std::getenv("BLOCKPLANET_POPUP_LOG")) std::fprintf(stdout, "{\"event\":\"popup\",\"text\":\"%s\"}\n", text.c_str());
@@ -259,12 +261,8 @@ void update_hud() {
             live.cell_dy = dy;
             popups.push_back(live);
         };
-        const auto gain_text = [&] { return "+" + std::to_string(int(std::lround(pending_gain))) + " s"; };
         if (const auto combo = combos.update(state)) {
-            if (state.mode == 2 && pending_gain >= 0.5) {
-                make(gain_text(), "", combo->dx, combo->dy);
-                pending_gain = 0.0;
-            } else if (state.mode == 1 && popups_on && combo->points > 0) {
+            if (popups_on && combo->points > 0) {
                 char text[32];
                 const long long points = combo->points;
                 if (points >= 1000) std::snprintf(text, sizeof text, "+%lld,%03lld", points / 1000, points % 1000);
@@ -272,47 +270,11 @@ void update_hud() {
                 make(text, combo->blocks >= 3 ? std::to_string(combo->blocks) + " blocks" : "", combo->dx, combo->dy);
             }
         }
-        // Time gained with no combo to place it (or long after): at the centre.
-        if (pending_gain >= 0.5) {
-            pending_age += std::min(elapsed, 0.1);
-            if (pending_age > 1.5) {
-                make(gain_text(), "", 0.0f, 0.0f);
-                pending_gain = 0.0;
-            }
-        } else {
-            pending_age = 0.0;
-        }
         for (auto& p : popups) p.popup.age += float(std::min(elapsed, 0.1));
         popups.erase(std::remove_if(popups.begin(), popups.end(), [](const LivePopup& p) { return p.popup.age > 1.4f; }),
                      popups.end());
     }
     if (!story) popups.clear();
-    // Score Attack records: the run's score and time survived (play time),
-    // saved when the run ends (leaving play) or a new one starts.
-    static long long attack_score = 0;
-    static double attack_seconds = 0.0;
-    static bool attack_running = false;
-    const auto commit_attack = [&] {
-        if (!attack_running) return;
-        attack_running = false;
-        auto& p = profile_data.progress;
-        bool changed = false;
-        if (attack_score > p.score_attack_best_score) p.score_attack_best_score = attack_score, changed = true;
-        if (attack_seconds > p.score_attack_best_seconds) p.score_attack_best_seconds = attack_seconds, changed = true;
-        if (changed) {
-            profile_dirty = true;
-            save_profile();
-        }
-    };
-    if (story && state.mode == 2) {
-        const long long score = static_cast<long long>(state.score) * 10;
-        if (attack_running && score < attack_score) commit_attack();  // a new run
-        if (!attack_running) attack_running = true, attack_score = 0, attack_seconds = 0.0;
-        attack_score = std::max(attack_score, score);
-        if (guest::load16(guest_rdram, 0x800E1228) < 0 && elapsed < 1.0) attack_seconds += elapsed;
-    } else if (attack_running && guest::load16(guest_rdram, 0x800E121C) != -1) {
-        commit_attack();
-    }
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
         blockplanet::ui::set_hud(std::nullopt);
@@ -323,7 +285,7 @@ void update_hud() {
     if (state.score < last_score || state.mode != 1) splits.reset();
     last_score = state.score;
     const bool paused = guest::load16(guest_rdram, 0x800E1228) >= 0;
-    auto& episode = profile_data.progress.episode_records["rescue"];
+    auto& episode = profile_data.progress.episode_records[variant_records(play_variant == PlayVariant::ScoreAttack ? PlayVariant::Story : play_variant)];
     const auto best_of = [&](int chapter) {
         const auto it = episode.find(chapter);
         return it == episode.end() ? std::vector<double>{} : it->second.best_levels;
@@ -345,7 +307,8 @@ void update_hud() {
             save_profile();
         }
         // A single stage: done; back to the menu shortly.
-        if (single_stage && finished->chapter == single_stage->first && finished->level == single_stage->second) {
+        if (play_variant != PlayVariant::ScoreAttack && single_stage && finished->chapter == single_stage->first &&
+            finished->level == single_stage->second) {
             single_stage_result = SingleStageResult{finished->time, best_before};
             single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
         }
@@ -364,43 +327,68 @@ void update_hud() {
         p.cells = hud_piece_cells(piece.shape, piece.cells);
         view.next.push_back(std::move(p));
     }
-    if (state.mode == 2) {
-        view.mode = "Score Attack";
-        view.stage = std::to_string(state.level);
-        // Splits by points: the score, the net difference, and each stage.
+    {
+        view.mode = play_variant    } else {
+        view.mode = play_variant == PlayVariant::TimeAttack ? "Time Attack" : play_variant == PlayVariant::ScoreAttack ? "Score Attack" : "Story";
+        view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
+    }
+    const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
+    if (state.mode == 1 && play_variant == PlayVariant::ScoreAttack) {
+        // Score Attack on Story's episodes: points per stage against the best
+        // points of each stage (records "score_attack", stored as numbers).
         static tetrisphere::ScoreSplits score_splits;
-        auto& p = profile_data.progress;
+        static int score_chapter = -1;
+        static std::uint32_t last_score_attack = 0;
+        if (state.chapter != score_chapter || state.score < last_score_attack) score_splits.reset(), score_chapter = state.chapter;
+        last_score_attack = state.score;
+        auto& records = profile_data.progress.episode_records["score_attack"][state.chapter];
+        std::vector<std::int64_t> bests;
+        for (double v : records.best_levels) bests.push_back(static_cast<std::int64_t>(v));
         const long long score = static_cast<long long>(state.score) * 10;
-        if (const auto f = score_splits.update(state.level, score, p.score_attack_best_stages)) {
-            if (p.score_attack_best_stages.size() < std::size_t(f->stage)) p.score_attack_best_stages.resize(std::size_t(f->stage), 0);
-            auto& b = p.score_attack_best_stages[std::size_t(f->stage - 1)];
-            if (f->points > b) {
-                b = f->points;
+        if (const auto f = score_splits.update(state.level, score, bests)) {
+            if (records.best_levels.size() < 10) records.best_levels.resize(10, 0.0);
+            const auto i = std::size_t(std::clamp(f->stage, 1, 10) - 1);
+            const double before = records.best_levels[i];
+            if (double(f->points) > before) {
+                records.best_levels[i] = double(f->points);
                 profile_dirty = true;
                 save_profile();
+            }
+            if (single_stage && f->stage == single_stage->second) {
+                single_stage_result = SingleStageResult{double(f->points), before};
+                single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
             }
         }
         const auto sv = score_splits.view();
         const auto signed_points = [](long long d) { return (d < 0 ? std::string("\u2212") : std::string("+")) + hud_number(d < 0 ? -d : d); };
-        view.time_label = "Score";
-        view.time = hud_number(sv.total);
-        if (sv.has_delta) view.time_delta = signed_points(sv.net_delta), view.time_ahead = sv.net_delta >= 0;
-        for (const auto& row : sv.rows) {
-            blockplanet::ui::HudView::Split split;
-            split.label = std::to_string(row.stage);
-            split.time = hud_number(row.points);
-            split.current = !row.done;
-            if (row.done && row.has_best) split.delta = signed_points(row.delta), split.ahead = row.delta >= 0;
-            view.splits.push_back(split);
+        if (single) {
+            const auto i = std::size_t(single_stage->second - 1);
+            const double b = single_stage_result ? single_stage_result->best_before : i < bests.size() ? double(bests[i]) : 0.0;
+            const long long mine = single_stage_result ? static_cast<long long>(single_stage_result->time)
+                                                       : sv.rows.empty() ? 0 : sv.rows.back().points;
+            view.time_label = single_stage_result ? "Your score" : "Stage score";
+            view.time = hud_number(mine);
+            if (b > 0.0) {
+                view.time_delta = signed_points(mine - static_cast<long long>(b));
+                view.time_ahead = mine >= static_cast<long long>(b);
+                view.best = "Best " + hud_number(static_cast<long long>(b));
+            } else {
+                view.best = single_stage_result ? "First score" : "No best yet";
+            }
+        } else {
+            view.time_label = "Score";
+            view.time = hud_number(sv.total);
+            if (sv.has_delta) view.time_delta = signed_points(sv.net_delta), view.time_ahead = sv.net_delta >= 0;
+            for (const auto& row : sv.rows) {
+                blockplanet::ui::HudView::Split split;
+                split.label = std::to_string(state.chapter) + ":" + std::to_string(row.stage);
+                split.time = hud_number(row.points);
+                split.current = !row.done;
+                if (row.done && row.has_best) split.delta = signed_points(row.delta), split.ahead = row.delta >= 0;
+                view.splits.push_back(split);
+            }
         }
-        if (p.score_attack_best_score > 0 || p.score_attack_best_seconds > 0.0)
-            view.best = "Best " + hud_number(p.score_attack_best_score) + " \u00B7 " + hud_time(p.score_attack_best_seconds);
-    } else {
-        view.mode = "Rescue";
-        view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
-    }
-    const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
-    if (single) {
+    } else if (single && play_variant == PlayVariant::TimeAttack) {
         // One stage: your time, the best, and the difference (live).
         const auto sv = splits.view();
         std::vector<double> best = best_of(state.chapter);
@@ -416,7 +404,7 @@ void update_hud() {
         } else {
             view.best = single_stage_result ? "First time" : "No best yet";
         }
-    } else if (state.mode == 1) {
+    } else if (state.mode == 1 && play_variant == PlayVariant::TimeAttack) {
         const auto sv = splits.view();
         view.time = hud_time(sv.total);
         view.time_delta = sv.has_delta ? hud_delta(sv.net_delta) : "";
@@ -429,6 +417,9 @@ void update_hud() {
             if (row.done && row.has_best) split.delta = hud_delta(row.delta), split.ahead = row.delta < 0.0;
             view.splits.push_back(split);
         }
+    } else if (state.mode == 1) {
+        // Story: the episode's time only (the speedrun timing is Time Attack's).
+        view.time = hud_time(splits.view().total);
     }
     view.progress = state.progress;
     place_hud(view, state);
@@ -1924,9 +1915,18 @@ bool handle_profile_command(const std::string& command) {
                                     std::chrono::steady_clock::now());
                 continue;
             }
-            if (*command == "story") {
-                blockplanet::ui::set_text("chapters_title", "Story");
-                blockplanet::ui::set_list("chapters", chapter_choices());
+            if (*command == "story" || *command == "time_attack" || *command == "score_attack") {
+                menu_variant = *command == "story" ? PlayVariant::Story
+                               : *command == "time_attack" ? PlayVariant::TimeAttack : PlayVariant::ScoreAttack;
+                auto choices = chapter_choices();
+                if (menu_variant != PlayVariant::Story && !choices.empty() && choices.front().id == "chapter0") {
+                    choices.erase(choices.begin());  // no Training in the attacks
+                    for (auto& c : choices) c.note = c.note == "skip training" ? "" : c.note;
+                    if (!choices.empty() && std::none_of(choices.begin(), choices.end(), [](const auto& c) { return c.focus; }))
+                        choices.front().focus = true;
+                }
+                blockplanet::ui::set_text("chapters_title", *command == "story" ? "Story" : *command == "time_attack" ? "Time Attack" : "Score Attack");
+                blockplanet::ui::set_list("chapters", choices);
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
@@ -1966,8 +1966,9 @@ bool handle_profile_command(const std::string& command) {
                 if (const auto m = profile_data.progress.levels_completed.find("rescue"); m != profile_data.progress.levels_completed.end())
                     if (const auto c = m->second.find(chapter); c != m->second.end()) done = c->second;
                 std::vector<double> best;
-                if (const auto m = profile_data.progress.episode_records.find("rescue"); m != profile_data.progress.episode_records.end())
+                if (const auto m = profile_data.progress.episode_records.find(variant_records(menu_variant)); m != profile_data.progress.episode_records.end())
                     if (const auto c = m->second.find(chapter); c != m->second.end()) best = c->second.best_levels;
+                if (menu_variant == PlayVariant::ScoreAttack) best.clear();  // points, not times: not shown as times
                 blockplanet::ui::set_text("stages_title", "Chapter " + std::to_string(chapter));
                 blockplanet::ui::set_list("stages", story_stages(chapter, done, best));
                 blockplanet::ui::request_show("stages");
@@ -1981,6 +1982,7 @@ bool handle_profile_command(const std::string& command) {
                 if (chapter >= 1 && chapter <= rescue_chapters && level >= 1 && game_option_applier) {
                     continue_mode.reset();
                     single_stage = std::pair{chapter, level};
+                    play_variant = menu_variant;
                     single_stage_quit_at.reset();
                     single_stage_result.reset();
                     game_option_applier->choose_start(chapter, level);
@@ -1990,6 +1992,7 @@ bool handle_profile_command(const std::string& command) {
             }
             if (command->rfind("chapter:", 0) == 0) {
                 single_stage.reset();
+                play_variant = menu_variant;
                 const int chapter = std::atoi(command->c_str() + 8);
                 chapter_zero_lesson = chapter == 0 ? "basics" : "";
                 continue_mode.reset();

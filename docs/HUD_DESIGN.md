@@ -45,20 +45,15 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 | Episode card (between episodes) | A full panel: "Episode 2" large, the message beneath (texts in [STORY_PROGRESSION.md](STORY_PROGRESSION.md)) |
 | Training instructor text | To be decided (paged lessons) |
 
-## Score Attack (the original's Time Trial)
+## Time Attack and Score Attack (Story's episodes)
 
-**Renamed and decided 2026-11-06:** the game's Time Trial (score as much as possible against a five-minute clock that combos extend) is called **Score Attack** in BlockPlanet; **Time Attack** is a new mode (Story's stages beaten as fast as possible, ROADMAP). Score Attack shows the **score** with the clock, and records the **best score** and the **longest time survived** (`progress.score_attack`), shown under the score ("Best 482,000 · 6:11").
+**Decided 2026-11-06:** competition is on **Story's episodes only**. The original's Time Trial (a five-minute clock over its own set of about 20 stages) is no longer offered. Solo lists **Story**, **Time Attack** and **Score Attack**; each opens the chapter list (the attacks without Chapter 0, and only chapters reached in Story), then **Whole episode** or a **single stage**. All three run the game's Story mode; BlockPlanet picks the HUD and the records.
 
-**Built (2026-11-06).** The game's Time Trial is mode 2: Story's stages against a clock (`+0x2B0C`, frames left), the stage shown as a count. Left: Health, **Time left** (red and pulsing in the last 30 seconds; on portrait screens under the hearts), Magic, Next. Right: "Score Attack", the stage and the progress bar, then **score splits** (the same template as Story's time splits, by points): the score total with the **net ± so far** against the best points of each stage (green ahead), a row per stage (points and ±), and the records beneath (best score · longest time survived). Best points per stage saved in `progress.score_attack.best_stages`. (The speedrun timing belongs to the planned Time Attack mode.) Time gained shows as "+N s" rising from where the combo cleared (or the centre). No splits. ("Furthest stage reached" is kept as an idea for the Multiphasic mode.)
+- **Story:** the episode's time only (no ± or splits). A finished stage still counts towards Story's stage bests (`progress.episode_records.rescue`).
+- **Time Attack:** LiveSplit-style timing: the episode's time, the net ± so far against the best stage times, a row per stage (time and ±; green ahead). A single stage shows its time, the best and ±, then returns to the menu. Records in `progress.episode_records.time_attack`.
+- **Score Attack:** the same template by points: points scored in the run, the net ± against the best points of each stage (more is better, so green when ahead), a row per stage. A single stage shows its points, the best and ±. Points count from the score the run starts with, since Story's score runs on. Best points per stage in `progress.episode_records.score_attack` (stored where times are, as numbers).
 
-| Priority 1 (left, top to bottom) | Priority 2 (right) |
-| --- | --- |
-| Hearts | Mode and stage (text, top right) |
-| **Countdown clock**, below the hearts; turns red or pulses in the last 30 seconds | (no score) |
-| Magic item box and charge bar | Progress bar |
-| Next pieces | |
-
-**Time gained** ("+5 s") floats up from where it was earned on the sphere, not beside the clock.
+The earlier Score Attack build on the original Time Trial (clock under health, "+N s" pop-ups, best score and longest time survived) is removed; old profiles keep their `progress.score_attack` values, unused. ("Furthest stage reached" is kept as an idea for the Multiphasic mode.)
 
 ## Puzzle
 
