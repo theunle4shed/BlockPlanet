@@ -343,7 +343,6 @@ void update_hud() {
         view.stage = std::to_string(state.level);
         view.clock = hud_time(std::max(0, state.clock_frames) / 60.0);
         view.clock_low = state.clock_frames < 30 * 60;
-        view.score = hud_number(static_cast<long long>(state.score) * 10);
     } else {
         view.mode = "Rescue";
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);

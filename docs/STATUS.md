@@ -22,7 +22,7 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 
 - **Story HUD** (`docs/HUD_DESIGN.md`): one tinted container per side, section titles, placed as on 4:3 (Graphics > HUD panels: near, edges, follow). Left: health and drop timer, magic (the game's own 3D model turning in the item box, its flight starting from the box; the box's tint drawn by the game behind it), next pieces (bar, square, S, T). Right: mode, stage and progress bar; LiveSplit-style episode splits against per-stage bests saved in the profile. Portrait: rows above and below.
 - **Story stage select:** whole episode or one stage; a single stage shows stage time, best and ±, then returns to the menu.
-- **Time Trial (Story's) HUD:** the clock under health (red in the last 30 s), score, "+N s" pop-ups for time gained. No records yet.
+- **Time Trial (Story's) HUD:** the clock under health (red in the last 30 s), "+N s" pop-ups for time gained; no score. No records yet.
 - **Title screen:** the game's own 3D letters held on screen; the painted picture hidden until replaced (`src/graphics/title_hooks.cpp`).
 - Profiles, Chapter 0 (Training), pause menu, audio and options, restart level/chapter (earlier in the session; see `CHANGES-SINCE-BLOCKSPHERE.md`).
 
