@@ -25,6 +25,7 @@
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
+#include "tetrisphere/magic_model.h"
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
@@ -183,6 +184,8 @@ std::string hud_time(double seconds) {
     return text;
 }
 
+void update_magic_box();
+
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
     static tetrisphere::ProgressTracker progress;
@@ -200,8 +203,10 @@ void update_hud() {
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
         blockplanet::ui::set_hud(std::nullopt);
+        blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
         return;
     }
+    update_magic_box();
     if (state.chapter != episode_chapter || state.level < last_level) {
         episode_chapter = state.chapter;
         episode_seconds = 0.0;
@@ -214,6 +219,7 @@ void update_hud() {
     view.hearts = state.hearts;
     view.drop_left = state.drop_left;
     view.magic = state.magic;
+    view.magic_model = blockplanet::magic_box_active();
     view.meter = state.meter;
     for (const auto& piece : state.next) {
         blockplanet::ui::HudPieceView p;
@@ -373,6 +379,42 @@ const char* perf_present_mode = "console";
 std::atomic<ControllerFamily> active_family{ControllerFamily::Keyboard};
 std::atomic<ControllerFamily> active_p2_family{ControllerFamily::Keyboard};
 Settings active_settings{};
+
+// Places the held magic's 3D model in the HUD's item box: the box's centre
+// (from assets/ui/hud.rcss: 119 x 401 dp on a 1080-dp-high screen, landscape
+// only) in the game's picture, in picture heights from its centre.
+void update_magic_box() {
+    int width = 0, height = 0;
+    if (window != nullptr) SDL_GetWindowSize(window, &width, &height);
+    if (width <= 0 || height <= 0 || width < height) {  // portrait: the box is above the picture
+        blockplanet::set_magic_box(true, NAN, NAN, 1.0f, NAN, 0.0f);
+        return;
+    }
+    const float window_aspect = float(width) / float(height);
+    float picture_aspect = window_aspect;
+    switch (active_settings.graphics.aspect) {
+    case GraphicsAspect::Expand16x9: picture_aspect = 16.0f / 9.0f; break;
+    case GraphicsAspect::Original4x3: picture_aspect = 4.0f / 3.0f; break;
+    default: picture_aspect = std::max(window_aspect, 4.0f / 3.0f); break;
+    }
+    // The picture's height in window pixels (pillarboxed or letterboxed).
+    const float picture_height = window_aspect >= picture_aspect ? float(height) : float(width) / picture_aspect;
+    const float dp = float(height) / 1080.0f;
+    const float x = (119.0f * dp - float(width) / 2.0f) / picture_height;
+    const float y = (401.0f * dp - float(height) / 2.0f) / picture_height;
+    // Outside the picture (a narrow picture setting in a wide window): keep the game's placement hidden.
+    if (std::abs(x) > picture_aspect / 2.0f || std::abs(y) > 0.5f) {
+        blockplanet::set_magic_box(true, NAN, NAN, 1.0f, NAN, 0.0f);
+        return;
+    }
+    // The same distance from the 4:3 frame's left edge as from the picture's.
+    const float picture_left = (float(width) - picture_aspect * picture_height) / 2.0f;
+    const float x_anchored = -2.0f / 3.0f + (119.0f * dp - picture_left) / picture_height;
+    // Sized to sit inside the box as it turns (measured with the Magnet).
+    blockplanet::set_magic_box(true, x, y, 0.45f * (132.0f * dp / picture_height) / 0.13f, x_anchored,
+                               (picture_aspect - 4.0f / 3.0f) / 2.0f);
+}
+
 Settings persisted_settings{};
 SDL_Rect windowed_bounds{};
 std::unique_ptr<WindowModeController> window_mode_controller;

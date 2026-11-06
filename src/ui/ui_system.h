@@ -54,6 +54,7 @@ struct HudView {
     int hearts = 3;            // 0 to 3
     float drop_left = 1.0f;    // the drop timer, 1 (full) to 0
     int magic = -1;            // -1 none, 0 to 5
+    bool magic_model = false;  // the game draws the magic's model in the box
     float meter = 0.0f;        // the magic meter, 0 to 1
     std::vector<HudPieceView> next;  // next first
     std::string mode;          // e.g. "Rescue"

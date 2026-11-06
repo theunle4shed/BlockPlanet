@@ -24,6 +24,7 @@
 // their arguments.
 
 #include "tetrisphere/pause_draw.h"
+#include "tetrisphere/magic_model.h"
 #include "tetrisphere/recomp_support.h"
 
 #include <atomic>
@@ -87,12 +88,16 @@ void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
     if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) return true;
+    if (helper == 0x8002D93Cu) blockplanet_magic_flight(rdram, ctx);
     // The held magic's model above the bowl (func_800C78A0's model draw, told
-    // apart by its matrices), only while held (player 1's +0x702 >= 0);
-    // BlockPlanet's item box shows it instead. Once used, the same model flies
+    // apart by its matrices), only while held (player 1's +0x702 >= 0) and
+    // only when it cannot be drawn in BlockPlanet's item box (magic_hooks.cpp
+    // moves it there), as on portrait screens where the box is outside the
+    // picture. Once used, the same model flies
     // over the sphere and is drawn as normal.
     if (helper == 0x8002D93Cu && static_cast<std::uint32_t>(ctx->r6) == 0x80161540u &&
         static_cast<std::uint32_t>(ctx->r7) == 0x801309A8u && hud_hidden.load(std::memory_order_relaxed) &&
+        !blockplanet::magic_box_active() &&
         static_cast<std::int8_t>(rdram[(0x80110922u & 0x00FFFFFFu) ^ 3u]) >= 0) {  // a magic is held, not in use
         ctx->r2 = 0;  // "animation finished": no
         return true;

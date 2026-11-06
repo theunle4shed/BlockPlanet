@@ -450,3 +450,30 @@ text = "blockplanet_hud_end(rdram, ctx);"
 [[patches.hook]]
 func = "func_800A3E6C"
 text = "if (blockplanet_skip_queue_model(rdram, ctx)) return;"
+
+# BlockPlanet's HUD: the held magic's model is drawn in the item box (moved,
+# scaled and turned) instead of above the bowl (src/graphics/magic_hooks.cpp).
+[[patches.hook]]
+func = "func_800C78A0"
+before_vram = 0x800C7ACC
+text = "blockplanet_held_magic_draw(rdram, ctx);"
+
+# While the held magic's model is drawn in BlockPlanet's item box, its draw
+# (func_800C78A0) is a left-anchored UI span, so on wide pictures RT64 moves
+# it to the left edge with the HUD instead of clipping it at the 4:3 edge.
+[[patches.hook]]
+func = "func_800CD3B8"
+before_vram = 0x800CFF64
+text = "if (blockplanet_magic_box_active()) tetrisphere_ui_span_begin(rdram, ctx, 0x800CFF64u, 1u);"
+
+[[patches.hook]]
+func = "func_800CD3B8"
+before_vram = 0x800CFF6C
+text = "tetrisphere_ui_span_end(rdram, ctx, 0x800CFF64u);"
+
+# End of the model helper: closes the UI span opened for the magic's flight
+# from the item box (src/graphics/magic_hooks.cpp).
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DEA0
+text = "blockplanet_model_draw_end(rdram, ctx);"

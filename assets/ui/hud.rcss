@@ -27,8 +27,11 @@ div { display: block; }
     position: absolute;
     left: 40dp;
     top: 190dp;
-    width: 200dp;
+    width: 232dp;
 }
+/* The left column is three cards; the magic card has a clear item box, so
+   the magic's 3D model (drawn by the game, under the HUD) shows through. */
+#left > .panel { margin-bottom: 14dp; }
 #right {
     position: absolute;
     right: 40dp;
@@ -68,16 +71,15 @@ div { display: block; }
 }
 
 /* The drop timer, below the hearts; it turns red when time is short. */
-#drop { width: 150dp; margin-top: 14dp; }
+#drop { width: 150dp; margin-top: 12dp; }
 #drop .fill { background-color: #f5c21f; }
 #drop.hurry .fill { background-color: #f04030; }
 
 /* Magic: an item box with the charge bar beneath. */
-#magic { margin-top: 36dp; }
+#magic { background-color: transparent; padding: 0dp; border-width: 0dp; }
 #item {
-    width: 120dp;
-    height: 120dp;
-    background-color: #0b1020c0;
+    width: 152dp;
+    height: 132dp;
     border: 3dp #f0f0f0;
     border-radius: 20dp;
 }
@@ -89,11 +91,11 @@ div { display: block; }
     font-weight: bold;
     color: #f5821f;
 }
-#meter { width: 126dp; margin-top: 10dp; }
+#meter { width: 152dp; margin-top: 10dp; }
 #meter .fill { background-color: #9c5cf0; }
 
 /* Next pieces: the next one first and larger. */
-#next { margin-top: 36dp; }
+
 #next .piece:last-child { margin-bottom: 0dp; }
 .piece {
     display: block;

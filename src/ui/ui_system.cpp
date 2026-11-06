@@ -159,17 +159,19 @@ std::string escape(const std::string& text) {
 // The HUD's markup for these values (placeholder art).
 std::string hud_rml(const HudView& hud) {
     std::string rml;
-    rml += "<div id='left' class='panel'>";
-    rml += "<div id='lives'><div id='hearts'>";
+    rml += "<div id='left'>";
+    rml += "<div id='lives' class='panel'><div id='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
     rml += "</div>";
     const bool hurry = hud.drop_left < 0.35f;
     rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div class='fill' style='width: " +
            percent(hud.drop_left) + "'/></div></div>";
-    rml += "<div id='magic'><div id='item'>";
-    rml += hud.magic >= 0 ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
+    rml += "<div id='magic' class='panel'><div id='item'>";
+    // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
+    // its name is shown only when it is not.
+    rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
     rml += "</div><div id='meter' class='bar'><div class='fill' style='width: " + percent(hud.meter) + "'/></div></div>";
-    rml += "<div id='next'>";
+    rml += "<div id='next' class='panel'>";
     for (std::size_t i = 0; i < hud.next.size(); ++i) {
         const auto& piece = hud.next[i];
         const int cell = i == 0 ? 34 : 26;
