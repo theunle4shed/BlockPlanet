@@ -1,0 +1,8 @@
+wait 14
+rewin 4
+wait 10
+poke cmd:chapter:1
+wait 1
+poke cmd:chapter:1
+wait 30
+wshot playing
