@@ -484,3 +484,77 @@ text = "blockplanet_model_draw_end(rdram, ctx);"
 [[patches.hook]]
 func = "func_800321D4"
 text = "if (blockplanet_scene_object(rdram, ctx)) return;"
+
+# Research: first call of candidate scene routines (BLOCKPLANET_FN_PROBE=1).
+[[patches.hook]]
+func = "func_8003FE3C"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8003FE3Cu);"
+
+[[patches.hook]]
+func = "func_8004127C"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8004127Cu);"
+
+[[patches.hook]]
+func = "func_8004C7E8"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8004C7E8u);"
+
+[[patches.hook]]
+func = "func_80050BFC"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80050BFCu);"
+
+[[patches.hook]]
+func = "func_80054098"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80054098u);"
+
+[[patches.hook]]
+func = "func_80057128"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80057128u);"
+
+[[patches.hook]]
+func = "func_80058100"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80058100u);"
+
+[[patches.hook]]
+func = "func_8005907C"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8005907Cu);"
+
+[[patches.hook]]
+func = "func_8005AFE8"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8005AFE8u);"
+
+[[patches.hook]]
+func = "func_8005C410"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8005C410u);"
+
+[[patches.hook]]
+func = "func_8005EE48"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8005EE48u);"
+
+[[patches.hook]]
+func = "func_80060630"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80060630u);"
+
+[[patches.hook]]
+func = "func_8006224C"
+text = "blockplanet_fn_probe(rdram, ctx, 0x8006224Cu);"
+
+[[patches.hook]]
+func = "func_80062C3C"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80062C3Cu);"
+
+[[patches.hook]]
+func = "func_80063F1C"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80063F1Cu);"
+
+[[patches.hook]]
+func = "func_80067798"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80067798u);"
+
+[[patches.hook]]
+func = "func_800685FC"
+text = "blockplanet_fn_probe(rdram, ctx, 0x800685FCu);"
+
+[[patches.hook]]
+func = "func_80070118"
+text = "blockplanet_fn_probe(rdram, ctx, 0x80070118u);"
+

@@ -56,6 +56,7 @@ void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_magic_box_active();
 bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_fn_probe(std::uint8_t* rdram, recomp_context* ctx, uint32_t fn);
 void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx);
 void tetrisphere_rescue_pause_snapshot_hook(std::uint8_t* rdram,
                                             recomp_context* ctx);

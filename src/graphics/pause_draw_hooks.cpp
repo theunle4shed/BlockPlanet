@@ -265,3 +265,18 @@ extern "C" bool blockplanet_scene_object(std::uint8_t*, recomp_context* ctx) {
     }
     return filter.only.count(object) == 0;
 }
+
+// Research: BLOCKPLANET_FN_PROBE=1 logs the first call of each probed routine
+// each second it runs (time and scene), to see which runs when.
+extern "C" void blockplanet_fn_probe(std::uint8_t* rdram, recomp_context*, std::uint32_t fn) {
+    static const bool on = std::getenv("BLOCKPLANET_FN_PROBE") != nullptr;
+    if (!on) return;
+    static std::mutex mutex;
+    static std::set<std::pair<std::uint32_t, long long>> seen;
+    static const auto start = std::chrono::steady_clock::now();
+    const long long second = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start).count();
+    std::lock_guard lock(mutex);
+    if (seen.insert({fn, second}).second)
+        std::fprintf(stdout, "{\"event\":\"fn\",\"fn\":\"0x%08X\",\"s\":%lld,\"scene\":%d}\n", fn, second,
+                     static_cast<int>(guest16(rdram, 0x800E121Cu)));
+}
