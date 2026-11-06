@@ -166,25 +166,27 @@ std::string escape(const std::string& text) {
 std::string hud_rml(const HudView& hud) {
     std::string rml;
     rml += "<div id='left' class='side'>";
-    rml += "<div id='lives' class='group'><div id='hearts'>";
+    rml += "<div id='lives' class='group'><div class='label'>Health</div><div id='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
     rml += "</div>";
     const bool hurry = hud.drop_left < 0.35f;
     // Bar fills are set on the elements each frame (set_hud_fills), so the
     // markup only changes when something else does.
     rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div id='drop-fill' class='fill'/></div></div>";
-    rml += "<div class='rule'/>";
+    rml += "<div class='rule'><div class='line'/></div>";
     // While the game draws the magic's model in the box it draws the box's tint
     // too, behind the model (magic_hooks.cpp); otherwise the HUD tints it.
     const bool model = hud.magic >= 0 && hud.magic_model;
-    rml += std::string("<div id='magic'><div class='band'/><div class='window'><div class='edge'/><div id='item'") +
+    rml += std::string("<div id='magic'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'") +
            (model ? " class='held'" : "") + ">";
     // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
     // its name is shown only when it is not.
     rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
-    rml += "</div><div class='edge'/></div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>";
-    rml += "<div class='rule'/>";
-    rml += "<div id='next' class='group'>";
+    // The meter sits under the box; on portrait screens, as a column beside it.
+    rml += "</div><div class='edge side-meter'><div id='meter-v' class='bar'><div id='meter-v-fill' class='fill'/></div></div>"
+           "</div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>";
+    rml += "<div class='rule'><div class='line'/></div>";
+    rml += "<div id='next' class='group'><div class='label'>Next</div>";
     for (std::size_t i = 0; i < hud.next.size(); ++i) {
         const auto& piece = hud.next[i];
         const int cell = i == 0 ? 34 : 26;
@@ -204,11 +206,13 @@ std::string hud_rml(const HudView& hud) {
     }
     rml += "</div></div>";
     rml += "<div id='right' class='side'>";
-    rml += "<div id='where' class='group'><div id='mode'>" + escape(hud.mode) + "</div><div id='stage'>" +
+    rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'>" +
            escape(hud.stage) + "</div></div>";
-    if (!hud.time.empty()) rml += "<div class='rule'/><div id='time' class='group'>" + escape(hud.time) + "</div>";
+    if (!hud.time.empty())
+        rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>Time</div><div id='time'>" +
+               escape(hud.time) + "</div></div>";
     if (hud.progress >= 0.0f)
-        rml += "<div class='rule'/><div id='progress-group' class='group'><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div></div>";
+        rml += "<div class='rule'><div class='line'/></div><div id='progress-group' class='group'><div class='label'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div></div>";
     rml += "</div>";
     return rml;
 }
@@ -218,6 +222,8 @@ void set_hud_fills(const HudView& hud) {
         {"drop-fill", hud.drop_left}, {"meter-fill", hud.meter}, {"progress-fill", hud.progress}};
     for (const auto& [id, value] : fills)
         if (auto* e = hud_document->GetElementById(id)) e->SetProperty("width", percent(value));
+    // The portrait screens' column meter fills upwards.
+    if (auto* e = hud_document->GetElementById("meter-v-fill")) e->SetProperty("height", percent(hud.meter));
 }
 
 std::string px(float value) { return std::to_string(int(std::lround(value))) + "px"; }

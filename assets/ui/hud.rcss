@@ -24,12 +24,24 @@ div { display: block; }
 #right { width: 248dp; text-align: right; }
 
 .group, .rule, #magic .band, #magic .edge { background-color: #0b1020b0; }
-.group { padding: 18dp 24dp; }
+.group { padding: 16dp 24dp 20dp 24dp; }
+
+/* Section titles, for new and returning players. */
+.label {
+    display: block;
+    font-size: 19dp;
+    font-weight: bold;
+    color: #9aa6c8;
+    margin-bottom: 8dp;
+    font-effect: none;
+}
 .side > :first-child { border-top-left-radius: 22dp; border-top-right-radius: 22dp; }
 .side > :last-child { border-bottom-left-radius: 22dp; border-bottom-right-radius: 22dp; }
 
-/* Dividers between groups: a thin light line across the tint. */
-.rule { height: 2dp; background-color: #343a52e0; }
+/* Dividers between groups: a thin light line across the tint, with room
+   either side. */
+.rule { padding: 10dp 18dp; }
+.rule .line { height: 2dp; background-color: #3a4260; }
 
 /* Hearts: three red tiles, a lost one dark. */
 #hearts { height: 48dp; }
@@ -66,8 +78,9 @@ div { display: block; }
 
 /* Magic: a clear window for the item (the game draws its 3D model there),
    framed by tinted bands, with the meter beneath. */
-#magic .band { height: 14dp; }
-#magic .band:last-child { height: auto; padding: 10dp 24dp 18dp 24dp; }
+#magic .band { height: auto; padding: 16dp 24dp 0dp 24dp; }
+#magic .band:last-child { padding: 10dp 24dp 20dp 24dp; }
+#magic .side-meter #meter-v { display: none; }
 #magic .window { height: 136dp; }
 #magic .edge { display: inline-block; width: 24dp; height: 136dp; vertical-align: top; }
 /* 24 + 184 (180 + a 2dp border each side) + 24 = the container's 232dp. The
@@ -115,30 +128,43 @@ div { display: block; }
 }
 
 /* Right: mode and stage, the episode's time, progress. */
-#mode { display: block; font-size: 30dp; color: #e8b818; }
+#where .label { color: #e8b818; font-size: 22dp; }
 #stage { display: block; font-size: 64dp; font-weight: bold; }
-#time { font-size: 44dp; font-weight: bold; }
+#time { display: block; font-size: 44dp; font-weight: bold; }
 #progress { height: 20dp; }
 #progress .fill { background-color: #48d060; }
 
 /* Portrait (taller than wide): the containers become rows, the groups side by
    side with dividers between them. */
 @media (orientation: portrait) {
+    /* Every section is 136dp tall (padding included), so the row's tint is
+       even; the magic meter is a column beside the item box, filling upwards,
+       so the row stays thin. */
     #left, #right { width: auto; text-align: left; }
     .side > div { display: inline-block; vertical-align: top; }
     .side > :first-child { border-radius: 0dp; border-top-left-radius: 22dp; border-bottom-left-radius: 22dp; }
     .side > :last-child { border-radius: 0dp; border-top-right-radius: 22dp; border-bottom-right-radius: 22dp; }
-    .rule { width: 2dp; height: 120dp; padding: 18dp 0dp; }
-    #lives, #next { height: 120dp; padding: 18dp 20dp; }
-    #magic .band { height: 10dp; }
-    #magic .window { height: 100dp; }
-    #magic .edge { width: 16dp; height: 100dp; }
-    #item { width: 116dp; height: 96dp; }
-    #item .name { padding-top: 34dp; font-size: 18dp; }
-    #meter { width: 120dp; }
-    #magic .band:last-child { padding: 6dp 16dp 4dp 16dp; }
+    .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
+    .rule { padding: 14dp 10dp; height: 108dp; }
+    .rule .line { width: 2dp; height: 108dp; }
+    #magic .band { height: auto; padding: 14dp 16dp 0dp 16dp; }
+    #magic .band:last-child { height: 3dp; padding: 0dp; }
+    #magic .band:last-child #meter { display: none; }
+    #magic .window { height: 92dp; }
+    #magic .edge { width: 16dp; height: 92dp; }
+    #magic .side-meter { width: 42dp; }
+    #magic .side-meter #meter-v {
+        display: block;
+        position: relative;
+        width: 12dp;
+        height: 88dp;
+        margin-left: 12dp;
+    }
+    #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
+    #item { width: 116dp; height: 88dp; }
+    #item .name { padding-top: 32dp; font-size: 18dp; }
     #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
-    #where, #time, #progress-group { height: 96dp; padding: 12dp 20dp; }
-    #progress { width: 160dp; margin-top: 36dp; }
-    #time { padding-top: 28dp; }
+    #stage { font-size: 56dp; }
+    #time { font-size: 40dp; }
+    #progress { width: 170dp; margin-top: 18dp; }
 }
