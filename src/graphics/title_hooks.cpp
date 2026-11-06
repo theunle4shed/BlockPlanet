@@ -30,7 +30,27 @@ std::uint32_t load32(const std::uint8_t* rdram, std::uint32_t address) {
     return v;
 }
 
+// The frame the title's 3D letters are held at: 150 (fully formed, before
+// they fade into the picture); BLOCKPLANET_TITLE_FREEZE=frame changes it, -1
+// keeps the original title.
+int title_freeze_frame() {
+    static const int frame = [] {
+        const char* v = std::getenv("BLOCKPLANET_TITLE_FREEZE");
+        return v ? std::atoi(v) : 150;
+    }();
+    return frame;
+}
+
 } // namespace
+
+// The title's painted picture (logo, characters, ring, rockets, copyright;
+// image pointer at 0x800E1614) and its soft shadow (0x800E1638) are not drawn
+// while the 3D letters are held: they are to be replaced (docs/HUD_DESIGN.md
+// has the plan in the research notes).
+extern "C" bool blockplanet_title_skip_image(std::uint8_t* rdram, std::uint32_t image) {
+    if (title_freeze_frame() < 0 || image == 0) return false;
+    return image == load32(rdram, 0x800E1614u) || image == load32(rdram, 0x800E1638u);
+}
 
 extern "C" bool blockplanet_title_skip_object(std::uint32_t scene, int object) {
     return drawing.load(std::memory_order_relaxed) && scene == letters_scene && (object < 11 || object > 21);
@@ -94,10 +114,7 @@ extern "C" void blockplanet_title_letters_end(std::uint8_t*, recomp_context*) { 
 // the scene's frame is set so that after advancing it lands on that frame, so
 // the animation never ends and the game keeps drawing the letters.
 extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ctx) {
-    static const int freeze = [] {
-        const char* v = std::getenv("BLOCKPLANET_TITLE_FREEZE");
-        return v ? std::atoi(v) : -1;
-    }();
+    static const int freeze = title_freeze_frame();
     if (freeze < 0) return;
     const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r4);
     if (scene < 0x80000000u || scene >= 0x80800000u) return;
@@ -111,8 +128,7 @@ extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ct
 // With the letters held (BLOCKPLANET_TITLE_FREEZE), the title picture is drawn
 // fully opaque (its alpha argument, on the stack at +0x1C).
 extern "C" void blockplanet_title_picture(std::uint8_t* rdram, recomp_context* ctx) {
-    static const bool freeze = std::getenv("BLOCKPLANET_TITLE_FREEZE") != nullptr;
-    if (!freeze) return;
+    if (title_freeze_frame() < 0) return;
     const std::uint32_t alpha = 0xFF;
     std::memcpy(rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x1C) & 0x00FFFFFFu), &alpha, 4);
 }

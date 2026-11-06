@@ -140,6 +140,7 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
         return list;
     }();
     if (helper != 0x8002D93Cu && image_skip.count(static_cast<std::uint32_t>(ctx->r5)) != 0) return true;
+    if (helper == 0x8003396Cu && blockplanet_title_skip_image(rdram, static_cast<std::uint32_t>(ctx->r5))) return true;
     static const bool draw_log = std::getenv("BLOCKPLANET_DRAW_LOG") != nullptr;  // research: every distinct 2D draw
     if (draw_log) {
         static std::mutex mutex;

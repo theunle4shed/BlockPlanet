@@ -61,6 +61,7 @@ void blockplanet_title_letters(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_title_letters_end(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_title_picture(std::uint8_t* rdram, recomp_context* ctx);
+bool blockplanet_title_skip_image(std::uint8_t* rdram, std::uint32_t image);
 bool blockplanet_title_skip_object(std::uint32_t scene, int object);
 void blockplanet_title_watch(std::uint8_t* rdram);
 void blockplanet_fn_probe(std::uint8_t* rdram, recomp_context* ctx, uint32_t fn);
