@@ -47,6 +47,8 @@ The new in-game HUD, decided with the project owner on 2026-11-05. It replaces t
 
 ## Time Trial
 
+**Built for Story's Time Trial (2026-11-06)**, labelled "Time Trial · Story" (other modes may get their own time trials later). The game's Time Trial is mode 2: Story's stages against a clock (`+0x2B0C`, frames left), the stage shown as a count. Left: Health, **Time left** (red and pulsing in the last 30 seconds; on portrait screens under the hearts), Magic, Next. Right: mode and stage with the progress bar, **Score**. Time gained shows as "+N s" rising from where the combo cleared (or the centre if no combo is found). No splits in Time Trial. Personal bests (best score, stages reached) are not yet recorded.
+
 | Priority 1 (left, top to bottom) | Priority 2 (right) |
 | --- | --- |
 | Hearts | Mode and stage (text, top right) |

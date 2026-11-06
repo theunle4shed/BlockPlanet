@@ -187,6 +187,16 @@ std::string hud_time(double seconds) {
     return text;
 }
 
+// A number with thousands separators: "12,340".
+std::string hud_number(long long value) {
+    std::string digits = std::to_string(value < 0 ? -value : value), out;
+    for (std::size_t i = 0; i < digits.size(); ++i) {
+        if (i > 0 && (digits.size() - i) % 3 == 0) out += ',';
+        out += digits[i];
+    }
+    return (value < 0 ? "-" : "") + out;
+}
+
 // A difference against a best time: "-3.4" or "+1:03".
 std::string hud_delta(double seconds) {
     const double a = std::abs(seconds);
@@ -221,40 +231,49 @@ void update_hud() {
     struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
     static std::vector<LivePopup> popups;
     static tetrisphere::ComboTracker combos;
-    // Story shows no score pop-ups (decided 2026-11-06); score modes will use
-    // them (BLOCKPLANET_POPUPS=1 shows them in Story for testing).
+    // Story shows no score pop-ups (decided 2026-11-06); Time Trial shows the
+    // time a combo gained ("+5 s") rising from where it cleared; score modes
+    // will use points (BLOCKPLANET_POPUPS=1 shows points in Story for testing).
     static const bool popups_on = std::getenv("BLOCKPLANET_POPUPS") != nullptr;
+    static int last_clock = 0;
+    static double pending_gain = 0.0, pending_age = 0.0;
     const bool paused_now = story && guest::load16(guest_rdram, 0x800E1228) >= 0;
-    if (story && !paused_now && popups_on) {
-        if (const auto combo = combos.update(state)) {
-            // Waves of the same chain (gravity, follow-on clears) join the
-            // last popup if it is still young.
-            static long long merged_points = 0;
-            static int merged_blocks = 0;
-            if (!popups.empty() && popups.back().popup.age < 0.8f) {
-                merged_points += combo->points;
-                merged_blocks += combo->blocks;
-                popups.pop_back();
-            } else {
-                merged_points = combo->points;
-                merged_blocks = combo->blocks;
-            }
-            auto merged = *combo;
-            merged.points = merged_points;
-            merged.blocks = merged_blocks;
-            const auto* combo_ptr = &merged;
+    if (story && state.mode == 2) {
+        if (state.clock_frames > last_clock + 30 && last_clock > 0) pending_gain += (state.clock_frames - last_clock) / 60.0;
+        last_clock = state.clock_frames;
+    }
+    if (story && !paused_now) {
+        const auto make = [&](const std::string& text, const std::string& note, float dx, float dy) {
+            if (std::getenv("BLOCKPLANET_POPUP_LOG")) std::fprintf(stdout, "{\"event\":\"popup\",\"text\":\"%s\"}\n", text.c_str());
             LivePopup live;
-            char text[32];
-            const long long points = combo_ptr->points;
-            if (points >= 1000)
-                std::snprintf(text, sizeof text, "+%lld,%03lld", points / 1000, points % 1000);
-            else
-                std::snprintf(text, sizeof text, "+%lld", points);
-            live.popup.text = points > 0 ? text : "";
-            live.popup.note = combo_ptr->blocks >= 3 ? std::to_string(combo_ptr->blocks) + " blocks" : "";
-            live.cell_dx = combo_ptr->dx;
-            live.cell_dy = combo_ptr->dy;
-            if (!live.popup.text.empty() || !live.popup.note.empty()) popups.push_back(live);
+            live.popup.text = text;
+            live.popup.note = note;
+            live.cell_dx = dx;
+            live.cell_dy = dy;
+            popups.push_back(live);
+        };
+        const auto gain_text = [&] { return "+" + std::to_string(int(std::lround(pending_gain))) + " s"; };
+        if (const auto combo = combos.update(state)) {
+            if (state.mode == 2 && pending_gain >= 0.5) {
+                make(gain_text(), "", combo->dx, combo->dy);
+                pending_gain = 0.0;
+            } else if (state.mode == 1 && popups_on && combo->points > 0) {
+                char text[32];
+                const long long points = combo->points;
+                if (points >= 1000) std::snprintf(text, sizeof text, "+%lld,%03lld", points / 1000, points % 1000);
+                else std::snprintf(text, sizeof text, "+%lld", points);
+                make(text, combo->blocks >= 3 ? std::to_string(combo->blocks) + " blocks" : "", combo->dx, combo->dy);
+            }
+        }
+        // Time gained with no combo to place it (or long after): at the centre.
+        if (pending_gain >= 0.5) {
+            pending_age += std::min(elapsed, 0.1);
+            if (pending_age > 1.5) {
+                make(gain_text(), "", 0.0f, 0.0f);
+                pending_gain = 0.0;
+            }
+        } else {
+            pending_age = 0.0;
         }
         for (auto& p : popups) p.popup.age += float(std::min(elapsed, 0.1));
         popups.erase(std::remove_if(popups.begin(), popups.end(), [](const LivePopup& p) { return p.popup.age > 1.4f; }),
@@ -268,7 +287,7 @@ void update_hud() {
         return;
     }
     update_magic_box();
-    if (state.score < last_score) splits.reset();
+    if (state.score < last_score || state.mode != 1) splits.reset();
     last_score = state.score;
     const bool paused = guest::load16(guest_rdram, 0x800E1228) >= 0;
     auto& episode = profile_data.progress.episode_records["rescue"];
@@ -276,7 +295,8 @@ void update_hud() {
         const auto it = episode.find(chapter);
         return it == episode.end() ? std::vector<double>{} : it->second.best_levels;
     };
-    if (const auto finished = splits.update(state.chapter, state.level, !paused && elapsed < 1.0 ? elapsed : 0.0,
+    if (state.mode != 1) {
+    } else if (const auto finished = splits.update(state.chapter, state.level, !paused && elapsed < 1.0 ? elapsed : 0.0,
                                             best_of(state.chapter))) {
         auto& record = episode[finished->chapter];
         if (record.best_levels.size() < 10) record.best_levels.resize(10, 0.0);
@@ -305,9 +325,17 @@ void update_hud() {
         p.cells = hud_piece_cells(piece.shape, piece.cells);
         view.next.push_back(std::move(p));
     }
-    view.mode = "Rescue";
-    view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
-    {
+    if (state.mode == 2) {
+        view.mode = "Time Trial \u00B7 Story";
+        view.stage = std::to_string(state.level);
+        view.clock = hud_time(std::max(0, state.clock_frames) / 60.0);
+        view.clock_low = state.clock_frames < 30 * 60;
+        view.score = hud_number(static_cast<long long>(state.score) * 10);
+    } else {
+        view.mode = "Rescue";
+        view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
+    }
+    if (state.mode == 1) {
         const auto sv = splits.view();
         view.time = hud_time(sv.total);
         view.time_delta = sv.has_delta ? hud_delta(sv.net_delta) : "";

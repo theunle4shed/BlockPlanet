@@ -64,8 +64,11 @@ float ProgressTracker::update(int level_key, int weakest_now) {
 
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out) {
     using namespace guest;
-    if (load16(rdram, 0x800E121C) != -1 || load16(rdram, 0x800E44A8) != 1) return false;
+    const int mode = load16(rdram, 0x800E44A8);
+    if (load16(rdram, 0x800E121C) != -1 || (mode != 1 && mode != 2)) return false;
     out = {};
+    out.mode = mode;
+    if (mode == 2) out.clock_frames = static_cast<int>(load32(rdram, player1 + 0x2B0C));
     out.hearts = std::clamp<int>(load16(rdram, player1 + 0x2D7E), 0, 3);
     const int drop = load16(rdram, player1 + 0x2B10);
     out.drop_left = std::clamp(1.0f - float(drop) / 600.0f, 0.0f, 1.0f);

@@ -60,6 +60,9 @@ struct HudView {
     std::string mode;          // e.g. "Rescue"
     std::string stage;         // e.g. "1:3"
     std::string time;          // the episode's time, e.g. "2:41"
+    std::string clock;         // Time Trial: the time left, e.g. "4:37" (empty: none)
+    bool clock_low = false;    // the last 30 seconds
+    std::string score;         // e.g. "12,340" (empty: not shown)
     std::string time_delta;    // the net difference so far, e.g. "-0:12", or empty
     bool time_ahead = false;
     // The episode's splits, LiveSplit style: completed levels, then the current.

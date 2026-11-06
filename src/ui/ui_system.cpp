@@ -172,8 +172,16 @@ std::string hud_rml(const HudView& hud) {
     const bool hurry = hud.drop_left < 0.35f;
     // Bar fills are set on the elements each frame (set_hud_fills), so the
     // markup only changes when something else does.
-    rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div id='drop-fill' class='fill'/></div></div>";
+    rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div id='drop-fill' class='fill'/></div>";
+    // On portrait screens the clock sits here, under the hearts, so the top row stays one line.
+    if (!hud.clock.empty())
+        rml += std::string("<div class='clock-inline") + (hud.clock_low ? " low" : "") + "'>" + escape(hud.clock) + "</div>";
+    rml += "</div>";
     rml += "<div class='rule'><div class='line'/></div>";
+    // Time Trial: the clock, below health (it ends the game when it runs out).
+    if (!hud.clock.empty())
+        rml += std::string("<div id='clock-group' class='group'><div class='label'>Time left</div><div id='clock'") +
+               (hud.clock_low ? " class='low'" : "") + ">" + escape(hud.clock) + "</div></div><div id='clock-rule' class='rule'><div class='line'/></div>";
     // While the game draws the magic's model in the box it draws the box's tint
     // too, behind the model (magic_hooks.cpp); otherwise the HUD tints it.
     const bool model = hud.magic >= 0 && hud.magic_model;
@@ -212,6 +220,9 @@ std::string hud_rml(const HudView& hud) {
     if (hud.progress >= 0.0f)
         rml += "<div class='sublabel'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div>";
     rml += "</div>";
+    if (!hud.score.empty())
+        rml += "<div class='rule'><div class='line'/></div><div id='score-group' class='group'><div class='label'>Score</div><div id='score'>" +
+               escape(hud.score) + "</div></div>";
     if (!hud.time.empty()) {
         rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>Time</div><div id='time'>" +
                escape(hud.time) + "</div>";

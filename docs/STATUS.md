@@ -21,12 +21,13 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 ## Done recently
 
 - **Story HUD** (`docs/HUD_DESIGN.md`): one tinted container per side, section titles, placed as on 4:3 (Graphics > HUD panels: near, edges, follow). Left: health and drop timer, magic (the game's own 3D model turning in the item box, its flight starting from the box; the box's tint drawn by the game behind it), next pieces (bar, square, S, T). Right: mode, stage and progress bar; LiveSplit-style episode splits against per-stage bests saved in the profile. Portrait: rows above and below.
+- **Time Trial (Story's) HUD:** the clock under health (red in the last 30 s), score, "+N s" pop-ups for time gained. No records yet.
 - **Title screen:** the game's own 3D letters held on screen; the painted picture hidden until replaced (`src/graphics/title_hooks.cpp`).
 - Profiles, Chapter 0 (Training), pause menu, audio and options, restart level/chapter (earlier in the session; see `CHANGES-SINCE-BLOCKSPHERE.md`).
 
 ## Open threads (next steps)
 
-1. **HUD for the other modes** (Time Trial, Puzzle, Hide & Seek with no progress bar, Lines, VS): designs agreed in `docs/HUD_DESIGN.md`; the Story HUD is the pattern.
+1. **HUD for the other modes** (Puzzle, Hide & Seek with no progress bar, Lines, VS): designs agreed in `docs/HUD_DESIGN.md`; the Story HUD is the pattern.
 2. **Title rebuild** (`docs/research/blockplanet-game-state.md`, "The title screen's artwork"): the ring and characters to replace (from game models: the gold robot is in the intro, the rockets are the Rocket magic, the crab is still to find); copyright lines to read from the title picture in the player's ROM at install and show as text (never written into the repository). Face-on letters: experiment off (letters drift; their true centre is still to find). A fake drop shadow for letter-on-letter shading is an idea.
 3. **The game's floating number** (parked): a grey 3D number after big combos ("6000", "48000"), not the points total; to hide in Story and possibly reuse in score modes. Real-drop combo tests need the matching blocks under the drop, not beside it.
 4. **Research loose ends:** what each magic does and its name; magic crystals; fuse vs gravity combos; CONNECT and CRYSTAL TOWER goals; the two unseen piece shapes (IDs 3, 4).

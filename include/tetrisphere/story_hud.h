@@ -18,6 +18,8 @@ struct HudPiece {
 };
 
 struct StoryHudState {
+    int mode = 1;              // 1 Story (Rescue), 2 Time Trial (Story's stages, against the clock)
+    int clock_frames = 0;      // Time Trial: the clock, frames left at 60 a second (+0x2B0C)
     int hearts = 0;            // 0 to 3
     float drop_left = 1.0f;    // the drop timer's time left, 1 (full) to 0
     int magic = -1;            // -1 none, 0 to 5 the held magic
@@ -129,7 +131,8 @@ private:
     std::vector<double> bests_;  // the best level times when the run started
 };
 
-// Reads the HUD's values for player 1. Returns false when Story is not in play.
+// Reads the HUD's values for player 1. Returns false unless Story or its Time
+// Trial is in play.
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out);
 
 } // namespace tetrisphere

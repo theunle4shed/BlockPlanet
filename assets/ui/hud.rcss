@@ -154,6 +154,13 @@ div { display: block; }
 #where .label { color: #e8b818; font-size: 22dp; }
 #stage { display: block; font-size: 64dp; font-weight: bold; }
 #time { display: block; font-size: 44dp; font-weight: bold; }
+/* Time Trial: the clock (red and pulsing in the last 30 seconds) and the score. */
+#clock { display: block; font-size: 46dp; font-weight: bold; }
+#clock.low { color: #f05a4a; animation: 0.5s sine-in-out infinite alternate pulse; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.55; } }
+#score { display: block; font-size: 36dp; font-weight: bold; }
+.clock-inline { display: none; }
+
 /* Differences against best times: green ahead, red behind. */
 .ahead { color: #5ad46a; }
 .behind { color: #f05a4a; }
@@ -206,6 +213,10 @@ div { display: block; }
     #progress { width: 120dp; margin-top: 8dp; height: 14dp; }
     #net { display: inline-block; margin-left: 12dp; }
     #time { display: inline-block; }
+    #clock-group, #clock-rule { display: none; }
+    .clock-inline { display: block; font-size: 26dp; font-weight: bold; margin-top: 6dp; }
+    .clock-inline.low { color: #f05a4a; }
+    #score { font-size: 32dp; }
     #splits { margin-top: 2dp; }
     .split { display: none; font-size: 18dp; line-height: 22dp; }
     .split:last-child, .split.last-done { display: block; }
