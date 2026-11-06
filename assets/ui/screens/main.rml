@@ -3,19 +3,21 @@
     <title>Main menu</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body class="compact">
     <div id="panel">
         <div class="title">BlockPlanet</div>
         <div class="subtitle">Main menu</div>
-        <div class="item" id="solo" data-action="open:solo">Solo</div>
-        <div class="item" id="multiplayer" data-action="open:multiplayer">Multiplayer</div>
-        <div class="item" id="profiles" data-action="command:profiles">Profiles</div>
+        <div data-list="continue"></div>
+        <div class="item" id="solo" data-action="open:solo" data-description="Play on your own: Story and its modes, Hide &amp; Seek, Puzzle and Lines.">Solo</div>
+        <div class="item" id="local" data-action="open:local" data-description="Play with friends on this PC.">Local</div>
+        <div class="item" id="online" data-action="open:online" data-description="Play with friends and others over the internet.">Online<span class="note">coming later</span></div>
+        <div class="item" id="profiles" data-action="command:profiles" data-description="Choose who is playing, or add a profile.">Profiles</div>
         <div class="item" id="media" data-action="command:media_player">Media Player<span class="note">coming later</span></div>
         <div class="item" id="trophies" data-action="command:trophies">Trophies<span class="note">coming later</span></div>
-        <div class="item" id="options" data-action="open:options">Options</div>
+        <div class="item" id="options" data-action="open:options" data-description="Graphics, sound, controls and more.">Options</div>
         <div class="item" id="credits" data-action="command:credits">Credits<span class="note">coming later</span></div>
         <div class="item" id="exit" data-action="command:exit">Exit</div>
-        <div class="hint">Placeholder screens. F1 closes the menu.</div>
+        <div id="description" class="description"></div>
     </div>
 </body>
 </rml>

@@ -203,3 +203,23 @@ body.over-pause { background-color: #00000000; }
     border-bottom: 1dp #ffffff33;
     margin-bottom: 6dp;
 }
+
+/* What the focused item is (data-description), under the list. */
+.description {
+    display: block;
+    margin-top: 24dp;
+    padding: 16dp 28dp;
+    min-height: 64dp;
+    font-size: 26dp;
+    line-height: 34dp;
+    color: #c8d0e8;
+    font-effect: none;
+    background-color: #ffffff0d;
+    border-radius: 14dp;
+}
+.description.empty { visibility: hidden; }
+
+/* Long lists (the main menu): smaller rows so the description fits. */
+body.compact #panel { top: 40dp; padding: 40dp 56dp; }
+body.compact .item { font-size: 38dp; padding: 6dp 28dp; margin-bottom: 2dp; }
+body.compact .subtitle { margin-bottom: 16dp; }

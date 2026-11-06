@@ -1,0 +1,17 @@
+<rml>
+<head>
+    <title>Local</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Local</div>
+        <div class="subtitle">Play with friends on this PC</div>
+        <div class="item" id="versus" data-action="command:versus" data-description="Race to the core against an opponent; combos send trouble their way.">Versus</div>
+        <div class="item" id="collaborate" data-action="command:collaborate" data-description="Two players on one sphere, working together.">Collaborate<span class="note">coming later</span></div>
+        <div class="item" id="custom" data-action="command:multiplayer_custom" data-description="Your own rules for a game with friends.">Custom<span class="note">coming later</span></div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

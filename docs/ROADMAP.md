@@ -208,6 +208,8 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 
 **Lines as a multiplayer mode.** Lines, the hidden mode, is a candidate for local and online VS. Research: how Lines' rules and win conditions differ from the modes VS already supports, and whether VS can run with Lines rules.
 
+**Join codes for streamers (idea, 2026-11-06).** Friend and lobby codes shown hidden (`••••••`) with a reveal button and a **Copy** button that works while hidden; a **streamer mode** setting hides codes everywhere by default (lobby, notifications) and perhaps friends' names. See REDESIGN.md, section 4.
+
 ## Single player first
 
 Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, magic, scoring, camera, HUD, renderer, audio, controls, saves); the modes differ mainly in their rules. So the modernisation is finished once, through single player, with Rescue (Story) as the reference mode because it uses the most systems. The other solo modes, then multiplayer, are built on the result rather than updated one by one from their originals.

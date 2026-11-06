@@ -134,12 +134,18 @@ std::optional<std::pair<int, int>> single_stage;
 // Story's episodes played three ways (docs/HUD_DESIGN.md): the story, Time
 // Attack (as fast as possible) and Score Attack (as many points as possible).
 // All run the game's Story mode; this picks the HUD and the records.
-enum class PlayVariant { Story, TimeAttack, ScoreAttack };
+// Casual is Story without a game over (no records or trophies).
+enum class PlayVariant { Story, TimeAttack, ScoreAttack, Casual };
 PlayVariant play_variant = PlayVariant::Story;  // the run in progress
 PlayVariant menu_variant = PlayVariant::Story;  // the chapter list on screen
 const char* variant_records(PlayVariant v) {
     return v == PlayVariant::TimeAttack ? "time_attack" : v == PlayVariant::ScoreAttack ? "score_attack" : "rescue";
 }
+const char* variant_title(PlayVariant v) {
+    return v == PlayVariant::TimeAttack ? "Time Attack" : v == PlayVariant::ScoreAttack ? "Score Attack"
+           : v == PlayVariant::Casual ? "Casual" : "Story";
+}
+bool variant_competes(PlayVariant v) { return v == PlayVariant::TimeAttack || v == PlayVariant::ScoreAttack; }
 struct SingleStageResult { double time; double best_before; };
 std::optional<SingleStageResult> single_stage_result;
 std::optional<std::chrono::steady_clock::time_point> single_stage_quit_at;
@@ -283,6 +289,26 @@ void attack_episode_done(const std::string& mode, int chapter) {
     post_game_event(event);
 }
 
+// The main menu's Continue (docs/REDESIGN.md): offered while a Story or
+// Casual game was left unfinished (not after a game over).
+void refresh_continue() {
+    const auto& last = profile_data.progress.last_play;
+    std::vector<blockplanet::ui::ListItem> items;
+    if (!last.submode.empty() && last.chapter >= 1 && last.level >= 1) {
+        blockplanet::ui::ListItem item;
+        item.id = "continue";
+        item.label = "Continue";
+        const std::string where = std::to_string(last.chapter) + ":" + std::to_string(last.level);
+        item.note = std::string(last.submode == "casual" ? "Casual " : "Story ") + where;
+        item.action = "command:continue";
+        item.description = "Carry on from episode " + std::to_string(last.chapter) + ", stage " +
+                           std::to_string(last.level) + ", where your last game stopped.";
+        item.focus = true;
+        items.push_back(std::move(item));
+    }
+    blockplanet::ui::set_list("continue", std::move(items));
+}
+
 void update_magic_box();
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
 
@@ -344,6 +370,27 @@ void update_hud() {
                      popups.end());
     }
     if (!story) popups.clear();
+    // Continue (the main menu): the Story or Casual stage being played, kept
+    // until a game over.
+    {
+        auto& last = profile_data.progress.last_play;
+        const bool in_play = guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E44A8) == 1;
+        if (in_play && guest::load16(guest_rdram, 0x80110220u + 0x2D7E) < 0 && !last.submode.empty()) {
+            last = {};
+            profile_dirty = true;
+            save_profile();
+            refresh_continue();
+        } else if (story && state.chapter >= 1 && state.level >= 1 && !single_stage &&
+                   (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual)) {
+            const std::string submode = play_variant == PlayVariant::Casual ? "casual" : "campaign";
+            if (last.submode != submode || last.chapter != state.chapter || last.level != state.level) {
+                last = {submode, state.chapter, state.level};
+                profile_dirty = true;
+                save_profile();
+                refresh_continue();
+            }
+        }
+    }
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
         blockplanet::ui::set_hud(std::nullopt);
@@ -367,9 +414,10 @@ void update_hud() {
         const auto i = std::size_t(std::clamp(finished->level, 1, 10) - 1);
         const double best_before = record.best_levels[i];
         bool changed = false;
-        if (finished->time > 0.5 && (record.best_levels[i] <= 0.0 || finished->time < record.best_levels[i]))
+        const bool keeps_records = play_variant != PlayVariant::Casual;  // Casual sets no records
+        if (keeps_records && finished->time > 0.5 && (record.best_levels[i] <= 0.0 || finished->time < record.best_levels[i]))
             record.best_levels[i] = finished->time, changed = true;
-        if (finished->episode_done && (record.best_total <= 0.0 || finished->episode_total < record.best_total))
+        if (keeps_records && finished->episode_done && (record.best_total <= 0.0 || finished->episode_total < record.best_total))
             record.best_total = finished->episode_total, changed = true;
         if (changed) {
             profile_dirty = true;
@@ -399,7 +447,7 @@ void update_hud() {
         view.next.push_back(std::move(p));
     }
     {
-        view.mode = play_variant == PlayVariant::TimeAttack ? "Time Attack" : play_variant == PlayVariant::ScoreAttack ? "Score Attack" : "Story";
+        view.mode = variant_title(play_variant);
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
     }
     const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
@@ -407,7 +455,7 @@ void update_hud() {
     // cleared (the core opened; the final episode has no next one to start).
     {
         static int cleared_episode_key = -1;
-        if (play_variant != PlayVariant::Story && !single_stage && state.level >= 10 && state.progress >= 1.0f &&
+        if (variant_competes(play_variant) && !single_stage && state.level >= 10 && state.progress >= 1.0f &&
             cleared_episode_key != state.chapter) {
             cleared_episode_key = state.chapter;
             attack_episode_done(variant_records(play_variant), state.chapter);
@@ -1265,6 +1313,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
             show_error(save_error.c_str());
             std::exit(74);
         }
+        refresh_continue();
         if (profile_data.preferences.controls) {
             apply_controls(active_settings, *profile_data.preferences.controls);
         } else {
@@ -1575,6 +1624,13 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
 
 void launch_mode(LaunchMode mode, bool keep_music = false) {
     if (guest_rdram == nullptr) return;
+    if (game_option_applier) {
+        // Casual (Story without a game over) applies to Story's launches only,
+        // and pauses trophies as --casual does.
+        const bool casual = mode == LaunchMode::Rescue && play_variant == PlayVariant::Casual;
+        game_option_applier->set_menu_casual(casual);
+        trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());
+    }
     if (!keep_music) end_track_override();
     const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
     if (accepted) blockplanet::ui::request_close();
@@ -2058,17 +2114,32 @@ bool handle_profile_command(const std::string& command) {
                                     std::chrono::steady_clock::now());
                 continue;
             }
-            if (*command == "story" || *command == "time_attack" || *command == "score_attack") {
+            if (*command == "continue") {
+                const auto last = profile_data.progress.last_play;
+                if (!last.submode.empty() && last.chapter >= 1 && last.level >= 1 && game_option_applier) {
+                    continue_mode.reset();
+                    single_stage.reset();
+                    single_stage_quit_at.reset();
+                    single_stage_result.reset();
+                    menu_variant = play_variant = last.submode == "casual" ? PlayVariant::Casual : PlayVariant::Story;
+                    chapter_zero_lesson.clear();
+                    game_option_applier->choose_start(last.chapter, last.level);
+                    launch_mode(LaunchMode::Rescue);
+                }
+                continue;
+            }
+            if (*command == "story" || *command == "time_attack" || *command == "score_attack" || *command == "casual") {
                 menu_variant = *command == "story" ? PlayVariant::Story
+                               : *command == "casual" ? PlayVariant::Casual
                                : *command == "time_attack" ? PlayVariant::TimeAttack : PlayVariant::ScoreAttack;
                 auto choices = chapter_choices();
-                if (menu_variant != PlayVariant::Story && !choices.empty() && choices.front().id == "chapter0") {
+                if (variant_competes(menu_variant) && !choices.empty() && choices.front().id == "chapter0") {
                     choices.erase(choices.begin());  // no Training in the attacks
                     for (auto& c : choices) c.note = c.note == "skip training" ? "" : c.note;
                     if (!choices.empty() && std::none_of(choices.begin(), choices.end(), [](const auto& c) { return c.focus; }))
                         choices.front().focus = true;
                 }
-                blockplanet::ui::set_text("chapters_title", *command == "story" ? "Story" : *command == "time_attack" ? "Time Attack" : "Score Attack");
+                blockplanet::ui::set_text("chapters_title", menu_variant == PlayVariant::Story ? "Campaign" : variant_title(menu_variant));
                 blockplanet::ui::set_list("chapters", choices);
                 blockplanet::ui::request_show("chapters");
                 continue;

@@ -7,13 +7,13 @@
     <div id="panel">
         <div class="title">Solo</div>
         <div class="subtitle">Play on your own</div>
-        <div class="item" id="story" data-action="command:story">Story</div>
-        <div class="item" id="time_attack" data-action="command:time_attack">Time Attack</div>
-        <div class="item" id="score_attack" data-action="command:score_attack">Score Attack</div>
-        <div class="item" id="lines" data-action="command:lines">Lines</div>
-        <div class="item" id="puzzle" data-action="command:puzzle">Puzzle</div>
-        <div class="item" id="custom" data-action="command:custom">Custom</div>
+        <div class="item" id="story" data-action="open:story" data-description="Break through each sphere to its core, episode by episode. Play the campaign, race the clock, chase points or play without a game over.">Story</div>
+        <div class="item" id="hide_and_seek" data-action="command:hide_and_seek" data-description="Dig away the blocks to find the pictures hidden in each sphere.">Hide &amp; Seek</div>
+        <div class="item" id="puzzle" data-action="command:puzzle" data-description="Clear set spheres with the pieces you are given. Think before you drop.">Puzzle</div>
+        <div class="item" id="lines" data-action="command:lines" data-description="A different game on the sphere, with its own levels.">Lines</div>
+        <div class="item" id="multiphasic" data-action="command:multiphasic" data-description="One long run: each core you open becomes the next sphere. How far can you go?">Multiphasic<span class="note">coming later</span></div>
         <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
     </div>
 </body>
 </rml>

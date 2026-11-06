@@ -41,10 +41,15 @@ public:
     // number), for Restart level. A chapter of 0 sets the level only: Hide &
     // Seek has its own chapter, not the Rescue chapter (0x800E44A0).
     void choose_start(int chapter, int level) { chosen_chapter_ = chapter; chosen_level_ = level; }
+    // Casual chosen in the menus (Story > Casual): no game over, as --casual,
+    // for the game being started.
+    void set_menu_casual(bool on) { menu_casual_ = on; }
+    bool menu_casual() const { return menu_casual_; }
 
 private:
     GameOptions options_;
     bool start_chapter_done_ = false;
+    bool menu_casual_ = false;
     std::optional<int> chosen_chapter_;
     std::optional<int> chosen_level_;
 };

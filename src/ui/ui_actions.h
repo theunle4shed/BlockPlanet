@@ -16,6 +16,7 @@ struct ListItem {
     bool enabled = true;
     int span = 1;         // columns taken in a grid (data-columns)
     bool focus = false;   // focused when the screen opens
+    std::string description;  // shown in the screen's #description while focused
 };
 
 } // namespace blockplanet::ui

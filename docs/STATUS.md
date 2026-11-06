@@ -26,6 +26,8 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 - **Title screen:** the game's own 3D letters held on screen; the painted picture hidden until replaced (`src/graphics/title_hooks.cpp`).
 - Profiles, Chapter 0 (Training), pause menu, audio and options, restart level/chapter (earlier in the session; see `CHANGES-SINCE-BLOCKSPHERE.md`).
 
+- **Menus** (docs/REDESIGN.md, section 4): Continue, Solo / Local / Online, archetypes, Story's sub-modes (Campaign, Time Attack, Score Attack, Casual), descriptions on focus.
+
 ## Open threads (next steps)
 
 1. **HUD for the other modes** (Puzzle, Hide & Seek with no progress bar, Lines, VS): designs agreed in `docs/HUD_DESIGN.md`; the Story HUD is the pattern.

@@ -52,7 +52,7 @@ void GameOptionApplier::apply(std::uint8_t* rdram) {
         }
     }
 
-    if (!options_.casual || !playing || state.mode == game_state::mode_vs_cpu) return;
+    if (!(options_.casual || menu_casual_) || !playing || state.mode == game_state::mode_vs_cpu) return;
     const auto context = game_state::p1_context;
     // Hearts only ever drop by one at a time, so refilling as soon as one is
     // lost keeps them from reaching -1 (game over).

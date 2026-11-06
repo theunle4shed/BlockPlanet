@@ -78,6 +78,15 @@ struct ProfileProgress {
     std::int64_t score_attack_best_score = 0;
     double score_attack_best_seconds = 0.0;
     std::vector<std::int64_t> score_attack_best_stages;  // best points per stage (index 0 = stage 1)
+    // An interrupted game, for the main menu's Continue (docs/REDESIGN.md):
+    // the sub-mode ("campaign" or "casual"), chapter and stage being played.
+    // Empty sub-mode: none. Cleared at a game over.
+    struct LastPlay {
+        std::string submode;
+        int chapter = 0;
+        int level = 0;
+    };
+    LastPlay last_play;
 };
 
 struct ProfileSaveData {

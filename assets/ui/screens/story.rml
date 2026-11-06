@@ -1,0 +1,18 @@
+<rml>
+<head>
+    <title>Story</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Story</div>
+        <div class="subtitle">Choose how to play</div>
+        <div class="item" id="campaign" data-action="command:story" data-description="The story, episode by episode. Open each sphere's core before the blocks reach you.">Campaign</div>
+        <div class="item" id="time_attack" data-action="command:time_attack" data-description="Story's episodes as fast as you can, against your best time for every stage. A whole episode or one stage.">Time Attack</div>
+        <div class="item" id="score_attack" data-action="command:score_attack" data-description="As many points as you can on Story's stages, against the clock. Combos add time, and time left becomes points.">Score Attack</div>
+        <div class="item" id="casual" data-action="command:casual" data-description="Story without a game over: lost hearts come back. No records or trophies.">Casual</div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

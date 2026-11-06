@@ -112,6 +112,13 @@ void Navigator::set_focus(Screen& screen, std::size_t index) {
     screen.focus = std::min(index, list.size() - 1);
     list[screen.focus]->SetClass("focused", true);
     list[screen.focus]->ScrollIntoView(false);
+    // What the focused item is: its data-description, in the screen's
+    // #description (menus explain each mode and sub-mode).
+    if (Rml::Element* description = screen.document->GetElementById("description")) {
+        const auto text = list[screen.focus]->GetAttribute<Rml::String>("data-description", "");
+        description->SetInnerRML(escaped(text));
+        description->SetClass("empty", text.empty());
+    }
 }
 
 void Navigator::fill(Screen& screen) {
@@ -129,6 +136,7 @@ void Navigator::fill(Screen& screen) {
             element->SetClass("disabled", !entry.enabled);
             element->SetAttribute("data-action", entry.action);
             if (entry.focus) element->SetAttribute("data-focus", true);
+            if (!entry.description.empty()) element->SetAttribute("data-description", entry.description);
             if (entry.span > 1) {
                 element->SetAttribute("data-span", entry.span);
                 element->SetClass("span" + std::to_string(entry.span), true);

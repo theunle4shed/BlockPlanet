@@ -80,6 +80,57 @@ This proposal builds on what BlockPlanet has already learned about the original 
 
 **Limitations.** A deep tree of small cartoon panels, slow transitions, name entry used for secrets, and modes split confusingly between Single, Practice and Training.
 
+**Structure (decided 2026-11-06).** Three levels: who you play with, the game (archetype), then how you play it (sub-mode). Each item shows a short description of what it is when focused. A level with a single choice is skipped (Lines has one sub-mode today, so Solo > Lines starts it). The levels are open to expansion: new archetypes, sub-modes, or a further level where a mode needs one.
+
+```
+CONTINUE        only while a Story or Casual game was left unfinished
+SOLO            Story · Hide & Seek · Puzzle · Lines · Multiphasic (later)
+  Story         Campaign · Time Attack · Score Attack · Casual
+                  then an episode, then Whole episode or one stage
+LOCAL           Versus · Collaborate (later) · Custom (later)
+ONLINE          Host a game · Join with a code (later)
+PROFILES · MEDIA PLAYER · TROPHIES · OPTIONS · CREDITS · EXIT
+```
+
+- **Archetypes:** Story, Lines and Multiphasic are the games that can grow multiplayer and sub-modes. Puzzle and Hide & Seek are archetypes with their own level sets, seen under Solo only for now.
+- **Casual** is a sub-mode chosen from the menu: Story without a game over (hearts come back), no records or trophies.
+- **Continue** resumes an interrupted game: the Story or Casual stage being played when the player quit or the game closed, kept until a game over. Not for Time Attack or Score Attack (a resumed run would not be a fair run).
+- **Join codes (online, later):** shown hidden (`••••••`) with a button to reveal them and a **Copy** button that works while hidden, and a **streamer mode** setting that hides codes everywhere by default (lobby, notifications), perhaps friends' names too.
+
+The earlier proposal (SOLO: Story, Time Trial, Lines, Puzzle, Custom, Training; MULTIPLAYER: Versus, Collaborate, Custom) is replaced. Training is each archetype's Chapter 0; Practice's settings become Custom later.
+
+**Changes to the original intention.** Make the push subtle (a few percent of zoom, eased) and switch it off with "Reduce camera motion". Zooming on every drop can cause motion sickness and makes repeated fast play harder to read. Consider zooming only on the final part of a long fall, or only on large combos.
+
+**Player benefit.** The sphere always reads clearly on any screen, nothing important is ever hidden by the renderer, and drops feel more physical.
+
+**Feasibility.** Framing and aspect support are mostly RT64 projection and HUD anchoring work. Drawing every exposed block means enlarging the game's sphere patch (research in progress). Seeing through the core needs the far side drawn as well (the "Full" sphere detail step), with the inward-facing block faces darkened, for example by lighting them with depth so the far side reads as distant and in shadow. The push and peek cameras need the game's camera values, which are not found yet.
+
+## 3. Story and progression
+
+**Why the original worked.** Rescue gave a simple goal (dig to the core) with escalating chapters, and the sphere's growing depth was a clear measure of difficulty. Each level was quick to understand.
+
+**Limitations.** Progress was thin and opaque. Unlocks were hidden behind typed codes (LINES, CREDITS, level select). There was no visible map of progress and no reason to replay cleared chapters. Losing all hearts sent you back without much sense of what was earned.
+
+**What changes.**
+- Rename Rescue to **Story**. Chapters unlock in order and stay selectable once unlocked, as already decided for chapter level select.
+- Hearts and stored magic persist across the levels of a chapter and reset at the start of each chapter. That makes each chapter a self-contained run with its own tension, and a failed chapter costs minutes, not an hour.
+- Remove the typed secret codes. Their content becomes earned unlocks (already decided).
+
+**What is added.**
+- A chapter map: tiles per chapter with best score, best time, stars or medals, and the content each chapter unlocks.
+- Chapter rewards: modes (Lines, Custom), media player content, visualiser presets, and cosmetic sphere themes.
+- Optional per-chapter challenges (no magic, no hearts lost, under par time) that award medals and trophies.
+
+**Player benefit.** A clear sense of direction, short and fair runs, and reasons to return to finished chapters.
+
+**Feasibility.** Chapter unlocks, the map and rewards are host-side, using the chapter and level values already found (`0x800E44A0`, player context `+0x23BA`). Persisting hearts and magic between levels and resetting them at chapter starts needs game-side hooks on the hearts value (found) and on magic (not yet found).
+
+## 4. Menu structure
+
+**Why the original worked.** Few menus, quick to reach play.
+
+**Limitations.** A deep tree of small cartoon panels, slow transitions, name entry used for secrets, and modes split confusingly between Single, Practice and Training.
+
 **Proposed structure.**
 
 ```
