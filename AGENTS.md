@@ -8,7 +8,7 @@ Keep ROMs, generated game code, extracted original assets, captures, audio, save
 
 ## Game-derived content
 
-Anything taken from the game (text, art, models, music, level data) is generated from the player's own ROM at install or run time and never committed. **Exception (decided by the owner, 2026-11-07):** the original game's copyright and licence notice may be written into the repository word for word, unchanged, so it can be shown as text, together with BlockPlanet's own disclaimer naming the rights holders. Nothing else from the game's text is committed.
+Anything taken from the game (text, art, models, music, level data) is generated from the player's own ROM at install or run time and never committed. **Exception (decided by the owner, 2026-11-07):** the original game's copyright and licence notice may be written into the repository word for word (in BlockPlanet's sentence case rather than the original's capitals, the owner's choice), so it can be shown as text, together with BlockPlanet's own disclaimer naming the rights holders. Nothing else from the game's text is committed.
 
 ## Attribution
 

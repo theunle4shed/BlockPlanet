@@ -1069,8 +1069,8 @@ void publish_game_text() {
 // as text, word for word (the owner's exception in AGENTS.md), with
 // BlockPlanet's own disclaimer beneath.
 constexpr const char* title_notice_lines[] = {
-    "\u00A91997 NINTENDO   GAME DESIGN BY H2O ENTERTAINMENT CORP.",
-    "TETRISPHERE\u2122 LICENSED TO NINTENDO BY THE TETRIS COMPANY.",
+    "\u00A91997 Nintendo \u00B7 Game design by H2O Entertainment Corp.",  // the original's wide gap, as a dot
+    "Tetrisphere\u2122 licensed to Nintendo by The Tetris Company.",
 };
 constexpr const char* title_disclaimer =
     "BlockPlanet is an unofficial fan project, not affiliated with or endorsed by Nintendo or The Tetris Company. "

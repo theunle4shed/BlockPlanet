@@ -5,7 +5,7 @@
 </head>
 <body class="over-pause">
     <div id="panel">
-        <div class="header">PAUSED</div>
+        <div class="header">Paused</div>
         <div class="subtitle" data-text="pause_where"></div>
         <div class="list" data-list="pause"></div>
     </div>
