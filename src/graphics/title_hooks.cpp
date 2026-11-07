@@ -421,38 +421,66 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
         const auto e0 = edge(2 * pi * k / 48), e1 = edge(2 * pi * (k + 1) / 48);
         tri({0, 0, 0.04f, 0.03f, 0.10f, 0.35f}, {e0[0], e0[1], 0.04f, 0.03f, 0.10f, 0.35f}, {e1[0], e1[1], 0.04f, 0.03f, 0.10f, 0.35f});
     }
-    // The haze: from the tile's left side to the left half of the edge.
-    const int n = 32;
-    for (int k = 0; k < n; ++k) {
-        const float a0 = pi * 0.5f + pi * k / n, a1 = pi * 0.5f + pi * (k + 1) / n;
-        const auto e0 = edge(a0), e1 = edge(a1);
-        const float t0 = std::sin(pi * k / n), t1 = std::sin(pi * (k + 1) / n);  // strongest straight left
-        tri({lx - hw, ly, 0.70f, 0.62f, 1.0f, 0.55f * (t0 + t1) / 2.0f},
-            {e0[0], e0[1], 0.36f, 0.30f, 0.82f, 0.32f * t0}, {e1[0], e1[1], 0.36f, 0.30f, 0.82f, 0.32f * t1});
-    }
-    // The streaks: from the tile's left half out to the left, lavender and blue.
-    const float streaks[][4] = {  // angle (degrees, 180 = left), width, which colour, length (share of the way to the edge)
-        {150, 5.0f, 0, 0.92f}, {161, 3.5f, 1, 0.80f}, {172, 4.5f, 0, 1.0f}, {183, 3.0f, 1, 0.85f}, {196, 4.5f, 0, 0.97f},
-        {206, 3.5f, 1, 0.80f}, {215, 5.0f, 0, 0.95f}, {227, 3.5f, 1, 0.75f}, {238, 4.0f, 0, 0.82f}, {140, 3.0f, 1, 0.70f},
-    };
-    for (const auto& r : streaks) {
-        const float a = r[0] * pi / 180.0f, w = r[1] * pi / 180.0f;
-        const auto e0 = edge(a - w), e1 = edge(a + w);
-        const float len = r[3];
-        const float sx = lx - hw * 0.6f, sy = ly;
-        const float cr = r[2] == 0 ? 0.80f : 0.70f, cg = r[2] == 0 ? 0.58f : 0.86f, cb = 1.0f;
-        tri({sx, sy, 1.0f, 1.0f, 1.0f, 0.85f},
-            {sx + (e0[0] - sx) * len, sy + (e0[1] - sy) * len, cr, cg, cb, 0.10f},
-            {sx + (e1[0] - sx) * len, sy + (e1[1] - sy) * len, cr, cg, cb, 0.10f});
-    }
-    // The tile: a white square, its left edge brightest.
+    // The tile's corners (tilted a little).
     const float tilt = 0.06f;
     const auto corner = [&](float x, float y) {
         return std::array<float, 2>{lx + x * std::cos(tilt) - y * std::sin(tilt), ly + x * std::sin(tilt) + y * std::cos(tilt)};
     };
-    const auto p0 = corner(-hw, -hh), p1 = corner(hw, -hh), p2 = corner(hw, hh), p3 = corner(-hw, hh);
-    tri({p0[0], p0[1], 1, 1, 1, 1}, {p1[0], p1[1], 0.95f, 0.95f, 1, 1}, {p2[0], p2[1], 0.95f, 0.95f, 1, 1});
-    tri({p0[0], p0[1], 1, 1, 1, 1}, {p2[0], p2[1], 0.95f, 0.95f, 1, 1}, {p3[0], p3[1], 1, 1, 1, 1});
+    const auto tl = corner(-hw, hh), tr = corner(hw, hh), br = corner(hw, -hh), bl = corner(-hw, -hh);
+    // Where on the tile a ray to edge angle a starts (the owner's sketch): the
+    // upper rays from the top edge, out to the top-right corner; the lower
+    // rays from the bottom edge, out to the bottom-right corner; the middle
+    // ones from the left edge. The light shines to the left only.
+    const auto source = [&](float a) {
+        const float s = std::sin(a);  // +1 up, -1 down
+        if (s > 0.25f) { const float t = std::min(1.0f, (s - 0.25f) / 0.6f); return std::array<float, 2>{tl[0] + (tr[0] - tl[0]) * t, tl[1] + (tr[1] - tl[1]) * t}; }
+        if (s < -0.25f) { const float t = std::min(1.0f, (-s - 0.25f) / 0.6f); return std::array<float, 2>{bl[0] + (br[0] - bl[0]) * t, bl[1] + (br[1] - bl[1]) * t}; }
+        const float t = (s + 0.25f) / 0.5f;
+        return std::array<float, 2>{bl[0] + (tl[0] - bl[0]) * t, bl[1] + (tl[1] - bl[1]) * t};
+    };
+    // The haze: quads from the tile's outline to the left half of the opening.
+    const int n = 40;
+    for (int k = 0; k < n; ++k) {
+        const float a0 = pi * 0.42f + pi * 1.16f * k / n, a1 = pi * 0.42f + pi * 1.16f * (k + 1) / n;
+        const auto e0 = edge(a0), e1 = edge(a1), s0 = source(a0), s1 = source(a1);
+        const float f0 = std::max(0.0f, -std::cos(a0)) * 0.7f + 0.3f, f1 = std::max(0.0f, -std::cos(a1)) * 0.7f + 0.3f;
+        const LightVertex q0{s0[0], s0[1], 0.74f, 0.66f, 1.0f, 0.55f * f0}, q1{s1[0], s1[1], 0.74f, 0.66f, 1.0f, 0.55f * f1};
+        const LightVertex r0{e0[0], e0[1], 0.36f, 0.30f, 0.82f, 0.10f * f0}, r1{e1[0], e1[1], 0.36f, 0.30f, 0.82f, 0.10f * f1};
+        tri(q0, r0, r1);
+        tri(q0, r1, q1);
+    }
+    // The streaks: lavender and pale blue, from the tile's outline outwards.
+    const float streaks[][4] = {  // angle (degrees, 180 = left), width, which colour, length
+        {112, 3.5f, 0, 0.85f}, {126, 3.0f, 1, 0.80f}, {140, 4.0f, 0, 0.95f}, {156, 3.0f, 1, 0.85f}, {172, 4.5f, 0, 1.0f},
+        {188, 3.0f, 1, 0.85f}, {204, 4.5f, 0, 0.95f}, {219, 3.0f, 1, 0.80f}, {233, 4.0f, 0, 0.90f}, {248, 3.5f, 1, 0.85f},
+    };
+    for (const auto& r : streaks) {
+        const float a = r[0] * pi / 180.0f, w = r[1] * pi / 180.0f;
+        const auto e0 = edge(a - w), e1 = edge(a + w), sa = source(a - w * 0.5f), sb = source(a + w * 0.5f);
+        const float len = r[3];
+        const float cr = r[2] == 0 ? 0.80f : 0.70f, cg = r[2] == 0 ? 0.58f : 0.86f, cb = 1.0f;
+        const LightVertex p0{sa[0], sa[1], 1.0f, 1.0f, 1.0f, 0.75f}, p1{sb[0], sb[1], 1.0f, 1.0f, 1.0f, 0.75f};
+        const LightVertex o0{sa[0] + (e0[0] - sa[0]) * len, sa[1] + (e0[1] - sa[1]) * len, cr, cg, cb, 0.0f};
+        const LightVertex o1{sb[0] + (e1[0] - sb[0]) * len, sb[1] + (e1[1] - sb[1]) * len, cr, cg, cb, 0.0f};
+        tri(p0, o0, o1);
+        tri(p0, o1, p1);
+    }
+    // The tile, blurred: soft bands around it fading out, then the white square.
+    for (int ring = 3; ring >= 1; --ring) {
+        const float g = 4.0f * ring;
+        const auto o_tl = corner(-hw - g, hh + g), o_tr = corner(hw + g, hh + g), o_br = corner(hw + g, -hh - g), o_bl = corner(-hw - g, -hh - g);
+        const float al = 0.22f;
+        const auto q = [&](std::array<float, 2> a, std::array<float, 2> b, std::array<float, 2> c2, std::array<float, 2> d) {
+            tri({a[0], a[1], 0.95f, 0.93f, 1.0f, 0.0f}, {b[0], b[1], 0.95f, 0.93f, 1.0f, 0.0f}, {c2[0], c2[1], 1, 1, 1, al});
+            tri({a[0], a[1], 0.95f, 0.93f, 1.0f, 0.0f}, {c2[0], c2[1], 1, 1, 1, al}, {d[0], d[1], 1, 1, 1, al});
+        };
+        q(o_tl, o_tr, tr, tl);
+        q(o_tr, o_br, br, tr);
+        q(o_br, o_bl, bl, br);
+        q(o_bl, o_tl, tl, bl);
+    }
+    tri({tl[0], tl[1], 1, 1, 1, 0.97f}, {tr[0], tr[1], 0.96f, 0.96f, 1, 0.97f}, {br[0], br[1], 0.96f, 0.96f, 1, 0.97f});
+    tri({tl[0], tl[1], 1, 1, 1, 0.97f}, {br[0], br[1], 0.96f, 0.96f, 1, 0.97f}, {bl[0], bl[1], 1, 1, 1, 0.97f});
     const std::uint32_t proj = 0x807EFE00u, model = 0x807EFE40u;
     const float p[4][4] = {{1.0f / 160.0f, 0, 0, 0}, {0, 1.0f / 120.0f, 0, 0}, {0, 0, 1.0f / 512.0f, 0}, {0, 0, 0, 1}};
     const float id[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
@@ -604,7 +632,7 @@ std::vector<TitleSceneSpec> title_scene_list() {
     const char* off = std::getenv("BLOCKPLANET_TITLE_CHARACTERS");
     if (off != nullptr && std::atoi(off) == 0) return list;
     const char* v = std::getenv("BLOCKPLANET_TITLE_SCENE");
-    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0xc9:0x27@0/0.50/0.28/0.80";
+    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0xc9:0x27@0/0.458/0.265/0.72";
     std::string text(v);
     std::size_t at = 0;
     while (at < text.size()) {
