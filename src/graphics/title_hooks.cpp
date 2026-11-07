@@ -466,10 +466,10 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
         tri(p0, o1, p1);
     }
     // The tile, blurred: soft bands around it fading out, then the white square.
-    for (int ring = 3; ring >= 1; --ring) {
-        const float g = 4.0f * ring;
+    for (int ring = 6; ring >= 1; --ring) {
+        const float g = 4.5f * ring;
         const auto o_tl = corner(-hw - g, hh + g), o_tr = corner(hw + g, hh + g), o_br = corner(hw + g, -hh - g), o_bl = corner(-hw - g, -hh - g);
-        const float al = 0.22f;
+        const float al = 0.24f;
         const auto q = [&](std::array<float, 2> a, std::array<float, 2> b, std::array<float, 2> c2, std::array<float, 2> d) {
             tri({a[0], a[1], 0.95f, 0.93f, 1.0f, 0.0f}, {b[0], b[1], 0.95f, 0.93f, 1.0f, 0.0f}, {c2[0], c2[1], 1, 1, 1, al});
             tri({a[0], a[1], 0.95f, 0.93f, 1.0f, 0.0f}, {c2[0], c2[1], 1, 1, 1, al}, {d[0], d[1], 1, 1, 1, al});
@@ -479,8 +479,12 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
         q(o_br, o_bl, bl, br);
         q(o_bl, o_tl, tl, bl);
     }
-    tri({tl[0], tl[1], 1, 1, 1, 0.97f}, {tr[0], tr[1], 0.96f, 0.96f, 1, 0.97f}, {br[0], br[1], 0.96f, 0.96f, 1, 0.97f});
-    tri({tl[0], tl[1], 1, 1, 1, 0.97f}, {br[0], br[1], 0.96f, 0.96f, 1, 0.97f}, {bl[0], bl[1], 1, 1, 1, 0.97f});
+    // The tile itself: bright at the centre, softer towards its edges.
+    const LightVertex mid{lx, ly, 1, 1, 1, 1.0f};
+    tri(mid, {tl[0], tl[1], 1, 1, 1, 0.97f}, {tr[0], tr[1], 1, 1, 1, 0.97f});
+    tri(mid, {tr[0], tr[1], 1, 1, 1, 0.97f}, {br[0], br[1], 1, 1, 1, 0.97f});
+    tri(mid, {br[0], br[1], 1, 1, 1, 0.97f}, {bl[0], bl[1], 1, 1, 1, 0.97f});
+    tri(mid, {bl[0], bl[1], 1, 1, 1, 0.97f}, {tl[0], tl[1], 1, 1, 1, 0.97f});
     const std::uint32_t proj = 0x807EFE00u, model = 0x807EFE40u;
     const float p[4][4] = {{1.0f / 160.0f, 0, 0, 0}, {0, 1.0f / 120.0f, 0, 0}, {0, 0, 1.0f / 512.0f, 0}, {0, 0, 0, 1}};
     const float id[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
@@ -772,6 +776,23 @@ void tint_parts(std::uint8_t* rdram, std::uint32_t object, int entry) {
     };
     const std::uint32_t b = object + be32(object + 4);
     const std::uint32_t parts = be32(b);
+    // Parts to leave out (flat backdrop cards in the robots' models): their
+    // batch count set to 0. BLOCKPLANET_TITLE_HIDE=part,part tries others.
+    {
+        std::vector<int> hide;
+        (void)entry;
+        if (const char* h = std::getenv("BLOCKPLANET_TITLE_HIDE")) {
+            hide.clear();
+            for (const char* q = h; *q;) { char* e = nullptr; hide.push_back(int(std::strtol(q, &e, 0))); q = (*e == ',') ? e + 1 : e; if (e == q && *q != 0) break; }
+        }
+        const std::uint32_t c = object + be32(object + 8);
+        for (int part : hide) {
+            if (part < 0 || std::uint32_t(part) >= parts) continue;
+            const std::int16_t off = std::int16_t(byte(c + 2u * std::uint32_t(part)) << 8 | byte(c + 2u * std::uint32_t(part) + 1));
+            const std::uint32_t blk = std::uint32_t(std::int32_t(c) + off);
+            byte(blk) = 0, byte(blk + 1) = 0;
+        }
+    }
     for (std::uint32_t p = 0; p < parts && p < 512; ++p) {
         const std::uint32_t rec = b + be32(b + 4 + 4 * p);
         if (!research) {
@@ -781,8 +802,9 @@ void tint_parts(std::uint8_t* rdram, std::uint32_t object, int entry) {
             if (entry == 0x27) {
                 // Wheels stands in the core's light: his colours washed
                 // towards a warm white, as if lit from inside.
-                const std::uint8_t warm[3] = {255, 246, 222};
-                for (int ch = 0; ch < 3; ++ch) byte(rec + std::uint32_t(ch)) = std::uint8_t((byte(rec + std::uint32_t(ch)) * 45 + warm[ch] * 55) / 100);
+                // Golden, as in the original picture (the light passing through him).
+                const std::uint8_t gold[3] = {255, 214, 112};
+                for (int ch = 0; ch < 3; ++ch) byte(rec + std::uint32_t(ch)) = std::uint8_t((byte(rec + std::uint32_t(ch)) * 35 + gold[ch] * 65) / 100);
             }
             continue;
         }
