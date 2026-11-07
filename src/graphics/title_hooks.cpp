@@ -406,7 +406,7 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
     // in the frame's centred units, y up. Its light spreads to the left only,
     // as streaks of lavender and pale blue in a blue-purple haze; the right of
     // the opening stays clear, so the background's squares show there.
-    const float lx = 13.0f, ly = 15.0f, hw = 27.0f, hh = 20.0f;
+    const float lx = 11.0f, ly = -3.0f, hw = 19.0f, hh = 16.0f;  // matched to the original on a grid
     const float ix = st.outer_x - st.rim - 2.0f, iy = st.outer_y - st.rim * st.rim_vertical - 2.0f;
     const float c = std::cos(st.tilt), sn = std::sin(st.tilt);
     const auto edge = [&](float a) {  // a point on the opening's edge
@@ -422,7 +422,7 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
         tri({0, 0, 0.04f, 0.03f, 0.10f, 0.35f}, {e0[0], e0[1], 0.04f, 0.03f, 0.10f, 0.35f}, {e1[0], e1[1], 0.04f, 0.03f, 0.10f, 0.35f});
     }
     // The tile's corners (tilted a little).
-    const float tilt = 0.06f;
+    const float tilt = 0.0f;  // level, as in the original
     const auto corner = [&](float x, float y) {
         return std::array<float, 2>{lx + x * std::cos(tilt) - y * std::sin(tilt), ly + x * std::sin(tilt) + y * std::cos(tilt)};
     };
@@ -465,6 +465,15 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
         tri(p0, o0, o1);
         tri(p0, o1, p1);
     }
+    // The white oval glow around the tile (the original's soft round light).
+    for (int k = 0; k < 40; ++k) {
+        const float a0 = 2 * pi * k / 40, a1 = 2 * pi * (k + 1) / 40;
+        const float rx = 34.0f, ry = 29.0f;
+        tri({lx, ly, 1, 1, 1, 0.92f}, {lx + rx * std::cos(a0), ly + ry * std::sin(a0), 1, 1, 1, 0.0f},
+            {lx + rx * std::cos(a1), ly + ry * std::sin(a1), 1, 1, 1, 0.0f});
+        tri({lx, ly, 1, 1, 1, 0.55f}, {lx + 0.6f * rx * std::cos(a0), ly + 0.6f * ry * std::sin(a0), 1, 1, 1, 0.35f},
+            {lx + 0.6f * rx * std::cos(a1), ly + 0.6f * ry * std::sin(a1), 1, 1, 1, 0.35f});
+    }
     // The tile, blurred: soft bands around it fading out, then the white square.
     for (int ring = 6; ring >= 1; --ring) {
         const float g = 4.5f * ring;
@@ -480,11 +489,11 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
         q(o_bl, o_tl, tl, bl);
     }
     // The tile itself: bright at the centre, softer towards its edges.
-    const LightVertex mid{lx, ly, 1, 1, 1, 1.0f};
-    tri(mid, {tl[0], tl[1], 1, 1, 1, 0.97f}, {tr[0], tr[1], 1, 1, 1, 0.97f});
-    tri(mid, {tr[0], tr[1], 1, 1, 1, 0.97f}, {br[0], br[1], 1, 1, 1, 0.97f});
-    tri(mid, {br[0], br[1], 1, 1, 1, 0.97f}, {bl[0], bl[1], 1, 1, 1, 0.97f});
-    tri(mid, {bl[0], bl[1], 1, 1, 1, 0.97f}, {tl[0], tl[1], 1, 1, 1, 0.97f});
+    const LightVertex mid{lx, ly, 1, 1, 1, 1.0f};  // pure white, the glow around it does the softening
+    tri(mid, {tl[0], tl[1], 1, 1, 1, 1.0f}, {tr[0], tr[1], 1, 1, 1, 1.0f});
+    tri(mid, {tr[0], tr[1], 1, 1, 1, 1.0f}, {br[0], br[1], 1, 1, 1, 1.0f});
+    tri(mid, {br[0], br[1], 1, 1, 1, 1.0f}, {bl[0], bl[1], 1, 1, 1, 1.0f});
+    tri(mid, {bl[0], bl[1], 1, 1, 1, 1.0f}, {tl[0], tl[1], 1, 1, 1, 1.0f});
     const std::uint32_t proj = 0x807EFE00u, model = 0x807EFE40u;
     const float p[4][4] = {{1.0f / 160.0f, 0, 0, 0}, {0, 1.0f / 120.0f, 0, 0}, {0, 0, 1.0f / 512.0f, 0}, {0, 0, 0, 1}};
     const float id[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
@@ -636,7 +645,7 @@ std::vector<TitleSceneSpec> title_scene_list() {
     const char* off = std::getenv("BLOCKPLANET_TITLE_CHARACTERS");
     if (off != nullptr && std::atoi(off) == 0) return list;
     const char* v = std::getenv("BLOCKPLANET_TITLE_SCENE");
-    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0xc9:0x27@0/0.458/0.265/0.72";
+    if (v == nullptr) v = "0x1b:0x28@0/-0.345/-0.141/0.92,0xc9:0x27@0/0.508/0.115/0.72";
     std::string text(v);
     std::size_t at = 0;
     while (at < text.size()) {
@@ -911,12 +920,12 @@ std::vector<MeshTriangle> decode_object(std::uint8_t* rdram, std::uint32_t o) {
 }
 
 struct BombPose { float x, y, size, yaw, pitch, roll; };
-// Positions in the 320 x 240 frame's centred units (y down), as in the
-// original picture: noses up and to the left, fins trailing at the lower right.
+// Positions in the 320 x 240 frame's centred units (y down), matched to the
+// original picture on a grid: noses to the left, fins on the right.
 constexpr BombPose bomb_poses[] = {
-    {80.0f, -20.0f, 0.0100f, 3.9f, -0.35f, 0.65f},
-    {104.0f, 16.0f, 0.0120f, 3.85f, -0.3f, 0.6f},
-    {78.0f, 50.0f, 0.0145f, 3.8f, -0.25f, 0.55f},
+    {62.0f, -12.0f, 0.0055f, 5.04f, -0.25f, 0.3f},
+    {68.0f, 19.0f, 0.0085f, 5.04f, -0.25f, 0.3f},
+    {40.0f, 54.0f, 0.0125f, 5.04f, -0.25f, 0.3f},
 };
 
 void draw_title_bombs(std::uint8_t* rdram) {
