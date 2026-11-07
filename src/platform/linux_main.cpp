@@ -1046,17 +1046,76 @@ void publish_game_text() {
         }
         const float area_w = frame->h * 4.0f / 3.0f;
         const float area_x = frame->x + (frame->w - area_w) / 2.0f;
-        for (const auto& t : texts) {
+        // Case: no shouting capitals (the owner's choice). The cards (font 1)
+        // are drawn a word at a time, so their words are cased together, in
+        // reading order, one run per colour (a yellow heading, an orange body),
+        // so sentences read as sentences.
+        std::vector<std::string> cased(texts.size());
+        // The game's button codes (%A%, %B%, ...) become the player's own button
+        // names (Xbox, PlayStation, Switch or keyboard).
+        const auto buttons = [&](std::string text) {
+            const auto bindings = controller_bindings();
+            const auto family = active_family.load();
+            const std::pair<const char*, std::string> codes[] = {
+                {"%A%", logical_action_label(family, bindings, LogicalAction::Confirm)},
+                {"%B%", logical_action_label(family, bindings, LogicalAction::Cancel)},
+                {"%Z%", magic_control_label(family, magic_control())},
+            };
+            for (const auto& [code, name] : codes)
+                for (std::size_t at; (at = text.find(code)) != std::string::npos;) text.replace(at, 3, "[" + name + "]");
+            return text;
+        };
+        auto texts_in = texts;
+        for (auto& t : texts_in) t.text = buttons(t.text);
+        for (std::size_t i = 0; i < texts.size(); ++i) cased[i] = tetrisphere::proper_case(texts_in[i].text);
+        {
+            std::vector<std::size_t> order;
+            for (std::size_t i = 0; i < texts.size(); ++i)
+                if (texts[i].font == 1) order.push_back(i);
+            std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+                return texts[a].y != texts[b].y ? texts[a].y < texts[b].y : texts[a].x < texts[b].x;
+            });
+            // A heading: the first line, when its colour differs from the
+            // next line's (a yellow title over an orange body); the rest is
+            // one text, cased as sentences.
+            std::size_t body = 0;
+            if (!order.empty()) {
+                const int first_y = texts[order[0]].y;
+                std::size_t k = 0;
+                while (k < order.size() && texts[order[k]].y == first_y) ++k;
+                if (k < order.size() && (texts[order[k]].r != texts[order[0]].r || texts[order[k]].g != texts[order[0]].g))
+                    body = k;
+            }
+            const auto apply = [&](std::size_t start, std::size_t end) {
+                if (start >= end) return;
+                std::string joined;
+                for (std::size_t k = start; k < end; ++k) joined += (k > start ? " " : "") + texts_in[order[k]].text;
+                const std::string run = tetrisphere::proper_case(joined);
+                std::vector<std::string> words;
+                std::string w;
+                for (char ch : run) {
+                    if (ch == ' ') { if (!w.empty()) words.push_back(w); w.clear(); }
+                    else w += ch;
+                }
+                if (!w.empty()) words.push_back(w);
+                if (words.size() == end - start)
+                    for (std::size_t k = start; k < end; ++k) cased[order[k]] = words[k - start];
+            };
+            apply(0, body);
+            apply(body, order.size());
+        }
+        for (std::size_t i = 0; i < texts.size(); ++i) {
+            const auto& t = texts[i];
             blockplanet::ui::HudView::Text out;
-            out.text = tetrisphere::proper_case(t.text);  // no shouting capitals (the owner's choice)
+            out.text = cased[i];
             out.x = (area_x + float(t.x) / 320.0f * area_w) / frame->window_w;
             out.y = (frame->y + (float(t.y) - 2.0f) / 240.0f * frame->h) / frame->window_h;
-            static const float font_lines[] = {13.0f, 13.0f, 11.0f, 11.0f};  // letter height per game font, of its 240 lines
+            static const float font_lines[] = {13.0f, 14.0f, 11.0f, 11.0f};  // letter height per game font, of its 240 lines
             const float lines = t.font >= 0 && t.font < 4 ? font_lines[t.font] : 11.0f;
             out.size = lines / 240.0f * frame->h / frame->window_h * 100.0f;
             out.width = float(t.width) / 320.0f * area_w / frame->window_w;
             char colour[16];
-            std::snprintf(colour, sizeof colour, "#%02x%02x%02x", t.r, t.g, t.b);
+            std::snprintf(colour, sizeof colour, "#%02x%02x%02x%02x", t.r, t.g, t.b, t.a);  // with the game's fade
             out.colour = colour;
             view->game_text.push_back(std::move(out));
         }

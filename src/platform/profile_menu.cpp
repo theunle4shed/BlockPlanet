@@ -282,7 +282,16 @@ std::string proper_case(const std::string& text) {
         for (const char* a : keep)
             if (bare == a) kept = true;
         bool first_letter = true;
+        bool bracket = false;
         for (char c : w) {
+            if (c == '[') bracket = true;
+            if (bracket) {  // a button name, as given
+                out += c;
+                if (c == ']') bracket = false;
+                first_letter = false;
+                sentence_start = false;
+                continue;
+            }
             if (c >= 'A' && c <= 'Z') {
                 const bool upper = kept || (first_letter && (title || sentence_start));
                 out += upper ? c : char(c - 'A' + 'a');

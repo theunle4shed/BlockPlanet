@@ -224,8 +224,8 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
             std::memcpy(&stack[k], rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x14u + 4u * std::uint32_t(k)) & 0x00FFFFFFu), 4);
         std::lock_guard lock(mutex);
         std::uint32_t raw0 = 0, raw1 = 0;
-        std::memcpy(&raw0, rdram + (at & 0x00FFFFFCu), 4);
-        std::memcpy(&raw1, rdram + ((at & 0x00FFFFFCu) + 4u), 4);
+        for (int k = 0; k < 4; ++k) raw0 = raw0 << 8 | rdram[((at + std::uint32_t(k)) & 0x00FFFFFFu) ^ 3u];
+        raw1 = static_cast<std::uint32_t>(ctx->r30);
         if (seen.insert(text + "@" + std::to_string(int(ctx->r6)) + "," + std::to_string(int(ctx->r7))).second)
             std::fprintf(stdout, "{\"event\":\"text\",\"raw\":\"%08X %08X\",\"ptr\":\"0x%08X\",\"text\":\"%s\",\"font\":%d,\"x\":%d,\"y\":%d,\"args\":[%u,%u,%u,%u],\"scene\":%d,\"mode\":%d}\n",
                          raw0, raw1, at, text.c_str(), int(ctx->r5), int(ctx->r6), int(ctx->r7), stack[0], stack[1], stack[2], stack[3],
@@ -234,9 +234,9 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     // The game's text, in BlockPlanet's font: kept for the UI and not drawn.
     if (helper == 0x800382B4u && text_replaced.load(std::memory_order_relaxed)) {
         static const bool keep_original = std::getenv("BLOCKPLANET_ORIGINAL_TEXT") != nullptr;
-        // Font 0 only for now (menus, Try Again, numbers): the cards' font 1
-        // passes its characters another way, still to decode.
-        if (!keep_original && (ctx->r5 & 0xFF) == 0) {
+        // Fonts 0 (menus, Try Again, numbers) and 1 (the cards: their text
+        // types out word by word, each word fading in by its alpha).
+        if (!keep_original && (ctx->r5 & 0xFF) <= 1) {
             blockplanet::GameText t;
             // func_800382B4(display list, font, x, y; string, r, g, b, a on the stack)
             std::uint32_t st[5];
@@ -251,7 +251,7 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
             t.font = int(ctx->r5 & 0xFF);
             t.x = int(ctx->r6), t.y = int(ctx->r7);
             const std::uint32_t c[3] = {st[1], st[2], st[3]};
-            t.r = c[0] & 0xFFu, t.g = c[1] & 0xFFu, t.b = c[2] & 0xFFu;
+            t.r = c[0] & 0xFFu, t.g = c[1] & 0xFFu, t.b = c[2] & 0xFFu, t.a = st[4] & 0xFFu;
             // Its width in the game's font, as func_800387CC measures it: the sum
             // of each character's s16 width at 0x80102D0C + font * 0x88 + char * 2.
             if (guest32(rdram, 0x80102D48u + 0x88u * std::uint32_t(t.font)) != 0)

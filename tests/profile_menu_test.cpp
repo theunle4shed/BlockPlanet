@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
         assert(proper_case("YOU MAY WANT TO TRY TRAINING") == "You may want to try training");
         assert(proper_case("ONE. TWO THREE FOUR") == "One. Two three four");
         assert(proper_case("Already fine") == "Already fine" && proper_case("1:23") == "1:23");
+        assert(proper_case("DIG WITH THE [A] BUTTON. THEN GO") == "Dig with the [A] button. Then go");
     }
     story = story_chapters({0}, 15);
     assert(story.size() == 2 && story[0].note == "completed" && story[1].focus && story[1].note == "next");

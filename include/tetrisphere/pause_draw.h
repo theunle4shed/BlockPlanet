@@ -25,7 +25,7 @@ struct GameText {
     std::string text;
     int font = 0;               // the game's font number (0 menus; others to measure)
     int x = 0, y = 0;           // the game's position, top left, in its 320 x 240 frame
-    unsigned r = 255, g = 255, b = 255;
+    unsigned r = 255, g = 255, b = 255, a = 255;
     int width = 0;              // its width in the game's own font (func_800387CC's table), 0 if unknown
 };
 std::vector<GameText> recent_game_text();
