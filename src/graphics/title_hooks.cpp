@@ -933,7 +933,7 @@ constexpr BombPose bomb_poses[] = {
     // Roll aims each nose at the breach (the white tile), as in the original.
     {62.0f, -12.0f, 0.0055f, 5.04f, -0.25f, 0.10f},
     {70.0f, 18.0f, 0.0085f, 5.04f, -0.25f, 0.35f},
-    {36.0f, 42.0f, 0.0125f, 4.4f, -0.7f, 0.5f},  // tail towards the viewer, as in the original
+    {40.0f, 48.0f, 0.0125f, 5.04f, 0.9f, 0.65f},  // tail towards the viewer (the owner's pick of four)
 };
 
 void draw_title_bombs(std::uint8_t* rdram) {
