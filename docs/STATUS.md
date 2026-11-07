@@ -31,7 +31,7 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 ## Open threads (next steps)
 
 1. **HUD for the other modes** (Hide & Seek, Puzzle, Lines and a first VS done; VS's shared progress bar and junk marker to do; Puzzle's dark band at the bottom to trace): designs agreed in `docs/HUD_DESIGN.md`; the Story HUD is the pattern.
-2. **Title rebuild** (done for a first version: the 3D letters, BlockPlanet's ring, Turbine and Wheels in their portrait colours, three Bombs, and the notice as text. To refine with the owner: Wheels' pose (borrowed scene), the robots' colours, lighting, placement on other screen shapes)
+2. **Title rebuild** (done for a first version: the 3D letters, BlockPlanet's ring, Turbine and Wheels in their portrait colours, three Bombs, and the notice as text. Light from the core, robots shaded, Wheels intact (scene 0xC9). To refine with the owner: colours, the core light's strength, placement on other screen shapes)
 3. **The game's floating number** (parked): a grey 3D number after big combos ("6000", "48000"), not the points total; to hide in Story and possibly reuse in score modes. Real-drop combo tests need the matching blocks under the drop, not beside it.
 4. **Asset catalogue** (`docs/research/blockplanet-assets.md`): archives unpacked and pictures catalogued; decode the 3D objects (s3) and scenes (s2) next.
 5. **Research loose ends:** how the original adds time for combos (Score Attack's rule is provisional); what each magic does and its name; magic crystals; fuse vs gravity combos; CONNECT and CRYSTAL TOWER goals; the two unseen piece shapes (IDs 3, 4).

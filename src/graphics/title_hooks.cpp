@@ -543,7 +543,7 @@ std::vector<TitleSceneSpec> title_scene_list() {
     const char* off = std::getenv("BLOCKPLANET_TITLE_CHARACTERS");
     if (off != nullptr && std::atoi(off) == 0) return list;
     const char* v = std::getenv("BLOCKPLANET_TITLE_SCENE");
-    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0x3e:0x27@0/0.04/-0.12/0.62";
+    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0xc9:0x27@0/0.67/-0.06/1.25";
     std::string text(v);
     std::size_t at = 0;
     while (at < text.size()) {
