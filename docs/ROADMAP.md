@@ -212,6 +212,15 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 
 **Join codes for streamers (idea, 2026-11-06).** Friend and lobby codes shown hidden (`••••••`) with a reveal button and a **Copy** button that works while hidden; a **streamer mode** setting hides codes everywhere by default (lobby, notifications) and perhaps friends' names. See REDESIGN.md, section 4.
 
+**Every screen in BlockPlanet's style (decided 2026-11-07).** For consistency, every screen the player sees should use BlockPlanet's design and font (Lato), not the original's pixel lettering. Already done: the menus, pause, the HUD in every mode, the title notice. Still the original's, to replace one by one (hide the original's text and draw BlockPlanet's, as the pause screen does), roughly in order of how often they are seen:
+1. The scores and game-over screen, Try Again, and the end-of-episode Continue / Exit menu.
+2. The episode cards ("EPISODE 2") and the messages between episodes.
+3. Hide & Seek's goal card and Lines' rules card (shown now through the original HUD, `0x801033AC`).
+4. Training's instructor text and pages (tied to the lessons' timing).
+5. The credits, the endings' text and name entry.
+6. Leftover original HUD pieces (the multiplier badge where it still shows).
+Each needs its text found (much of it is pictures in the main archive; the asset catalogue lists them) and the screen's timing kept.
+
 **Credits (reminder, 2026-11-07).** When the credits are done, add a section for the repositories BlockPlanet builds on or referenced (Blocksphere, N64Recomp, N64ModernRuntime, RT64, RmlUi and others in THIRD_PARTY_NOTICES.md), and the owner's Git username.
 
 **Animated title characters (nice to have, idea 2026-11-07).** Turbine and Wheels are held on one frame of their scenes; letting them move (an idle loop: tentacles swaying, a wheel turning, the Bombs drifting) would bring the title to life. The scene code already animates them; what is needed is a short loop that stays inside the ring, and Wheels' own scene.
