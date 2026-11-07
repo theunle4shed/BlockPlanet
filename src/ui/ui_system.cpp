@@ -141,7 +141,9 @@ void apply_requests() {
 }
 
 const char* magic_name(int magic) {
-    static const char* names[] = {"Firecracker", "Dynamite", "Magnet", "Atom", "Rocket", "Ray Gun"};
+    // Held magic 0 to 5, lowest to highest (the manual: Firecracker, Bundle O' Dynamite,
+    // Electro Magnet, Atom, Bomb, Ray Gun; shortened to fit the item box).
+    static const char* names[] = {"Firecracker", "Dynamite", "Magnet", "Atom", "Bomb", "Ray Gun"};
     return magic >= 0 && magic < 6 ? names[magic] : "";
 }
 

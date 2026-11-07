@@ -36,7 +36,11 @@ The main archive's name artwork (entries `0x118` to `0x11E`: Rocket, Gear, Gyro,
 | 5 | Turbine | `0x11D` | `0x9F` | `0x28` | teal, tentacles (the title's crab robot) |
 | 6 | Jak | `0x11E` | `0xA0` | `0x29` | lavender, round, big arm |
 
-The models are the robots in ball form (textured; their limbs are folded inside and posed by animation), so a preview without a scene shows mostly a sphere. The title picture's white rockets with red fins are not the Rocket robot (navy); they match the separate rocket object s2 `0x5E`.
+The models are the robots in ball form (textured; their limbs are folded inside and posed by animation), so a preview without a scene shows mostly a sphere. The title picture's white rockets with red fins are not the Rocket robot (navy): they are the **Bomb** magic's missile (magic value 4; its pieces are in the combined magic object s2 `0x14`, and a similar standalone object is s2 `0x5E`).
+
+## The magic items
+
+Held magic 0 to 5 (player context `+0x702`), lowest to highest: Firecracker, Bundle O' Dynamite, Electro Magnet, Atom, Bomb, Ray Gun (the manual's names, in the order the models appear). Each is a scene, s3 `0xD2` + value, drawing objects of the combined object s2 `0x14` (43 parts: dynamite sticks and band, magnet halves, atom rings and nucleus, the bomb's body and red fins, the ray gun's barrel and cones, spark bursts).
 
 ## 3D objects (archive s2)
 
