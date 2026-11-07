@@ -585,8 +585,12 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         static Rml::Vector2f last{0, 0};
         auto s = left->GetBox().GetSize(Rml::BoxArea::Border);
         if (s.x > 0 && s.y > 0) last = s; else s = last;
+        // The row is drawn 1.3 times larger about its bottom centre (hud.rcss),
+        // so it is kept on screen at that size.
+        constexpr float scale = 1.3f;
+        const float grow = (scale - 1.0f) / 2.0f * s.x;
         const float cx = (hud.picture_x + hud.picture_w * 0.25f) * width;
-        const float lx = std::clamp(cx - s.x / 2.0f, margin, std::max(margin, width - margin - s.x));
+        const float lx = std::clamp(cx - s.x / 2.0f, margin + grow, std::max(margin + grow, width - margin - s.x - grow));
         const float ly = height - margin - s.y;
         left->SetProperty("left", px(lx));
         left->SetProperty("top", px(ly));
