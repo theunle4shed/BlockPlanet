@@ -24,7 +24,19 @@ A picture is s16 width, s16 height, s16 format, 2 bytes, then pixels: format 0 i
 
 ## The robot characters
 
-The main archive's name artwork (entries `0x118` to `0x11E`: Rocket, Gear, Gyro, Stomp, Wheels, Turbine, Jak) names the game's **seven robot characters** the player chooses from, not the magics (corrected 2026-11-07, the owner's knowledge, confirmed by online guides). Each has a balance of speed (moving) and power (speed when moving a block), the "speed / power" artwork (`0x110`): Rocket the fastest and weakest, Gear fast and weak, Wheels (the default) and Turbine even, Gyro and Jak slow and strong, Stomp the slowest and strongest. The "DEMO" portraits (`0x8B`, `0x8C`, `0x9D` to `0xA0`, `0xBD`) are probably the same characters (the teal crab-like one among them), so the title picture's characters are likely playable robots. Their in-memory selection and stats are still to find.
+The main archive's name artwork (entries `0x118` to `0x11E`: Rocket, Gear, Gyro, Stomp, Wheels, Turbine, Jak) names the game's **seven robot characters** the player chooses from, not the magics (corrected 2026-11-07, the owner's knowledge, confirmed by online guides). Each has a balance of speed (moving) and power (speed when moving a block), the "speed / power" artwork (`0x110`): Rocket the fastest and weakest, Gear fast and weak, Wheels (the default) and Turbine even, Gyro and Jak slow and strong, Stomp the slowest and strongest. The "DEMO" portraits (`0x8B`, `0x8C`, `0x9D` to `0xA0`, `0xBD`) are probably the same characters (the teal crab-like one among them), so the title picture's characters are likely playable robots. **Matched (2026-11-07) through the game's own tables**, in robot order 0 to 6: the player page loads the names into a table in this order (`0x8004156C` onwards), the DEMO portraits are a table at `0x800E23C0`, and a loop loads the seven 3D models from a table at `0x800E0744` (`0x8005DA58`). `0x800E23B4` is read in many places and is probably the selected robot.
+
+| # | Robot | Name art | Portrait | 3D model (s2) | Looks like (portrait) |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Rocket | `0x118` | `0xBD` | `0x23` | dark navy, rocket flame beneath |
+| 1 | Gear | `0x119` | `0x8B` | `0x24` | blue, gear arm |
+| 2 | Gyro | `0x11A` | `0x8C` | `0x32` | purple, spinning-top base, eyes on stalks |
+| 3 | Stomp | `0x11B` | `0x9D` | `0x26` | orange, round visor |
+| 4 | Wheels | `0x11C` | `0x9E` | `0x27` | cream and gold, big wheel (the title's gold robot) |
+| 5 | Turbine | `0x11D` | `0x9F` | `0x28` | teal, tentacles (the title's crab robot) |
+| 6 | Jak | `0x11E` | `0xA0` | `0x29` | lavender, round, big arm |
+
+The models are the robots in ball form (textured; their limbs are folded inside and posed by animation), so a preview without a scene shows mostly a sphere. The title picture's white rockets with red fins are not the Rocket robot (navy); they match the separate rocket object s2 `0x5E`.
 
 ## 3D objects (archive s2)
 
