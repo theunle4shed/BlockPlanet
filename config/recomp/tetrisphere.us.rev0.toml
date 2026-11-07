@@ -666,3 +666,9 @@ func = "func_8002D93C"
 before_vram = 0x8002DD1C
 text = "ctx->r1 = S32(0x80800001u);"
 
+# The game's text routine (font in a1, x in a2, y in a3, the string and its
+# colour on the stack): its strings are drawn in BlockPlanet's font instead
+# (src/graphics/pause_draw_hooks.cpp, the game's text).
+[[patches.hook]]
+func = "func_800382B4"
+text = "if (blockplanet_draw_filter(rdram, ctx, 0x800382B4u)) return;"

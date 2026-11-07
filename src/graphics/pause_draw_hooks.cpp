@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <set>
 #include <string>
@@ -80,12 +81,31 @@ std::atomic<bool> hud_hidden{false};
 bool in_hud = false;
 
 bool is_2d_helper(std::uint32_t helper) {
-    return helper == 0x8003396Cu || helper == 0x800353F4u || helper == 0x80036FE4u || helper == 0x80071DE8u || helper == 0x80038478u || helper == 0x8007240Cu;
+    return helper == 0x8003396Cu || helper == 0x800353F4u || helper == 0x80036FE4u || helper == 0x80071DE8u || helper == 0x80038478u ||
+           helper == 0x8007240Cu || helper == 0x800382B4u;
 }
 
 } // namespace
 
+namespace {
+std::atomic<bool> text_replaced{true};
+std::mutex text_mutex;
+struct TimedText { blockplanet::GameText text; std::chrono::steady_clock::time_point at; };
+std::vector<TimedText> texts;
+}
+
 namespace blockplanet {
+void set_game_text_replaced(bool replaced) { text_replaced.store(replaced); }
+std::vector<GameText> recent_game_text() {
+    const auto now = std::chrono::steady_clock::now();
+    std::lock_guard lock(text_mutex);
+    std::vector<GameText> out;
+    std::vector<TimedText> keep;
+    for (const auto& t : texts)
+        if (now - t.at < std::chrono::milliseconds(150)) keep.push_back(t), out.push_back(t.text);
+    texts = std::move(keep);
+    return out;
+}
 void set_pause_menu_shown(bool shown) { menu_shown.store(shown); }
 void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 }
@@ -177,6 +197,65 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
             std::fprintf(stdout, "{\"event\":\"draw\",\"helper\":\"0x%08X\",\"a0\":\"0x%08X\",\"a1\":\"0x%08X\",\"a2\":%d,\"a3\":%d,\"scene\":%d}\n",
                          helper, static_cast<std::uint32_t>(ctx->r4), static_cast<std::uint32_t>(ctx->r5), static_cast<int>(ctx->r6),
                          static_cast<int>(ctx->r7), static_cast<int>(guest16(rdram, 0x800E121Cu)));
+    }
+    // Research: BLOCKPLANET_TEXT_LOG=1 logs each distinct string drawn by the
+    // game's text routine (0x80038478: a1 x, a2 y, a3 string, then four words
+    // on the stack), with those words.
+    static const bool text_log = std::getenv("BLOCKPLANET_TEXT_LOG") != nullptr;
+    if (text_log && helper == 0x800382B4u) {
+        static std::mutex mutex;
+        static std::set<std::string> seen;
+        std::string text;
+        std::uint32_t at = 0;
+        std::memcpy(&at, rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x10u) & 0x00FFFFFFu), 4);
+        for (std::uint32_t k = 0; k < 96 && at >= 0x80000000u; ++k) {
+            const char ch = static_cast<char>(rdram[((at + k) & 0x00FFFFFFu) ^ 3u]);
+            if (ch == 0) break;
+            text += (ch >= 32 && ch < 127 && ch != '"' && ch != '\\') ? ch : '?';
+        }
+        std::uint32_t stack[4];
+        for (int k = 0; k < 4; ++k)
+            std::memcpy(&stack[k], rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x14u + 4u * std::uint32_t(k)) & 0x00FFFFFFu), 4);
+        std::lock_guard lock(mutex);
+        std::uint32_t raw0 = 0, raw1 = 0;
+        std::memcpy(&raw0, rdram + (at & 0x00FFFFFCu), 4);
+        std::memcpy(&raw1, rdram + ((at & 0x00FFFFFCu) + 4u), 4);
+        if (seen.insert(text + "@" + std::to_string(int(ctx->r6)) + "," + std::to_string(int(ctx->r7))).second)
+            std::fprintf(stdout, "{\"event\":\"text\",\"raw\":\"%08X %08X\",\"ptr\":\"0x%08X\",\"text\":\"%s\",\"font\":%d,\"x\":%d,\"y\":%d,\"args\":[%u,%u,%u,%u],\"scene\":%d,\"mode\":%d}\n",
+                         raw0, raw1, at, text.c_str(), int(ctx->r5), int(ctx->r6), int(ctx->r7), stack[0], stack[1], stack[2], stack[3],
+                         int(guest16(rdram, 0x800E121Cu)), int(guest16(rdram, 0x800E44A8u)));
+    }
+    // The game's text, in BlockPlanet's font: kept for the UI and not drawn.
+    if (helper == 0x800382B4u && text_replaced.load(std::memory_order_relaxed)) {
+        static const bool keep_original = std::getenv("BLOCKPLANET_ORIGINAL_TEXT") != nullptr;
+        // Font 0 only for now (menus, Try Again, numbers): the cards' font 1
+        // passes its characters another way, still to decode.
+        if (!keep_original && (ctx->r5 & 0xFF) == 0) {
+            blockplanet::GameText t;
+            // func_800382B4(display list, font, x, y; string, r, g, b, a on the stack)
+            std::uint32_t st[5];
+            for (int k = 0; k < 5; ++k)
+                std::memcpy(&st[k], rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x10u + 4u * std::uint32_t(k)) & 0x00FFFFFFu), 4);
+            const std::uint32_t at = st[0];
+            for (std::uint32_t k = 0; k < 160 && at >= 0x80000000u; ++k) {
+                const char ch = static_cast<char>(rdram[((at + k) & 0x00FFFFFFu) ^ 3u]);
+                if (ch == 0) break;
+                t.text += ch;
+            }
+            t.font = int(ctx->r5 & 0xFF);
+            t.x = int(ctx->r6), t.y = int(ctx->r7);
+            const std::uint32_t c[3] = {st[1], st[2], st[3]};
+            t.r = c[0] & 0xFFu, t.g = c[1] & 0xFFu, t.b = c[2] & 0xFFu;
+            if (!t.text.empty()) {
+                const auto now = std::chrono::steady_clock::now();
+                std::lock_guard lock(text_mutex);
+                bool found = false;
+                for (auto& e : texts)
+                    if (e.text.x == t.x && e.text.y == t.y && e.text.text == t.text) e.at = now, e.text = t, found = true;
+                if (!found && texts.size() < 256) texts.push_back({t, now});
+            }
+            return true;
+        }
     }
     if (helper == 0x8002D93Cu) {
         blockplanet_magic_flight(rdram, ctx);

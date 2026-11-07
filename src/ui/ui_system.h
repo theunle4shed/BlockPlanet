@@ -113,6 +113,12 @@ struct HudView {
     std::vector<std::string> title_notice;
     std::string title_disclaimer;
     float title_x = 0, title_y = 0, title_w = 0;
+    // The game's own text, in BlockPlanet's font (the game's strings, placed
+    // as the game placed them; fractions of the window, size in window
+    // heights). With nothing else set, only these are shown.
+    struct Text { std::string text; float x = 0, y = 0, size = 0; std::string colour; };
+    std::vector<Text> game_text;
+    bool text_only = false;
     bool versus = false;
     VersusPlayer players[2];
     // 0 near (as on a 4:3 screen, still), 1 the screen's edges, 2 near and

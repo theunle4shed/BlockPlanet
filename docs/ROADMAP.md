@@ -221,6 +221,8 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 6. Leftover original HUD pieces (the multiplier badge where it still shows).
 Each needs its text found (much of it is pictures in the main archive; the asset catalogue lists them) and the screen's timing kept.
 
+**Progress (2026-11-07):** the game's text routine (`func_800382B4`) is hooked, and its font 0 (menus, the Try Again / Exit / Training menu, the original HUD's numbers) is now drawn in BlockPlanet's font at the game's own positions. Next: font 1 (the cards; it passes a constant pointer at `0x800F63DC`, one call per character, so the characters come another way), the pictures with text in them (the Try Again hint), and alignment (the game places right-aligned menus by its own letter widths).
+
 **Credits (reminder, 2026-11-07).** When the credits are done, add a section for the repositories BlockPlanet builds on or referenced (Blocksphere, N64Recomp, N64ModernRuntime, RT64, RmlUi and others in THIRD_PARTY_NOTICES.md), and the owner's Git username.
 
 **Animated title characters (nice to have, idea 2026-11-07).** Turbine and Wheels are held on one frame of their scenes; letting them move (an idle loop: tentacles swaying, a wheel turning, the Bombs drifting) would bring the title to life. The scene code already animates them; what is needed is a short loop that stays inside the ring, and Wheels' own scene.

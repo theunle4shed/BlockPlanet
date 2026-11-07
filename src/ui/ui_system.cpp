@@ -208,7 +208,23 @@ std::string versus_column(const HudView::VersusPlayer& p, const char* id, const 
     return rml;
 }
 
+std::string game_text_rml(const HudView& hud) {
+    std::string rml;
+    const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };
+    for (const auto& t : hud.game_text)
+        rml += "<div class='game-text' style='left: " + pct(t.x) + "; top: " + pct(t.y) + "; font-size: " +
+               std::to_string(t.size) + "vh; color: " + t.colour + ";'>" + escape(t.text) + "</div>";
+    return rml;
+}
+
+std::string hud_rml_parts(const HudView& hud);
+
 std::string hud_rml(const HudView& hud) {
+    if (hud.text_only) return game_text_rml(hud);
+    return hud_rml_parts(hud) + game_text_rml(hud);
+}
+
+std::string hud_rml_parts(const HudView& hud) {
     std::string rml;
     if (!hud.title_notice.empty()) {
         const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };

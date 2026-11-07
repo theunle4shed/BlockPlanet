@@ -333,6 +333,9 @@ std::string hide_and_seek_goal(int goal) {
 
 void update_magic_box();
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
+std::optional<blockplanet::ui::HudView> last_hud_view;  // what update_hud last showed (nullopt: none)
+void show_hud(std::optional<blockplanet::ui::HudView> view) { last_hud_view = std::move(view); }
+void publish_game_text();
 
 int& last_drops_seen() { static int v = 0; return v; }
 int& last_slides_seen() { static int v = 0; return v; }
@@ -396,7 +399,7 @@ void update_puzzle_hud() {
     }
     tetrisphere::StoryHudState state;
     place_hud(view, state);
-    blockplanet::ui::set_hud(view);
+    show_hud(view);
 }
 
 bool update_title_overlay();
@@ -500,7 +503,7 @@ void update_hud() {
         blockplanet::set_original_hud_hidden(!card);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
         if (card) {
-            blockplanet::ui::set_hud(std::nullopt);
+            show_hud(std::nullopt);
             return;
         }
         blockplanet::ui::HudView view;
@@ -532,7 +535,7 @@ void update_hud() {
         tetrisphere::StoryHudState state;
         place_hud(view, state);
         view.distance_mode = 1;  // VS: always at the outer edges
-        blockplanet::ui::set_hud(view);
+        show_hud(view);
         return;
     }
     // Puzzle (mode 4): its own HUD (docs/HUD_DESIGN.md, Puzzle).
@@ -547,13 +550,13 @@ void update_hud() {
     // its HUD routine: while one is up, show the original HUD and not ours.
     if (story && guest::load16(guest_rdram, 0x801033AC) != 0) {
         blockplanet::set_original_hud_hidden(false);
-        blockplanet::ui::set_hud(std::nullopt);
+        show_hud(std::nullopt);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
         return;
     }
     blockplanet::set_original_hud_hidden(story);
     if (!story) {
-        blockplanet::ui::set_hud(std::nullopt);
+        show_hud(std::nullopt);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
         return;
     }
@@ -854,7 +857,7 @@ void update_hud() {
         popup.y = -view.sphere_radius * std::sin(b);  // the board's rows run upwards on screen
         view.popups.push_back(popup);
     }
-    blockplanet::ui::set_hud(std::move(view));
+    show_hud(std::move(view));
 }
 
 // Research aid: BLOCKPLANET_WATCH="0x800E44A8:2,0x80103958:4" logs each
@@ -1029,6 +1032,37 @@ std::optional<PictureFrame> picture_frame() {
     return f;
 }
 
+// The game's text in BlockPlanet's font (pause_draw_hooks.cpp keeps the
+// strings the game drew): placed where the game placed them in its 4:3 frame,
+// joined to whatever HUD is shown, then handed to the UI.
+void publish_game_text() {
+    auto view = last_hud_view;
+    const auto texts = blockplanet::recent_game_text();
+    const auto frame = picture_frame();
+    if (!texts.empty() && frame) {
+        if (!view) {
+            view = blockplanet::ui::HudView{};
+            view->text_only = true;
+        }
+        const float area_w = frame->h * 4.0f / 3.0f;
+        const float area_x = frame->x + (frame->w - area_w) / 2.0f;
+        for (const auto& t : texts) {
+            blockplanet::ui::HudView::Text out;
+            out.text = t.text;
+            out.x = (area_x + float(t.x) / 320.0f * area_w) / frame->window_w;
+            out.y = (frame->y + (float(t.y) - 2.0f) / 240.0f * frame->h) / frame->window_h;
+            static const float font_lines[] = {13.0f, 13.0f, 11.0f, 11.0f};  // letter height per game font, of its 240 lines
+            const float lines = t.font >= 0 && t.font < 4 ? font_lines[t.font] : 11.0f;
+            out.size = lines / 240.0f * frame->h / frame->window_h * 100.0f;
+            char colour[16];
+            std::snprintf(colour, sizeof colour, "#%02x%02x%02x", t.r, t.g, t.b);
+            out.colour = colour;
+            view->game_text.push_back(std::move(out));
+        }
+    }
+    blockplanet::ui::set_hud(std::move(view));
+}
+
 // The title screen: the painted picture (with the copyright lines) is not
 // drawn while the 3D letters are held, so the original game's notice is shown
 // as text, word for word (the owner's exception in AGENTS.md), with
@@ -1045,7 +1079,7 @@ bool update_title_overlay() {
     if (!blockplanet_title_recent(nullptr)) return false;
     const auto frame = picture_frame();
     if (!frame) {
-        blockplanet::ui::set_hud(std::nullopt);
+        show_hud(std::nullopt);
         return true;
     }
     // Where the picture had the lines: near the bottom of the game's 4:3
@@ -1058,7 +1092,7 @@ bool update_title_overlay() {
     view.title_x = (area_x + area_w * 0.04f) / frame->window_w;
     view.title_w = area_w * 0.92f / frame->window_w;
     view.title_y = (frame->y + frame->h * 0.84f) / frame->window_h;
-    blockplanet::ui::set_hud(view);
+    show_hud(view);
     return true;
 }
 
@@ -2552,6 +2586,7 @@ bool handle_profile_command(const std::string& command) {
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
             update_hud();
+            publish_game_text();
             // A single stage finished: pause, then quit to the menu.
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();

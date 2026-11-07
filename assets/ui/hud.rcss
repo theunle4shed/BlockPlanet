@@ -260,3 +260,11 @@ div { display: block; }
     #title-notice .notice { font-size: 13dp; line-height: 17dp; letter-spacing: 0dp; }
     #title-notice .disclaimer { font-size: 11dp; line-height: 14dp; margin-top: 5dp; }
 }
+
+/* The game's own text in BlockPlanet's font, placed as the game placed it. */
+.game-text {
+    position: absolute;
+    white-space: nowrap;
+    font-weight: bold;
+    font-effect: outline(2dp #1a0c04);
+}
