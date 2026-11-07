@@ -90,6 +90,11 @@ std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<
 std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done);
 // The puzzles to choose from: each solved one (with its best time and fewest
 // moves, when known) and the next unsolved, up to `count`; the next is focused.
+// The game's all-capitals text in BlockPlanet's style: short labels (three
+// words or fewer) in Title Case ("TRY AGAIN" -> "Try Again"), longer lines in
+// sentence case. Abbreviations (VS, CPU, ...) stay in capitals, "&" gets
+// spaces ("HIDE&SEEK" -> "Hide & Seek"). Text with any lower case is unchanged.
+std::string proper_case(const std::string& text);
 std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
                                                    const std::vector<double>& best_moves, int count = 100);
 

@@ -106,6 +106,13 @@ int main(int argc, char** argv) {
         assert(puzzles[2].label == "Puzzle 3" && puzzles[2].note == "next" && puzzles[2].focus &&
                puzzles[2].action == "command:puzzle:3");
         assert(puzzle_list({}, {}, {}).size() == 1);
+        // The game's capitals in BlockPlanet's style.
+        assert(proper_case("TRY AGAIN") == "Try Again" && proper_case("EXIT") == "Exit");
+        assert(proper_case("HIDE&SEEK") == "Hide & Seek" && proper_case("VS CPU") == "VS CPU");
+        assert(proper_case("CLOSE GAME") == "Close Game" && proper_case("PLAYER 1") == "Player 1");
+        assert(proper_case("YOU MAY WANT TO TRY TRAINING") == "You may want to try training");
+        assert(proper_case("ONE. TWO THREE FOUR") == "One. Two three four");
+        assert(proper_case("Already fine") == "Already fine" && proper_case("1:23") == "1:23");
     }
     story = story_chapters({0}, 15);
     assert(story.size() == 2 && story[0].note == "completed" && story[1].focus && story[1].note == "next");

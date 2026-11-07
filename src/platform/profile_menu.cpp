@@ -241,4 +241,60 @@ std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, 
     return items;
 }
 
+std::string proper_case(const std::string& text) {
+    bool has_upper = false;
+    for (char c : text) {
+        if (c >= 'a' && c <= 'z') return text;
+        if (c >= 'A' && c <= 'Z') has_upper = true;
+    }
+    if (!has_upper) return text;
+    std::string spaced;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '&') {
+            if (!spaced.empty() && spaced.back() != ' ') spaced += ' ';
+            spaced += '&';
+            if (i + 1 < text.size() && text[i + 1] != ' ') spaced += ' ';
+        } else {
+            spaced += text[i];
+        }
+    }
+    std::vector<std::string> words;
+    std::string word;
+    for (char c : spaced) {
+        if (c == ' ') { words.push_back(word); word.clear(); }
+        else word += c;
+    }
+    words.push_back(word);
+    int letters_words = 0;
+    for (const auto& w : words)
+        if (!w.empty()) ++letters_words;
+    const bool title = letters_words <= 3;
+    static const char* keep[] = {"VS", "CPU", "HUD", "TV", "OK", "N64", "H2O", "TM", "X"};
+    std::string out;
+    bool sentence_start = true;
+    for (std::size_t k = 0; k < words.size(); ++k) {
+        if (k > 0) out += ' ';
+        const std::string& w = words[k];
+        bool kept = false;
+        std::string bare;
+        for (char c : w)
+            if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) bare += c;
+        for (const char* a : keep)
+            if (bare == a) kept = true;
+        bool first_letter = true;
+        for (char c : w) {
+            if (c >= 'A' && c <= 'Z') {
+                const bool upper = kept || (first_letter && (title || sentence_start));
+                out += upper ? c : char(c - 'A' + 'a');
+                first_letter = false;
+                sentence_start = false;
+            } else {
+                out += c;
+                if (c == '.' || c == '!' || c == '?') sentence_start = true;
+            }
+        }
+    }
+    return out;
+}
+
 } // namespace tetrisphere

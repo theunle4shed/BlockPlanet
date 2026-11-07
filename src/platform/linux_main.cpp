@@ -1048,7 +1048,7 @@ void publish_game_text() {
         const float area_x = frame->x + (frame->w - area_w) / 2.0f;
         for (const auto& t : texts) {
             blockplanet::ui::HudView::Text out;
-            out.text = t.text;
+            out.text = tetrisphere::proper_case(t.text);  // no shouting capitals (the owner's choice)
             out.x = (area_x + float(t.x) / 320.0f * area_w) / frame->window_w;
             out.y = (frame->y + (float(t.y) - 2.0f) / 240.0f * frame->h) / frame->window_h;
             static const float font_lines[] = {13.0f, 13.0f, 11.0f, 11.0f};  // letter height per game font, of its 240 lines

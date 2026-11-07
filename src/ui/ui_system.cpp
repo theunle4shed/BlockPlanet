@@ -451,8 +451,12 @@ bool update_hud_document() {
             const float target = e->GetAttribute<float>("data-w", 0.0f) * window_w;
             const float actual = e->GetBox().GetSize().x;
             if (target <= 0.0f || actual <= 0.0f) continue;
-            const float scale = std::clamp(target / actual, 0.7f, 1.4f);
-            e->SetProperty("transform", "scale(" + std::to_string(scale) + ", 1)");
+            // Mixed case is narrower than the game's capitals: only a little
+            // stretch, and the rest of the span split either side (centred in
+            // it, so the game's layout still reads).
+            const float scale = std::clamp(target / actual, 0.85f, 1.12f);
+            const float shift = std::max(0.0f, (target - actual * scale) / 2.0f);
+            e->SetProperty("transform", "translate(" + std::to_string(shift) + "px, 0px) scale(" + std::to_string(scale) + ", 1)");
             e->SetProperty("transform-origin", "0% 50%");
         }
     }
