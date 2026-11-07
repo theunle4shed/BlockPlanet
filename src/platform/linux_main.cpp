@@ -481,6 +481,42 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     show_hud(view);
 }
 
+// Training's sphere, whole: the game draws it through a ready-made display
+// list that clips to the left half of the screen (a scissor 0..160 of 320, to
+// keep it clear of the original speech bubble), which slices its right edge
+// flat. BlockPlanet's speech panel no longer sits there, so in Training the
+// scissor is widened to the whole screen, and put back for every other mode
+// (VS's split screen uses it). Found by its value near 0x80165148 (the game's
+// table of viewports and scissors), as the address may move.
+void update_training_scissor(bool training) {
+    static std::uint32_t found = 0;
+    static bool widened = false;
+    if (guest_rdram == nullptr || std::getenv("BLOCKPLANET_ORIGINAL_TRAINING_CLIP") != nullptr) return;
+    auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
+    constexpr std::uint32_t half = 0x002803C0u, whole = 0x005003C0u;  // lower right: x 160 or 320, y 240 (quarter pixels)
+    const auto valid = [&](std::uint32_t a) {
+        const std::uint32_t w1 = guest::load32(guest_rdram, a + 4);
+        return guest::load32(guest_rdram, a) == 0xED000000u && (w1 == half || w1 == whole);
+    };
+    if (found == 0 || !valid(found)) {
+        found = 0;
+        for (std::uint32_t a = 0x80164000u; a < 0x80167000u; a += 8)
+            if (guest::load32(guest_rdram, a) == 0xED000000u && guest::load32(guest_rdram, a + 4) == half) {
+                found = a;
+                break;
+            }
+        widened = false;
+    }
+    if (found == 0) return;
+    if (training && !widened) {
+        guest::store32(rdram, found + 4, whole);
+        widened = true;
+    } else if (!training && widened) {
+        guest::store32(rdram, found + 4, half);
+        widened = false;
+    }
+}
+
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
     if (update_title_overlay()) return;
@@ -572,6 +608,7 @@ void update_hud() {
             }
         }
     }
+    update_training_scissor(story && state.mode == 3);
     if (story && state.mode == 3) {  // Training
         update_training_hud(state);
         return;
