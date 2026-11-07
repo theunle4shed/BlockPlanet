@@ -1,0 +1,16 @@
+<rml>
+<head>
+    <title>Story</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title">Story</div>
+        <div class="subtitle">New to Tetrisphere?</div>
+        <div class="item" id="training" data-action="command:training" data-description="Wheels shows you how to play: moving the shadow, sliding and dropping pieces, combos and magic. You can return to Story afterwards.">Start with Training</div>
+        <div class="item" id="story" data-action="open:story" data-description="Go straight to the campaign. Training stays a button press away in the Story menus.">Go straight to Story</div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description empty"></div>
+    </div>
+</body>
+</rml>

@@ -3086,6 +3086,23 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
+            if (*command == "open_story") {
+                // A new player (no Story episode done) is asked once whether to
+                // start with Training; afterwards Story opens directly.
+                bool episode_done = false;
+                if (const auto found = profile_data.progress.chapters_completed.find("rescue");
+                    found != profile_data.progress.chapters_completed.end())
+                    for (int chapter : found->second) episode_done = episode_done || chapter >= 1;
+                if (profile_save && !episode_done && !profile_data.progress.training_offered) {
+                    profile_data.progress.training_offered = true;
+                    profile_dirty = true;
+                    save_profile();
+                    blockplanet::ui::request_show("first_story");
+                } else {
+                    blockplanet::ui::request_show("story");
+                }
+                continue;
+            }
             if (*command == "training_story") {
                 // X on Story: its Training lessons.
                 const auto done = [&](const char* mode) {

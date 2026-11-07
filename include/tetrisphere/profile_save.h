@@ -95,6 +95,9 @@ struct ProfileProgress {
         int magic = -1;
     };
     LastPlay last_play;
+    // A new player opening Story has been asked once whether to start with
+    // Training (docs/DECISIONS-2026-11-07.md).
+    bool training_offered = false;
 };
 
 struct ProfileSaveData {
