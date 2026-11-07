@@ -305,7 +305,7 @@ div { display: block; }
    sides, half inside the panel, so panel and tail read as one shape. */
 .card-panel {
     position: absolute;
-    padding: 1.1em 1.3em 0.5em 1.3em;
+    padding: 0.7em 0.95em 0.35em 0.95em;
     background-color: #0d1222;
     border: 0.35vh #f0f0f0;
     border-radius: 2.2vh;
@@ -316,7 +316,7 @@ div { display: block; }
     display: block;
     font-weight: bold;
     font-size: 1.12em;
-    margin-bottom: 0.45em;
+    margin-bottom: 0.35em;
     font-effect: outline(1dp #1a0c04);
 }
 .card-body {
@@ -327,11 +327,11 @@ div { display: block; }
 .card-body .hl { font-weight: bold; }
 .card-hint {
     display: block;
-    text-align: right;
+    text-align: left;  /* the tail is under the right of the bottom edge */
     color: #c8ccd8;
     font-weight: bold;
     font-size: 0.78em;
-    margin-top: 0.3em;
+    margin-top: 0.15em;
 }
 .card-tail {
     position: absolute;

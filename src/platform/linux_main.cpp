@@ -1247,19 +1247,21 @@ void publish_game_text() {
             view->game_text.push_back(std::move(out));
         }
         if (box) {
-            // Training's bubble as a panel holding the card's text: its right
-            // edge and bottom where the bubble's were (x +146, y +98), narrower
-            // (118 of the game's 320 columns), growing upwards to fit; the tail
-            // where the bubble's was (x +123), pointing down at Wheels.
+            // Training's bubble as a panel holding the card's text, always
+            // spoken by Wheels: its bottom edge fixed just above his hat (the
+            // game's line 127; he stands at the same place in every lesson),
+            // its right edge where the old bubble's was (column 300), narrower
+            // (118 of the game's 320 columns), growing upwards only; the tail
+            // over his head (column 277).
             const auto fx = [&](float x) { return (area_x + x / 320.0f * area_w) / frame->window_w; };
             const auto fy = [&](float y) { return (frame->y + y / 240.0f * frame->h) / frame->window_h; };
             const float width = 118.0f * std::max(1.0f, card_text_scale());  // wider for larger text, so it stays on screen
-            const float right = float(box->x + box->w - 4);
+            constexpr float right = 300.0f, bottom = 127.0f, tail_x = 277.0f;
             blockplanet::ui::HudView::Panel panel;
             panel.right = 1.0f - fx(right);
-            panel.bottom = 1.0f - fy(float(box->y + 98));
+            panel.bottom = 1.0f - fy(bottom);
             panel.w = fx(right) - fx(right - width);
-            panel.tail = (float(box->x + 123) - (right - width)) / width;
+            panel.tail = (tail_x - (right - width)) / width;
             panel.text_size = 10.0f / 240.0f * frame->h / frame->window_h * 100.0f * card_text_scale();
             if (!card_lines.empty()) {
                 const std::size_t first = card_lines.begin()->second.front();
