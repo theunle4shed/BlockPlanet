@@ -1054,6 +1054,7 @@ void publish_game_text() {
             static const float font_lines[] = {13.0f, 13.0f, 11.0f, 11.0f};  // letter height per game font, of its 240 lines
             const float lines = t.font >= 0 && t.font < 4 ? font_lines[t.font] : 11.0f;
             out.size = lines / 240.0f * frame->h / frame->window_h * 100.0f;
+            out.width = float(t.width) / 320.0f * area_w / frame->window_w;
             char colour[16];
             std::snprintf(colour, sizeof colour, "#%02x%02x%02x", t.r, t.g, t.b);
             out.colour = colour;

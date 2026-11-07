@@ -221,7 +221,7 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 6. Leftover original HUD pieces (the multiplier badge where it still shows).
 Each needs its text found (much of it is pictures in the main archive; the asset catalogue lists them) and the screen's timing kept.
 
-**Progress (2026-11-07):** the game's text routine (`func_800382B4`) is hooked, and its font 0 (menus, the Try Again / Exit / Training menu, the original HUD's numbers) is now drawn in BlockPlanet's font at the game's own positions. Next: font 1 (the cards: one call per character, its string argument a pointer into a table at `0x800F63DC` rather than the letters; the per-character loop is around `0x80071FC4` to `0x800720C4`), the pictures with text in them (the Try Again hint), and alignment (the game places right-aligned menus by its own letter widths).
+**Progress (2026-11-07):** the game's text routine (`func_800382B4`) is hooked, and its font 0 (menus, the Try Again / Exit / Training menu, the original HUD's numbers) is now drawn in BlockPlanet's font at the game's own positions. Next: font 1 (the cards: one call per character, its string argument a pointer into a table at `0x800F63DC` rather than the letters; the per-character loop is around `0x80071FC4` to `0x800720C4`), the pictures with text in them (the Try Again hint). Alignment is done: each string is fitted to the width the game's font would give it.
 
 **Records without name entry (decided 2026-11-07).** Profiles already have a name, so record screens use the profile's name instead of asking for one (the original's name entry stays only for its cheat codes, if kept at all).
 

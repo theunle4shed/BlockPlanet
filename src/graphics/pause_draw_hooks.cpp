@@ -43,6 +43,12 @@
 
 namespace {
 
+std::uint32_t guest32(const std::uint8_t* rdram, std::uint32_t address) {
+    std::uint32_t v;
+    std::memcpy(&v, rdram + (address & 0x00FFFFFFu), 4);
+    return v;
+}
+
 std::int16_t guest16(const std::uint8_t* rdram, std::uint32_t address) {
     std::int16_t value = 0;
     const std::uint32_t offset = (address & 0x00FFFFFFu) ^ 2u;
@@ -246,6 +252,11 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
             t.x = int(ctx->r6), t.y = int(ctx->r7);
             const std::uint32_t c[3] = {st[1], st[2], st[3]};
             t.r = c[0] & 0xFFu, t.g = c[1] & 0xFFu, t.b = c[2] & 0xFFu;
+            // Its width in the game's font, as func_800387CC measures it: the sum
+            // of each character's s16 width at 0x80102D0C + font * 0x88 + char * 2.
+            if (guest32(rdram, 0x80102D48u + 0x88u * std::uint32_t(t.font)) != 0)
+                for (unsigned char ch : t.text)
+                    t.width += guest16(rdram, 0x80102D0Cu + 0x88u * std::uint32_t(t.font) + 2u * ch);
             if (!t.text.empty()) {
                 const auto now = std::chrono::steady_clock::now();
                 std::lock_guard lock(text_mutex);

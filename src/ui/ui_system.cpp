@@ -212,8 +212,8 @@ std::string game_text_rml(const HudView& hud) {
     std::string rml;
     const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };
     for (const auto& t : hud.game_text)
-        rml += "<div class='game-text' style='left: " + pct(t.x) + "; top: " + pct(t.y) + "; font-size: " +
-               std::to_string(t.size) + "vh; color: " + t.colour + ";'>" + escape(t.text) + "</div>";
+        rml += "<div class='game-text' data-w='" + std::to_string(t.width) + "' style='left: " + pct(t.x) + "; top: " +
+               pct(t.y) + "; font-size: " + std::to_string(t.size) + "vh; color: " + t.colour + ";'>" + escape(t.text) + "</div>";
     return rml;
 }
 
@@ -439,6 +439,23 @@ bool update_hud_document() {
     }
     set_hud_fills(*hud);
     place_popups(*hud);
+    // The game's text fitted to the span the game gave it (so the game's own
+    // alignment holds): each string stretched or narrowed to that width,
+    // from its left edge (measured in the last layout; a transform does not
+    // change it).
+    {
+        Rml::ElementList texts;
+        hud_document->GetElementsByClassName(texts, "game-text");
+        const float window_w = float(context->GetDimensions().x);
+        for (auto* e : texts) {
+            const float target = e->GetAttribute<float>("data-w", 0.0f) * window_w;
+            const float actual = e->GetBox().GetSize().x;
+            if (target <= 0.0f || actual <= 0.0f) continue;
+            const float scale = std::clamp(target / actual, 0.7f, 1.4f);
+            e->SetProperty("transform", "scale(" + std::to_string(scale) + ", 1)");
+            e->SetProperty("transform-origin", "0% 50%");
+        }
+    }
     const auto size = context->GetDimensions();
     Rml::Vector2f left_at{0, 0};
     place_hud_sides(*hud, float(size.x), float(size.y), left_at);
