@@ -67,6 +67,7 @@
 #include <memory>
 #include <string>
 #include <fstream>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -1104,7 +1105,33 @@ void publish_game_text() {
             apply(0, body);
             apply(body, order.size());
         }
+        // The cards' words (font 1), joined back into their lines: one text per
+        // line, from where its first word starts, each word keeping its colour
+        // and fade (the typing still shows).
+        std::map<int, std::vector<std::size_t>> card_lines;
+        for (std::size_t i = 0; i < texts.size(); ++i)
+            if (texts[i].font == 1) card_lines[texts[i].y].push_back(i);
+        // The body's lines start at one left edge (the game sometimes starts a
+        // line after a sentence's two spaces, which looks like an indent).
+        int body_left = 1 << 20;
+        for (const auto& [y, idx] : card_lines)
+            if (y != card_lines.begin()->first)
+                for (std::size_t i : idx) body_left = std::min(body_left, texts[i].x);
+        std::set<std::size_t> joined_away;
+        std::map<std::size_t, std::vector<std::pair<std::string, std::string>>> joined;
+        for (auto& [y, idx] : card_lines) {
+            std::sort(idx.begin(), idx.end(), [&](std::size_t l, std::size_t r) { return texts[l].x < texts[r].x; });
+            auto& parts = joined[idx[0]];
+            for (std::size_t k = 0; k < idx.size(); ++k) {
+                const auto& w = texts[idx[k]];
+                char c[16];
+                std::snprintf(c, sizeof c, "#%02x%02x%02x%02x", w.r, w.g, w.b, w.a);
+                parts.emplace_back(cased[idx[k]], c);
+                if (k > 0) joined_away.insert(idx[k]);
+            }
+        }
         for (std::size_t i = 0; i < texts.size(); ++i) {
+            if (joined_away.count(i)) continue;
             const auto& t = texts[i];
             blockplanet::ui::HudView::Text out;
             out.text = cased[i];
@@ -1117,6 +1144,13 @@ void publish_game_text() {
             char colour[16];
             std::snprintf(colour, sizeof colour, "#%02x%02x%02x%02x", t.r, t.g, t.b, t.a);  // with the game's fade
             out.colour = colour;
+            if (t.font == 1) out.width = 0;  // card text flows as text, not fitted to the game's spans
+            if (t.font == 1 && !card_lines.empty() && t.y != card_lines.begin()->first && body_left < (1 << 20) && t.x - body_left < 40)
+                out.x = (area_x + float(body_left) / 320.0f * area_w) / frame->window_w;
+            if (const auto j = joined.find(i); j != joined.end() && j->second.size() > 1) {
+                out.parts = j->second;
+                out.width = 0;  // a joined line is laid out as text, from its start
+            }
             view->game_text.push_back(std::move(out));
         }
     }

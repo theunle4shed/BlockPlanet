@@ -116,7 +116,10 @@ struct HudView {
     // The game's own text, in BlockPlanet's font (the game's strings, placed
     // as the game placed them; fractions of the window, size in window
     // heights). With nothing else set, only these are shown.
-    struct Text { std::string text; float x = 0, y = 0, size = 0, width = 0; std::string colour; };  // width: the game's span (window widths), 0 unknown
+    struct Text {
+        std::string text; float x = 0, y = 0, size = 0, width = 0; std::string colour;
+        std::vector<std::pair<std::string, std::string>> parts;  // a joined line: each word and its colour (then text is unused)
+    };  // width: the game's span (window widths), 0 unknown
     std::vector<Text> game_text;
     bool text_only = false;
     bool versus = false;

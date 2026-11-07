@@ -212,8 +212,17 @@ std::string game_text_rml(const HudView& hud) {
     std::string rml;
     const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };
     for (const auto& t : hud.game_text)
+    {
+        std::string body;
+        if (t.parts.empty()) {
+            body = escape(t.text);
+        } else {
+            for (std::size_t k = 0; k < t.parts.size(); ++k)
+                body += (k ? "&nbsp;" : "") + std::string("<span style='color: ") + t.parts[k].second + ";'>" + escape(t.parts[k].first) + "</span>";
+        }
         rml += "<div class='game-text' data-w='" + std::to_string(t.width) + "' style='left: " + pct(t.x) + "; top: " +
-               pct(t.y) + "; font-size: " + std::to_string(t.size) + "vh; color: " + t.colour + ";'>" + escape(t.text) + "</div>";
+               pct(t.y) + "; font-size: " + std::to_string(t.size) + "vh; color: " + t.colour + ";'>" + body + "</div>";
+    }
     return rml;
 }
 
