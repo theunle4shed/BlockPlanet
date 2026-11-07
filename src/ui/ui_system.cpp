@@ -208,6 +208,38 @@ std::string versus_column(const HudView::VersusPlayer& p, const char* id, const 
     return rml;
 }
 
+// Button codes in the game's text ("[k:Z]", "[x:A]", "[p:Cross]", "[n:B]",
+// family then name) as button symbols: a key cap, an Xbox letter in its
+// colour, a PlayStation shape, a Switch letter.
+std::string with_buttons(const std::string& escaped_text) {
+    std::string out;
+    std::size_t at = 0;
+    while (true) {
+        const std::size_t open = escaped_text.find('[', at);
+        const std::size_t close = open == std::string::npos ? open : escaped_text.find(']', open);
+        if (open == std::string::npos || close == std::string::npos || close < open + 3 || escaped_text[open + 2] != ':') {
+            out += escaped_text.substr(at);
+            return out;
+        }
+        out += escaped_text.substr(at, open - at);
+        const char family = escaped_text[open + 1];
+        const std::string name = escaped_text.substr(open + 3, close - open - 3);
+        if (family == 'k') {
+            out += "<span class='btn key'>" + name + "</span>";
+        } else if (family == 'x') {
+            const char* colour = name == "A" ? "#3fae3f" : name == "B" ? "#d6402f" : name == "X" ? "#2f6fd6" : "#e0b020";
+            out += std::string("<span class='btn pad' style='background-color: ") + colour + ";'>" + name + "</span>";
+        } else if (family == 'p') {
+            const std::string shape = name == "Cross" ? "cross" : name == "Circle" ? "circle" : name == "Square" ? "square" : "triangle";
+            out += shape == "cross" ? "<span class='btn pad ps'><span class='ps-cross'><span class='bar a'/><span class='bar b'/></span></span>"
+                                    : "<span class='btn pad ps'><span class='ps-" + shape + "'/></span>";
+        } else {
+            out += "<span class='btn pad nx'>" + name + "</span>";
+        }
+        at = close + 1;
+    }
+}
+
 std::string game_text_rml(const HudView& hud) {
     std::string rml;
     const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };
@@ -215,11 +247,11 @@ std::string game_text_rml(const HudView& hud) {
     {
         std::string body;
         if (t.parts.empty()) {
-            body = escape(t.text);
+            body = with_buttons(escape(t.text));
         } else {
             for (std::size_t k = 0; k < t.parts.size(); ++k)
                 // The space goes inside the span (spaces between elements are dropped).
-                body += std::string("<span style='color: ") + t.parts[k].second + ";'>" + escape(t.parts[k].first) +
+                body += std::string("<span style='color: ") + t.parts[k].second + ";'>" + with_buttons(escape(t.parts[k].first)) +
                         (k + 1 < t.parts.size() ? " " : "") + "</span>";
         }
         const std::string wrap = t.wrap > 0 ? "width: " + pct(t.wrap) + "; white-space: normal; line-height: 1.3;" : "";

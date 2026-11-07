@@ -268,3 +268,32 @@ div { display: block; }
     font-weight: bold;
     font-effect: outline(2dp #1a0c04);
 }
+
+/* Button symbols in the game's text (ui_system.cpp, with_buttons). Sized in
+   em, so they follow the text. */
+.btn {
+    display: inline-block;
+    min-width: 1.15em;
+    height: 1.15em;
+    line-height: 1.15em;
+    padding: 0em 0.12em;
+    margin: 0em 0.08em;
+    text-align: center;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #f8f8f8;
+    font-effect: none;
+    vertical-align: middle;
+}
+.btn.key { border: 0.1em #e8e8f0; border-radius: 0.25em; background-color: #2a2e3c; padding: 0em 0.3em; }
+.btn.pad { border-radius: 0.6em; }
+.btn.nx { background-color: #3a3c44; border: 0.08em #d8d8e0; }
+.btn.ps { background-color: #1e2028; border: 0.08em #9098b0; position: relative; width: 1.15em; padding: 0em; }
+.ps-cross, .ps-circle, .ps-square, .ps-triangle { display: block; position: absolute; }
+.ps-cross { left: 0.22em; top: 0.22em; width: 0.7em; height: 0.7em; }
+.ps-cross .bar { display: block; position: absolute; left: 0em; top: 0.3em; width: 0.7em; height: 0.12em; background-color: #7aa8ff; }
+.ps-cross .bar.a { transform: rotate(45deg); }
+.ps-cross .bar.b { transform: rotate(-45deg); }
+.ps-circle { left: 0.27em; top: 0.27em; width: 0.45em; height: 0.45em; border: 0.1em #ff6680; border-radius: 0.35em; }
+.ps-square { left: 0.3em; top: 0.3em; width: 0.42em; height: 0.42em; border: 0.1em #e080d0; }
+.ps-triangle { left: 0.25em; top: 0.3em; width: 0em; height: 0em; border-left: 0.32em transparent; border-right: 0.32em transparent; border-bottom: 0.52em #40c8a0; border-top: 0em transparent; }

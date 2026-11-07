@@ -1056,14 +1056,21 @@ void publish_game_text() {
         // names (Xbox, PlayStation, Switch or keyboard).
         const auto buttons = [&](std::string text) {
             const auto bindings = controller_bindings();
-            const auto family = active_family.load();
+            auto family = active_family.load();
+            if (const char* f = std::getenv("BLOCKPLANET_BUTTON_FAMILY")) {  // research: k, x, p or n
+                family = *f == 'k' ? ControllerFamily::Keyboard : *f == 'p' ? ControllerFamily::PlayStation
+                       : *f == 'n' ? ControllerFamily::NintendoSwitch : ControllerFamily::Xbox;
+            }
             const std::pair<const char*, std::string> codes[] = {
                 {"%A%", logical_action_label(family, bindings, LogicalAction::Confirm)},
                 {"%B%", logical_action_label(family, bindings, LogicalAction::Cancel)},
                 {"%Z%", magic_control_label(family, magic_control())},
             };
+            // As "[family:name]", drawn as a button symbol by the UI.
+            const char* f = family == ControllerFamily::Keyboard ? "k" : family == ControllerFamily::Xbox ? "x"
+                          : family == ControllerFamily::PlayStation ? "p" : "n";
             for (const auto& [code, name] : codes)
-                for (std::size_t at; (at = text.find(code)) != std::string::npos;) text.replace(at, 3, "[" + name + "]");
+                for (std::size_t at; (at = text.find(code)) != std::string::npos;) text.replace(at, 3, std::string("[") + f + ":" + name + "]");
             return text;
         };
         auto texts_in = texts;

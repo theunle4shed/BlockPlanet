@@ -26,7 +26,7 @@ Draft, 2026-11-07: still to check against the owner's Windows test; features mar
 - **A new HUD for every mode** (Story and its modes, Hide & Seek, Puzzle, Lines, VS), in two tinted panels beside the sphere, placed as on a 4:3 screen and moved out of the sphere's way; rows above and below on tall screens. Graphics > HUD panels: near the sphere, at the screen's edges, or following the sphere.
 - Story: hearts with the drop timer, the held magic turning in its box (and flying from it when used), the next pieces, the stage, a progress bar towards the core, and the time.
 - Hide & Seek shows the level's goal in words and no progress bar (it would give the pictures away); Puzzle shows drops and slides left and your best moves; Lines shows its own; VS gives each player a column.
-- The game's own cards (Lines' rules, Hide & Seek's goals) stay readable.
+- The game's own cards (Lines' rules, Hide & Seek's goals) in BlockPlanet's font, as wrapped sentences, with symbols for your own buttons (key caps, or your pad's buttons).
 
 ## Title screen
 

@@ -242,8 +242,11 @@ std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, 
 }
 
 std::string proper_case(const std::string& text) {
-    bool has_upper = false;
+    bool has_upper = false, in_bracket = false;
     for (char c : text) {
+        if (c == '[') in_bracket = true;
+        if (c == ']') in_bracket = false;
+        if (in_bracket) continue;  // button codes do not count
         if (c >= 'a' && c <= 'z') return text;
         if (c >= 'A' && c <= 'Z') has_upper = true;
     }
