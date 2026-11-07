@@ -115,6 +115,11 @@ int main(int argc, char** argv) {
         assert(proper_case("Already fine") == "Already fine" && proper_case("1:23") == "1:23");
         assert(proper_case("DIG WITH THE [A] BUTTON. THEN GO") == "Dig with the [A] button. Then go");
         assert(proper_case("PRESS [x:A] TO GO ON") == "Press [x:A] to go on");
+        assert(game_quotes("LET%S GO !") == "LET\u2019S GO!");
+        assert(game_quotes("YOUR %X% COUNT ??") == "YOUR \u2018X\u2019 COUNT??");
+        assert(proper_case(game_quotes("HI! MY NAME IS WHEELS. I WILL SHOW YOU TETRISPHERE. I%M HERE")) ==
+               "Hi! My name is Wheels. I will show you Tetrisphere. I\u2019m here");
+        assert(proper_case(game_quotes("ONLY FUSE COMBOS GET YOUR %X% COUNT UP")) == "Only fuse combos get your \u2018X\u2019 count up");
     }
     story = story_chapters({0}, 15);
     assert(story.size() == 2 && story[0].note == "completed" && story[1].focus && story[1].note == "next");

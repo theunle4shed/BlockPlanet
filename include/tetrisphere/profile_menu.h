@@ -96,6 +96,9 @@ std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done);
 // spaces ("HIDE&SEEK" -> "Hide & Seek"), text in [brackets] (button names) is
 // kept as it is. Text with any lower case is unchanged.
 std::string proper_case(const std::string& text);
+// The game's % (its apostrophe and quote mark) as typographic quotes, and no
+// space before ! or ?.
+std::string game_quotes(const std::string& text);
 std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
                                                    const std::vector<double>& best_moves, int count = 100);
 

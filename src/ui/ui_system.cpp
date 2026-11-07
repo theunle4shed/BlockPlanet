@@ -224,7 +224,11 @@ std::string with_buttons(const std::string& escaped_text) {
         out += escaped_text.substr(at, open - at);
         const char family = escaped_text[open + 1];
         const std::string name = escaped_text.substr(open + 3, close - open - 3);
-        if (family == 'k') {
+        const bool shoulder = family != 'k' && (name.size() == 2 && (name[0] == 'L' || name[0] == 'R' || name[0] == 'Z')
+                                                || name == "L" || name == "R");
+        if (shoulder) {  // bumpers and triggers: a dark rounded bar with its name
+            out += "<span class='btn shoulder'>" + name + "</span>";
+        } else if (family == 'k') {
             out += "<span class='btn key'>" + name + "</span>";
         } else if (family == 'x') {
             const char* colour = name == "A" ? "#3fae3f" : name == "B" ? "#d6402f" : name == "X" ? "#2f6fd6" : "#e0b020";

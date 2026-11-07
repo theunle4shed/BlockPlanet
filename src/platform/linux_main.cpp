@@ -1038,7 +1038,14 @@ std::optional<PictureFrame> picture_frame() {
 // joined to whatever HUD is shown, then handed to the UI.
 void publish_game_text() {
     auto view = last_hud_view;
-    const auto texts = blockplanet::recent_game_text();
+    auto texts = blockplanet::recent_game_text();
+    // Puzzle's drops and slides counters are drawn in the cards' font too (white
+    // digits in the rings): they are not card text, so they are laid out as
+    // the menus' text is, at their own place.
+    for (auto& t : texts)
+        if (t.font == 1 && t.r == 255 && t.g == 255 && t.b == 255 && !t.text.empty() &&
+            t.text.find_first_not_of("0123456789") == std::string::npos)
+            t.font = 0;
     const auto frame = picture_frame();
     if (!texts.empty() && frame) {
         if (!view) {
@@ -1061,17 +1068,31 @@ void publish_game_text() {
                 family = *f == 'k' ? ControllerFamily::Keyboard : *f == 'p' ? ControllerFamily::PlayStation
                        : *f == 'n' ? ControllerFamily::NintendoSwitch : ControllerFamily::Xbox;
             }
+            // The codes as the game's font draws them (docs/research/m2-native-prompts.md):
+            // %C#% is C-down (Magic), %C"% C-up, %C$% C-right; L and R are the shoulders
+            // (the port maps C-right to the right trigger, L and R to the bumpers).
+            const auto pick = [&](const char* k, const char* x, const char* p, const char* n) {
+                return std::string(family == ControllerFamily::Keyboard ? k : family == ControllerFamily::Xbox ? x
+                                 : family == ControllerFamily::PlayStation ? p : n);
+            };
             const std::pair<const char*, std::string> codes[] = {
                 {"%A%", logical_action_label(family, bindings, LogicalAction::Confirm)},
                 {"%B%", logical_action_label(family, bindings, LogicalAction::Cancel)},
-                {"%Z%", magic_control_label(family, magic_control())},
+                {"%L%", pick("J", "LB", "L1", "L")},
+                {"%R%", pick("S", "RB", "R1", "R")},
+                {"%C#%", magic_control_label(family, magic_control())},
+                {"%C\"%", logical_action_label(family, bindings, LogicalAction::FaceUp)},
+                {"%C$%", pick("L", "RT", "R2", "ZR")},
             };
             // As "[family:name]", drawn as a button symbol by the UI.
             const char* f = family == ControllerFamily::Keyboard ? "k" : family == ControllerFamily::Xbox ? "x"
                           : family == ControllerFamily::PlayStation ? "p" : "n";
-            for (const auto& [code, name] : codes)
-                for (std::size_t at; (at = text.find(code)) != std::string::npos;) text.replace(at, 3, std::string("[") + f + ":" + name + "]");
-            return text;
+            for (const auto& [code, name] : codes) {
+                const std::size_t n = std::strlen(code);
+                for (std::size_t at; (at = text.find(code)) != std::string::npos;) text.replace(at, n, std::string("[") + f + ":" + name + "]");
+            }
+            // Any other % is the font's apostrophe or quote mark ("LET%S", "%X%").
+            return tetrisphere::game_quotes(text);
         };
         auto texts_in = texts;
         for (auto& t : texts_in) t.text = buttons(t.text);
@@ -1124,6 +1145,15 @@ void publish_game_text() {
         for (const auto& [y, idx] : card_lines)
             if (y != card_lines.begin()->first)
                 for (std::size_t i : idx) body_left = std::min(body_left, texts[i].x);
+        // The card's right edge: the furthest the game's own lines reach, kept
+        // while the card shows (its words type in one by one). A centred box
+        // (text starting left of centre) may use its width mirrored about the
+        // centre; a box to one side (Training's) only the game's own edge.
+        static int card_right = 0;
+        if (card_lines.empty()) card_right = 0;
+        for (const auto& [y, idx] : card_lines)
+            if (y != card_lines.begin()->first)
+                for (std::size_t i : idx) card_right = std::max(card_right, texts[i].x + texts[i].width);
         std::set<std::size_t> joined_away;
         std::map<std::size_t, std::vector<std::pair<std::string, std::string>>> joined;
         // The heading line stays a line; the body becomes one paragraph, in
@@ -1164,7 +1194,10 @@ void publish_game_text() {
                 out.parts = j->second;
                 out.width = 0;  // laid out as text, from its start
                 if (i == body_first && body_left < (1 << 20))
-                    out.wrap = 2.0f * (160.0f - float(body_left) - 2.0f) / 320.0f * area_w / frame->window_w;
+                {
+                    const int right = std::max(card_right + 3, body_left < 160 ? 320 - body_left - 4 : 0);
+                    if (right > body_left) out.wrap = float(right - body_left) / 320.0f * area_w / frame->window_w;
+                }
             }
             view->game_text.push_back(std::move(out));
         }

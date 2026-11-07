@@ -241,6 +241,28 @@ std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, 
     return items;
 }
 
+std::string game_quotes(const std::string& text) {
+    // The game's font draws % as its apostrophe and quote mark. Opening when
+    // it starts a word, otherwise closing (the apostrophe).
+    std::string out;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] != '%') { out += text[i]; continue; }
+        const bool opens = (i == 0 || text[i - 1] == ' ') && i + 1 < text.size() && text[i + 1] != ' ';
+        out += opens ? "\u2018" : "\u2019";
+    }
+    // No space before ! or ? (the original's typewriter spacing).
+    std::string tidy;
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        if (out[i] == ' ') {
+            std::size_t j = i;
+            while (j < out.size() && out[j] == ' ') ++j;
+            if (j < out.size() && (out[j] == '!' || out[j] == '?') && !tidy.empty() && tidy.back() != ' ') { i = j - 1; continue; }
+        }
+        tidy += out[i];
+    }
+    return tidy;
+}
+
 std::string proper_case(const std::string& text) {
     bool has_upper = false, in_bracket = false;
     for (char c : text) {
@@ -272,7 +294,9 @@ std::string proper_case(const std::string& text) {
     for (const auto& w : words)
         if (!w.empty()) ++letters_words;
     const bool title = letters_words <= 3;
-    static const char* keep[] = {"VS", "CPU", "HUD", "TV", "OK", "N64", "H2O", "TM", "X"};
+    static const char* keep[] = {"VS", "CPU", "HUD", "TV", "OK", "N64", "H2O", "TM", "X", "I"};
+    // Names keep their capital wherever they fall.
+    static const char* names[] = {"WHEELS", "TURBINE", "TETRISPHERE", "NINTENDO"};
     std::string out;
     bool sentence_start = true;
     for (std::size_t k = 0; k < words.size(); ++k) {
@@ -284,6 +308,16 @@ std::string proper_case(const std::string& text) {
             if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) bare += c;
         for (const char* a : keep)
             if (bare == a) kept = true;
+        // "I", also as "I'M" / "I'LL" (letters before an apostrophe).
+        std::string head;
+        for (char c : w) {
+            if (c >= 'A' && c <= 'Z') head += c;
+            else if (c == '\'' || c == '\xE2') break;
+            else if (!head.empty()) break;
+        }
+        bool name = head == "I" && bare.size() <= 3 && w.find_first_of("'\xE2") != std::string::npos;
+        for (const char* a : names)
+            if (bare == a) name = true;
         bool first_letter = true;
         bool bracket = false;
         for (char c : w) {
@@ -296,7 +330,7 @@ std::string proper_case(const std::string& text) {
                 continue;
             }
             if (c >= 'A' && c <= 'Z') {
-                const bool upper = kept || (first_letter && (title || sentence_start));
+                const bool upper = kept || (first_letter && (title || sentence_start || name));
                 out += upper ? c : char(c - 'A' + 'a');
                 first_letter = false;
                 sentence_start = false;
