@@ -248,3 +248,7 @@ body.over-pause { background-color: #00000000; }
 body.compact #panel { top: 40dp; padding: 40dp 56dp; }
 body.compact .item { font-size: 38dp; padding: 6dp 28dp; margin-bottom: 2dp; }
 body.compact .subtitle { margin-bottom: 16dp; }
+
+/* How to Play (pause menu): short paragraphs to read. */
+.howto { display: block; margin: 12dp 0dp 20dp 0dp; }
+.howto .para { display: block; font-size: 24dp; line-height: 34dp; color: #dfe3ee; margin-bottom: 10dp; }

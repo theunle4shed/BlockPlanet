@@ -1302,6 +1302,50 @@ std::string hide_and_seek_title(const std::string& card) {
     return {};
 }
 
+// The pause menu's How to Play: BlockPlanet's own short guide to the mode
+// (the owner's choice: to read, no demonstration), naming the player's own
+// buttons. One paragraph per line.
+std::string how_to_play(int mode) {
+    const auto family = active_family.load();
+    const auto bindings = controller_bindings();
+    const std::string a = logical_action_label(family, bindings, LogicalAction::Confirm);
+    const std::string b = logical_action_label(family, bindings, LogicalAction::Cancel);
+    const std::string magic = magic_control_label(family, magic_control());
+    const std::string move = family == ControllerFamily::Keyboard ? "the arrow keys" : "the stick or d-pad";
+    const std::string basics =
+        "Move the shadow over the sphere with " + move + ". It has the shape of your next piece.\n"
+        "Drop your piece (" + a + ") onto pieces of the same shape. Two together are ready; a third breaks them.\n"
+        "To slide a piece, line the shadow up with it, hold " + b + " and move.\n"
+        "Dropping where no two pieces match costs a heart.\n";
+    switch (mode) {
+    case 1: {
+        std::string text = "Dig through the sphere to its core: clear a big enough area to finish the stage.\n" + basics +
+                           "Three or more pieces breaking together make a combo. Smaller combos give power pieces; 20 or more give magic, used with " +
+                           magic + ".";
+        if (play_variant == PlayVariant::TimeAttack) text += "\nTime Attack: finish each stage as fast as you can. Your splits show against your best.";
+        if (play_variant == PlayVariant::ScoreAttack) text += "\nScore Attack: the clock counts down. Combos add time, and time left becomes points.";
+        if (play_variant == PlayVariant::Casual) text += "\nCasual: no game over. Lost hearts come back.";
+        return text;
+    }
+    case 4:
+        return "Clear every piece on the sphere with only the drops and slides shown.\n"
+               "Your piece is a wildcard: it fits any shape.\n"
+               "To slide a piece, line the shadow up with it, hold " + b + " and move.\n"
+               "Zoom in and out with the shoulder buttons. Start the puzzle again from the pause menu.";
+    case 5: {
+        const std::string goal = hide_and_seek_goal(guest::load16(guest_rdram, 0x800E44A4));
+        return "Uncover the hidden picture to win" + (goal.empty() ? std::string(".") : ": " + goal + ".") + "\n" + basics +
+               "Dig carefully: the goal shows on the right of the screen.";
+    }
+    case 6:
+        return "Uncover the core area before your opponent does.\n" + basics +
+               "Your combos send dark pieces to your opponent's sphere. Dark pieces break only as part of a combo.";
+    default:
+        return "Line up three pieces in a row, across or down, to remove them.\n"
+               "Clear a big enough area of the core for your friend to escape.";
+    }
+}
+
 void publish_game_text() {
     auto view = last_hud_view;
     auto texts = blockplanet::recent_game_text();
@@ -3050,6 +3094,14 @@ bool handle_profile_command(const std::string& command) {
                     std::fprintf(stdout, "{\"event\":\"restart\",\"mode\":\"%s\"}\n", launch_mode_name(*mode));
                     std::fflush(stdout);
                 }
+                continue;
+            }
+            if (*command == "pause_howto") {
+                const int mode = guest::load16(guest_rdram, 0x800E44A8);
+                blockplanet::ui::set_text("howto_title", mode == 1 ? std::string(variant_title(play_variant)) : mode == 4 ? "Puzzle"
+                                                         : mode == 5 ? "Hide & Seek" : mode == 6 ? "VS" : "Lines");
+                blockplanet::ui::set_text("howto_body", how_to_play(mode));
+                blockplanet::ui::request_show("howto");
                 continue;
             }
             if (*command == "pause_resume" || *command == "pause_skip" || *command == "pause_quit") {

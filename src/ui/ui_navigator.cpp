@@ -368,7 +368,20 @@ void Navigator::fill_text(Screen& screen) {
     screen.document->QuerySelectorAll(all, "[data-text]");
     for (Rml::Element* element : all) {
         const auto found = texts_.find(element->GetAttribute<Rml::String>("data-text", ""));
-        element->SetInnerRML(found == texts_.end() ? Rml::String() : escaped(found->second));
+        const Rml::String text = found == texts_.end() ? Rml::String() : found->second;
+        if (element->HasAttribute("data-paragraphs")) {
+            // One paragraph per line.
+            Rml::String rml;
+            std::size_t at = 0;
+            while (at <= text.size()) {
+                const std::size_t end = std::min(text.find('\n', at), text.size());
+                if (end > at) rml += "<p class='para'>" + escaped(text.substr(at, end - at)) + "</p>";
+                at = end + 1;
+            }
+            element->SetInnerRML(rml);
+        } else {
+            element->SetInnerRML(escaped(text));
+        }
     }
 }
 

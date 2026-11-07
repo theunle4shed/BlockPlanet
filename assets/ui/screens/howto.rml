@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>How to Play</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body class="over-pause">
+    <div id="panel" class="wide">
+        <div class="header">How to Play</div>
+        <div class="subtitle" data-text="howto_title"></div>
+        <div class="howto" data-text="howto_body" data-paragraphs="1"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>

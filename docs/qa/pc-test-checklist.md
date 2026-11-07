@@ -30,6 +30,7 @@ For the owner's playtests. Tick what works, note what doesn't (what you did, wha
 - [ ] Win a stage: the next stage follows (1:1 to 1:2).
 - [ ] Single stage (e.g. 1:5): starts at 1:5; after winning, back to the stage list with the time shown.
 - [ ] Pause: BlockPlanet's pause panel; Restart chapter asks first; Quit to menu returns to BlockPlanet's main menu.
+- [ ] Pause > How to Play in Story, Hide & Seek, Puzzle, Lines and VS: short paragraphs naming your buttons. Read for wording.
 - [ ] New profile: Solo > Story first asks "Start with Training" or "Go straight to Story"; the next time, Story opens directly.
 - [ ] Training: in Solo, with Story selected, the description ends with your X button (or T on the keyboard) and "Training". Press it: Training lists Basics and Advanced. Each starts and returns to the menus when done. Puzzle's X starts Puzzle Training.
 - [ ] Graphics > Text size: Small, Default, Large and Larger change Training's speech bubble; the bubble stays on screen at Larger.
