@@ -38,6 +38,15 @@ The main archive's name artwork (entries `0x118` to `0x11E`: Rocket, Gear, Gyro,
 
 The models are the robots in ball form (textured; their limbs are folded inside and posed by animation), so a preview without a scene shows mostly a sphere. The title picture's white rockets with red fins are not the Rocket robot (navy): they are the **Bomb** magic's missile (magic value 4; its pieces are in the combined magic object s2 `0x14`, and a similar standalone object is s2 `0x5E`).
 
+## Drawing robots on the title (2026-11-07, in progress)
+
+`BLOCKPLANET_TITLE_SCENE=scene:object[,…]` (`src/graphics/title_hooks.cpp`) loads s2 objects and s3 scenes with the game's loaders (`func_8002A100`, `func_8002A0C0`), builds each with `func_8002CF70(memory, scene, &object, 1, &size)` and draws it each title frame with `func_8002D93C(scene, frames)`, behind the letters. Findings:
+
+- **The scene must be built in the game's own memory pool** (pointer `0x800F22C0`, end `0x800FC5AC`; about 475 KB free on the title): `func_8002CF70` refuses memory above 4 MB ("detected by LWAllocateMemory", it checks pointers lie below `0x80400001`). The pool is reset when the game leaves the title, so the scene is built again each time the title comes back.
+- **Which scene goes with which robot:** the game's sequence at `0x8005DA44` pairs scenes from the table at `0x800E0714` with robots from `0x800E0734` (s3 `0x04` Rocket, `0x77` Gyro, `0x09` Gear, `0x20` Jak, `0x15` Stomp, `0x1B` Turbine, `0x00` Rocket, `0xCB` Jak, `0x0F` Stomp, `0x24` Jak, `0x1F` Turbine, `0x05` Gear, `0x7A` Gyro). It also loads the robots' shared texture (main `0xB1`) into `0x800E0000`.
+- **Working:** Turbine (s2 `0x28`) with scene `0x1B` builds (13,440 bytes), unfolds and animates behind the ring.
+- **Not yet:** it draws solid black. Lights sent before it (one white light and ambient) and the robot texture in `0x800E0000` did not change that, so the render state the robots need (combiner, texture loading, lighting mode) is still to find; the robot sequence's own draw (`0x8005E32C`) is the place to compare. Placement and scale on the title are also to do.
+
 ## The magic items
 
 Held magic 0 to 5 (player context `+0x702`), lowest to highest: Firecracker, Bundle O' Dynamite, Electro Magnet, Atom, Bomb, Ray Gun (the manual's names, in the order the models appear). Each is a scene, s3 `0xD2` + value, drawing objects of the combined object s2 `0x14` (43 parts: dynamite sticks and band, magnet halves, atom rings and nucleus, the bomb's body and red fins, the ray gun's barrel and cones, spark bursts).

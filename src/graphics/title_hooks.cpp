@@ -19,6 +19,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -406,12 +408,139 @@ void draw_title_ring(std::uint8_t* rdram) {
 }
 } // namespace
 
+namespace {
+// The title's characters (Turbine, Wheels and the Bomb magic), drawn with the
+// game's own scene system: once, the robots' 3D objects and a scene are
+// loaded with the game's loaders into memory the game does not use (its
+// memory pointer and end, 0x800F22C0 and 0x800FC5AC, are pointed there for
+// the duration and put back), the scene is built (func_8002CF70) and then it
+// is drawn each title frame (func_8002D93C) before the letters.
+constexpr std::uint32_t heap_pointer = 0x800F22C0u, heap_end = 0x800FC5ACu;
+constexpr std::uint32_t object_array = 0x8073F000u, size_out = 0x8073F100u;
+std::uint32_t title_scene = 0;
+
+void call4(std::uint8_t* rdram, recomp_context* ctx, void (*fn)(std::uint8_t*, recomp_context*),
+           std::uint32_t a0, std::uint32_t a1, std::uint32_t a2, std::uint32_t a3, std::uint32_t stack0 = 0) {
+    const recomp_context saved = *ctx;
+    ctx->r29 = static_cast<gpr>(static_cast<std::int32_t>(saved.r29) - 0x80);
+    std::memcpy(rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x10u) & 0x00FFFFFFu), &stack0, 4);
+    ctx->r4 = static_cast<gpr>(static_cast<std::int32_t>(a0));
+    ctx->r5 = static_cast<gpr>(static_cast<std::int32_t>(a1));
+    ctx->r6 = static_cast<gpr>(static_cast<std::int32_t>(a2));
+    ctx->r7 = static_cast<gpr>(static_cast<std::int32_t>(a3));
+    fn(rdram, ctx);
+    const auto result = ctx->r2;
+    *ctx = saved;
+    ctx->r2 = result;
+}
+
+// Research: BLOCKPLANET_TITLE_SCENE=scene:object[,scene:object...] builds those
+// s3 scenes, each with one s2 object (hex or decimal), and draws them.
+std::vector<std::pair<int, int>> title_scene_list() {
+    std::vector<std::pair<int, int>> list;
+    const char* v = std::getenv("BLOCKPLANET_TITLE_SCENE");
+    if (v == nullptr) return list;
+    std::string text(v);
+    std::size_t at = 0;
+    while (at < text.size()) {
+        const std::size_t comma = text.find(',', at);
+        const std::string item = text.substr(at, comma == std::string::npos ? std::string::npos : comma - at);
+        const std::size_t colon = item.find(':');
+        if (colon != std::string::npos)
+            list.emplace_back(int(std::strtol(item.substr(0, colon).c_str(), nullptr, 0)),
+                              int(std::strtol(item.substr(colon + 1).c_str(), nullptr, 0)));
+        if (comma == std::string::npos) break;
+        at = comma + 1;
+    }
+    return list;
+}
+std::vector<std::uint32_t> title_scenes;
+// The robots' shared texture (main archive entry 0xB1, 44 x 44), which the
+// credits put in the global at 0x800E0000 before drawing robot scenes.
+std::uint32_t robot_texture = 0;
+constexpr std::uint32_t robot_texture_global = 0x800E0000u;
+
+void build_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
+    // Built from the game's own memory (its scenes must lie below 4 MB), which
+    // the game resets when it leaves the title: so built again whenever the
+    // title comes back (not drawn for a moment).
+    static auto last = std::chrono::steady_clock::time_point{};
+    const auto now = std::chrono::steady_clock::now();
+    const bool returned = now - last > std::chrono::milliseconds(500);
+    last = now;
+    if (!returned) return;
+    title_scenes.clear();
+    robot_texture = 0;
+    const auto list = title_scene_list();
+    if (list.empty()) return;
+    call4(rdram, ctx, func_8002A8B4, 0x736C50u, 0xB1u, 8u, 0);
+    robot_texture = static_cast<std::uint32_t>(ctx->r2);
+    std::uint32_t slot = 0;
+    for (const auto& [scene_entry, object_entry] : list) {
+        call4(rdram, ctx, func_8002A100, std::uint32_t(object_entry), 0, 0, 0);
+        const std::uint32_t object = static_cast<std::uint32_t>(ctx->r2);
+        const std::uint32_t object_slot = object_array + 4u * slot++;
+        put32(rdram, object_slot, object);
+        call4(rdram, ctx, func_8002A0C0, std::uint32_t(scene_entry), 0, 0, 0);
+        const std::uint32_t scene_data = static_cast<std::uint32_t>(ctx->r2);
+        const std::uint32_t at = (load32(rdram, heap_pointer) + 15u) & ~15u;
+        if (object == 0 || scene_data == 0 || load32(rdram, heap_end) < at + 0x10000u) break;  // not enough room
+        put32(rdram, heap_pointer, at);
+        put32(rdram, size_out, 0);
+        call4(rdram, ctx, func_8002CF70, at, scene_data, object_slot, 1, size_out);
+        const std::uint32_t built = static_cast<std::uint32_t>(ctx->r2);
+        put32(rdram, heap_pointer, at + load32(rdram, size_out));
+        title_scenes.push_back(built);
+        std::fprintf(stdout, "{\"event\":\"title_scene\",\"scene\":%d,\"object\":%d,\"built\":\"0x%08X\",\"size\":%u}\n",
+                     scene_entry, object_entry, built, load32(rdram, size_out));
+        std::fflush(stdout);
+    }
+}
+
+void draw_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
+    const std::uint32_t elapsed = load32(rdram, 0x800E1208u) - load32(rdram, 0x800E1210u);
+    if (title_scenes.empty()) return;
+    // Lights for the scene (the credits set their own; the title has none):
+    // one white key light from the upper left and front, and a soft ambient.
+    {
+        constexpr std::uint32_t lights = 0x807E8000u;  // clear of the ring's vertices (0x807E0000 on)
+        const auto byte = [&](std::uint32_t a, std::uint8_t v) { rdram[(a & 0x00FFFFFFu) ^ 3u] = v; };
+        for (int k = 0; k < 3; ++k) {
+            byte(lights + std::uint32_t(k), 0xE0);        // light colour
+            byte(lights + 4u + std::uint32_t(k), 0xE0);   // (copy)
+            byte(lights + 16u + std::uint32_t(k), 0x50);  // ambient
+            byte(lights + 20u + std::uint32_t(k), 0x50);
+        }
+        byte(lights + 8, 0xC4);   // direction (x, y, z), signed
+        byte(lights + 9, 0x40);
+        byte(lights + 10, 0x60);
+        std::uint32_t dl = load32(rdram, display_list_pointer);
+        const auto cmd = [&](std::uint32_t w0, std::uint32_t w1) {
+            put32(rdram, dl, w0);
+            put32(rdram, dl + 4u, w1);
+            dl += 8u;
+        };
+        cmd(0xBC000002u, 0x80000040u);  // one light
+        cmd(0x03860010u, lights);       // light 1
+        cmd(0x03880010u, lights + 16u); // ambient
+        put32(rdram, display_list_pointer, dl);
+    }
+    const std::uint32_t saved = load32(rdram, robot_texture_global);
+    if (robot_texture != 0) put32(rdram, robot_texture_global, robot_texture);
+    for (const std::uint32_t scene : title_scenes)
+        if (scene >= 0x80000000u && scene < 0x80800000u) call4(rdram, ctx, func_8002D93C, scene, elapsed, 0, 0);
+    put32(rdram, robot_texture_global, saved);
+}
+} // namespace
+
 // With the letters held (BLOCKPLANET_TITLE_FREEZE), the title picture is drawn
 // fully opaque (its alpha argument, on the stack at +0x1C).
 extern "C" void blockplanet_title_picture(std::uint8_t* rdram, recomp_context* ctx) {
     if (title_freeze_frame() < 0) return;
     static const bool ring = std::getenv("BLOCKPLANET_TITLE_RING") == nullptr || std::atoi(std::getenv("BLOCKPLANET_TITLE_RING")) != 0;
     if (ring) draw_title_ring(rdram);
+    build_title_scene(rdram, ctx);
+    draw_title_scene(rdram, ctx);
     const std::uint32_t alpha = 0xFF;
     std::memcpy(rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x1C) & 0x00FFFFFFu), &alpha, 4);
 }

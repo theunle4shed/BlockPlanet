@@ -11,6 +11,11 @@ extern "C" {
 bool tetrisphere_controls_view_hook(std::uint8_t*,recomp_context*);
 void recomp_entrypoint(std::uint8_t* rdram, recomp_context* ctx);
 void func_8006FA28(std::uint8_t* rdram, recomp_context* ctx);
+void func_8002A8B4(std::uint8_t* rdram, recomp_context* ctx);  // load an archive entry: a0 archive, a1 entry, a2 8
+void func_8002A100(std::uint8_t* rdram, recomp_context* ctx);  // load a 3D object (s2 archive): a0 entry
+void func_8002A0C0(std::uint8_t* rdram, recomp_context* ctx);  // load a scene (s3 archive): a0 entry
+void func_8002CF70(std::uint8_t* rdram, recomp_context* ctx);  // build a scene: a0 memory, a1 scene, a2 objects, a3 1, sp+0x10 size out
+void func_8002D93C(std::uint8_t* rdram, recomp_context* ctx);  // draw a built scene: a0 scene, a1 frames elapsed
 void func_8002D93C(std::uint8_t* rdram, recomp_context* ctx);
 void func_80029510(std::uint8_t* rdram, recomp_context* ctx);
 void func_800295D4(std::uint8_t* rdram, recomp_context* ctx);
