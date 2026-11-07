@@ -33,6 +33,8 @@ For the owner's playtests. Tick what works, note what doesn't (what you did, wha
 - [ ] Training: in Solo, with Story selected, the description ends with your X button (or T on the keyboard) and "Training". Press it: Training lists Basics and Advanced. Each starts and returns to the menus when done. Puzzle's X starts Puzzle Training.
 - [ ] Graphics > Text size: Small, Default, Large and Larger change Training's speech bubble; the bubble stays on screen at Larger.
 - [ ] Training's bubble scrolls instead of leaving the screen: try Text size Larger on a short or narrow window. The right stick, Page Up / Page Down or the mouse wheel scroll it, and "Scroll" shows in its hint only then.
+- [ ] Training's HUD: a row along the bottom, empty at first; Next appears when Wheels shows the shadow, Health at Lives, To the core at Game objective, Magic at Magic, each glowing briefly. Advanced adds the X count; Puzzle Training shows drops and slides at its last page.
+- [ ] Training's pages: one A press moves past text already shown; the first "press down or A" page is skipped; demonstrations ("Watch") still play.
 - [ ] Training cards: the button symbols match your controller (bumpers, triggers and Magic too), apostrophes look right, and the text stays inside the box.
 - [ ] Game over: GAME OVER, then Try Again / Exit / Training in BlockPlanet's font.
 - [ ] Quit mid-episode, restart the game: Continue offers that episode; it starts at its first stage with the score and hearts it began with.

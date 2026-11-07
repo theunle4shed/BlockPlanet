@@ -85,6 +85,14 @@ struct HudView {
     };
     std::vector<Split> splits;
     float progress = -1.0f;    // 0 to 1, or -1 to hide the bar
+    // Training (docs/TRAINING_REDESIGN.md): one row along the bottom of the
+    // screen, holding only the parts Wheels has introduced; a part just
+    // introduced glows for a moment (`intro`: "next", "lives", "magic",
+    // "progress", "xcount", "moves").
+    bool bottom_row = false;
+    bool show_lives = true, show_magic = true;
+    int multiplier = -1;       // the X count, or -1 to hide it
+    std::vector<std::string> intro;
     // Placement: the game's picture as fractions of the window (x, y, width,
     // height), and the sphere's radius on screen in picture heights.
     float picture_x = 0.0f, picture_y = 0.0f, picture_w = 1.0f, picture_h = 1.0f;
@@ -136,6 +144,13 @@ struct HudView {
         float tail = 0.8f;                   // the tail's place along the bottom edge, 0 left to 1 right
         float text_size = 0;                 // the body's size, in vh
         std::vector<std::pair<std::string, std::string>> heading, body;  // (text, colour) runs
+        // Several pages at once (Training's joined pages): blocks in order,
+        // each a heading or a paragraph; a run "\n" is a line break.
+        struct Block {
+            bool heading = false;
+            std::vector<std::pair<std::string, std::string>> runs;
+        };
+        std::vector<Block> blocks;  // used instead of heading and body when not empty
         std::string hint;
         std::string scroll_hint;  // shown when the text is longer than the screen allows ("[x:RS] Scroll")
     };

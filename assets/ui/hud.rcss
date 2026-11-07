@@ -348,3 +348,29 @@ div { display: block; }
     display: block;
     overflow-y: hidden;  /* scrolled by BlockPlanet (right stick, Page Up / Down, wheel) */
 }
+
+/* Training: one row along the bottom (as the portrait rows), holding only
+   what Wheels has introduced. A part just introduced glows for a moment. */
+#left.row { width: auto; text-align: left; transform: scale(1.3); transform-origin: 50% 100%; }
+#left.row > div { display: inline-block; vertical-align: top; }
+#left.row > :first-child { border-radius: 0dp; border-top-left-radius: 22dp; border-bottom-left-radius: 22dp; }
+#left.row > :last-child { border-radius: 0dp; border-top-right-radius: 22dp; border-bottom-right-radius: 22dp; }
+#left.row .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
+#left.row .rule { padding: 14dp 10dp; height: 108dp; }
+#left.row .rule .line { width: 2dp; height: 108dp; }
+#left.row #magic .band { height: auto; padding: 14dp 16dp 0dp 16dp; }
+#left.row #magic .band:last-child { height: 3dp; padding: 0dp; }
+#left.row #magic .band:last-child #meter { display: none; }
+#left.row #magic .window { height: 92dp; }
+#left.row #magic .edge { width: 16dp; height: 92dp; }
+#left.row #magic .side-meter { width: 42dp; }
+#left.row #magic .side-meter #meter-v { display: block; position: relative; width: 12dp; height: 88dp; margin-left: 12dp; }
+#left.row #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
+#left.row #item { width: 116dp; height: 88dp; }
+#left.row #item .name { padding-top: 32dp; font-size: 18dp; }
+#left.row #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
+#left.row #progress { width: 160dp; margin-top: 18dp; height: 14dp; }
+#left.row .count { font-size: 48dp; line-height: 52dp; }
+#left.row .intro { background-color: #f2c14e40; }
+#left.row .intro .label { color: #ffe08a; }
+.card-para + .card-para, .card-para + .card-heading { margin-top: 0.55em; }

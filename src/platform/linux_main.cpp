@@ -412,6 +412,74 @@ void update_puzzle_hud() {
 bool update_title_overlay();
 extern "C" bool blockplanet_title_recent(std::uint32_t* image);
 
+// Training (mode 3, docs/TRAINING_REDESIGN.md): Story's HUD as one row along
+// the bottom, each part shown once Wheels has introduced it, found from the
+// page he is on (0x80103958, the start of his current page, which only moves
+// forward through a lesson's text). A part glows for a few seconds when it
+// first appears. The original HUD is hidden.
+void update_training_hud(const tetrisphere::StoryHudState& state) {
+    const int type = guest::load16(guest_rdram, 0x800E44AC);  // 1 Basics, 2 Advanced, 3 Puzzle
+    const std::uint32_t page = guest::load32(guest_rdram, 0x80103958);
+    // A page "has reached" a topic when it starts at (or just before: its
+    // codes) the text that introduces it.
+    const auto reached = [&](std::uint32_t text) { return page + 8 >= text; };
+    blockplanet::ui::HudView view;
+    view.bottom_row = true;
+    view.show_next = view.show_lives = view.show_magic = false;
+    if (type == 1) {
+        view.show_next = reached(0x800EE8FC);   // "notice that the shadow is in the shape of the current piece"
+        view.show_lives = reached(0x800EEC5C);  // "Lives:"
+        if (reached(0x800EED70)) view.progress = state.progress;  // "Game objective:"
+        view.show_magic = reached(0x800EF198);  // "Magic:"
+    } else if (type == 2) {
+        view.show_next = view.show_lives = view.show_magic = true;  // taught in Basics
+        view.progress = state.progress;
+        if (reached(0x800EF44C)) {  // "X count:"
+            constexpr std::uint32_t p1 = 0x80110220u;
+            view.multiplier = guest::load16(guest_rdram, p1 + 0x2AE6) + guest::load16(guest_rdram, p1 + 0x2AE8) + 1;
+        }
+    } else if (type == 3 && reached(0x800EFAAB)) {  // "remove every piece ... slides and drops allowed"
+        constexpr std::uint32_t p1 = 0x80110220u;
+        view.drops_left = std::max<int>(0, guest::load16(guest_rdram, p1 + 0x25C6));
+        view.slides_left = std::max<int>(0, guest::load16(guest_rdram, p1 + 0x25C8));
+    }
+    // The glow: from when each part first appears in this lesson.
+    static int glow_type = 0;
+    static std::uint32_t glow_page = 0;
+    static std::map<std::string, std::chrono::steady_clock::time_point> since;
+    if (type != glow_type || page < glow_page) since.clear();  // a new or restarted lesson
+    glow_type = type;
+    glow_page = page;
+    const auto now = std::chrono::steady_clock::now();
+    const std::pair<const char*, bool> parts[] = {{"next", view.show_next}, {"lives", view.show_lives}, {"magic", view.show_magic},
+                                                  {"progress", view.progress >= 0.0f}, {"xcount", view.multiplier >= 1},
+                                                  {"moves", view.drops_left >= 0}};
+    for (const auto& [name, shown] : parts) {
+        if (!shown) continue;
+        // Parts shown from the lesson's start (taught earlier) do not glow.
+        const auto it = since.try_emplace(name, page + 8 < 0x800EE7B0u || (type == 2 && std::string(name) != "xcount")
+                                                    ? now - std::chrono::seconds(10) : now).first;
+        if (now - it->second < std::chrono::milliseconds(3000)) view.intro.push_back(name);
+    }
+    view.hearts = state.hearts;
+    view.drop_left = state.drop_left;
+    view.magic = state.magic;
+    view.magic_model = view.show_magic && blockplanet::magic_box_active();
+    view.meter = state.meter;
+    for (const auto& piece : state.next) {
+        blockplanet::ui::HudPieceView p;
+        p.mystery = piece.mystery;
+        p.colour = hud_material_colour(piece.material);
+        p.cells = hud_piece_cells(piece.shape, piece.cells);
+        view.next.push_back(std::move(p));
+    }
+    blockplanet::set_original_hud_hidden(true);
+    if (view.show_magic) update_magic_box();
+    else blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
+    place_hud(view, state);
+    show_hud(view);
+}
+
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
     if (update_title_overlay()) return;
@@ -502,6 +570,10 @@ void update_hud() {
                 refresh_continue();
             }
         }
+    }
+    if (story && state.mode == 3) {  // Training
+        update_training_hud(state);
+        return;
     }
     // VS CPU (mode 6): a column per player (docs/HUD_DESIGN.md, VS).
     if (!story && !original && guest::load16(guest_rdram, 0x800E121C) == -1 &&
@@ -1042,6 +1114,101 @@ std::optional<PictureFrame> picture_frame() {
 // The game's text in BlockPlanet's font (pause_draw_hooks.cpp keeps the
 // strings the game drew): placed where the game placed them in its 4:3 frame,
 // joined to whatever HUD is shown, then handed to the UI.
+// Training's pages (docs/TRAINING_REDESIGN.md, step 2). A lesson's text is a
+// string in the game's memory; the instructor's current page starts at
+// 0x80103958. Codes: -0 a line break, -1 the next word in yellow, -2 a page
+// break (waiting for A), -5 a demonstration ("watch", then on by itself), -3
+// and -4 a scripted action as the page opens (an arrow, Wheels moving).
+struct TrainingPage {
+    std::uint32_t start = 0, end = 0;  // the page's text, up to its break code
+    char ends = 0;                     // '2', '5', or 0 (the string's end)
+    bool scripted = false;             // opens with -3 (an action on screen)
+    bool skip = false;                 // "press down or A to page through the training text"
+};
+
+std::vector<TrainingPage> training_pages(std::uint32_t at) {
+    std::vector<TrainingPage> pages;
+    if (guest_rdram == nullptr || at < 0x80000000u || at >= 0x80800000u) return pages;
+    std::uint32_t s = at, e = at;
+    for (int guard = 0; guard < 8000 && guest::load8(guest_rdram, s - 1) != 0; ++guard) --s;
+    for (int guard = 0; guard < 8000 && guest::load8(guest_rdram, e) != 0; ++guard) ++e;
+    std::uint32_t from = s;
+    for (std::uint32_t i = s; i + 1 < e; ++i) {
+        const char c = char(guest::load8(guest_rdram, i)), d = char(guest::load8(guest_rdram, i + 1));
+        if (c == '-' && (d == '2' || d == '5')) {
+            pages.push_back({from, i, d});
+            from = i + 2;
+            ++i;
+        }
+    }
+    pages.push_back({from, e, 0});
+    for (auto& page : pages) {
+        std::string text;
+        for (std::uint32_t i = page.start; i < page.end; ++i) text += char(guest::load8(guest_rdram, i));
+        for (std::size_t i = 0; i + 1 < text.size() && text[i] == '-' && std::isdigit(static_cast<unsigned char>(text[i + 1])); i += 2)
+            if (text[i + 1] == '3') page.scripted = true;
+        page.skip = text.find("TO PAGE THROUGH THE TRAINING TEXT") != std::string::npos;
+    }
+    return pages;
+}
+
+// The pages shown together with the current one: a page that only continues
+// the text (after a -2 break, opening with no scripted action) joins the one
+// before it. Returns the first and last page of the group, and the current.
+struct TrainingGroup { std::vector<TrainingPage> pages; std::size_t first = 0, last = 0, current = 0; };
+std::optional<TrainingGroup> training_group() {
+    const std::uint32_t at = guest::load32(guest_rdram, 0x80103958);
+    TrainingGroup g;
+    g.pages = training_pages(at);
+    if (g.pages.empty()) return std::nullopt;
+    std::size_t k = 0;
+    for (std::size_t i = 0; i < g.pages.size(); ++i)
+        if (g.pages[i].start <= at) k = i;
+    const auto joins = [&](std::size_t i) {  // page i joins page i - 1
+        return g.pages[i - 1].ends == '2' && !g.pages[i].scripted && !g.pages[i].skip && !g.pages[i - 1].skip;
+    };
+    g.current = g.first = g.last = k;
+    while (g.first > 0 && joins(g.first)) --g.first;
+    while (g.last + 1 < g.pages.size() && joins(g.last + 1)) ++g.last;
+    return g;
+}
+
+// A to press for the player (Training): through pages already shown in a
+// group, and past the paging hint. Pressed in short pulses until the page moves.
+std::atomic<std::uint32_t> training_inject{0};
+void update_training_presses(bool card_shown) {
+    static std::uint32_t pressing_page = 0;
+    static auto started = std::chrono::steady_clock::now();
+    const auto now = std::chrono::steady_clock::now();
+    const bool training = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                          guest::load16(guest_rdram, 0x800E44A8) == 3 && guest::load16(guest_rdram, 0x800E1228) < 0;
+    std::optional<TrainingGroup> g;
+    if (training && card_shown) g = training_group();
+    bool want = false;
+    if (g) {
+        const auto& page = g->pages[g->current];
+        // Past pages shown already: the player pressed A at the group's first;
+        // a demonstration at the group's end runs by itself.
+        want = page.skip || (g->current > g->first && !(g->current == g->last && page.ends == '5'));
+    }
+    if (!want) {
+        pressing_page = 0;
+        training_inject.store(0);
+        return;
+    }
+    const std::uint32_t at = g->pages[g->current].start;
+    if (at != pressing_page) {
+        pressing_page = at;
+        started = now;
+    }
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - started).count();
+    if (ms > 4000) {  // the page does not move: leave it to the player
+        training_inject.store(0);
+        return;
+    }
+    training_inject.store(0x10000u | (ms % 300 < 120 ? 0x8000u : 0u));
+}
+
 void publish_game_text() {
     auto view = last_hud_view;
     auto texts = blockplanet::recent_game_text();
@@ -1269,6 +1436,69 @@ void publish_game_text() {
                 if (card_heading) panel.heading = joined[first];
                 if (body_first < texts.size()) panel.body = joined[body_first];
             }
+            // Training: the whole group of pages, read from the lesson's text.
+            if (guest::load16(guest_rdram, 0x800E44A8) == 3)
+                if (const auto g = training_group()) {
+                    constexpr const char* orange = "#ff8c1aff";
+                    constexpr const char* yellow = "#ffd23cff";
+                    for (std::size_t i = g->first; i <= g->last; ++i) {
+                        const auto& pg = g->pages[i];
+                        if (pg.skip) continue;
+                        std::string text;
+                        for (std::uint32_t a = pg.start; a < pg.end; ++a) text += char(guest::load8(guest_rdram, a));
+                        // Words, each with its colour, and the -0 line breaks.
+                        struct Word { std::string text; bool yellow = false; bool line_before = false; };
+                        std::vector<Word> words;
+                        Word word;
+                        bool next_yellow = false, line = false;
+                        const auto flush = [&] {
+                            if (!word.text.empty()) words.push_back(word);
+                            word = Word{};
+                        };
+                        for (std::size_t c = 0; c < text.size(); ++c) {
+                            if (text[c] == '-' && c + 1 < text.size() && std::isdigit(static_cast<unsigned char>(text[c + 1]))) {
+                                const char code = text[++c];
+                                if (code == '0') { flush(); line = true; }
+                                if (code == '1') { if (word.text.empty()) next_yellow = true; else word.yellow = true; }
+                                continue;
+                            }
+                            if (text[c] == ' ') { flush(); continue; }
+                            if (word.text.empty()) {
+                                word.yellow = next_yellow;
+                                word.line_before = line;
+                                next_yellow = line = false;
+                            }
+                            word.text += text[c];
+                        }
+                        flush();
+                        if (words.empty()) continue;
+                        // A heading: the page's first line, when it ends with a colon.
+                        std::size_t body = 0;
+                        while (body < words.size() && (body == 0 || !words[body].line_before)) ++body;
+                        const bool heading = body < words.size() && !words[body - 1].text.empty() && words[body - 1].text.back() == ':';
+                        if (!heading) body = 0;
+                        const auto runs = [&](std::size_t from, std::size_t to, bool title) {
+                            std::string joined_text;
+                            for (std::size_t w = from; w < to; ++w) joined_text += (w > from ? " " : "") + buttons(words[w].text);
+                            std::string cased_text = tetrisphere::proper_case(joined_text);
+                            if (title && !cased_text.empty() && cased_text.back() == ':') cased_text.pop_back();
+                            std::vector<std::string> split;
+                            std::size_t a = 0;
+                            for (std::size_t b; (b = cased_text.find(' ', a)) != std::string::npos; a = b + 1) split.push_back(cased_text.substr(a, b - a));
+                            split.push_back(cased_text.substr(a));
+                            std::vector<std::pair<std::string, std::string>> out;
+                            for (std::size_t w = from; w < to; ++w) {
+                                // A line break the game asks for: only before a list's items (1. 2. ...).
+                                const std::string& t = split.size() == to - from ? split[w - from] : buttons(words[w].text);
+                                if (w > from && words[w].line_before && std::isdigit(static_cast<unsigned char>(t[0]))) out.push_back({"\n", ""});
+                                out.push_back({t, title ? yellow : words[w].yellow ? yellow : orange});
+                            }
+                            return out;
+                        };
+                        if (heading) panel.blocks.push_back({true, runs(0, body, true)});
+                        if (body < words.size()) panel.blocks.push_back({false, runs(body, words.size(), false)});
+                    }
+                }
             if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
             if (box->prompt == 2) panel.hint = "Watch";
             {
@@ -2833,7 +3063,7 @@ bool handle_profile_command(const std::string& command) {
                 switch (state.mode) {
                 case 1: where = "Story \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
                 case 2: where = "Score Attack"; break;
-                case 3: where = state.training_type == 3 ? "Puzzle \u00B7 Chapter 0" : "Story \u00B7 Chapter 0"; break;
+                case 3: where = state.training_type == 3 ? "Training \u00B7 Puzzle" : state.training_type == 2 ? "Training \u00B7 Advanced" : "Training \u00B7 Basics"; break;
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
                 case 5: where = "Hide & Seek \u00B7 Level " + std::to_string(state.level + 1); break;  // its chapter is not the Rescue one
                 case 6: where = "Versus"; break;
@@ -2845,11 +3075,12 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::request_open("pause");
             }
             if (pause.close_menu) blockplanet::ui::request_close();
-            launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons) : 0u);
+            launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons) : training_inject.load());
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
             update_hud();
             publish_game_text();
+            update_training_presses(blockplanet::recent_card_box().has_value());
             // A single stage finished: pause, then quit to the menu.
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();

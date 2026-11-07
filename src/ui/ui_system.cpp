@@ -147,7 +147,8 @@ void apply_card_scroll(float window_h) {
     if (page != card_scroll.page) {  // a new page: from its top, following
         card_scroll.page = page;
         card_scroll.top = 0.0f;
-        card_scroll.follow = true;
+        // Text typing in is followed; text shown whole (joined pages) starts at its top.
+        card_scroll.follow = scroll->GetAttribute<Rml::String>("data-follow", "1") != "0";
     }
     // The most the text may take: the panel's bottom edge stays put, and its
     // top stops 3% of the screen short of the top.
@@ -328,10 +329,14 @@ std::string game_text_rml(const HudView& hud) {
         const auto runs = [&](const std::vector<std::pair<std::string, std::string>>& parts) {
             std::string out;
             for (std::size_t k = 0; k < parts.size(); ++k) {
+                if (parts[k].first == "\n") {
+                    out += "<br/>";
+                    continue;
+                }
                 const auto& colour = parts[k].second;
                 const bool yellow = colour.size() >= 7 && std::stoi(colour.substr(3, 2), nullptr, 16) > 170;
                 out += std::string("<span class='") + (yellow ? "hl" : "") + "' style='color: " + colour + ";'>" +
-                       with_buttons(escape(parts[k].first)) + (k + 1 < parts.size() ? " " : "") + "</span>";
+                       with_buttons(escape(parts[k].first)) + (k + 1 < parts.size() && parts[k + 1].first != "\n" ? " " : "") + "</span>";
             }
             return out;
         };
@@ -339,13 +344,23 @@ std::string game_text_rml(const HudView& hud) {
         std::string page;
         for (const auto& part : p->heading) page += part.first + " ";
         for (std::size_t k = 0; k < p->body.size() && k < 4; ++k) page += p->body[k].first + " ";
+        if (!p->blocks.empty())
+            for (std::size_t k = 0; k < p->blocks.front().runs.size() && k < 4; ++k) page += p->blocks.front().runs[k].first + " ";
         rml += std::string("<div class='card-panel") + (card_scroll.overflow ? " overflow" : "") + "' style='right: " +
                pct(p->right) + "; bottom: " + pct(p->bottom) + "; width: " + pct(p->w) + "; font-size: " +
                std::to_string(p->text_size) + "vh;'>";
-        if (!p->heading.empty()) rml += "<div class='card-heading'>" + runs(p->heading) + "</div>";
         const std::string limit = card_scroll.max_px > 0.0f ? "max-height: " + std::to_string(int(card_scroll.max_px)) + "px;" : "";
-        rml += "<div id='card-scroll' class='card-scroll' data-page='" + escape(page) + "' style='" + limit + "'><div class='card-body'>" +
-               runs(p->body) + "</div></div>";
+        if (p->blocks.empty()) {
+            if (!p->heading.empty()) rml += "<div class='card-heading'>" + runs(p->heading) + "</div>";
+            rml += "<div id='card-scroll' class='card-scroll' data-page='" + escape(page) + "' style='" + limit + "'><div class='card-body'>" +
+                   runs(p->body) + "</div></div>";
+        } else {
+            // Joined pages: everything scrolls together, headings included.
+            rml += "<div id='card-scroll' class='card-scroll' data-follow='0' data-page='" + escape(page) + "' style='" + limit + "'>";
+            for (const auto& block : p->blocks)
+                rml += std::string("<div class='") + (block.heading ? "card-heading" : "card-body card-para") + "'>" + runs(block.runs) + "</div>";
+            rml += "</div>";
+        }
         std::string hint = p->hint.empty() ? std::string() : with_buttons(escape(p->hint));
         if (card_scroll.overflow && !p->scroll_hint.empty())
             hint += std::string(hint.empty() ? "" : "<span>&nbsp;&nbsp;</span>") + with_buttons(escape(p->scroll_hint));
@@ -393,6 +408,48 @@ std::string hud_rml_parts(const HudView& hud) {
     }
     if (hud.versus)
         return versus_column(hud.players[0], "left", "Player 1") + versus_column(hud.players[1], "right", "Player 2");
+    if (hud.bottom_row) {
+        // Training: one row along the bottom, only what has been introduced,
+        // in the order a player meets them.
+        const auto glow = [&](const char* part) {
+            return std::find(hud.intro.begin(), hud.intro.end(), part) != hud.intro.end() ? " intro" : "";
+        };
+        std::vector<std::string> parts;
+        if (hud.show_next)
+            parts.push_back(std::string("<div id='next' class='group") + glow("next") + "'><div class='label'>Next</div>" +
+                            pieces_rml(hud.next, hud.next.size()) + "</div>");
+        if (hud.show_lives) {
+            std::string lives = std::string("<div id='lives' class='group") + glow("lives") + "'><div class='label'>Health</div><div id='hearts'>";
+            for (int i = 0; i < 3; ++i) lives += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
+            lives += std::string("</div><div id='drop' class='bar") + (hud.drop_left < 0.35f ? " hurry" : "") +
+                     "'><div id='drop-fill' class='fill'/></div></div>";
+            parts.push_back(lives);
+        }
+        if (hud.show_magic) {
+            const bool model = hud.magic >= 0 && hud.magic_model;
+            parts.push_back(std::string("<div id='magic' class='") + glow("magic") +
+                            "'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'" +
+                            (model ? " class='held'" : "") + ">" +
+                            (hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "") +
+                            "</div><div class='edge side-meter'><div id='meter-v' class='bar'><div id='meter-v-fill' class='fill'/></div></div>"
+                            "</div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>");
+        }
+        if (hud.multiplier >= 1)
+            parts.push_back(std::string("<div id='xcount' class='group") + glow("xcount") + "'><div class='label'>X count</div><div class='count'>" +
+                            std::to_string(hud.multiplier) + "x</div></div>");
+        if (hud.progress >= 0.0f)
+            parts.push_back(std::string("<div id='core' class='group") + glow("progress") +
+                            "'><div class='label'>To the core</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div></div>");
+        if (hud.drops_left >= 0)
+            parts.push_back(std::string("<div id='drops' class='group") + glow("moves") + "'><div class='label'>Drops left</div><div class='count'>" +
+                            std::to_string(hud.drops_left) + "</div></div><div class='rule'><div class='line'/></div><div id='slides' class='group" +
+                            glow("moves") + "'><div class='label'>Slides left</div><div class='count'>" +
+                            std::to_string(std::max(0, hud.slides_left)) + "</div></div>");
+        if (parts.empty()) return rml;
+        rml += "<div id='left' class='side row'>";
+        for (std::size_t i = 0; i < parts.size(); ++i) rml += (i ? "<div class='rule'><div class='line'/></div>" : "") + parts[i];
+        return rml + "</div>";
+    }
     rml += "<div id='left' class='side'>";
     if (hud.drops_left >= 0) {
         // Puzzle: the moves left, nothing else (no hearts, magic or queue).
@@ -520,9 +577,23 @@ std::string px_text(float value) { return px(value); }
 void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2f& left_at) {
     auto* left = hud_document->GetElementById("left");
     auto* right = hud_document->GetElementById("right");
-    if (left == nullptr || right == nullptr) return;
     const float dp = height / design_height;
     const float margin = 24.0f * dp;
+    if (hud.bottom_row && left != nullptr) {
+        // Training's row: at the bottom, centred under the sphere's side of the
+        // picture (a quarter of the way across), clear of Wheels on the right.
+        static Rml::Vector2f last{0, 0};
+        auto s = left->GetBox().GetSize(Rml::BoxArea::Border);
+        if (s.x > 0 && s.y > 0) last = s; else s = last;
+        const float cx = (hud.picture_x + hud.picture_w * 0.25f) * width;
+        const float lx = std::clamp(cx - s.x / 2.0f, margin, std::max(margin, width - margin - s.x));
+        const float ly = height - margin - s.y;
+        left->SetProperty("left", px(lx));
+        left->SetProperty("top", px(ly));
+        left_at = {lx, ly};
+        return;
+    }
+    if (left == nullptr || right == nullptr) return;
     const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width;
     const float cy = (hud.picture_y + hud.picture_h / 2.0f) * height;
     // Sizes from the last layout (the border box).

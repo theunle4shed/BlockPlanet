@@ -66,7 +66,8 @@ float ProgressTracker::update(int level_key, int weakest_now) {
 bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryHudState& out) {
     using namespace guest;
     const int mode = load16(rdram, 0x800E44A8);
-    if (load16(rdram, 0x800E121C) != -1 || (mode != 1 && mode != 5 && mode != 9)) return false;  // Story, Hide & Seek, Lines
+    // Story, Training (its HUD reveals parts as they are taught), Hide & Seek, Lines
+    if (load16(rdram, 0x800E121C) != -1 || (mode != 1 && mode != 3 && mode != 5 && mode != 9)) return false;
     out = {};
     out.mode = mode;
     const int hearts = load16(rdram, player1 + 0x2D7E);

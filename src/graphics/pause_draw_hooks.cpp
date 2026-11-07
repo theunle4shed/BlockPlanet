@@ -128,7 +128,22 @@ void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
-    if (in_hud && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) {
+    // Training draws its speech (text and bubble) and its pointing arrows in
+    // the HUD routine too: they stay when the original HUD is hidden (the
+    // speech is then captured and replaced below).
+    bool training_keep = false;
+    if (in_hud && guest16(rdram, 0x800E44A8u) == 3) {
+        if (helper == 0x800382B4u) training_keep = true;
+        if (helper == 0x8003396Cu && (static_cast<std::uint32_t>(ctx->r5) >> 24) == 0x80u) {
+            const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
+            const int w = guest16(rdram, image), h = guest16(rdram, image + 2);
+            const int x = int(ctx->r6), y = int(ctx->r7);
+            const bool controller_area = x >= 155 && x <= 215 && y >= 120 && y <= 185;
+            training_keep = (w == 150 && h == 115) || (w == 62 && h == 14) || (w == 50 && h == 14) ||
+                            (!controller_area && ((w == 28 && h == 16) || (w == 16 && h == 28)));
+        }
+    }
+    if (in_hud && !training_keep && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) {
         // Research: BLOCKPLANET_HUD_SKIP_LOG=1 logs each distinct 2D draw skipped here.
         static const bool skip_log = std::getenv("BLOCKPLANET_HUD_SKIP_LOG") != nullptr;
         if (skip_log) {
