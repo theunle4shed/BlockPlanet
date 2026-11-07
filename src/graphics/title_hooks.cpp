@@ -933,7 +933,7 @@ constexpr BombPose bomb_poses[] = {
     // Roll aims each nose at the breach (the white tile), as in the original.
     {62.0f, -12.0f, 0.0055f, 5.04f, -0.25f, 0.10f},
     {70.0f, 18.0f, 0.0085f, 5.04f, -0.25f, 0.35f},
-    {46.0f, 50.0f, 0.0125f, 5.04f, -0.25f, 0.65f},
+    {36.0f, 42.0f, 0.0125f, 4.4f, -0.7f, 0.5f},  // tail towards the viewer, as in the original
 };
 
 void draw_title_bombs(std::uint8_t* rdram) {
@@ -944,7 +944,11 @@ void draw_title_bombs(std::uint8_t* rdram) {
     if (mesh.empty()) return;
     struct Face { float depth; std::array<std::array<float, 3>, 3> p; std::array<float, 3> colour; };
     std::vector<Face> faces;
-    for (const auto& pose : bomb_poses) {
+    // Research: BLOCKPLANET_TITLE_BOMB3=x,y,size,yaw,pitch,roll overrides the third.
+    BombPose poses[3] = {bomb_poses[0], bomb_poses[1], bomb_poses[2]};
+    if (const char* b3 = std::getenv("BLOCKPLANET_TITLE_BOMB3"))
+        std::sscanf(b3, "%f,%f,%f,%f,%f,%f", &poses[2].x, &poses[2].y, &poses[2].size, &poses[2].yaw, &poses[2].pitch, &poses[2].roll);
+    for (const auto& pose : poses) {
         const float cy = std::cos(pose.yaw), sy = std::sin(pose.yaw), cp = std::cos(pose.pitch), sp = std::sin(pose.pitch),
                     cr = std::cos(pose.roll), sr = std::sin(pose.roll);
         for (const auto& t : mesh) {
