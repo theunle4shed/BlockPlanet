@@ -54,4 +54,11 @@ Open questions from step 2: a long group scrolls, and A still moves on even when
 
 The game builds every projection with one routine, `guPerspective` at `0x800D47E0`. It is called from six places (`0x80031B58`, `0x8003926C`, `0x8003B5F4`, `0x800C9318`, `0x800CD478`, `0x800CFEC8`), and each passes an aspect of 4:3 (`0x3FAAAAAB`). The narrow sphere in Training does not come from the projection. It must come from the viewport, or from a scale on the sphere's model in Training (wider than tall on screen means a smaller x scale).
 
-Next step: log the display list's viewport (`G_MOVEMEM` to the viewport) and the sphere's model matrix in Training and in Story, and compare them. BlockPlanet draws the sphere itself (`sphere_hooks.cpp`) from the game's matrices, so a corrected x scale can be applied there in Training only.
+Checked further the same day:
+
+- **Not a scale:** the sphere's per-axis scale (player context `+0x2478` flag, `+0x247A` to `+0x247E`) is 1:1 on every axis, and switched off, in Training.
+- **The viewport moves it, without squeezing:** Training's viewport (at `0x800E92C8` in memory) is full size (640 × 480 in quarter pixels) but centred at x 377 instead of 640, so the sphere sits left of centre.
+- **The real cause is clipping:** with Graphics > Picture set to 4:3, the sphere is about as wide as it is tall (about 408 × 420 pixels at 720p), but its right side is cut off in a straight vertical line at the middle of the screen. The cut makes it read as narrow. The game clips it there to keep the sphere clear of the original speech bubble. It does this with BlockPlanet's sphere off too.
+- **Where the clip is set:** probably one of the game's scissor commands (`G_SETSCISSOR`, `0xED`), set in `func_8006FA28`, `func_800A43E0`, `func_800A4D60`, `func_800C25FC`, `func_800CB070` and `func_800CD3B8`. All of them cover the full height. `func_8006FA28`'s covers the full width (320); the others' widths are computed and not yet read.
+
+Next step: log the scissor commands in Training's display list to find the one at the screen's middle, then widen it in Training only. The new panel no longer covers that part of the screen.
