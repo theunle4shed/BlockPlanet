@@ -22,6 +22,10 @@ Each archive is a big-endian u16 entry count, then count + 1 big-endian u32 offs
 
 A picture is s16 width, s16 height, s16 format, 2 bytes, then pixels: format 0 is RGBA 5551 (16-bit), 2 is one byte per pixel (intensity), 3 is one byte per pixel (likely colour-indexed). Entry `0x15` is the title picture (270 × 205), `0x14` its shadow.
 
+## The robot characters
+
+The main archive's name artwork (entries `0x118` to `0x11E`: Rocket, Gear, Gyro, Stomp, Wheels, Turbine, Jak) names the game's **seven robot characters** the player chooses from, not the magics (corrected 2026-11-07, the owner's knowledge, confirmed by online guides). Each has a balance of speed (moving) and power (speed when moving a block), the "speed / power" artwork (`0x110`): Rocket the fastest and weakest, Gear fast and weak, Wheels (the default) and Turbine even, Gyro and Jak slow and strong, Stomp the slowest and strongest. The "DEMO" portraits (`0x8B`, `0x8C`, `0x9D` to `0xA0`, `0xBD`) are probably the same characters (the teal crab-like one among them), so the title picture's characters are likely playable robots. Their in-memory selection and stats are still to find.
+
 ## 3D objects (archive s2)
 
 Decoded from the game's mesh routine `func_800331B0`. Header: u32 offsets to sections A (`0x18`), B (materials), C (parts), D (vertices) and E, then the size.
