@@ -36,6 +36,7 @@ For the owner's playtests. Tick what works, note what doesn't (what you did, wha
 - [ ] Resize the window while playing (Story, Training, a card showing): the HUD, the speech panel and the menus should follow the new size at once, with nothing left in the old place.
 - [ ] Training's HUD: a row along the bottom, empty at first; Next appears when Wheels shows the shadow, Health at Lives, To the core at Game objective, Magic at Magic, each glowing briefly. Advanced adds the X count; Puzzle Training shows drops and slides at its last page.
 - [ ] Training's pages: one A press moves past text already shown; the first "press down or A" page is skipped; demonstrations ("Watch") still play.
+- [ ] Hide & Seek, Lines and VS cards: BlockPlanet's panel (no tail) with the whole text at once, Hide & Seek's new titles (Any Picture, Five Drills…), "sphere" not "ball", and BlockPlanet's HUD behind it (no original HUD).
 - [ ] Training cards: the button symbols match your controller (bumpers, triggers and Magic too), apostrophes look right, and the text stays inside the box.
 - [ ] Game over: GAME OVER, then Try Again / Exit / Training in BlockPlanet's font.
 - [ ] Quit mid-episode, restart the game: Continue offers that episode; it starts at its first stage with the score and hearts it began with.

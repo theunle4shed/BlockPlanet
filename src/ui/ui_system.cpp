@@ -163,7 +163,10 @@ void apply_card_scroll(float window_h) {
             const char* v = std::getenv("BLOCKPLANET_CARD_TOP");
             return v != nullptr ? std::clamp(float(std::atof(v)), 0.0f, 0.9f) : 0.03f;
         }();
-        const float wanted = (panel_top + panel_h) - window_h * top_margin - others;
+        // A panel anchored at its top grows downwards: it stops 3% short of the bottom.
+        const bool from_top = panel->GetAttribute<Rml::String>("data-anchor", "bottom") == "top";
+        const float wanted = from_top ? window_h * (1.0f - 0.03f) - panel_top - others
+                                      : (panel_top + panel_h) - window_h * top_margin - others;
         if (std::abs(wanted - card_scroll.max_px) > 2.0f) card_scroll.max_px = std::max(0.0f, wanted);
     }
     const float max_top = std::max(0.0f, scroll->GetScrollHeight() - shown);
@@ -346,9 +349,10 @@ std::string game_text_rml(const HudView& hud) {
         for (std::size_t k = 0; k < p->body.size() && k < 4; ++k) page += p->body[k].first + " ";
         if (!p->blocks.empty())
             for (std::size_t k = 0; k < p->blocks.front().runs.size() && k < 4; ++k) page += p->blocks.front().runs[k].first + " ";
-        rml += std::string("<div class='card-panel") + (card_scroll.overflow ? " overflow" : "") + "' style='right: " +
-               pct(p->right) + "; bottom: " + pct(p->bottom) + "; width: " + pct(p->w) + "; font-size: " +
-               std::to_string(p->text_size) + "vh;'>";
+        const std::string anchor = p->top >= 0.0f ? "top: " + pct(p->top) : "bottom: " + pct(p->bottom);
+        rml += std::string("<div class='card-panel") + (card_scroll.overflow ? " overflow" : "") + "' data-anchor='" +
+               (p->top >= 0.0f ? "top" : "bottom") + "' style='right: " + pct(p->right) + "; " + anchor + "; width: " + pct(p->w) +
+               "; font-size: " + std::to_string(p->text_size) + "vh;'>";
         const std::string limit = card_scroll.max_px > 0.0f ? "max-height: " + std::to_string(int(card_scroll.max_px)) + "px;" : "";
         if (p->blocks.empty()) {
             if (!p->heading.empty()) rml += "<div class='card-heading'>" + runs(p->heading) + "</div>";
@@ -368,8 +372,10 @@ std::string game_text_rml(const HudView& hud) {
         rml += "</div>";
         // The tail, beside the panel (a child would be clipped by it), from the
         // same bottom edge: half of it overlaps the panel's rim.
-        const float left = 1.0f - p->right - p->w + p->tail * p->w;
-        rml += "<div class='card-tail' style='left: " + pct(left) + "; bottom: " + pct(p->bottom) + ";'/>";
+        if (p->tail >= 0.0f) {
+            const float left = 1.0f - p->right - p->w + p->tail * p->w;
+            rml += "<div class='card-tail' style='left: " + pct(left) + "; bottom: " + pct(p->bottom) + ";'/>";
+        }
     }
     for (const auto& t : hud.game_text)
     {

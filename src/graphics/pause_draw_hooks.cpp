@@ -131,16 +131,22 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     // Training draws its speech (text and bubble) and its pointing arrows in
     // the HUD routine too: they stay when the original HUD is hidden (the
     // speech is then captured and replaced below).
+    // The same for the rules and goal cards (Hide & Seek, VS, Lines): their
+    // text, box and "more" prompt are drawn in the HUD routine.
     bool training_keep = false;
-    if (in_hud && guest16(rdram, 0x800E44A8u) == 3) {
+    const int draw_mode = in_hud ? guest16(rdram, 0x800E44A8u) : 0;
+    if (in_hud && (draw_mode == 3 || draw_mode == 5 || draw_mode == 6 || draw_mode == 9)) {
         if (helper == 0x800382B4u) training_keep = true;
         if (helper == 0x8003396Cu && (static_cast<std::uint32_t>(ctx->r5) >> 24) == 0x80u) {
             const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
             const int w = guest16(rdram, image), h = guest16(rdram, image + 2);
             const int x = int(ctx->r6), y = int(ctx->r7);
             const bool controller_area = x >= 155 && x <= 215 && y >= 120 && y <= 185;
-            training_keep = (w == 150 && h == 115) || (w == 62 && h == 14) || (w == 50 && h == 14) ||
-                            (!controller_area && ((w == 28 && h == 16) || (w == 16 && h == 28)));
+            if (draw_mode == 3)
+                training_keep = (w == 150 && h == 115) || (w == 62 && h == 14) || (w == 50 && h == 14) ||
+                                (!controller_area && ((w == 28 && h == 16) || (w == 16 && h == 28)));
+            else
+                training_keep = (w == 203 && h == 143) || (w == 62 && h == 14);
         }
     }
     if (in_hud && !training_keep && is_2d_helper(helper) && hud_hidden.load(std::memory_order_relaxed)) {
@@ -224,6 +230,26 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     // BlockPlanet's card panel along with the text. Told apart by size and
     // format, as their addresses depend on what the game has loaded.
     static const bool original_text = std::getenv("BLOCKPLANET_ORIGINAL_TEXT") != nullptr;  // the game's text, bubble and all
+    // A rules or goal card's box (Hide & Seek, VS, Lines: a 203 x 143 one-byte
+    // picture), replaced by BlockPlanet's card panel along with its text.
+    if (helper == 0x8003396Cu && !original_text && text_replaced.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1) {
+        const int mode = guest16(rdram, 0x800E44A8u);
+        const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
+        if ((mode == 5 || mode == 6 || mode == 9) && (image >> 24) == 0x80u && guest16(rdram, image + 4) == 2 &&
+            guest16(rdram, image) == 203 && guest16(rdram, image + 2) == 143) {
+            std::lock_guard lock(text_mutex);
+            card_box = blockplanet::CardBox{int(ctx->r6), int(ctx->r7), 203, 143, 0, 1};
+            card_box_at = std::chrono::steady_clock::now();
+            return true;
+        }
+        if ((mode == 5 || mode == 6 || mode == 9) && (image >> 24) == 0x80u && guest16(rdram, image + 4) == 2 &&
+            guest16(rdram, image) == 62 && guest16(rdram, image + 2) == 14) {  // "more" under the card
+            std::lock_guard lock(text_mutex);
+            card_prompt = 1;
+            card_prompt_at = std::chrono::steady_clock::now();
+            return true;
+        }
+    }
     if (helper == 0x8003396Cu && !original_text && text_replaced.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
         guest16(rdram, 0x800E44A8u) == 3) {
         const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);

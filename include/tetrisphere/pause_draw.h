@@ -37,6 +37,7 @@ std::vector<GameText> recent_game_text();
 struct CardBox {
     int x = 0, y = 0, w = 0, h = 0;  // the bubble image, in the game's 320 x 240 frame
     int prompt = 0;                   // 0 none, 1 "more", 2 "watch"
+    int kind = 0;                     // 0 Training's speech bubble, 1 a rules or goal card's box (203 x 143)
 };
 std::optional<CardBox> recent_card_box();
 void set_game_text_replaced(bool replaced);

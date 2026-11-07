@@ -113,6 +113,8 @@ int main(int argc, char** argv) {
         assert(proper_case("DIG WITH THE [A] BUTTON. THEN GO") == "Dig with the [A] button. Then go");
         assert(proper_case("PRESS [x:A] TO GO ON") == "Press [x:A] to go on");
         assert(game_quotes("LET%S GO !") == "LET\u2019S GO!");
+        assert(fix_wording("AROUND THE BALL. THE -1BALL%S CORE, BALLOON") == "AROUND THE SPHERE. THE -1SPHERE%S CORE, BALLOON");
+        assert(fix_wording("IT TALLYS. YOU CAN NOT! WHY ?? YES !!") == "IT TALLIES. YOU CANNOT! WHY ? YES !");
         assert(game_quotes("YOUR %X% COUNT ??") == "YOUR \u2018X\u2019 COUNT??");
         assert(proper_case(game_quotes("HI! MY NAME IS WHEELS. I WILL SHOW YOU TETRISPHERE. I%M HERE")) ==
                "Hi! My name is Wheels. I will show you Tetrisphere. I\u2019m here");

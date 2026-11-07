@@ -578,7 +578,9 @@ void update_hud() {
     // VS CPU (mode 6): a column per player (docs/HUD_DESIGN.md, VS).
     if (!story && !original && guest::load16(guest_rdram, 0x800E121C) == -1 &&
         guest::load16(guest_rdram, 0x800E44A8) == 6) {
-        const bool card = guest::load16(guest_rdram, 0x801033AC) != 0;
+        // The rules card shows in BlockPlanet's panel (kept from the hidden HUD);
+        // with the original text, the original HUD shows while it is up.
+        const bool card = std::getenv("BLOCKPLANET_ORIGINAL_TEXT") != nullptr && guest::load16(guest_rdram, 0x801033AC) != 0;
         blockplanet::set_original_hud_hidden(!card);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
         if (card) {
@@ -626,8 +628,11 @@ void update_hud() {
         return;
     }
     // A card of the game's own (Lines' rules, Hide & Seek's goal) is drawn by
-    // its HUD routine: while one is up, show the original HUD and not ours.
-    if (story && guest::load16(guest_rdram, 0x801033AC) != 0) {
+    // its HUD routine; BlockPlanet shows it in its own panel (the card's text,
+    // box and prompt are kept from the hidden HUD), so our HUD stays up. With
+    // the original text (BLOCKPLANET_ORIGINAL_TEXT=1) the original HUD shows instead.
+    static const bool original_text = std::getenv("BLOCKPLANET_ORIGINAL_TEXT") != nullptr;
+    if (story && original_text && guest::load16(guest_rdram, 0x801033AC) != 0) {
         blockplanet::set_original_hud_hidden(false);
         show_hud(std::nullopt);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
@@ -1209,6 +1214,48 @@ void update_training_presses(bool card_shown) {
     training_inject.store(0x10000u | (ms % 300 < 120 ? 0x8000u : 0u));
 }
 
+// A rules or goal card's whole text, from its heading's first word: the
+// game keeps each card as one string ("-1MULTI-0DIG THROUGH..."), in its
+// code and data (0x800E0000 to 0x80100000). Found once per word.
+std::optional<std::string> find_card_text(const std::string& first_word) {
+    if (guest_rdram == nullptr || first_word.size() < 2) return std::nullopt;
+    static std::map<std::string, std::optional<std::string>> found;
+    if (const auto it = found.find(first_word); it != found.end()) return it->second;
+    const std::string needle = "-1" + first_word;
+    std::optional<std::string> result;
+    for (std::uint32_t a = 0x800E0001u; a < 0x80100000u - needle.size() && !result; ++a) {
+        if (guest::load8(guest_rdram, a - 1) != 0) continue;
+        bool match = true;
+        for (std::size_t k = 0; k < needle.size() && match; ++k) match = char(guest::load8(guest_rdram, a + std::uint32_t(k))) == needle[k];
+        if (!match) continue;
+        // The whole word: what follows is a code, a space or the end.
+        const char next = char(guest::load8(guest_rdram, a + std::uint32_t(needle.size())));
+        if (std::isalpha(static_cast<unsigned char>(next))) continue;
+        std::string text;
+        for (std::uint32_t k = 0; k < 2000; ++k) {
+            const char ch = char(guest::load8(guest_rdram, a + k));
+            if (ch == 0) break;
+            text += ch;
+        }
+        // Only a card's text: one with a -0 line break after its heading, and no page breaks.
+        if (text.find("-0") != std::string::npos && text.find("-2") == std::string::npos) result = text;
+    }
+    found[first_word] = result;
+    return result;
+}
+
+// Hide & Seek's goal cards: the owner's titles for the game's internal names
+// (docs/DECISIONS-2026-11-07.md). Empty: keep the card's own heading.
+std::string hide_and_seek_title(const std::string& card) {
+    static const std::pair<const char*, const char*> titles[] = {
+        {"-1MULTI-0", "Any Picture"}, {"-1DRILL-0", "Five Drills"}, {"-1HIDE -1AND -1SEEK-0", "Help Them Escape"},
+        {"-1SHIFT-0", "Four Parts"}, {"-1UNIQUE-0", "Unique Shape"}, {"-1BRICK-0", "Brick Drop"},
+        {"-1CONNECT-0", "Connected Pictures"}, {"-1TOWER-0", "Tower"}, {"-1CRYSTAL -1TOWER-0", "Crystal Tower"}};
+    for (const auto& [start, title] : titles)
+        if (card.rfind(start, 0) == 0) return title;
+    return {};
+}
+
 void publish_game_text() {
     auto view = last_hud_view;
     auto texts = blockplanet::recent_game_text();
@@ -1276,7 +1323,7 @@ void publish_game_text() {
                 for (std::size_t at; (at = text.find(code)) != std::string::npos;) text.replace(at, n, std::string("[") + f + ":" + name + "]");
             }
             // Any other % is the font's apostrophe or quote mark ("LET%S", "%X%").
-            return tetrisphere::game_quotes(text);
+            return tetrisphere::game_quotes(tetrisphere::fix_wording(text));
         };
         // A card's heading: its first line, when that line ends with a colon
         // ("Training:") or is a short line in one colour over a line starting
@@ -1451,74 +1498,109 @@ void publish_game_text() {
             panel.w = fx(right) - fx(right - width);
             panel.tail = (tail_x - (right - width)) / width;
             panel.text_size = 10.0f / 240.0f * frame->h / frame->window_h * 100.0f * card_text_scale();
+            if (box->kind == 1) {
+                // A rules or goal card: centred where the game's box was (its
+                // middle column, from near its top), a little narrower, growing
+                // downwards; no tail (nobody is speaking).
+                const float card_w = 148.0f * std::max(1.0f, card_text_scale() * 0.9f);  // clear of the HUD panels beside it
+                const float centre = float(box->x) + float(box->w) / 2.0f;
+                panel.right = 1.0f - fx(centre + card_w / 2.0f);
+                panel.w = fx(centre + card_w / 2.0f) - fx(centre - card_w / 2.0f);
+                panel.top = fy(float(box->y) + 6.0f);
+                panel.tail = -1.0f;
+                panel.text_size *= 1.1f;
+            }
+            bool card_found = false;
             if (!card_lines.empty()) {
                 const std::size_t first = card_lines.begin()->second.front();
                 if (card_heading) panel.heading = joined[first];
                 if (body_first < texts.size()) panel.body = joined[body_first];
             }
+            // A card's text (a string in the game's memory, with its codes) as
+            // panel blocks: a heading (the first line, when it ends with a colon
+            // or is a short line all in yellow; `title` replaces it), then the
+            // paragraph, with line breaks only before a list's items.
+            const auto add_text = [&](std::string text, const std::string& title) {
+                text = tetrisphere::fix_wording(text);
+                constexpr const char* orange = "#ff8c1aff";
+                constexpr const char* yellow = "#ffd23cff";
+                struct Word { std::string text; bool yellow = false; bool line_before = false; };
+                std::vector<Word> words;
+                Word word;
+                bool next_yellow = false, line = false;
+                const auto flush = [&] {
+                    if (!word.text.empty()) words.push_back(word);
+                    word = Word{};
+                };
+                for (std::size_t c = 0; c < text.size(); ++c) {
+                    if (text[c] == '-' && c + 1 < text.size() && std::isdigit(static_cast<unsigned char>(text[c + 1]))) {
+                        const char code = text[++c];
+                        if (code == '0') { flush(); line = true; }
+                        if (code == '1') { if (word.text.empty()) next_yellow = true; else word.yellow = true; }
+                        continue;
+                    }
+                    if (text[c] == ' ') { flush(); continue; }
+                    if (word.text.empty()) {
+                        word.yellow = next_yellow;
+                        word.line_before = line;
+                        next_yellow = line = false;
+                    }
+                    word.text += text[c];
+                }
+                flush();
+                if (words.empty()) return;
+                std::size_t body = 0;
+                while (body < words.size() && (body == 0 || !words[body].line_before)) ++body;
+                bool all_yellow = true;
+                for (std::size_t w = 0; w < body; ++w) all_yellow = all_yellow && words[w].yellow;
+                const bool heading = body < words.size() && ((!words[body - 1].text.empty() && words[body - 1].text.back() == ':') ||
+                                                             (body <= 3 && all_yellow));
+                if (!heading) body = 0;
+                const auto runs = [&](std::size_t from, std::size_t to, bool is_title) {
+                    std::string joined_text;
+                    for (std::size_t w = from; w < to; ++w) joined_text += (w > from ? " " : "") + buttons(words[w].text);
+                    std::string cased_text = tetrisphere::proper_case(joined_text);
+                    if (is_title && !cased_text.empty() && cased_text.back() == ':') cased_text.pop_back();
+                    std::vector<std::string> split;
+                    std::size_t a = 0;
+                    for (std::size_t b; (b = cased_text.find(' ', a)) != std::string::npos; a = b + 1) split.push_back(cased_text.substr(a, b - a));
+                    split.push_back(cased_text.substr(a));
+                    std::vector<std::pair<std::string, std::string>> out;
+                    for (std::size_t w = from; w < to; ++w) {
+                        const std::string& t = split.size() == to - from ? split[w - from] : buttons(words[w].text);
+                        if (w > from && words[w].line_before && std::isdigit(static_cast<unsigned char>(t[0]))) out.push_back({"\n", ""});
+                        out.push_back({t, is_title ? yellow : words[w].yellow ? yellow : orange});
+                    }
+                    return out;
+                };
+                if (heading) {
+                    if (!title.empty()) panel.blocks.push_back({true, {{title, yellow}}});
+                    else panel.blocks.push_back({true, runs(0, body, true)});
+                }
+                if (body < words.size()) panel.blocks.push_back({false, runs(body, words.size(), false)});
+            };
             // Training: the whole group of pages, read from the lesson's text.
-            if (guest::load16(guest_rdram, 0x800E44A8) == 3)
-                if (const auto g = training_group()) {
-                    constexpr const char* orange = "#ff8c1aff";
-                    constexpr const char* yellow = "#ffd23cff";
+            if (box->kind == 0 && guest::load16(guest_rdram, 0x800E44A8) == 3)
+                if (const auto g = training_group())
                     for (std::size_t i = g->first; i <= g->last; ++i) {
                         const auto& pg = g->pages[i];
                         if (pg.skip) continue;
                         std::string text;
                         for (std::uint32_t a = pg.start; a < pg.end; ++a) text += char(guest::load8(guest_rdram, a));
-                        // Words, each with its colour, and the -0 line breaks.
-                        struct Word { std::string text; bool yellow = false; bool line_before = false; };
-                        std::vector<Word> words;
-                        Word word;
-                        bool next_yellow = false, line = false;
-                        const auto flush = [&] {
-                            if (!word.text.empty()) words.push_back(word);
-                            word = Word{};
-                        };
-                        for (std::size_t c = 0; c < text.size(); ++c) {
-                            if (text[c] == '-' && c + 1 < text.size() && std::isdigit(static_cast<unsigned char>(text[c + 1]))) {
-                                const char code = text[++c];
-                                if (code == '0') { flush(); line = true; }
-                                if (code == '1') { if (word.text.empty()) next_yellow = true; else word.yellow = true; }
-                                continue;
-                            }
-                            if (text[c] == ' ') { flush(); continue; }
-                            if (word.text.empty()) {
-                                word.yellow = next_yellow;
-                                word.line_before = line;
-                                next_yellow = line = false;
-                            }
-                            word.text += text[c];
-                        }
-                        flush();
-                        if (words.empty()) continue;
-                        // A heading: the page's first line, when it ends with a colon.
-                        std::size_t body = 0;
-                        while (body < words.size() && (body == 0 || !words[body].line_before)) ++body;
-                        const bool heading = body < words.size() && !words[body - 1].text.empty() && words[body - 1].text.back() == ':';
-                        if (!heading) body = 0;
-                        const auto runs = [&](std::size_t from, std::size_t to, bool title) {
-                            std::string joined_text;
-                            for (std::size_t w = from; w < to; ++w) joined_text += (w > from ? " " : "") + buttons(words[w].text);
-                            std::string cased_text = tetrisphere::proper_case(joined_text);
-                            if (title && !cased_text.empty() && cased_text.back() == ':') cased_text.pop_back();
-                            std::vector<std::string> split;
-                            std::size_t a = 0;
-                            for (std::size_t b; (b = cased_text.find(' ', a)) != std::string::npos; a = b + 1) split.push_back(cased_text.substr(a, b - a));
-                            split.push_back(cased_text.substr(a));
-                            std::vector<std::pair<std::string, std::string>> out;
-                            for (std::size_t w = from; w < to; ++w) {
-                                // A line break the game asks for: only before a list's items (1. 2. ...).
-                                const std::string& t = split.size() == to - from ? split[w - from] : buttons(words[w].text);
-                                if (w > from && words[w].line_before && std::isdigit(static_cast<unsigned char>(t[0]))) out.push_back({"\n", ""});
-                                out.push_back({t, title ? yellow : words[w].yellow ? yellow : orange});
-                            }
-                            return out;
-                        };
-                        if (heading) panel.blocks.push_back({true, runs(0, body, true)});
-                        if (body < words.size()) panel.blocks.push_back({false, runs(body, words.size(), false)});
+                        add_text(text, "");
                     }
+            // A rules or goal card (Hide & Seek, Lines, VS): found in the game's
+            // memory from its heading's first word, which types in first, and
+            // shown whole at once.
+            if (box->kind == 1 && !card_lines.empty()) {
+                std::string first;
+                for (char ch : texts[card_lines.begin()->second.front()].text)
+                    if (std::isalpha(static_cast<unsigned char>(ch))) first += ch; else break;
+                if (const auto found = find_card_text(first)) {
+                    add_text(*found, hide_and_seek_title(*found));
+                    card_found = true;
                 }
+            }
             if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
             if (box->prompt == 2) panel.hint = "Watch";
             {

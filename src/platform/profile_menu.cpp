@@ -2,6 +2,7 @@
 #include "tetrisphere/profile_menu.h"
 
 #include <algorithm>
+#include <cctype>
 
 namespace tetrisphere {
 
@@ -239,6 +240,32 @@ std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, 
                          "command:puzzle:" + std::to_string(n), true, 1, n == last});
     }
     return items;
+}
+
+std::string fix_wording(const std::string& text) {
+    // The owner's choices (docs/DECISIONS-2026-11-07.md): "sphere", not "ball";
+    // spelling and grammar fixed; single ! and ?. On the game's capitals, codes kept.
+    std::string s = text;
+    const auto word_char = [](char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; };
+    const auto replace_word = [&](const std::string& from, const std::string& to) {
+        for (std::size_t at = 0; (at = s.find(from, at)) != std::string::npos;) {
+            const bool starts = at == 0 || !word_char(s[at - 1]) || (at >= 2 && s[at - 2] == '-' && std::isdigit(static_cast<unsigned char>(s[at - 1])));
+            const std::size_t after = at + from.size();
+            if (starts && (after >= s.size() || !word_char(s[after]))) {
+                s.replace(at, from.size(), to);
+                at += to.size();
+            } else {
+                at = after;
+            }
+        }
+    };
+    replace_word("BALL", "SPHERE");
+    replace_word("TALLYS", "TALLIES");
+    replace_word("CAN NOT", "CANNOT");
+    replace_word("WITH LESS THAN", "WITH FEWER THAN");
+    for (const char* doubled : {"??", "!!"})
+        for (std::size_t at; (at = s.find(doubled)) != std::string::npos;) s.erase(at, 1);
+    return s;
 }
 
 std::string game_quotes(const std::string& text) {
