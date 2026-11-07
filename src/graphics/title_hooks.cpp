@@ -930,9 +930,10 @@ struct BombPose { float x, y, size, yaw, pitch, roll; };
 // Positions in the 320 x 240 frame's centred units (y down), matched to the
 // original picture on a grid: noses to the left, fins on the right.
 constexpr BombPose bomb_poses[] = {
-    {62.0f, -12.0f, 0.0055f, 5.04f, -0.25f, 0.3f},
-    {68.0f, 19.0f, 0.0085f, 5.04f, -0.25f, 0.3f},
-    {40.0f, 54.0f, 0.0125f, 5.04f, -0.25f, 0.3f},
+    // Roll aims each nose at the breach (the white tile), as in the original.
+    {62.0f, -12.0f, 0.0055f, 5.04f, -0.25f, 0.10f},
+    {70.0f, 18.0f, 0.0085f, 5.04f, -0.25f, 0.35f},
+    {46.0f, 50.0f, 0.0125f, 5.04f, -0.25f, 0.65f},
 };
 
 void draw_title_bombs(std::uint8_t* rdram) {
