@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,15 @@ struct GameText {
     int width = 0;              // its width in the game's own font (func_800387CC's table), 0 if unknown
 };
 std::vector<GameText> recent_game_text();
+
+// Training's speech bubble (a 150 x 115 one-byte image), with its "more" or
+// "watch" prompt beneath: not drawn while the game's text is replaced, and
+// reported here (seen in the last 150 ms) so BlockPlanet draws its own panel.
+struct CardBox {
+    int x = 0, y = 0, w = 0, h = 0;  // the bubble image, in the game's 320 x 240 frame
+    int prompt = 0;                   // 0 none, 1 "more", 2 "watch"
+};
+std::optional<CardBox> recent_card_box();
 void set_game_text_replaced(bool replaced);
 
 } // namespace blockplanet

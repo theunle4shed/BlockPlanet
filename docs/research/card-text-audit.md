@@ -39,3 +39,7 @@ Glyph evidence for the C buttons: `docs/research/m2-native-prompts.md`. An earli
 - So are the "▼ more ▼" and "◀ watch" prompts under the cards.
 
 These stay as pictures until BlockPlanet's card panel replaces them.
+
+## Training's bubble (2026-11-07)
+
+Training's speech bubble is a 150 × 115 one-byte image drawn by the image helper `0x8003396C` at (154, 15). Its body runs from x 155 to 300 and y 15 to 113, and its tail at x 272–283 reaches y 122. The prompts under it are "▼ more ▼" (62 × 14 at (201, 115)) and "◀ watch" (50 × 14 at (200, 116)). BlockPlanet hides the three in Training (mode 3) and draws its own panel in their place. Hide & Seek's and Lines' boxes are other pictures, still drawn by the game.

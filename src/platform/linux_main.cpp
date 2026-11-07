@@ -1047,7 +1047,18 @@ void publish_game_text() {
             t.text.find_first_not_of("0123456789") == std::string::npos)
             t.font = 0;
     const auto frame = picture_frame();
-    if (!texts.empty() && frame) {
+    const auto box = blockplanet::recent_card_box();
+    // Inside BlockPlanet's card panel (Training), the card's text starts a
+    // little in from the panel's rim, as the menus' text does.
+    if (box) {
+        int left = 1 << 20;
+        for (const auto& t : texts)
+            if (t.font == 1) left = std::min(left, t.x);
+        const int shift = left < (1 << 20) ? std::max(0, box->x + 9 - left) : 0;
+        for (auto& t : texts)
+            if (t.font == 1) t.x += shift;
+    }
+    if ((!texts.empty() || box) && frame) {
         if (!view) {
             view = blockplanet::ui::HudView{};
             view->text_only = true;
@@ -1094,6 +1105,30 @@ void publish_game_text() {
             // Any other % is the font's apostrophe or quote mark ("LET%S", "%X%").
             return tetrisphere::game_quotes(text);
         };
+        // A card's heading: its first line, when that line ends with a colon
+        // ("Training:") or is a short line in one colour over a line starting
+        // in another (Hide & Seek's yellow "Drill" over its orange goal).
+        // Otherwise the first line is part of the body (a page without one).
+        bool card_heading = false;
+        {
+            std::map<int, std::vector<std::size_t>> rows;
+            for (std::size_t i = 0; i < texts.size(); ++i)
+                if (texts[i].font == 1) rows[texts[i].y].push_back(i);
+            for (auto& [y, idx] : rows)
+                std::sort(idx.begin(), idx.end(), [&](std::size_t l, std::size_t r) { return texts[l].x < texts[r].x; });
+            if (rows.size() > 1) {
+                const auto& first = rows.begin()->second;
+                const auto& second = std::next(rows.begin())->second;
+                const auto same = [&](std::size_t a, std::size_t b) {
+                    return texts[a].r == texts[b].r && texts[a].g == texts[b].g && texts[a].b == texts[b].b;
+                };
+                const std::string& last = texts[first.back()].text;
+                bool one_colour = true;
+                for (std::size_t i : first) one_colour = one_colour && same(i, first[0]);
+                card_heading = (!last.empty() && last.back() == ':') ||
+                               (first.size() <= 3 && one_colour && !same(second[0], first[0]));
+            }
+        }
         auto texts_in = texts;
         for (auto& t : texts_in) t.text = buttons(t.text);
         for (std::size_t i = 0; i < texts.size(); ++i) cased[i] = tetrisphere::proper_case(texts_in[i].text);
@@ -1108,12 +1143,9 @@ void publish_game_text() {
             // next line's (a yellow title over an orange body); the rest is
             // one text, cased as sentences.
             std::size_t body = 0;
-            if (!order.empty()) {
+            if (!order.empty() && card_heading) {
                 const int first_y = texts[order[0]].y;
-                std::size_t k = 0;
-                while (k < order.size() && texts[order[k]].y == first_y) ++k;
-                if (k < order.size() && (texts[order[k]].r != texts[order[0]].r || texts[order[k]].g != texts[order[0]].g))
-                    body = k;
+                while (body < order.size() && texts[order[body]].y == first_y) ++body;
             }
             const auto apply = [&](std::size_t start, std::size_t end) {
                 if (start >= end) return;
@@ -1143,7 +1175,7 @@ void publish_game_text() {
         // line after a sentence's two spaces, which looks like an indent).
         int body_left = 1 << 20;
         for (const auto& [y, idx] : card_lines)
-            if (y != card_lines.begin()->first)
+            if (!card_heading || y != card_lines.begin()->first)
                 for (std::size_t i : idx) body_left = std::min(body_left, texts[i].x);
         // The card's right edge: the furthest the game's own lines reach, kept
         // while the card shows (its words type in one by one). A centred box
@@ -1161,7 +1193,7 @@ void publish_game_text() {
         std::size_t body_first = texts.size();
         for (auto& [y, idx] : card_lines) {
             std::sort(idx.begin(), idx.end(), [&](std::size_t l, std::size_t r) { return texts[l].x < texts[r].x; });
-            const bool heading = y == card_lines.begin()->first && card_lines.size() > 1;
+            const bool heading = card_heading && y == card_lines.begin()->first;
             for (std::size_t k = 0; k < idx.size(); ++k) {
                 const auto& w = texts[idx[k]];
                 char c[16];
@@ -1172,6 +1204,11 @@ void publish_game_text() {
                 if (owner != idx[k]) joined_away.insert(idx[k]);
             }
         }
+        // A heading in the panel needs no colon ("Training", not "Training:").
+        if (card_heading && !card_lines.empty()) {
+            auto& parts = joined[card_lines.begin()->second.front()];
+            if (!parts.empty() && !parts.back().first.empty() && parts.back().first.back() == ':') parts.back().first.pop_back();
+        }
         for (std::size_t i = 0; i < texts.size(); ++i) {
             if (joined_away.count(i)) continue;
             const auto& t = texts[i];
@@ -1180,25 +1217,45 @@ void publish_game_text() {
             out.x = (area_x + float(t.x) / 320.0f * area_w) / frame->window_w;
             out.y = (frame->y + (float(t.y) - 2.0f) / 240.0f * frame->h) / frame->window_h;
             static const float font_lines[] = {13.0f, 14.0f, 11.0f, 11.0f};  // letter height per game font, of its 240 lines
-            const float lines = t.font >= 0 && t.font < 4 ? font_lines[t.font] : 11.0f;
+            float lines = t.font >= 0 && t.font < 4 ? font_lines[t.font] : 11.0f;
+            if (box && t.font == 1) lines = 12.5f;  // a little smaller in the panel, so a page fits
             out.size = lines / 240.0f * frame->h / frame->window_h * 100.0f;
             out.width = float(t.width) / 320.0f * area_w / frame->window_w;
             char colour[16];
             std::snprintf(colour, sizeof colour, "#%02x%02x%02x%02x", t.r, t.g, t.b, t.a);  // with the game's fade
             out.colour = colour;
             if (t.font == 1) out.width = 0;  // card text flows as text, not fitted to the game's spans
-            if (t.font == 1 && !card_lines.empty() && t.y != card_lines.begin()->first && body_left < (1 << 20) && t.x - body_left < 40)
+            if (t.font == 1 && !card_lines.empty() && (!card_heading || t.y != card_lines.begin()->first) && body_left < (1 << 20) &&
+                t.x - body_left < 40)
                 out.x = (area_x + float(body_left) / 320.0f * area_w) / frame->window_w;
             if (const auto j = joined.find(i); j != joined.end()) {
                 out.parts = j->second;
                 out.width = 0;  // laid out as text, from its start
                 if (i == body_first && body_left < (1 << 20))
                 {
-                    const int right = std::max(card_right + 10, body_left < 160 ? 320 - body_left - 4 : 0);
+                    const int right = box ? box->x + box->w - 12
+                                          : std::max(card_right + 10, body_left < 160 ? 320 - body_left - 4 : 0);
                     if (right > body_left) out.wrap = float(right - body_left) / 320.0f * area_w / frame->window_w;
                 }
             }
             view->game_text.push_back(std::move(out));
+        }
+        if (box) {
+            // Training's bubble as a panel: its body (the image less its tail,
+            // x +1 to +146, y 0 to +98) and the tail under it at +123, 9 high.
+            const auto fx = [&](float x) { return (area_x + x / 320.0f * area_w) / frame->window_w; };
+            const auto fy = [&](float y) { return (frame->y + y / 240.0f * frame->h) / frame->window_h; };
+            blockplanet::ui::HudView::Panel panel;
+            panel.x = fx(float(box->x + 1));
+            panel.y = fy(float(box->y));
+            panel.w = fx(float(box->x + box->w - 4)) - panel.x;
+            panel.h = fy(float(box->y + 98)) - panel.y;
+            panel.tail_x = fx(float(box->x + 123));
+            panel.tail_h = 9.0f / 240.0f * frame->h / frame->window_h;
+            panel.text_size = 8.5f / 240.0f * frame->h / frame->window_h * 100.0f;
+            if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
+            if (box->prompt == 2) panel.hint = "Watch";
+            view->card_panel = panel;
         }
     }
     blockplanet::ui::set_hud(std::move(view));

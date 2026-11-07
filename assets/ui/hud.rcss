@@ -298,3 +298,28 @@ div { display: block; }
 .ps-circle { left: 0.27em; top: 0.27em; width: 0.45em; height: 0.45em; border: 0.1em #ff6680; border-radius: 0.35em; }
 .ps-square { left: 0.3em; top: 0.3em; width: 0.42em; height: 0.42em; border: 0.1em #e080d0; }
 .ps-triangle { left: 0.25em; top: 0.3em; width: 0em; height: 0em; border-left: 0.32em transparent; border-right: 0.32em transparent; border-bottom: 0.52em #40c8a0; border-top: 0em transparent; }
+
+/* A card's panel in the menus' style (Training's speech bubble, replaced):
+   the menus' tint and white rim, with a tail under its bottom edge pointing
+   to the speaker. */
+.card-panel {
+    position: absolute;
+    background-color: #0b1020f2;
+    border: 0.35vh #f0f0f0;
+    border-radius: 2.2vh;
+}
+.card-tail {
+    position: absolute;
+    width: 0px;
+    height: 0px;
+    border-top-color: #f0f0f0;
+    border-bottom-width: 0px;
+}
+.card-tail.edge { margin-left: -2.1vh; border-left: 2.1vh transparent; border-right: 2.1vh transparent; border-top-color: #f0f0f0; }
+.card-tail.fill { margin-left: -1.6vh; border-left: 1.6vh transparent; border-right: 1.6vh transparent; border-top-color: #0b1020; }
+.card-hint {
+    position: absolute;
+    color: #c8ccd8;
+    font-weight: bold;
+    white-space: nowrap;
+}

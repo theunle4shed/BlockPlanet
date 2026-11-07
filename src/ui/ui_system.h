@@ -124,6 +124,18 @@ struct HudView {
         float wrap = 0;  // a paragraph wrapped to this width (window widths); 0: one line
     };  // width: the game's span (window widths), 0 unknown
     std::vector<Text> game_text;
+    // A card's panel in BlockPlanet's style, drawn behind its text (Training's
+    // speech bubble): position and size as fractions of the window, the tail
+    // under its bottom edge at tail_x, and a hint in its bottom right corner
+    // ("[family:name]" codes for button symbols).
+    struct Panel {
+        float x = 0, y = 0, w = 0, h = 0;
+        float tail_x = 0;   // the tail's centre, a fraction of the window's width
+        float tail_h = 0;   // its height, a fraction of the window's height
+        float text_size = 0;  // the hint's size, in vh
+        std::string hint;
+    };
+    std::optional<Panel> card_panel;
     bool text_only = false;
     bool versus = false;
     VersusPlayer players[2];

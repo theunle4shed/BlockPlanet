@@ -255,6 +255,21 @@ std::string with_buttons(const std::string& escaped_text) {
 std::string game_text_rml(const HudView& hud) {
     std::string rml;
     const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };
+    if (const auto& p = hud.card_panel) {
+        // The panel, then its tail (a triangle pointing down, from borders: an
+        // outline triangle under a fill triangle), then the hint.
+        rml += "<div class='card-panel' style='left: " + pct(p->x) + "; top: " + pct(p->y) + "; width: " + pct(p->w) +
+               "; height: " + pct(p->h) + ";'/>";
+        const float tail_top = p->y + p->h;
+        rml += "<div class='card-tail edge' style='left: " + pct(p->tail_x) + "; top: " + pct(tail_top - 0.004f) +
+               "; border-top-width: " + std::to_string(p->tail_h * 100.0f + 0.6f) + "vh;'/>";
+        rml += "<div class='card-tail fill' style='left: " + pct(p->tail_x) + "; top: " + pct(tail_top - 0.006f) +
+               "; border-top-width: " + std::to_string(p->tail_h * 100.0f) + "vh;'/>";
+        if (!p->hint.empty())
+            rml += "<div class='card-hint' style='right: " + pct(1.0f - p->x - p->w + 0.012f) + "; top: " +
+                   pct(p->y + p->h - 0.055f) + "; font-size: " + std::to_string(p->text_size) + "vh;'>" +
+                   with_buttons(escape(p->hint)) + "</div>";
+    }
     for (const auto& t : hud.game_text)
     {
         std::string body;

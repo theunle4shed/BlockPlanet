@@ -98,6 +98,9 @@ std::atomic<bool> text_replaced{true};
 std::mutex text_mutex;
 struct TimedText { blockplanet::GameText text; std::chrono::steady_clock::time_point at; };
 std::vector<TimedText> texts;
+std::optional<blockplanet::CardBox> card_box;
+std::chrono::steady_clock::time_point card_box_at, card_prompt_at;
+int card_prompt = 0;
 }
 
 namespace blockplanet {
@@ -111,6 +114,14 @@ std::vector<GameText> recent_game_text() {
         if (now - t.at < std::chrono::milliseconds(150)) keep.push_back(t), out.push_back(t.text);
     texts = std::move(keep);
     return out;
+}
+std::optional<CardBox> recent_card_box() {
+    std::lock_guard lock(text_mutex);
+    const auto now = std::chrono::steady_clock::now();
+    if (!card_box || now - card_box_at > std::chrono::milliseconds(150)) return std::nullopt;
+    CardBox box = *card_box;
+    box.prompt = now - card_prompt_at < std::chrono::milliseconds(150) ? card_prompt : 0;
+    return box;
 }
 void set_pause_menu_shown(bool shown) { menu_shown.store(shown); }
 void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
@@ -194,15 +205,40 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     }();
     if (helper != 0x8002D93Cu && image_skip.count(static_cast<std::uint32_t>(ctx->r5)) != 0) return true;
     if (helper == 0x8003396Cu && blockplanet_title_skip_image(rdram, static_cast<std::uint32_t>(ctx->r5))) return true;
+    // Training's speech bubble and its prompts (in play, mode 3), replaced by
+    // BlockPlanet's card panel along with the text. Told apart by size and
+    // format, as their addresses depend on what the game has loaded.
+    if (helper == 0x8003396Cu && text_replaced.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
+        guest16(rdram, 0x800E44A8u) == 3) {
+        const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
+        if ((image >> 24) == 0x80u && guest16(rdram, image + 4) == 2) {
+            const int w = guest16(rdram, image), h = guest16(rdram, image + 2);
+            const int prompt = w == 62 && h == 14 ? 1 : w == 50 && h == 14 ? 2 : 0;
+            if ((w == 150 && h == 115) || prompt != 0) {
+                std::lock_guard lock(text_mutex);
+                const auto now = std::chrono::steady_clock::now();
+                if (prompt != 0) card_prompt = prompt, card_prompt_at = now;
+                else card_box = blockplanet::CardBox{int(ctx->r6), int(ctx->r7), w, h, 0}, card_box_at = now;
+                return true;
+            }
+        }
+    }
     static const bool draw_log = std::getenv("BLOCKPLANET_DRAW_LOG") != nullptr;  // research: every distinct 2D draw
     if (draw_log) {
         static std::mutex mutex;
         static std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
         std::lock_guard lock(mutex);
         if (seen.insert({helper, static_cast<std::uint32_t>(ctx->r5)}).second)
-            std::fprintf(stdout, "{\"event\":\"draw\",\"helper\":\"0x%08X\",\"a0\":\"0x%08X\",\"a1\":\"0x%08X\",\"a2\":%d,\"a3\":%d,\"scene\":%d}\n",
-                         helper, static_cast<std::uint32_t>(ctx->r4), static_cast<std::uint32_t>(ctx->r5), static_cast<int>(ctx->r6),
-                         static_cast<int>(ctx->r7), static_cast<int>(guest16(rdram, 0x800E121Cu)));
+        {
+            // For the image helper, the image's header: s16 width, height, format.
+            const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
+            const bool has_image = helper == 0x8003396Cu && (image >> 24) == 0x80u;
+            std::fprintf(stdout, "{\"event\":\"draw\",\"helper\":\"0x%08X\",\"a0\":\"0x%08X\",\"a1\":\"0x%08X\",\"a2\":%d,\"a3\":%d,\"scene\":%d,\"w\":%d,\"h\":%d,\"format\":%d}\n",
+                         helper, static_cast<std::uint32_t>(ctx->r4), image, static_cast<int>(ctx->r6),
+                         static_cast<int>(ctx->r7), static_cast<int>(guest16(rdram, 0x800E121Cu)),
+                         has_image ? guest16(rdram, image) : 0, has_image ? guest16(rdram, image + 2) : 0,
+                         has_image ? guest16(rdram, image + 4) : 0);
+        }
     }
     // Research: BLOCKPLANET_TEXT_LOG=1 logs each distinct string drawn by the
     // game's text routine (0x80038478: a1 x, a2 y, a3 string, then four words
