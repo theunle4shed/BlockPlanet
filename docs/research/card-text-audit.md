@@ -36,9 +36,9 @@ Glyph evidence for the C buttons: `docs/research/m2-native-prompts.md`. An earli
 ## Still in pictures
 
 - The game-over hint and the short Hide & Seek hints ("look under the towers…", "find all 4 parts…", "uncover multiple cores…") are painted into pictures in the main archive (around ROM `0x7D5C24`), not drawn as text.
-- So are the "▼ more ▼" and "◀ watch" prompts under the cards.
+- So are the "▼ more ▼" and "◀ watch" prompts under the cards. Training's are now replaced (below).
 
-These stay as pictures until BlockPlanet's card panel replaces them.
+The others stay as pictures until BlockPlanet's card panel replaces them.
 
 ## Training's bubble (2026-11-07)
 
