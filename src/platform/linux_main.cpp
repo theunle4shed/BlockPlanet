@@ -1332,8 +1332,28 @@ void publish_game_text() {
                     else w += ch;
                 }
                 if (!w.empty()) words.push_back(w);
-                if (words.size() == end - start)
-                    for (std::size_t k = start; k < end; ++k) cased[order[k]] = words[k - start];
+                // Back to the pieces, by each piece's word count (a piece is a word
+                // as a card types in, or a whole line, as the game-over hint draws).
+                std::vector<std::size_t> counts;
+                std::size_t total = 0;
+                for (std::size_t k = start; k < end; ++k) {
+                    std::size_t n = 0;
+                    bool in_word = false;
+                    for (char ch : texts_in[order[k]].text) {
+                        if (ch != ' ' && !in_word) ++n;
+                        in_word = ch != ' ';
+                    }
+                    counts.push_back(n);
+                    total += n;
+                }
+                if (total == words.size()) {
+                    std::size_t at = 0;
+                    for (std::size_t k = start; k < end; ++k) {
+                        std::string piece;
+                        for (std::size_t n = 0; n < counts[k - start]; ++n) piece += (n ? " " : "") + words[at++];
+                        cased[order[k]] = piece;
+                    }
+                }
             };
             apply(0, body);
             apply(body, order.size());
