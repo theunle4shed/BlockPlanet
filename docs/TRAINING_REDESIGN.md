@@ -49,3 +49,9 @@ Open questions from step 2: a long group scrolls, and A still moves on even when
 | 3. BlockPlanet's own pages for the HUD elements the lessons skip | Medium |
 | 4. The wide-screen layout, with the true camera aspect | Research, then medium |
 | 5. Lesson steps in the list, and Wheels animating | Research |
+
+## Research: Training's squashed sphere (2026-11-07)
+
+The game builds every projection with one routine, `guPerspective` at `0x800D47E0`. It is called from six places (`0x80031B58`, `0x8003926C`, `0x8003B5F4`, `0x800C9318`, `0x800CD478`, `0x800CFEC8`), and each passes an aspect of 4:3 (`0x3FAAAAAB`). The narrow sphere in Training does not come from the projection. It must come from the viewport, or from a scale on the sphere's model in Training (wider than tall on screen means a smaller x scale).
+
+Next step: log the display list's viewport (`G_MOVEMEM` to the viewport) and the sphere's model matrix in Training and in Story, and compare them. BlockPlanet draws the sphere itself (`sphere_hooks.cpp`) from the game's matrices, so a corrected x scale can be applied there in Training only.
