@@ -14,11 +14,10 @@ Pictures and drawing from the original game that BlockPlanet hides or replaces, 
 | N64 controller picture (65 × 59 and 50 × 28), its lit buttons (11 × 11, 8 × 8) and the arrows pointing at them | Training | Nothing: the speech names the player's own buttons | 2026-11-07 | `BLOCKPLANET_ORIGINAL_TEXT=1` |
 | Rules and goal card box (203 × 143) and its "▼ more ▼" | Hide & Seek, Lines, VS | BlockPlanet's card panel, without a tail, with the whole text at once | 2026-11-07 | `BLOCKPLANET_ORIGINAL_TEXT=1` |
 | The original HUD while a card is up | Hide & Seek, Lines, VS | BlockPlanet's HUD stays up | 2026-11-07 | `BLOCKPLANET_ORIGINAL_TEXT=1` |
-| The original HUD (2D parts drawn by `func_80075CD8`, and the held magic's model) | Story, Hide & Seek, Puzzle, Lines, VS | BlockPlanet's HUD panels | HUD work | The original HUD shows where BlockPlanet's has no layout yet (Training for now) |
+| The original HUD (2D parts drawn by `func_80075CD8`, and the held magic's model) | Story, Training, Hide & Seek, Puzzle, Lines, VS | BlockPlanet's HUD panels (Training: one row along the bottom, revealed as taught) | HUD work | `BLOCKPLANET_ORIGINAL_HUD=1` |
 | Pause screen's white line, menu text, button hints and instructor | Pause | BlockPlanet's pause panel (the game's pause background is kept) | Pause work | — |
 
 ## Still original, and planned to go
 
-- **Training's original HUD** (hearts, 1x, magic bowl, the next piece in the corner): it will be replaced by Story's HUD at the bottom of the screen, shown as each element is introduced (`docs/TRAINING_REDESIGN.md`).
 - **Text painted into pictures**: the game-over hint and Hide & Seek's short hints (`docs/research/card-text-audit.md`).
 - **Font 2**: not yet identified.
