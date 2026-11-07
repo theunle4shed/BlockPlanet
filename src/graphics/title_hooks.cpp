@@ -32,6 +32,10 @@ std::atomic<bool> drawing{false};    // set while BlockPlanet draws the letters
 // address, for BlockPlanet's title overlay (the copyright lines).
 std::atomic<long long> title_seen_ms{0};
 std::atomic<std::uint32_t> title_seen_image{0};
+std::atomic<long long> title_routine_ms{0};  // when the title routine last drew (its letters hook)
+long long now_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 std::uint32_t load32(const std::uint8_t* rdram, std::uint32_t address) {
     std::uint32_t v;
@@ -72,7 +76,8 @@ extern "C" bool blockplanet_title_skip_image(std::uint8_t* rdram, std::uint32_t 
 extern "C" bool blockplanet_title_recent(std::uint32_t* image) {
     const long long now = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
-    if (now - title_seen_ms.load() > 250) return false;
+    // Only the title routine (the intro's logo screens draw the same image).
+    if (now - title_seen_ms.load() > 250 || now - title_routine_ms.load() > 250) return false;
     if (image != nullptr) *image = title_seen_image.load();
     return true;
 }
@@ -233,6 +238,7 @@ extern "C" void blockplanet_title_letters_end(std::uint8_t*, recomp_context*) { 
 extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ctx) {
     static const int freeze = title_freeze_frame();
     if (freeze < 0) return;
+    title_routine_ms.store(now_ms());
     const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r4);
     if (scene < 0x80000000u || scene >= 0x80800000u) return;
     const int frame = static_cast<int>(load32(rdram, scene + 0x24));
@@ -417,6 +423,7 @@ namespace {
 // is drawn each title frame (func_8002D93C) before the letters.
 constexpr std::uint32_t heap_pointer = 0x800F22C0u, heap_end = 0x800FC5ACu;
 constexpr std::uint32_t object_array = 0x8073F000u, size_out = 0x8073F100u;
+constexpr std::uint32_t scene_memory = 0x80740000u, scene_memory_end = 0x807DF000u;
 std::uint32_t title_scene = 0;
 
 void call4(std::uint8_t* rdram, recomp_context* ctx, void (*fn)(std::uint8_t*, recomp_context*),
@@ -461,9 +468,10 @@ std::uint32_t robot_texture = 0;
 constexpr std::uint32_t robot_texture_global = 0x800E0000u;
 
 void build_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
-    // Built from the game's own memory (its scenes must lie below 4 MB), which
-    // the game resets when it leaves the title: so built again whenever the
-    // title comes back (not drawn for a moment).
+    // Built in BlockPlanet's own memory above 4 MB (the scene code's 4 MB
+    // checks are raised to 8 MB in the recompiler config), with the game's
+    // memory pointer and end pointed there for the duration. Built again
+    // whenever the title comes back (not drawn for a moment), as before.
     static auto last = std::chrono::steady_clock::time_point{};
     const auto now = std::chrono::steady_clock::now();
     const bool returned = now - last > std::chrono::milliseconds(500);
@@ -473,6 +481,9 @@ void build_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
     robot_texture = 0;
     const auto list = title_scene_list();
     if (list.empty()) return;
+    const std::uint32_t saved_pointer = load32(rdram, heap_pointer), saved_end = load32(rdram, heap_end);
+    put32(rdram, heap_pointer, scene_memory);
+    put32(rdram, heap_end, scene_memory_end);
     call4(rdram, ctx, func_8002A8B4, 0x736C50u, 0xB1u, 8u, 0);
     robot_texture = static_cast<std::uint32_t>(ctx->r2);
     std::uint32_t slot = 0;
@@ -495,6 +506,8 @@ void build_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
                      scene_entry, object_entry, built, load32(rdram, size_out));
         std::fflush(stdout);
     }
+    put32(rdram, heap_pointer, saved_pointer);
+    put32(rdram, heap_end, saved_end);
 }
 
 void draw_title_scene(std::uint8_t* rdram, recomp_context* ctx) {

@@ -585,3 +585,84 @@ text = "blockplanet_title_freeze(rdram, ctx);"
 func = "func_800685FC"
 before_vram = 0x8006923C
 text = "blockplanet_title_picture(rdram, ctx);"
+
+# 8 MB for the game's 3D scenes (docs/research/blockplanet-game-state.md, the
+# 4 MB checks): the LightWave scene code checks that pointers lie below
+# 0x80400001 (4 MB, the console's memory without the Expansion Pak) and stops
+# with "detected by LWAllocateMemory" otherwise. BlockPlanet runs with 8 MB,
+# so just before each comparison the limit is raised to 0x80800001.
+[[patches.hook]]
+func = "func_80026DB0"
+before_vram = 0x80026E10
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002CF70"
+before_vram = 0x8002D110
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002CF70"
+before_vram = 0x8002D218
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002CF70"
+before_vram = 0x8002D28C
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002CF70"
+before_vram = 0x8002D8D0
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002D994
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002D9F4
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DA68
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DAF0
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DB50
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DBAC
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DC08
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DC64
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DCC0
+text = "ctx->r1 = S32(0x80800001u);"
+
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DD1C
+text = "ctx->r1 = S32(0x80800001u);"
+
