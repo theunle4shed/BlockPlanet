@@ -208,7 +208,8 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     // Training's speech bubble and its prompts (in play, mode 3), replaced by
     // BlockPlanet's card panel along with the text. Told apart by size and
     // format, as their addresses depend on what the game has loaded.
-    if (helper == 0x8003396Cu && text_replaced.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
+    static const bool original_text = std::getenv("BLOCKPLANET_ORIGINAL_TEXT") != nullptr;  // the game's text, bubble and all
+    if (helper == 0x8003396Cu && !original_text && text_replaced.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
         guest16(rdram, 0x800E44A8u) == 3) {
         const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
         if ((image >> 24) == 0x80u && guest16(rdram, image + 4) == 2) {
