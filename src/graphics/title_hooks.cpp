@@ -64,60 +64,13 @@ extern "C" bool blockplanet_title_skip_image(std::uint8_t* rdram, std::uint32_t 
     return image == load32(rdram, 0x800E1638u);
 }
 
-namespace {
-// The title picture, loaded by BlockPlanet itself: with the letters held, the
-// title never reaches the point where the game loads it (the pointer stays on
-// a 10 x 10 placeholder). The game's own ROM read and decompressor are run
-// once from the title hook, into memory the game does not use (it is written
-// for 4 MB). This lies inside BlockPlanet's second sphere vertex buffer
-// (0x80600000, 2 MB), which is not in use on the title; the picture is only
-// read once, straight away (the copyright lines are copied out), so play
-// overwriting it later does no harm.
-constexpr std::uint32_t picture_archive = 0x736C50u;  // ROM offset of the title's archive
-constexpr int picture_entry = 0x15;                   // the picture (0x14 its shadow)
-constexpr std::uint32_t scratch = 0x80700000u;
-constexpr std::uint32_t picture_at = 0x80720000u;
-std::atomic<std::uint32_t> loaded_picture{0};
-
-void call(std::uint8_t* rdram, recomp_context* ctx, void (*fn)(std::uint8_t*, recomp_context*),
-          std::uint32_t a0, std::uint32_t a1, std::uint32_t a2) {
-    const recomp_context saved = *ctx;
-    ctx->r29 = static_cast<gpr>(static_cast<std::int32_t>(saved.r29) - 0x80);
-    ctx->r4 = static_cast<gpr>(static_cast<std::int32_t>(a0));
-    ctx->r5 = static_cast<gpr>(static_cast<std::int32_t>(a1));
-    ctx->r6 = static_cast<gpr>(static_cast<std::int32_t>(a2));
-    fn(rdram, ctx);
-    *ctx = saved;
-}
-
-void load_picture(std::uint8_t* rdram, recomp_context* ctx) {
-    static bool tried = false;
-    if (tried) return;
-    tried = true;
-    // The archive: a count, then each entry's offset (big-endian words from +2).
-    call(rdram, ctx, func_8002A430, picture_archive + 2u + 4u * picture_entry, scratch, 8);
-    const auto be32 = [&](std::uint32_t address) {  // bytes as the game reads them
-        const auto byte = [&](std::uint32_t a) { return std::uint32_t(rdram[(a & 0x00FFFFFFu) ^ 3u]); };
-        return byte(address) << 24 | byte(address + 1) << 16 | byte(address + 2) << 8 | byte(address + 3);
-    };
-    const std::uint32_t start = be32(scratch), end = be32(scratch + 4);
-    if (end <= start || end - start > 0x10000u) return;
-    const std::uint32_t length = (end - start + 1u) & ~1u;
-    call(rdram, ctx, func_8002A430, picture_archive + start, scratch + 0x100u, length);
-    call(rdram, ctx, func_80081BE8, scratch + 0x100u, picture_at, 0);
-    if (load32(rdram, picture_at) != 0) loaded_picture.store(picture_at);
-    std::fprintf(stdout, "{\"event\":\"title_picture_loaded\",\"bytes\":%u}\n", length);
-    std::fflush(stdout);
-}
-} // namespace
-
 // Whether the title picture came up in the last quarter second (and so the
 // title is on screen), with its address.
 extern "C" bool blockplanet_title_recent(std::uint32_t* image) {
     const long long now = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
     if (now - title_seen_ms.load() > 250) return false;
-    if (image != nullptr) *image = loaded_picture.load() != 0 ? loaded_picture.load() : title_seen_image.load();
+    if (image != nullptr) *image = title_seen_image.load();
     return true;
 }
 
@@ -277,7 +230,6 @@ extern "C" void blockplanet_title_letters_end(std::uint8_t*, recomp_context*) { 
 extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ctx) {
     static const int freeze = title_freeze_frame();
     if (freeze < 0) return;
-    load_picture(rdram, ctx);
     const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r4);
     if (scene < 0x80000000u || scene >= 0x80800000u) return;
     const int frame = static_cast<int>(load32(rdram, scene + 0x24));

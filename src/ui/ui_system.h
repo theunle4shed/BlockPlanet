@@ -107,11 +107,12 @@ struct HudView {
         float meter = 0.0f;
         std::vector<HudPieceView> next;  // the next one or two
     };
-    // The title screen: only an image (the copyright lines cut from the
-    // player's own title picture), at a rectangle given as fractions of the
-    // window (x, y, width, height). Empty: not the title.
-    std::string title_image;
-    float title_x = 0, title_y = 0, title_w = 0, title_h = 0;
+    // The title screen: only the original game's notice lines and
+    // BlockPlanet's disclaimer, centred in a band given as fractions of the
+    // window (x, y, width). Empty: not the title.
+    std::vector<std::string> title_notice;
+    std::string title_disclaimer;
+    float title_x = 0, title_y = 0, title_w = 0;
     bool versus = false;
     VersusPlayer players[2];
     // 0 near (as on a 4:3 screen, still), 1 the screen's edges, 2 near and

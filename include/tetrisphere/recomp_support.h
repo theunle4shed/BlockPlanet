@@ -11,8 +11,6 @@ extern "C" {
 bool tetrisphere_controls_view_hook(std::uint8_t*,recomp_context*);
 void recomp_entrypoint(std::uint8_t* rdram, recomp_context* ctx);
 void func_8006FA28(std::uint8_t* rdram, recomp_context* ctx);
-void func_8002A430(std::uint8_t* rdram, recomp_context* ctx);  // ROM read: a0 ROM offset, a1 address, a2 length
-void func_80081BE8(std::uint8_t* rdram, recomp_context* ctx);  // decompress: a0 packed data, a1 destination
 void func_8002D93C(std::uint8_t* rdram, recomp_context* ctx);
 void func_80029510(std::uint8_t* rdram, recomp_context* ctx);
 void func_800295D4(std::uint8_t* rdram, recomp_context* ctx);

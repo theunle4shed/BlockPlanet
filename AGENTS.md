@@ -6,6 +6,10 @@ BlockPlanet continues Blocksphere by djultra64. These instructions apply to peop
 
 Keep ROMs, generated game code, extracted original assets, captures, audio, saves, and credentials out of Git and shared packages. Generated code comes from the ROM and stays private, like the ROM itself.
 
+## Game-derived content
+
+Anything taken from the game (text, art, models, music, level data) is generated from the player's own ROM at install or run time and never committed. **Exception (decided by the owner, 2026-11-07):** the original game's copyright and licence notice may be written into the repository word for word, unchanged, so it can be shown as text, together with BlockPlanet's own disclaimer naming the rights holders. Nothing else from the game's text is committed.
+
 ## Attribution
 
 - Credit Blocksphere and djultra64 for all work up to fork commit `53203b6`. Never rewrite or re-attribute that history.

@@ -250,3 +250,8 @@ div { display: block; }
     .split { display: none; font-size: 18dp; line-height: 22dp; }
     .split:last-child, .split.last-done { display: block; }
 }
+
+/* The title screen: the original game's notice and BlockPlanet's disclaimer. */
+#title-notice { position: absolute; text-align: center; font-effect: outline(2dp #05081a); }
+#title-notice .notice { display: block; font-size: 22dp; line-height: 28dp; color: #4fb3d0; letter-spacing: 1dp; }
+#title-notice .disclaimer { display: block; margin-top: 8dp; font-size: 17dp; line-height: 22dp; color: #9aa6c8; }
