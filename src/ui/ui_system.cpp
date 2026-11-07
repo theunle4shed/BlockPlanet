@@ -98,7 +98,7 @@ bool start(std::uint32_t width, std::uint32_t height) {
     Rml::SetSystemInterface(system_interface.get());
     Rml::SetRenderInterface(renderer.get());
     if (!Rml::Initialise()) return false;
-    for (const char* font : {"fonts/LatoLatin-Regular.ttf", "fonts/LatoLatin-Bold.ttf"}) {
+    for (const char* font : {"fonts/LatoLatin-Regular.ttf", "fonts/LatoLatin-Bold.ttf", "fonts/LatoLatin-Italic.ttf", "fonts/LatoLatin-BoldItalic.ttf"}) {
         if (!Rml::LoadFontFace(asset(font))) std::fprintf(stderr, "{\"event\":\"ui_font_missing\",\"font\":\"%s\"}\n", font);
     }
     context = Rml::CreateContext("main", Rml::Vector2i(int(width), int(height)));
@@ -256,19 +256,29 @@ std::string game_text_rml(const HudView& hud) {
     std::string rml;
     const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };
     if (const auto& p = hud.card_panel) {
-        // The panel, then its tail (a triangle pointing down, from borders: an
-        // outline triangle under a fill triangle), then the hint.
-        rml += "<div class='card-panel' style='left: " + pct(p->x) + "; top: " + pct(p->y) + "; width: " + pct(p->w) +
-               "; height: " + pct(p->h) + ";'/>";
-        const float tail_top = p->y + p->h;
-        rml += "<div class='card-tail edge' style='left: " + pct(p->tail_x) + "; top: " + pct(tail_top - 0.004f) +
-               "; border-top-width: " + std::to_string(p->tail_h * 100.0f + 0.6f) + "vh;'/>";
-        rml += "<div class='card-tail fill' style='left: " + pct(p->tail_x) + "; top: " + pct(tail_top - 0.006f) +
-               "; border-top-width: " + std::to_string(p->tail_h * 100.0f) + "vh;'/>";
-        if (!p->hint.empty())
-            rml += "<div class='card-hint' style='right: " + pct(1.0f - p->x - p->w + 0.012f) + "; top: " +
-                   pct(p->y + p->h - 0.055f) + "; font-size: " + std::to_string(p->text_size) + "vh;'>" +
-                   with_buttons(escape(p->hint)) + "</div>";
+        // Runs keep the game's colours (and its fade as each word types in);
+        // a highlighted run (the game's yellow) is bold. Spaces go inside the
+        // spans, as spaces between elements are dropped.
+        const auto runs = [&](const std::vector<std::pair<std::string, std::string>>& parts) {
+            std::string out;
+            for (std::size_t k = 0; k < parts.size(); ++k) {
+                const auto& colour = parts[k].second;
+                const bool yellow = colour.size() >= 7 && std::stoi(colour.substr(3, 2), nullptr, 16) > 170;
+                out += std::string("<span class='") + (yellow ? "hl" : "") + "' style='color: " + colour + ";'>" +
+                       with_buttons(escape(parts[k].first)) + (k + 1 < parts.size() ? " " : "") + "</span>";
+            }
+            return out;
+        };
+        rml += "<div class='card-panel' style='right: " + pct(p->right) + "; bottom: " + pct(p->bottom) + "; width: " +
+               pct(p->w) + "; font-size: " + std::to_string(p->text_size) + "vh;'>";
+        if (!p->heading.empty()) rml += "<div class='card-heading'>" + runs(p->heading) + "</div>";
+        rml += "<div class='card-body'>" + runs(p->body) + "</div>";
+        rml += "<div class='card-hint'>" + (p->hint.empty() ? std::string("&nbsp;") : with_buttons(escape(p->hint))) + "</div>";
+        rml += "</div>";
+        // The tail, beside the panel (a child would be clipped by it), from the
+        // same bottom edge: half of it overlaps the panel's rim.
+        const float left = 1.0f - p->right - p->w + p->tail * p->w;
+        rml += "<div class='card-tail' style='left: " + pct(left) + "; bottom: " + pct(p->bottom) + ";'/>";
     }
     for (const auto& t : hud.game_text)
     {

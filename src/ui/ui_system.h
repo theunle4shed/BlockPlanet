@@ -128,11 +128,14 @@ struct HudView {
     // speech bubble): position and size as fractions of the window, the tail
     // under its bottom edge at tail_x, and a hint in its bottom right corner
     // ("[family:name]" codes for button symbols).
+    // The panel holds its text: a heading (bold, upright) and the body (the
+    // speech, in italics; the game's yellow highlights in bold). It grows
+    // upwards from its bottom edge to fit the text, so the tail stays put.
     struct Panel {
-        float x = 0, y = 0, w = 0, h = 0;
-        float tail_x = 0;   // the tail's centre, a fraction of the window's width
-        float tail_h = 0;   // its height, a fraction of the window's height
-        float text_size = 0;  // the hint's size, in vh
+        float right = 0, bottom = 0, w = 0;  // fractions of the window: its right and bottom edges, its width
+        float tail = 0.8f;                   // the tail's place along the bottom edge, 0 left to 1 right
+        float text_size = 0;                 // the body's size, in vh
+        std::vector<std::pair<std::string, std::string>> heading, body;  // (text, colour) runs
         std::string hint;
     };
     std::optional<Panel> card_panel;

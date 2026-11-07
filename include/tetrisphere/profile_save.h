@@ -43,6 +43,9 @@ struct ProfilePreferences {
     // "near" (where they would be on a 4:3 screen), "edges" (the screen's
     // edges) or "follow" (near, moving out as the sphere grows). Unset: "near".
     std::optional<std::string> hud_distance;
+    // The size of the game's card and speech text (Graphics > Text size, an
+    // accessibility choice): "small", "default", "large" or "larger". Unset: "default".
+    std::optional<std::string> text_size;
 };
 
 struct ProfileStatistics {

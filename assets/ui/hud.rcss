@@ -300,26 +300,47 @@ div { display: block; }
 .ps-triangle { left: 0.25em; top: 0.3em; width: 0em; height: 0em; border-left: 0.32em transparent; border-right: 0.32em transparent; border-bottom: 0.52em #40c8a0; border-top: 0em transparent; }
 
 /* A card's panel in the menus' style (Training's speech bubble, replaced):
-   the menus' tint and white rim, with a tail under its bottom edge pointing
-   to the speaker. */
+   the menus' tint and white rim, holding its text, growing upwards from its
+   bottom edge. The tail is a square turned 45 degrees with the rim on two
+   sides, half inside the panel, so panel and tail read as one shape. */
 .card-panel {
     position: absolute;
-    background-color: #0b1020f2;
+    padding: 1.1em 1.3em 0.5em 1.3em;
+    background-color: #0d1222;
     border: 0.35vh #f0f0f0;
     border-radius: 2.2vh;
+    white-space: normal;
+    line-height: 1.32;
+}
+.card-heading {
+    display: block;
+    font-weight: bold;
+    font-size: 1.12em;
+    margin-bottom: 0.45em;
+    font-effect: outline(1dp #1a0c04);
+}
+.card-body {
+    display: block;
+    font-style: italic;
+    font-weight: normal;
+}
+.card-body .hl { font-weight: bold; }
+.card-hint {
+    display: block;
+    text-align: right;
+    color: #c8ccd8;
+    font-weight: bold;
+    font-size: 0.78em;
+    margin-top: 0.3em;
 }
 .card-tail {
     position: absolute;
-    width: 0px;
-    height: 0px;
-    border-top-color: #f0f0f0;
-    border-bottom-width: 0px;
-}
-.card-tail.edge { margin-left: -2.1vh; border-left: 2.1vh transparent; border-right: 2.1vh transparent; border-top-color: #f0f0f0; }
-.card-tail.fill { margin-left: -1.6vh; border-left: 1.6vh transparent; border-right: 1.6vh transparent; border-top-color: #0b1020; }
-.card-hint {
-    position: absolute;
-    color: #c8ccd8;
-    font-weight: bold;
-    white-space: nowrap;
+    margin-left: -2.6vh;
+    margin-bottom: -2.6vh;
+    width: 5.2vh;
+    height: 5.2vh;
+    background-color: #0d1222;
+    border-right: 0.35vh #f0f0f0;
+    border-bottom: 0.35vh #f0f0f0;
+    transform: rotate(45deg);
 }

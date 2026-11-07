@@ -212,6 +212,14 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     if (helper == 0x8003396Cu && !original_text && text_replaced.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
         guest16(rdram, 0x800E44A8u) == 3) {
         const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
+        // The N64 controller picture under the bubble, its lit buttons and the
+        // arrows pointing at them (few players hold an N64 pad; the cards name
+        // their own buttons): everything small drawn in that area.
+        if ((image >> 24) == 0x80u) {
+            const int x = int(ctx->r6), y = int(ctx->r7);
+            if (x >= 155 && x <= 215 && y >= 120 && y <= 185 && guest16(rdram, image) <= 70 && guest16(rdram, image + 2) <= 60)
+                return true;
+        }
         if ((image >> 24) == 0x80u && guest16(rdram, image + 4) == 2) {
             const int w = guest16(rdram, image), h = guest16(rdram, image + 2);
             const int prompt = w == 62 && h == 14 ? 1 : w == 50 && h == 14 ? 2 : 0;

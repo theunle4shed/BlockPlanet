@@ -1,4 +1,4 @@
-Lato (LatoLatin-Regular.ttf, LatoLatin-Bold.ttf), from the RmlUi samples.
+Lato (LatoLatin-Regular.ttf, LatoLatin-Bold.ttf, LatoLatin-Italic.ttf, LatoLatin-BoldItalic.ttf), from the RmlUi samples.
 
 Copyright (c) 2010-2015, Łukasz Dziedzic (dziedzic@typoland.com),
 with Reserved Font Name Lato.

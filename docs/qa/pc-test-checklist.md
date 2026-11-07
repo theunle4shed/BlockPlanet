@@ -31,6 +31,7 @@ For the owner's playtests. Tick what works, note what doesn't (what you did, wha
 - [ ] Single stage (e.g. 1:5): starts at 1:5; after winning, back to the stage list with the time shown.
 - [ ] Pause: BlockPlanet's pause panel; Restart chapter asks first; Quit to menu returns to BlockPlanet's main menu.
 - [ ] Training: in Solo, with Story selected, the description ends with your X button (or T on the keyboard) and "Training". Press it: Training lists Basics and Advanced. Each starts and returns to the menus when done. Puzzle's X starts Puzzle Training.
+- [ ] Graphics > Text size: Small, Default, Large and Larger change Training's speech bubble; the bubble stays on screen at Larger.
 - [ ] Training cards: the button symbols match your controller (bumpers, triggers and Magic too), apostrophes look right, and the text stays inside the box.
 - [ ] Game over: GAME OVER, then Try Again / Exit / Training in BlockPlanet's font.
 - [ ] Quit mid-episode, restart the game: Continue offers that episode; it starts at its first stage with the score and hearts it began with.

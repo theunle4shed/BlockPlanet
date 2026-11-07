@@ -337,6 +337,11 @@ void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState&
 std::optional<blockplanet::ui::HudView> last_hud_view;  // what update_hud last showed (nullopt: none)
 void show_hud(std::optional<blockplanet::ui::HudView> view) { last_hud_view = std::move(view); }
 void publish_game_text();
+// Graphics > Text size, as a scale for the card and speech text.
+float card_text_scale() {
+    const auto size = profile_data.preferences.text_size.value_or("default");
+    return size == "small" ? 0.85f : size == "large" ? 1.2f : size == "larger" ? 1.4f : 1.0f;
+}
 
 int& last_drops_seen() { static int v = 0; return v; }
 int& last_slides_seen() { static int v = 0; return v; }
@@ -1238,21 +1243,29 @@ void publish_game_text() {
                     if (right > body_left) out.wrap = float(right - body_left) / 320.0f * area_w / frame->window_w;
                 }
             }
+            if (box && t.font == 1) continue;  // in the panel instead
             view->game_text.push_back(std::move(out));
         }
         if (box) {
-            // Training's bubble as a panel: its body (the image less its tail,
-            // x +1 to +146, y 0 to +98) and the tail under it at +123, 9 high.
+            // Training's bubble as a panel holding the card's text: its right
+            // edge and bottom where the bubble's were (x +146, y +98), narrower
+            // (118 of the game's 320 columns), growing upwards to fit; the tail
+            // where the bubble's was (x +123), pointing down at Wheels.
             const auto fx = [&](float x) { return (area_x + x / 320.0f * area_w) / frame->window_w; };
             const auto fy = [&](float y) { return (frame->y + y / 240.0f * frame->h) / frame->window_h; };
+            const float width = 118.0f * std::max(1.0f, card_text_scale());  // wider for larger text, so it stays on screen
+            const float right = float(box->x + box->w - 4);
             blockplanet::ui::HudView::Panel panel;
-            panel.x = fx(float(box->x + 1));
-            panel.y = fy(float(box->y));
-            panel.w = fx(float(box->x + box->w - 4)) - panel.x;
-            panel.h = fy(float(box->y + 98)) - panel.y;
-            panel.tail_x = fx(float(box->x + 123));
-            panel.tail_h = 9.0f / 240.0f * frame->h / frame->window_h;
-            panel.text_size = 8.5f / 240.0f * frame->h / frame->window_h * 100.0f;
+            panel.right = 1.0f - fx(right);
+            panel.bottom = 1.0f - fy(float(box->y + 98));
+            panel.w = fx(right) - fx(right - width);
+            panel.tail = (float(box->x + 123) - (right - width)) / width;
+            panel.text_size = 10.0f / 240.0f * frame->h / frame->window_h * 100.0f * card_text_scale();
+            if (!card_lines.empty()) {
+                const std::size_t first = card_lines.begin()->second.front();
+                if (card_heading) panel.heading = joined[first];
+                if (body_first < texts.size()) panel.body = joined[body_first];
+            }
             if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
             if (box->prompt == 2) panel.hint = "Watch";
             view->card_panel = panel;
@@ -2073,11 +2086,26 @@ bool handle_hud_setting(const std::string& command) {
 }
 
 void publish_hud_settings() {
-    static std::string last;
+    static std::string last, last_text;
     const auto value = profile_data.preferences.hud_distance.value_or("near");
+    const auto text = profile_data.preferences.text_size.value_or("default");
+    if (text != last_text) blockplanet::ui::set_setting("text_size", last_text = text);
     if (value == last) return;
     last = value;
     blockplanet::ui::set_setting("hud_distance", value);
+}
+
+// Graphics > Text size: the card and speech text's size, saved in the profile.
+bool handle_text_setting(const std::string& command) {
+    const std::string prefix = "setting:text_size=";
+    if (command.rfind(prefix, 0) != 0) return false;
+    const auto value = command.substr(prefix.size());
+    if (value != "small" && value != "default" && value != "large" && value != "larger") return true;
+    profile_data.preferences.text_size = value;
+    profile_dirty = true;
+    save_profile();
+    blockplanet::ui::set_setting("text_size", value);
+    return true;
 }
 
 // "setting:NAME=VALUE" from the menus, as a settings change (field numbers
@@ -2556,6 +2584,7 @@ bool handle_profile_command(const std::string& command) {
             if (*command == "exit") close_game();
             if (handle_audio_setting(*command)) continue;
             if (handle_hud_setting(*command)) continue;
+            if (handle_text_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "audio_screen") {
