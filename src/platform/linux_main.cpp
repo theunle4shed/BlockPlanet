@@ -1225,6 +1225,14 @@ void update_training_presses(bool card_shown) {
     const auto now = std::chrono::steady_clock::now();
     const bool training = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) == -1 &&
                           guest::load16(guest_rdram, 0x800E44A8) == 3 && guest::load16(guest_rdram, 0x800E1228) < 0;
+    // A long card not yet scrolled to its end: the game is held (A does not
+    // move on) until the player has scrolled down.
+    if (card_shown && blockplanet::ui::card_needs_scroll() && guest_rdram != nullptr &&
+        guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E1228) < 0) {
+        pressing_page = 0;
+        training_inject.store(0x10000u);
+        return;
+    }
     std::optional<TrainingGroup> g;
     if (training && card_shown) g = training_group();
     bool want = false;

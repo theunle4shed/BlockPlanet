@@ -33,3 +33,14 @@ The owner's answers to twenty questions, with their notes. Round 2 (follow-ups) 
 - **Title screen:** leave it for now.
 - **Crash reports:** a crash log the player can send.
 - **After the PC test:** new panels for the Hide & Seek and Lines cards.
+
+## Round 2 (answered so far)
+
+- **Story's HUD:** the bottom row automatically on narrow or tall screens. **Resizing:** follow the new size at once, switching to the bottom row when the window becomes narrow or tall.
+- **A long bubble:** the hint reads "Scroll to continue" until the end is reached, then "A More" (done).
+- **Going back in Training:** B or LB shows the previous page's text, read-only; A returns.
+- **"Your turn" steps:** only for the key moves (slide, drop a third piece, use magic).
+- **A new player opening Story:** a choice, "Start with Training" or "Go straight to Story", asked once per profile.
+- **Reviewing the text:** a list of only the lines Claude would change, with Claude's recommendations, for the owner's feedback. Rewrite freely in BlockPlanet's voice, never wordy.
+- **Unlocks** (to settle on the owner's computer): keep the original's conditions, unlocked directly, with no codes. Completing a Story episode unlocks Time Attack and Score Attack, which play any episode completed in Story. Once the first Story episode is complete, the new-player choice (Training or Story) is no longer offered, as the player can pick from Solo > Story. Other modes (Lines, Multiphasic) work the same way: complete an episode, then their sub-modes open.
+- **How to play:** in the pause menu, BlockPlanet's own short guide per mode, to read (no interaction or demonstration).

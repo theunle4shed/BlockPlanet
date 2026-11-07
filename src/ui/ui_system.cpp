@@ -123,8 +123,10 @@ struct CardScroll {
     bool follow = true;
     float max_px = 0.0f;
     bool overflow = false;
+    bool at_end = true;  // scrolled to the end (or nothing to scroll)
 };
 CardScroll card_scroll;
+std::atomic<bool> card_needs_scroll_flag{false};
 std::mutex card_scroll_mutex;
 float card_scroll_lines = 0.0f;  // requested, not yet applied
 
@@ -140,6 +142,7 @@ void apply_card_scroll(float window_h) {
     Rml::Element* scroll = hud_document != nullptr && hud_document->IsVisible() ? hud_document->GetElementById("card-scroll") : nullptr;
     if (scroll == nullptr) {
         card_scroll = CardScroll{};
+        card_needs_scroll_flag.store(false);
         return;
     }
     Rml::Element* panel = scroll->GetParentNode();
@@ -180,6 +183,8 @@ void apply_card_scroll(float window_h) {
     card_scroll.top = std::min(card_scroll.top, max_top);
     scroll->SetScrollTop(card_scroll.top);
     card_scroll.overflow = max_top > 1.0f;
+    card_scroll.at_end = card_scroll.top >= max_top - 1.0f;
+    card_needs_scroll_flag.store(card_scroll.overflow && !card_scroll.at_end);
 }
 
 // Applies queued requests to the navigator.
@@ -365,8 +370,12 @@ std::string game_text_rml(const HudView& hud) {
                 rml += std::string("<div class='") + (block.heading ? "card-heading" : "card-body card-para") + "'>" + runs(block.runs) + "</div>";
             rml += "</div>";
         }
+        // Until the text has been scrolled to its end, A does not move on: the
+        // hint asks for scrolling instead (the owner's choice).
         std::string hint = p->hint.empty() ? std::string() : with_buttons(escape(p->hint));
-        if (card_scroll.overflow && !p->scroll_hint.empty())
+        if (card_scroll.overflow && !card_scroll.at_end && !p->scroll_hint.empty())
+            hint = with_buttons(escape(p->scroll_hint + " to continue"));
+        else if (card_scroll.overflow && !p->scroll_hint.empty())
             hint += std::string(hint.empty() ? "" : "<span>&nbsp;&nbsp;</span>") + with_buttons(escape(p->scroll_hint));
         rml += "<div class='card-hint'>" + (hint.empty() ? std::string("&nbsp;") : hint) + "</div>";
         rml += "</div>";
@@ -845,6 +854,8 @@ std::optional<HudBox> hud_item_box() {
 }
 
 bool menus_open() { return open_flag.load(); }
+
+bool card_needs_scroll() { return card_needs_scroll_flag.load(); }
 
 void scroll_card(float lines) {
     std::lock_guard lock(card_scroll_mutex);

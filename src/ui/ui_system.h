@@ -179,6 +179,9 @@ bool menus_open();
 // Scrolls the card panel's text when it is taller than the screen allows, by
 // `lines` (positive: down). Right stick, Page Up / Page Down, mouse wheel.
 void scroll_card(float lines);
+// The card panel's text is taller than its space and not yet scrolled to its
+// end: A should not move on yet.
+bool card_needs_scroll();
 
 // The next command the player chose (an item's command:NAME), if any.
 std::optional<std::string> take_command();
