@@ -582,6 +582,63 @@ constexpr std::uint32_t robot_texture_global = 0x800E0000u;
 // Each part's colour (material RGB, the first bytes of its record in section
 // B of the loaded object). Research: BLOCKPLANET_TITLE_TINT=1 gives every part
 // a distinct colour and logs them, to tell the parts apart.
+
+// The robots are drawn without the game's lighting (their colour is the
+// part's colour times the vertex colour, white throughout), so they look
+// flat. Shading is baked into the vertex colours instead: a normal for each
+// vertex from the geometry (the average of its triangles' normals), lit by a
+// key light from the upper left and front, in the model's own space.
+void compute_normals(std::uint8_t* rdram, std::uint32_t o) {
+    const auto u8 = [&](std::uint32_t a) { return std::uint32_t(rdram[(a & 0x00FFFFFFu) ^ 3u]); };
+    const auto be16 = [&](std::uint32_t a) { return std::int16_t(u8(a) << 8 | u8(a + 1)); };
+    const auto be32 = [&](std::uint32_t a) { return u8(a) << 24 | u8(a + 1) << 16 | u8(a + 2) << 8 | u8(a + 3); };
+    if (o < 0x80000000u || be32(o) != 0x18u) return;
+    const std::uint32_t b = o + be32(o + 4), c = o + be32(o + 8), v = o + be32(o + 12), e = o + be32(o + 16);
+    const std::uint32_t parts = be32(b), count = (e - v) / 16u;
+    if (count == 0 || count > 8192) return;
+    std::vector<std::array<float, 3>> pos(count), nrm(count, {0, 0, 0});
+    for (std::uint32_t i = 0; i < count; ++i)
+        pos[i] = {float(be16(v + 16 * i)), float(be16(v + 16 * i + 2)), float(be16(v + 16 * i + 4))};
+    for (std::uint32_t part = 0; part < parts && part < 512; ++part) {
+        const std::uint32_t blk = std::uint32_t(std::int32_t(c) + be16(c + 2 * part));
+        const int batches = be16(blk);
+        const std::uint32_t tri = std::uint32_t(std::int32_t(blk) + be16(blk + 2));
+        std::array<int, 32> cache{};
+        std::uint32_t nibble = 0;
+        const auto next = [&]() {
+            const std::uint32_t byte = u8(tri + nibble / 2);
+            const int n = (nibble % 2 == 0) ? int(byte >> 4) : int(byte & 15);
+            ++nibble;
+            return n;
+        };
+        for (int k = 0; k < batches && k < 512; ++k) {
+            const std::uint32_t q = blk + 4 + 6u * std::uint32_t(k);
+            const int first = be16(q), slot = int(u8(q + 2)), n = int(u8(q + 3)), triangles = int(u8(q + 4));
+            for (int i = 0; i < n && slot + i < 32; ++i) cache[std::size_t(slot + i)] = first + i;
+            for (int t = 0; t < triangles; ++t) {
+                const int i0 = cache[std::size_t(next())], i1 = cache[std::size_t(next())], i2 = cache[std::size_t(next())];
+                if (i0 < 0 || i1 < 0 || i2 < 0 || std::uint32_t(std::max({i0, i1, i2})) >= count) continue;
+                const auto& a = pos[std::size_t(i0)]; const auto& bb = pos[std::size_t(i1)]; const auto& cc = pos[std::size_t(i2)];
+                const float ux = bb[0] - a[0], uy = bb[1] - a[1], uz = bb[2] - a[2], vx = cc[0] - a[0], vy = cc[1] - a[1], vz = cc[2] - a[2];
+                const std::array<float, 3> f{uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx};
+                for (int idx : {i0, i1, i2})
+                    for (int ch = 0; ch < 3; ++ch) nrm[std::size_t(idx)][std::size_t(ch)] += f[std::size_t(ch)];
+            }
+        }
+    }
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const auto& n = nrm[i];
+        const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        if (len <= 0.0f) continue;
+        const float nx = n[0] / len, ny = n[1] / len, nz = n[2] / len;
+        const float key = std::max(0.0f, -0.45f * nx + 0.62f * ny + 0.64f * nz);
+        const float rim = std::pow(1.0f - std::fabs(nz), 3.0f) * 0.25f;
+        const float shade = std::clamp(0.42f + 0.68f * key + rim, 0.0f, 1.0f);
+        for (int ch = 0; ch < 3; ++ch)
+            rdram[((v + 16 * i + 12u + std::uint32_t(ch)) & 0x00FFFFFFu) ^ 3u] = std::uint8_t(std::lround(shade * 255.0f));
+    }
+}
+
 // The robots' colours, chosen from their portraits (main archive DEMO
 // pictures): the objects store black for every part, and the game's own
 // source of their colours is not found yet. Part numbers found by tinting.
@@ -837,6 +894,39 @@ void draw_title_bombs(std::uint8_t* rdram) {
     put32(rdram, display_list_pointer, dl);
 }
 
+// The robots' lighting on the title: the scenes' own lights are mostly
+// ambient, which looks flat, so the lights they load (G_MOVEMEM light 1 and
+// the ambient after it) are rewritten: a strong warm-white key light from the
+// upper left and front, and a low ambient. Takes effect from the next frame.
+void relight_scene(std::uint8_t* rdram, std::uint32_t from, std::uint32_t to) {
+    const auto byte = [&](std::uint32_t a, std::uint8_t v) { rdram[(a & 0x00FFFFFFu) ^ 3u] = v; };
+    // The number of directional lights (G_MOVEWORD numlights: 0x80000000 +
+    // 32 x (lights + 1)); the ambient follows the last.
+    std::uint32_t lights = 1;
+    for (std::uint32_t a = from; a + 8u <= to && a < from + 8u * 8192u; a += 8u)
+        if (load32(rdram, a) == 0xBC000002u) lights = std::max(1u, ((load32(rdram, a + 4u) & 0x7FFFFFFFu) / 32u) - 1u);
+    const std::uint32_t ambient_slot = 0x86u + 2u * lights;
+    for (std::uint32_t a = from; a + 8u <= to && a < from + 8u * 8192u; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a);
+        if ((w0 >> 24) != 0x03u) continue;
+        const std::uint32_t which = (w0 >> 16) & 0xFFu, at = load32(rdram, a + 4u) | 0x80000000u;
+        if (which > 0x86u && which < ambient_slot) {  // the other lights: a faint cool fill from below right
+            const std::uint8_t c[3] = {40, 46, 70};
+            for (int k = 0; k < 3; ++k) byte(at + std::uint32_t(k), c[k]), byte(at + 4u + std::uint32_t(k), c[k]);
+            byte(at + 8, std::uint8_t(std::int8_t(70))), byte(at + 9, std::uint8_t(std::int8_t(-60))), byte(at + 10, std::uint8_t(std::int8_t(60)));
+            continue;
+        }
+        if (which == 0x86u) {  // light 1: colour, copy, direction (towards the light)
+            const std::uint8_t c[3] = {236, 232, 220};
+            for (int k = 0; k < 3; ++k) byte(at + std::uint32_t(k), c[k]), byte(at + 4u + std::uint32_t(k), c[k]);
+            byte(at + 8, std::uint8_t(std::int8_t(-58))), byte(at + 9, std::uint8_t(std::int8_t(72))), byte(at + 10, std::uint8_t(std::int8_t(84)));
+        } else if (which == ambient_slot) {  // the ambient
+            const std::uint8_t c[3] = {64, 64, 72};
+            for (int k = 0; k < 3; ++k) byte(at + std::uint32_t(k), c[k]), byte(at + 4u + std::uint32_t(k), c[k]);
+        }
+    }
+}
+
 void build_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
     // Built in BlockPlanet's own memory above 4 MB (the scene code's 4 MB
     // checks are raised to 8 MB in the recompiler config), with the game's
@@ -867,6 +957,7 @@ void build_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
         call4(rdram, ctx, func_8002A100, std::uint32_t(object_entry), 0, 0, 0);
         const std::uint32_t object = static_cast<std::uint32_t>(ctx->r2);
         tint_parts(rdram, object, object_entry);
+        compute_normals(rdram, object);
         const std::uint32_t object_slot = object_array + 4u * slot++;
         put32(rdram, object_slot, object);
         call4(rdram, ctx, func_8002A0C0, std::uint32_t(scene_entry), 0, 0, 0);
@@ -936,6 +1027,7 @@ void draw_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
         const std::uint32_t from = load32(rdram, display_list_pointer);
         call4(rdram, ctx, func_8002D93C, scene, frame >= 0 ? 0u : elapsed, 0, 0);
         if (k < title_scene_specs.size()) place_scene(rdram, from, load32(rdram, display_list_pointer), title_scene_specs[k], k);
+        relight_scene(rdram, from, load32(rdram, display_list_pointer));
     }
     // Research: BLOCKPLANET_TITLE_DL_LOG=1 logs the scene's commands once.
     static bool logged = std::getenv("BLOCKPLANET_TITLE_DL_LOG") == nullptr;
