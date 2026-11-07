@@ -399,8 +399,12 @@ void update_puzzle_hud() {
     blockplanet::ui::set_hud(view);
 }
 
+bool update_title_overlay();
+extern "C" bool blockplanet_title_recent(std::uint32_t* image);
+
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
+    if (update_title_overlay()) return;
     static tetrisphere::ProgressTracker progress;
     // The episode's splits (game time per level, LiveSplit style): counted
     // while playing (not paused); a new chapter, Try Again or a new game
@@ -1024,6 +1028,95 @@ std::optional<PictureFrame> picture_frame() {
     f.y = (f.window_h - f.h) / 2.0f;
     return f;
 }
+
+// The title screen (docs/research/blockplanet-game-state.md, the title's
+// artwork): the painted picture is not drawn, so its copyright lines are cut
+// from the player's own picture in memory (never shipped), saved once as an
+// image in the data directory (enlarged 4x, pixel for pixel, so they stay
+// sharp), and shown where the picture had them.
+bool update_title_overlay() {
+    std::uint32_t image = 0;
+    if (!blockplanet_title_recent(&image) || guest_rdram == nullptr) return false;
+    static std::string path;
+    static float fx = 0, fy = 0, fw = 0, fh = 0;  // in the game's 320 x 240 frame
+    if (path.empty()) {
+        // Until the picture is in memory (BlockPlanet loads it from the title
+        // hook; until then the pointer shows a small placeholder): the title
+        // picture is about 270 x 205.
+        const int w = guest::load16(guest_rdram, image), h = guest::load16(guest_rdram, image + 2);
+        if (w >= 200 && h >= 150 && w <= 320 && h <= 240 && guest::load16(guest_rdram, image + 4) == 0) {
+            const auto pixel = [&](int x, int y) {
+                return static_cast<std::uint16_t>(guest::load16(guest_rdram, image + 8 + 2u * std::uint32_t(y * w + x)));
+            };
+            const auto row_used = [&](int y) {
+                for (int x = 0; x < w; ++x)
+                    if (pixel(x, y) & 1) return true;
+                return false;
+            };
+            // The lines: the block of rows at the bottom, above it a clear gap.
+            int bottom = h - 1;
+            while (bottom > 0 && !row_used(bottom)) --bottom;
+            int top = bottom;
+            while (top > 0 && row_used(top - 1)) --top;
+            // Lines may be separated by a clear row: include a second block
+            // close above (within 3 rows).
+            for (int gap = 1; gap <= 3 && top - gap > 0; ++gap)
+                if (row_used(top - gap - 1) && top - gap - 1 > h * 3 / 4) {
+                    top -= gap + 1;
+                    while (top > 0 && row_used(top - 1)) --top;
+                    break;
+                }
+            int left = w, right = -1;
+            for (int y = top; y <= bottom; ++y)
+                for (int x = 0; x < w; ++x)
+                    if (pixel(x, y) & 1) left = std::min(left, x), right = std::max(right, x);
+            if (right >= left && bottom - top < 40) {
+                constexpr int scale = 4;
+                const int cw = right - left + 1, ch = bottom - top + 1;
+                std::vector<std::uint8_t> tga(18 + std::size_t(cw * scale) * std::size_t(ch * scale) * 4, 0);
+                tga[2] = 2;  // uncompressed true colour
+                tga[12] = std::uint8_t((cw * scale) & 0xFF), tga[13] = std::uint8_t((cw * scale) >> 8);
+                tga[14] = std::uint8_t((ch * scale) & 0xFF), tga[15] = std::uint8_t((ch * scale) >> 8);
+                tga[16] = 32, tga[17] = 0x28;  // 8-bit alpha, top-left origin
+                for (int y = 0; y < ch * scale; ++y)
+                    for (int x = 0; x < cw * scale; ++x) {
+                        const std::uint16_t v = pixel(left + x / scale, top + y / scale);
+                        auto* o = &tga[18 + (std::size_t(y) * std::size_t(cw * scale) + std::size_t(x)) * 4];
+                        o[0] = std::uint8_t(((v >> 1) & 31) * 255 / 31);   // B
+                        o[1] = std::uint8_t(((v >> 6) & 31) * 255 / 31);   // G
+                        o[2] = std::uint8_t(((v >> 11) & 31) * 255 / 31);  // R
+                        o[3] = (v & 1) ? 255 : 0;
+                    }
+                const auto dir = application_data_directory() / "generated";
+                std::error_code ec;
+                std::filesystem::create_directories(dir, ec);
+                const auto file = dir / "title-lines.tga";
+                if (std::ofstream(file, std::ios::binary).write(reinterpret_cast<const char*>(tga.data()), std::streamsize(tga.size()))) {
+                    path = file.string();
+                    // The picture is drawn at (24, 21) in the 320 x 240 frame.
+                    fx = 24.0f + left, fy = 21.0f + top, fw = float(cw), fh = float(ch);
+                }
+            }
+        }
+    }
+    const auto frame = picture_frame();
+    if (path.empty() || !frame) {
+        blockplanet::ui::set_hud(std::nullopt);
+        return true;
+    }
+    // The game's 2D frame is the 4:3 area in the middle of the picture.
+    const float area_w = frame->h * 4.0f / 3.0f;
+    const float area_x = frame->x + (frame->w - area_w) / 2.0f;
+    blockplanet::ui::HudView view;
+    view.title_image = path;
+    view.title_x = (area_x + fx / 320.0f * area_w) / frame->window_w;
+    view.title_y = (frame->y + fy / 240.0f * frame->h) / frame->window_h;
+    view.title_w = fw / 320.0f * area_w / frame->window_w;
+    view.title_h = fh / 240.0f * frame->h / frame->window_h;
+    blockplanet::ui::set_hud(view);
+    return true;
+}
+
 
 // Places the held magic's 3D model in the HUD's item box, wherever the HUD's
 // layout put it (ui::hud_item_box), in picture heights from the picture's

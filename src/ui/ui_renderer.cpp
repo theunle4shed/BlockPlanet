@@ -188,7 +188,10 @@ void Renderer::ReleaseGeometry(Rml::CompiledGeometryHandle handle) {
 Rml::TextureHandle Renderer::LoadTexture(Rml::Vector2i& dimensions, const Rml::String& source) {
     // Read through RmlUi's file interface, decode with stb_image.
     Rml::FileInterface* files = Rml::GetFileInterface();
-    const Rml::FileHandle file = files->Open(source);
+    Rml::FileHandle file = files->Open(source);
+    // RmlUi drops the leading '/' of an absolute path (files BlockPlanet makes
+    // in its data directory, such as the title's lines): try it with one.
+    if (!file && !source.empty() && source[0] != '/') file = files->Open("/" + source);
     if (!file) return 0;
     const std::size_t size = files->Length(file);
     std::vector<std::uint8_t> bytes(size);

@@ -208,6 +208,12 @@ std::string versus_column(const HudView::VersusPlayer& p, const char* id, const 
 
 std::string hud_rml(const HudView& hud) {
     std::string rml;
+    if (!hud.title_image.empty()) {
+        const auto pct = [](float v) { return std::to_string(v * 100.0f) + "%"; };
+        return "<img id='title-image' src='" + escape(hud.title_image) + "' style='position: absolute; left: " +
+               pct(hud.title_x) + "; top: " + pct(hud.title_y) + "; width: " + pct(hud.title_w) + "; height: " +
+               pct(hud.title_h) + ";'/>";
+    }
     if (hud.versus)
         return versus_column(hud.players[0], "left", "Player 1") + versus_column(hud.players[1], "right", "Player 2");
     rml += "<div id='left' class='side'>";
