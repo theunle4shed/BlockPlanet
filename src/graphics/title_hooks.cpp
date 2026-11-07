@@ -303,11 +303,12 @@ namespace {
 struct RingStyle {
     float centre_x = 161.0f, centre_y = 138.0f;      // in the 320 x 240 frame
     float outer_x = 124.0f, outer_y = 64.0f;          // half-widths of the outer edge
-    float rim = 21.0f;                                // the rim's width at the sides
-    float rim_vertical = 0.55f;                       // ... and its share at the top and bottom
+    float rim = 25.0f;                                // the rim's width at the sides (the original's is thick)
+    float rim_vertical = 0.62f;                       // ... and its share at the top and bottom
     float depth = 12.0f;                              // extrusion
     float back_dx = 2.0f, back_dy = -6.0f;            // where the back shows (seen from a little above)
-    float tilt = -0.06f;                              // radians, as in the picture
+    float tilt = 0.12f;                               // radians: lower on the left, as in the picture
+    float offset_y = -4.0f;                           // a little lower than centre, as in the picture
     std::array<float, 3> face{0.90f, 0.40f, 0.09f};   // orange
     std::array<float, 3> shadow{0.40f, 0.12f, 0.03f};
     std::array<float, 3> light{1.00f, 0.74f, 0.36f};
@@ -354,7 +355,7 @@ std::vector<std::vector<RingVertex>> ring_strips(const RingStyle& st, int segmen
     const float c = std::cos(st.tilt), sn = std::sin(st.tilt);
     const auto place = [&](float x, float y, float z) {
         // Centred, y up (the frame's y runs down), tilted.
-        return std::array<float, 3>{x * c - y * sn, x * sn + y * c, z};
+        return std::array<float, 3>{x * c - y * sn, x * sn + y * c + st.offset_y, z};
     };
     for (int k = 0; k <= segments; ++k) {
         const float a = 6.2831853f * float(k) / float(segments);
@@ -411,7 +412,7 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
     const float c = std::cos(st.tilt), sn = std::sin(st.tilt);
     const auto edge = [&](float a) {  // a point on the opening's edge
         const float x = ix * std::cos(a), y = iy * std::sin(a);
-        return std::array<float, 2>{x * c - y * sn, x * sn + y * c};
+        return std::array<float, 2>{x * c - y * sn, x * sn + y * c + st.offset_y};
     };
     std::vector<std::array<LightVertex, 3>> tris;
     const auto tri = [&](LightVertex a, LightVertex b, LightVertex d) { tris.push_back({a, b, d}); };
@@ -419,7 +420,8 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
     // A faint shade over the whole opening, so the background reads as behind it.
     for (int k = 0; k < 48; ++k) {
         const auto e0 = edge(2 * pi * k / 48), e1 = edge(2 * pi * (k + 1) / 48);
-        tri({0, 0, 0.04f, 0.03f, 0.10f, 0.35f}, {e0[0], e0[1], 0.04f, 0.03f, 0.10f, 0.35f}, {e1[0], e1[1], 0.04f, 0.03f, 0.10f, 0.35f});
+        // Purple, as the original's blurred squares behind the light.
+        tri({0, 0, 0.22f, 0.08f, 0.30f, 0.42f}, {e0[0], e0[1], 0.16f, 0.05f, 0.24f, 0.42f}, {e1[0], e1[1], 0.16f, 0.05f, 0.24f, 0.42f});
     }
     // The tile's corners (tilted a little).
     const float tilt = 0.0f;  // level, as in the original
@@ -444,8 +446,9 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
         const float a0 = pi * 0.42f + pi * 1.16f * k / n, a1 = pi * 0.42f + pi * 1.16f * (k + 1) / n;
         const auto e0 = edge(a0), e1 = edge(a1), s0 = source(a0), s1 = source(a1);
         const float f0 = std::max(0.0f, -std::cos(a0)) * 0.7f + 0.3f, f1 = std::max(0.0f, -std::cos(a1)) * 0.7f + 0.3f;
-        const LightVertex q0{s0[0], s0[1], 0.74f, 0.66f, 1.0f, 0.55f * f0}, q1{s1[0], s1[1], 0.74f, 0.66f, 1.0f, 0.55f * f1};
-        const LightVertex r0{e0[0], e0[1], 0.36f, 0.30f, 0.82f, 0.10f * f0}, r1{e1[0], e1[1], 0.36f, 0.30f, 0.82f, 0.10f * f1};
+        // Bluish white near the tile, pale blue further out (the original's left side).
+        const LightVertex q0{s0[0], s0[1], 0.78f, 0.86f, 1.0f, 0.60f * f0}, q1{s1[0], s1[1], 0.78f, 0.86f, 1.0f, 0.60f * f1};
+        const LightVertex r0{e0[0], e0[1], 0.40f, 0.55f, 0.90f, 0.18f * f0}, r1{e1[0], e1[1], 0.40f, 0.55f, 0.90f, 0.18f * f1};
         tri(q0, r0, r1);
         tri(q0, r1, q1);
     }
@@ -886,7 +889,11 @@ std::vector<MeshTriangle> decode_object(std::uint8_t* rdram, std::uint32_t o) {
     const std::uint32_t vertex_count = (e - v) / 16u;
     for (std::uint32_t part = 0; part < parts && part < 256; ++part) {
         const std::uint32_t rec = b + be32(b + 4 + 4 * part);
-        const std::array<float, 3> colour{u8(rec) / 255.0f, u8(rec + 1) / 255.0f, u8(rec + 2) / 255.0f};
+        std::array<float, 3> colour{u8(rec) / 255.0f, u8(rec + 1) / 255.0f, u8(rec + 2) / 255.0f};
+        // The missile as in the original picture: no flat cards or flame (parts
+        // 0 to 2), and its front disc silver, not red (part 6).
+        if (part <= 2) continue;
+        if (part == 6) colour = {0.80f, 0.80f, 0.82f};
         const std::uint32_t blk = std::uint32_t(std::int32_t(c) + be16(c + 2 * part));
         const int batches = be16(blk);
         const std::uint32_t tri = std::uint32_t(std::int32_t(blk) + be16(blk + 2));
