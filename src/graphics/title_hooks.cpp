@@ -342,6 +342,96 @@ std::vector<std::vector<RingVertex>> ring_strips(const RingStyle& st, int segmen
     return strips;
 }
 
+
+// The light from the exposed core (the owner's reading of the original
+// picture): a white core tile behind Wheels, a soft glow and a fan of rays
+// coming towards the viewer, all kept inside the ring's opening. Drawn as
+// translucent shapes over the opening, before the characters.
+struct LightVertex { float x, y; float r, g, b, a; };
+
+void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
+    std::uint32_t dl = load32(rdram, display_list_pointer);
+    std::uint32_t projection = 0;
+    for (std::uint32_t at = dl - 8u, n = 0; n < 4096 && at >= 0x80000000u; at -= 8u, ++n) {
+        const std::uint32_t w0 = load32(rdram, at);
+        if ((w0 >> 24) == 0x01u && (w0 >> 16 & 0x01u) != 0) { projection = load32(rdram, at + 4u); break; }
+    }
+    if (projection == 0) return;
+    const auto cmd = [&](std::uint32_t w0, std::uint32_t w1) { put32(rdram, dl, w0); put32(rdram, dl + 4u, w1); dl += 8u; };
+    // Where the light comes from (behind Wheels), in the frame's centred units, y up.
+    const float lx = 7.0f, ly = 6.0f;
+    const float ix = st.outer_x - st.rim - 2.0f, iy = st.outer_y - st.rim * st.rim_vertical - 2.0f;
+    const float c = std::cos(st.tilt), sn = std::sin(st.tilt);
+    const auto edge = [&](float a) {  // a point on the opening's edge
+        const float x = ix * std::cos(a), y = iy * std::sin(a);
+        return std::array<float, 2>{x * c - y * sn, x * sn + y * c};
+    };
+    std::vector<std::array<LightVertex, 3>> tris;
+    const auto tri = [&](LightVertex a, LightVertex b, LightVertex d) { tris.push_back({a, b, d}); };
+    // The glow: a fan from the light to the opening's edge, white fading to the
+    // purple of the blurred squares.
+    const int n = 48;
+    for (int k = 0; k < n; ++k) {
+        const auto e0 = edge(6.2831853f * k / n), e1 = edge(6.2831853f * (k + 1) / n);
+        tri({lx, ly, 1.0f, 0.98f, 0.92f, 0.85f}, {e0[0], e0[1], 0.55f, 0.32f, 0.70f, 0.0f}, {e1[0], e1[1], 0.55f, 0.32f, 0.70f, 0.0f});
+    }
+    // The rays: thin wedges from the light to the edge, brighter at the light.
+    const int rays = 14;
+    for (int k = 0; k < rays; ++k) {
+        const float a = 6.2831853f * (k + 0.35f * std::sin(k * 2.1f)) / rays, w = 0.05f + 0.03f * std::sin(k * 1.7f);
+        const auto e0 = edge(a - w), e1 = edge(a + w);
+        tri({lx, ly, 1.0f, 1.0f, 1.0f, 0.75f}, {e0[0], e0[1], 0.9f, 0.85f, 1.0f, 0.0f}, {e1[0], e1[1], 0.9f, 0.85f, 1.0f, 0.0f});
+    }
+    // The exposed core tile: a white square, turned a little, with a bright rim.
+    const float h = 15.0f, t = 0.12f;
+    std::array<std::array<float, 2>, 4> sq;
+    for (int k = 0; k < 4; ++k) {
+        const float a = t + 1.5707963f * k + 0.785398f;
+        sq[std::size_t(k)] = {lx + h * 1.4142f * std::cos(a), ly + h * 1.4142f * std::sin(a) * 0.82f};
+    }
+    for (int k = 0; k < 2; ++k) {
+        const auto& a = sq[0]; const auto& b = sq[std::size_t(k + 1)]; const auto& d = sq[std::size_t(k + 2)];
+        tri({a[0], a[1], 1, 1, 1, 0.95f}, {b[0], b[1], 1, 1, 1, 0.95f}, {d[0], d[1], 1, 1, 1, 0.95f});
+    }
+    const std::uint32_t proj = 0x807EFE00u, model = 0x807EFE40u;
+    const float p[4][4] = {{1.0f / 160.0f, 0, 0, 0}, {0, 1.0f / 120.0f, 0, 0}, {0, 0, 1.0f / 512.0f, 0}, {0, 0, 0, 1}};
+    const float id[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
+    put_matrix(rdram, proj, p);
+    put_matrix(rdram, model, id);
+    cmd(0xE7000000u, 0);
+    cmd(0xBA001402u, 0x00000000u);
+    cmd(0xB900031Du, 0x00504A40u);             // translucent surface, no z
+    cmd(0xFCFFFFFFu, 0xFFFE793Cu);             // shade colour and alpha
+    cmd(0xBB000000u, 0x00000000u);
+    cmd(0xB6000000u, 0xFFFFFFFFu);
+    cmd(0xB7000000u, 0x00000204u);
+    cmd(0x01030040u, proj);
+    cmd(0x01060040u, model);
+    std::uint32_t vtx = 0x807E4000u;
+    for (std::size_t i = 0; i < tris.size(); i += 5) {
+        const std::size_t count = std::min<std::size_t>(5, tris.size() - i);
+        const std::uint32_t base = vtx;
+        for (std::size_t f = 0; f < count; ++f)
+            for (const auto& v : tris[i + f]) {
+                put16(rdram, vtx + 0, std::uint16_t(std::int16_t(std::lround(v.x))));
+                put16(rdram, vtx + 2, std::uint16_t(std::int16_t(std::lround(v.y))));
+                put16(rdram, vtx + 4, 0), put16(rdram, vtx + 6, 0), put16(rdram, vtx + 8, 0), put16(rdram, vtx + 10, 0);
+                put8(rdram, vtx + 12, std::uint8_t(std::clamp(v.r, 0.0f, 1.0f) * 255));
+                put8(rdram, vtx + 13, std::uint8_t(std::clamp(v.g, 0.0f, 1.0f) * 255));
+                put8(rdram, vtx + 14, std::uint8_t(std::clamp(v.b, 0.0f, 1.0f) * 255));
+                put8(rdram, vtx + 15, std::uint8_t(std::clamp(v.a, 0.0f, 1.0f) * 255));
+                vtx += 16u;
+            }
+        const std::uint32_t verts = std::uint32_t(count * 3);
+        cmd(0x04000000u | ((verts - 1) << 20) | (verts * 16u), base);
+        for (std::uint32_t f = 0; f < count; ++f) cmd(0xBF000000u, ((3 * f) * 10u) << 16 | ((3 * f + 1) * 10u) << 8 | ((3 * f + 2) * 10u));
+    }
+    cmd(0xBD000000u, 0x00000000u);
+    cmd(0x01030040u, projection);
+    cmd(0xE7000000u, 0);
+    put32(rdram, display_list_pointer, dl);
+}
+
 void draw_title_ring(std::uint8_t* rdram) {
     static const RingStyle style;
     static const auto strips = ring_strips(style, 56);
@@ -411,6 +501,7 @@ void draw_title_ring(std::uint8_t* rdram) {
     cmd(0x01030040u, projection);              // the game's projection again
     cmd(0xE7000000u, 0);
     put32(rdram, display_list_pointer, dl);
+    draw_title_light(rdram, style);
 }
 } // namespace
 
@@ -452,7 +543,7 @@ std::vector<TitleSceneSpec> title_scene_list() {
     const char* off = std::getenv("BLOCKPLANET_TITLE_CHARACTERS");
     if (off != nullptr && std::atoi(off) == 0) return list;
     const char* v = std::getenv("BLOCKPLANET_TITLE_SCENE");
-    if (v == nullptr) v = "0x1b:0x28@0/-0.35/-0.15/0.6,0x3e:0x27@0/0.05/-0.15/0.5";
+    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0x3e:0x27@0/0.04/-0.12/0.62";
     std::string text(v);
     std::size_t at = 0;
     while (at < text.size()) {
@@ -541,6 +632,12 @@ void tint_parts(std::uint8_t* rdram, std::uint32_t object, int entry) {
             for (std::size_t k = 0; k < count; ++k)
                 if (int(p) >= table[k].first && int(p) <= table[k].last)
                     byte(rec) = table[k].r, byte(rec + 1) = table[k].g, byte(rec + 2) = table[k].b;
+            if (entry == 0x27) {
+                // Wheels stands in the core's light: his colours washed
+                // towards a warm white, as if lit from inside.
+                const std::uint8_t warm[3] = {255, 246, 222};
+                for (int ch = 0; ch < 3; ++ch) byte(rec + std::uint32_t(ch)) = std::uint8_t((byte(rec + std::uint32_t(ch)) * 45 + warm[ch] * 55) / 100);
+            }
             continue;
         }
         // A colour per part, its hue coding its number (2.5 degrees apart), so a
@@ -649,9 +746,9 @@ struct BombPose { float x, y, size, yaw, pitch, roll; };
 // Positions in the 320 x 240 frame's centred units (y down), as in the
 // original picture: noses up and to the left, fins trailing at the lower right.
 constexpr BombPose bomb_poses[] = {
-    {70.0f, -16.0f, 0.0080f, 3.9f, -0.35f, 0.65f},
-    {90.0f, 14.0f, 0.0095f, 3.85f, -0.3f, 0.6f},
-    {66.0f, 42.0f, 0.0115f, 3.8f, -0.25f, 0.55f},
+    {80.0f, -20.0f, 0.0100f, 3.9f, -0.35f, 0.65f},
+    {104.0f, 16.0f, 0.0120f, 3.85f, -0.3f, 0.6f},
+    {78.0f, 50.0f, 0.0145f, 3.8f, -0.25f, 0.55f},
 };
 
 void draw_title_bombs(std::uint8_t* rdram) {
@@ -826,8 +923,8 @@ void draw_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
         // Only inside the ring's area: parts of a scene that sit elsewhere in
         // its first frame are cut off (G_SETSCISSOR, in quarter pixels).
         std::uint32_t dl = load32(rdram, display_list_pointer);
-        put32(rdram, dl, 0xED000000u | (0u << 12) | (4u * 60u));
-        put32(rdram, dl + 4u, (4u * 320u) << 12 | (4u * 214u));
+        put32(rdram, dl, 0xED000000u | (0u << 12) | (4u * 40u));
+        put32(rdram, dl + 4u, (4u * 320u) << 12 | (4u * 222u));
         put32(rdram, display_list_pointer, dl + 8u);
     }
     const std::uint32_t dl_before = load32(rdram, display_list_pointer);
