@@ -137,6 +137,7 @@ struct HudView {
         float text_size = 0;                 // the body's size, in vh
         std::vector<std::pair<std::string, std::string>> heading, body;  // (text, colour) runs
         std::string hint;
+        std::string scroll_hint;  // shown when the text is longer than the screen allows ("[x:RS] Scroll")
     };
     std::optional<Panel> card_panel;
     bool text_only = false;
@@ -159,6 +160,9 @@ std::optional<HudBox> hud_item_box();
 
 // True while a menu screen is open (or about to open).
 bool menus_open();
+// Scrolls the card panel's text when it is taller than the screen allows, by
+// `lines` (positive: down). Right stick, Page Up / Page Down, mouse wheel.
+void scroll_card(float lines);
 
 // The next command the player chose (an item's command:NAME), if any.
 std::optional<std::string> take_command();

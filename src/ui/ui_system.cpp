@@ -112,6 +112,72 @@ bool start(std::uint32_t width, std::uint32_t height) {
 
 std::string with_buttons(const std::string& escaped_text);
 
+// The card panel's scrolling (presentation thread): the page shown (its
+// heading and first words), how far it is scrolled, whether it follows the
+// text as it types in (until the player scrolls), the most the text may take
+// before it scrolls (from the last layout: the panel stops short of the top
+// of the screen), and whether it overflows (for the hint).
+struct CardScroll {
+    std::string page;
+    float top = 0.0f;
+    bool follow = true;
+    float max_px = 0.0f;
+    bool overflow = false;
+};
+CardScroll card_scroll;
+std::mutex card_scroll_mutex;
+float card_scroll_lines = 0.0f;  // requested, not yet applied
+
+// After layout: keeps the card panel's text within the screen (scrolling it),
+// follows the text as it types in, and applies the player's scrolling.
+void apply_card_scroll(float window_h) {
+    float lines = 0.0f;
+    {
+        std::lock_guard lock(card_scroll_mutex);
+        lines = card_scroll_lines;
+        card_scroll_lines = 0.0f;
+    }
+    Rml::Element* scroll = hud_document != nullptr && hud_document->IsVisible() ? hud_document->GetElementById("card-scroll") : nullptr;
+    if (scroll == nullptr) {
+        card_scroll = CardScroll{};
+        return;
+    }
+    Rml::Element* panel = scroll->GetParentNode();
+    const auto page = scroll->GetAttribute<Rml::String>("data-page", "");
+    if (page != card_scroll.page) {  // a new page: from its top, following
+        card_scroll.page = page;
+        card_scroll.top = 0.0f;
+        card_scroll.follow = true;
+    }
+    // The most the text may take: the panel's bottom edge stays put, and its
+    // top stops 3% of the screen short of the top.
+    const float panel_top = panel->GetAbsoluteOffset(Rml::BoxArea::Border).y;
+    const float panel_h = panel->GetBox().GetSize(Rml::BoxArea::Border).y;
+    const float shown = scroll->GetClientHeight();
+    if (panel_h > 0.0f) {
+        const float others = panel_h - shown;
+        // Research: BLOCKPLANET_CARD_TOP=0.5 keeps the panel's top that far
+        // down the screen (to test the scrolling).
+        static const float top_margin = [] {
+            const char* v = std::getenv("BLOCKPLANET_CARD_TOP");
+            return v != nullptr ? std::clamp(float(std::atof(v)), 0.0f, 0.9f) : 0.03f;
+        }();
+        const float wanted = (panel_top + panel_h) - window_h * top_margin - others;
+        if (std::abs(wanted - card_scroll.max_px) > 2.0f) card_scroll.max_px = std::max(0.0f, wanted);
+    }
+    const float max_top = std::max(0.0f, scroll->GetScrollHeight() - shown);
+    const float line = scroll->GetBox().GetSize().y > 0.0f ? panel->GetComputedValues().font_size() * 1.32f : 20.0f;
+    if (lines != 0.0f) {
+        card_scroll.follow = false;
+        card_scroll.top = std::clamp(card_scroll.top + lines * line, 0.0f, max_top);
+        if (card_scroll.top >= max_top - 1.0f) card_scroll.follow = true;
+    }
+    if (card_scroll.follow) card_scroll.top = max_top;
+    card_scroll.top = std::min(card_scroll.top, max_top);
+    scroll->SetScrollTop(card_scroll.top);
+    card_scroll.overflow = max_top > 1.0f;
+}
+
 // Applies queued requests to the navigator.
 void apply_requests() {
     std::deque<Request> pending;
@@ -269,11 +335,21 @@ std::string game_text_rml(const HudView& hud) {
             }
             return out;
         };
-        rml += "<div class='card-panel' style='right: " + pct(p->right) + "; bottom: " + pct(p->bottom) + "; width: " +
-               pct(p->w) + "; font-size: " + std::to_string(p->text_size) + "vh;'>";
+        // The page, for the scroll state: its heading and first words.
+        std::string page;
+        for (const auto& part : p->heading) page += part.first + " ";
+        for (std::size_t k = 0; k < p->body.size() && k < 4; ++k) page += p->body[k].first + " ";
+        rml += std::string("<div class='card-panel") + (card_scroll.overflow ? " overflow" : "") + "' style='right: " +
+               pct(p->right) + "; bottom: " + pct(p->bottom) + "; width: " + pct(p->w) + "; font-size: " +
+               std::to_string(p->text_size) + "vh;'>";
         if (!p->heading.empty()) rml += "<div class='card-heading'>" + runs(p->heading) + "</div>";
-        rml += "<div class='card-body'>" + runs(p->body) + "</div>";
-        rml += "<div class='card-hint'>" + (p->hint.empty() ? std::string("&nbsp;") : with_buttons(escape(p->hint))) + "</div>";
+        const std::string limit = card_scroll.max_px > 0.0f ? "max-height: " + std::to_string(int(card_scroll.max_px)) + "px;" : "";
+        rml += "<div id='card-scroll' class='card-scroll' data-page='" + escape(page) + "' style='" + limit + "'><div class='card-body'>" +
+               runs(p->body) + "</div></div>";
+        std::string hint = p->hint.empty() ? std::string() : with_buttons(escape(p->hint));
+        if (card_scroll.overflow && !p->scroll_hint.empty())
+            hint += std::string(hint.empty() ? "" : "<span>&nbsp;&nbsp;</span>") + with_buttons(escape(p->scroll_hint));
+        rml += "<div class='card-hint'>" + (hint.empty() ? std::string("&nbsp;") : hint) + "</div>";
         rml += "</div>";
         // The tail, beside the panel (a child would be clipped by it), from the
         // same bottom edge: half of it overlaps the panel's rim.
@@ -593,6 +669,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
             context->SetDensityIndependentPixelRatio(float(height) / design_height);
         }
         context->Update();
+        apply_card_scroll(float(height));
         context->Render();
     }
     renderer->end_frame();
@@ -687,6 +764,11 @@ std::optional<HudBox> hud_item_box() {
 }
 
 bool menus_open() { return open_flag.load(); }
+
+void scroll_card(float lines) {
+    std::lock_guard lock(card_scroll_mutex);
+    card_scroll_lines += lines;
+}
 
 std::optional<std::string> take_command() {
     std::lock_guard lock(requests_mutex);

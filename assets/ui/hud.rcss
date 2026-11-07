@@ -344,3 +344,7 @@ div { display: block; }
     border-bottom: 0.35vh #f0f0f0;
     transform: rotate(45deg);
 }
+.card-scroll {
+    display: block;
+    overflow-y: hidden;  /* scrolled by BlockPlanet (right stick, Page Up / Down, wheel) */
+}

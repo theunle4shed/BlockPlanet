@@ -121,6 +121,7 @@ bool profile_dirty = false;
 // finished, carry on into that mode's next part (Story Chapter 1, or the
 // puzzles).
 std::string chapter_zero_lesson;  // "basics" or "puzzle"
+float card_stick = 0.0f;  // the right stick's vertical position, scrolling the card panel
 // A mode to start once the game is back at its menu: after a Chapter 0, or
 // for Restart level. `start` is the chapter and level (1-based) to begin at.
 struct PendingLaunch {
@@ -1270,6 +1271,14 @@ void publish_game_text() {
             }
             if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
             if (box->prompt == 2) panel.hint = "Watch";
+            {
+                auto family = active_family.load();
+                if (const char* o = std::getenv("BLOCKPLANET_BUTTON_FAMILY"))  // research, as for the cards' buttons
+                    family = *o == 'k' ? ControllerFamily::Keyboard : *o == 'p' ? ControllerFamily::PlayStation
+                           : *o == 'n' ? ControllerFamily::NintendoSwitch : ControllerFamily::Xbox;
+                const char f = family == ControllerFamily::Xbox ? 'x' : family == ControllerFamily::PlayStation ? 'p' : 'n';
+                panel.scroll_hint = family == ControllerFamily::Keyboard ? "[k:PgDn] Scroll" : std::string("[") + f + ":RS] Scroll";
+            }
             view->card_panel = panel;
         }
     }
@@ -2552,8 +2561,27 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
                 continue;
             }
+            // The card panel's scrolling (when its text is taller than the screen
+            // allows): the right stick (the game does not use it), Page Up /
+            // Page Down and the mouse wheel. Outside the menus only.
+            if (!blockplanet::ui::menus_open()) {
+                if (event.type == SDL_CONTROLLERAXISMOTION && event.caxis.axis == SDL_CONTROLLER_AXIS_RIGHTY)
+                    card_stick = std::abs(event.caxis.value) > 8000 ? float(event.caxis.value) / 32767.0f : 0.0f;
+                if (event.type == SDL_KEYDOWN && (event.key.keysym.scancode == SDL_SCANCODE_PAGEUP ||
+                                                  event.key.keysym.scancode == SDL_SCANCODE_PAGEDOWN))
+                    blockplanet::ui::scroll_card(event.key.keysym.scancode == SDL_SCANCODE_PAGEUP ? -3.0f : 3.0f);
+                if (event.type == SDL_MOUSEWHEEL) blockplanet::ui::scroll_card(-2.0f * float(event.wheel.y));
+            }
             if (handle_menu_event(event, event_port>=0, active_settings.bindings)) continue;
             handle_controls_event(event,event_port>=0 || removed_assigned,detected);
+        }
+        {
+            // The right stick scrolls the card panel smoothly: up to 8 lines a second.
+            static auto last = std::chrono::steady_clock::now();
+            const auto now = std::chrono::steady_clock::now();
+            const float seconds = std::min(0.1f, std::chrono::duration<float>(now - last).count());
+            last = now;
+            if (card_stick != 0.0f) blockplanet::ui::scroll_card(card_stick * 8.0f * seconds);
         }
         bool held=keyboard_state.buttons()!=0;
         for(const auto& port:controller_ports.snapshot()) {
