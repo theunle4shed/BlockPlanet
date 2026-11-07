@@ -33,6 +33,7 @@ For the owner's playtests. Tick what works, note what doesn't (what you did, wha
 - [ ] Training: in Solo, with Story selected, the description ends with your X button (or T on the keyboard) and "Training". Press it: Training lists Basics and Advanced. Each starts and returns to the menus when done. Puzzle's X starts Puzzle Training.
 - [ ] Graphics > Text size: Small, Default, Large and Larger change Training's speech bubble; the bubble stays on screen at Larger.
 - [ ] Training's bubble scrolls instead of leaving the screen: try Text size Larger on a short or narrow window. The right stick, Page Up / Page Down or the mouse wheel scroll it, and "Scroll" shows in its hint only then.
+- [ ] Crash report (Windows): start BlockPlanet with `BLOCKPLANET_CRASH_TEST=20` set; it closes after 20 seconds. Start it again: a message says where the crash report is. Open it: it should list the build, what the game was doing and a stack with module names.
 - [ ] Resize the window while playing (Story, Training, a card showing): the HUD, the speech panel and the menus should follow the new size at once, with nothing left in the old place.
 - [ ] Training's HUD: a row along the bottom, empty at first; Next appears when Wheels shows the shadow, Health at Lives, To the core at Game objective, Magic at Magic, each glowing briefly. Advanced adds the X count; Puzzle Training shows drops and slides at its last page.
 - [ ] Training's pages: one A press moves past text already shown; the first "press down or A" page is skipped; demonstrations ("Watch") still play.

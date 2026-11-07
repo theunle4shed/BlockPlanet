@@ -364,6 +364,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/keyboard_state.cpp
     src/platform/audio_output.cpp
     src/platform/diagnostic_log.cpp
+    src/platform/crash_report.cpp
     src/platform/linux_ai.cpp
     src/platform/linux_main.cpp
     src/platform/wav_capture.cpp
@@ -588,6 +589,14 @@ else()
     target_compile_options(developer_records_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME developer_records COMMAND developer_records_test)
+add_executable(crash_report_test tests/crash_report_test.cpp src/platform/crash_report.cpp)
+target_include_directories(crash_report_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(crash_report_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(crash_report_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME crash_report COMMAND crash_report_test "${CMAKE_CURRENT_BINARY_DIR}/crash-report-test")
 
 add_executable(profile_menu_test tests/profile_menu_test.cpp src/platform/profile_menu.cpp
     src/platform/profiles.cpp src/platform/relaunch.cpp)
@@ -1062,6 +1071,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/keyboard_state.cpp
         src/platform/audio_output.cpp
         src/platform/diagnostic_log.cpp
+        src/platform/crash_report.cpp
         src/platform/trophies.cpp
         src/platform/trophy_service.cpp
         src/platform/game_event_watcher.cpp

@@ -13,6 +13,7 @@
 #include "tetrisphere/game_event_watcher.h"
 #include "tetrisphere/game_options.h"
 #include "tetrisphere/close_game_menu.h"
+#include "tetrisphere/crash_report.h"
 
 #include "tetrisphere/rt64_context.h"
 #include "tetrisphere/run_options.h"
@@ -2201,6 +2202,16 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         show_error(diagnostic_error.c_str());
         std::exit(74);
     }
+    install_crash_handler(diagnostic_path.parent_path(), run_id(), TETRISPHERE_BUILD_ID);
+    // A crash last time: say where its report is (once). Not in automated test
+    // runs, which would stop at the message.
+    if (const auto reports = take_new_crash_reports(diagnostic_path.parent_path());
+        !reports.empty() && std::getenv("TETRISPHERE_QA_CONTROLLERS") == nullptr) {
+        const std::string message = "BlockPlanet closed unexpectedly last time. A crash report was saved here:\n\n" +
+                                    std::string(reinterpret_cast<const char*>(reports.back().u8string().c_str())) +
+                                    "\n\nPlease send it with a short note of what you were doing.";
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "BlockPlanet", message.c_str(), nullptr);
+    }
     std::fprintf(stdout, "{\"event\":\"diagnostic_file_ready\",\"run_id\":\"%s\"}\n",
                  run_id());
     std::fflush(stdout);
@@ -3181,6 +3192,22 @@ bool handle_profile_command(const std::string& command) {
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
             update_hud();
+            {
+                // What the game is doing, for a crash report.
+                const auto st = read_game_state(guest_rdram);
+                char context[160];
+                std::snprintf(context, sizeof context, "scene %d, mode %d, chapter %d, level %d, menus %s, screen %s", st.scene, st.mode,
+                              st.chapter + 1, st.level + 1, blockplanet::ui::menus_open() ? "open" : "closed",
+                              blockplanet::ui::current_screen().c_str());
+                set_crash_context(context);
+                // Research: BLOCKPLANET_CRASH_TEST=seconds crashes on purpose after that long, to test the report.
+                static const char* crash_test = std::getenv("BLOCKPLANET_CRASH_TEST");
+                static const auto started = std::chrono::steady_clock::now();
+                if (crash_test != nullptr && std::chrono::steady_clock::now() - started > std::chrono::seconds(std::atoi(crash_test))) {
+                    volatile int* nowhere = nullptr;
+                    *nowhere = 1;
+                }
+            }
             publish_game_text();
             update_training_presses(blockplanet::recent_card_box().has_value());
             // A single stage finished: pause, then quit to the menu.
