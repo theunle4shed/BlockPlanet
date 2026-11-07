@@ -119,6 +119,7 @@ struct HudView {
     struct Text {
         std::string text; float x = 0, y = 0, size = 0, width = 0; std::string colour;
         std::vector<std::pair<std::string, std::string>> parts;  // a joined line: each word and its colour (then text is unused)
+        float wrap = 0;  // a paragraph wrapped to this width (window widths); 0: one line
     };  // width: the game's span (window widths), 0 unknown
     std::vector<Text> game_text;
     bool text_only = false;

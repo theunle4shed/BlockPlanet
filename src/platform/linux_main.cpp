@@ -1119,15 +1119,21 @@ void publish_game_text() {
                 for (std::size_t i : idx) body_left = std::min(body_left, texts[i].x);
         std::set<std::size_t> joined_away;
         std::map<std::size_t, std::vector<std::pair<std::string, std::string>>> joined;
+        // The heading line stays a line; the body becomes one paragraph, in
+        // reading order, wrapped to the card's width (the box is centred in
+        // the game's frame, its text from body_left), so it fills the box.
+        std::size_t body_first = texts.size();
         for (auto& [y, idx] : card_lines) {
             std::sort(idx.begin(), idx.end(), [&](std::size_t l, std::size_t r) { return texts[l].x < texts[r].x; });
-            auto& parts = joined[idx[0]];
+            const bool heading = y == card_lines.begin()->first && card_lines.size() > 1;
             for (std::size_t k = 0; k < idx.size(); ++k) {
                 const auto& w = texts[idx[k]];
                 char c[16];
                 std::snprintf(c, sizeof c, "#%02x%02x%02x%02x", w.r, w.g, w.b, w.a);
-                parts.emplace_back(cased[idx[k]], c);
-                if (k > 0) joined_away.insert(idx[k]);
+                const std::size_t owner = heading ? idx[0] : (body_first == texts.size() ? idx[k] : body_first);
+                if (!heading && body_first == texts.size()) body_first = idx[k];
+                joined[owner].emplace_back(cased[idx[k]], c);
+                if (owner != idx[k]) joined_away.insert(idx[k]);
             }
         }
         for (std::size_t i = 0; i < texts.size(); ++i) {
@@ -1147,9 +1153,11 @@ void publish_game_text() {
             if (t.font == 1) out.width = 0;  // card text flows as text, not fitted to the game's spans
             if (t.font == 1 && !card_lines.empty() && t.y != card_lines.begin()->first && body_left < (1 << 20) && t.x - body_left < 40)
                 out.x = (area_x + float(body_left) / 320.0f * area_w) / frame->window_w;
-            if (const auto j = joined.find(i); j != joined.end() && j->second.size() > 1) {
+            if (const auto j = joined.find(i); j != joined.end()) {
                 out.parts = j->second;
-                out.width = 0;  // a joined line is laid out as text, from its start
+                out.width = 0;  // laid out as text, from its start
+                if (i == body_first && body_left < (1 << 20))
+                    out.wrap = 2.0f * (160.0f - float(body_left) - 2.0f) / 320.0f * area_w / frame->window_w;
             }
             view->game_text.push_back(std::move(out));
         }
