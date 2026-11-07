@@ -210,7 +210,7 @@ div { display: block; }
     /* Every section is 136dp tall (padding included), so the row's tint is
        even; the magic meter is a column beside the item box, filling upwards,
        so the row stays thin. */
-    #left, #right { width: auto; text-align: left; }
+    #left, #right { width: auto; text-align: left; white-space: nowrap; }
     .side > div { display: inline-block; vertical-align: top; }
     .side > :first-child { border-radius: 0dp; border-top-left-radius: 22dp; border-bottom-left-radius: 22dp; }
     .side > :last-child { border-radius: 0dp; border-top-right-radius: 22dp; border-bottom-right-radius: 22dp; }

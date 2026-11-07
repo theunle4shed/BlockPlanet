@@ -589,7 +589,10 @@ std::string px_text(float value) { return px(value); }
 // wider or taller screens they stay near the sphere; pushed out as the sphere
 // grows on screen, so they keep clear of it, but never past the screen's edge.
 // Sizes come from the last layout.
+float hud_left_scale = 1.0f;  // the left container's drawn scale (portrait rows shrink to fit)
+
 void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2f& left_at) {
+    hud_left_scale = 1.0f;
     auto* left = hud_document->GetElementById("left");
     auto* right = hud_document->GetElementById("right");
     const float dp = height / design_height;
@@ -644,14 +647,27 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         right->SetProperty("left", px(rx));
         right->SetProperty("top", px(std::clamp(cy - rh / 2.0f, margin, std::max(margin, height - margin - rh))));
     } else {
-        const float frame = hud.distance_mode == 1 ? height : hud.picture_w * width * 2.0f / 3.0f;  // half a 3:4 frame's height
-        const float ly = std::max(margin, std::min(cy - frame + margin, cy - clear - lh));
-        const float ry = std::min(height - margin - rh, std::max(cy + frame - margin - rh, cy + clear));
-        const float lx = std::clamp(cx - lw / 2.0f, margin, std::max(margin, width - margin - lw));
+        // Narrow or tall screens (the owner's choice): both rows at the bottom,
+        // one above the other, each on one line, shrunk to fit the width.
+        const float avail = width - 2.0f * margin;
+        // The rows' whole width (their box stops at the window's edge).
+        const float lfull = std::max(lw, left->GetScrollWidth()), rfull = std::max(rw, right->GetScrollWidth());
+        const float sl = lfull > 0.0f ? std::min(1.0f, avail / lfull) : 1.0f;
+        const float sr = rfull > 0.0f ? std::min(1.0f, avail / rfull) : 1.0f;
+        const float gap = 10.0f * dp;
+        const float ry = height - margin - rh * sr;
+        const float ly = ry - gap - lh * sl;
+        const float lx = std::max(margin, (width - lfull * sl) / 2.0f);
+        const float rx = std::max(margin, (width - rfull * sr) / 2.0f);
+        left->SetProperty("transform", "scale(" + std::to_string(sl) + ")");
+        left->SetProperty("transform-origin", "0% 0%");
+        right->SetProperty("transform", "scale(" + std::to_string(sr) + ")");
+        right->SetProperty("transform-origin", "0% 0%");
         left->SetProperty("left", px(lx));
         left->SetProperty("top", px(ly));
         left_at = {lx, ly};
-        right->SetProperty("left", px(std::clamp(cx - rw / 2.0f, margin, std::max(margin, width - margin - rw))));
+        hud_left_scale = sl;
+        right->SetProperty("left", px(rx));
         right->SetProperty("top", px(ry));
     }
 }
@@ -716,9 +732,11 @@ bool update_hud_document() {
     // just placed (absolute offsets lag behind the placement).
     auto* left_side = hud_document->GetElementById("left");
     if (auto* item = hud_document->GetElementById("item"); item != nullptr && left_side != nullptr) {
-        Rml::Vector2f offset = left_at;
-        for (auto* e = item; e != nullptr && e != left_side; e = e->GetParentNode()) offset += e->GetRelativeOffset(Rml::BoxArea::Border);
-        const auto item_size = item->GetBox().GetSize(Rml::BoxArea::Border);
+        // The item's place inside the left container, scaled as the container is drawn.
+        Rml::Vector2f inside{0, 0};
+        for (auto* e = item; e != nullptr && e != left_side; e = e->GetParentNode()) inside += e->GetRelativeOffset(Rml::BoxArea::Border);
+        const Rml::Vector2f offset = left_at + inside * hud_left_scale;
+        const auto item_size = item->GetBox().GetSize(Rml::BoxArea::Border) * hud_left_scale;
         if (item_size.x > 0 && item_size.y > 0) {  // not right after a rebuild
             std::lock_guard lock(hud_mutex);
             hud_item = std::array<float, 4>{offset.x, offset.y, item_size.x, item_size.y};
