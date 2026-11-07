@@ -84,12 +84,9 @@ int main(int argc, char** argv) {
     editor.press("Q");
     assert(editor.text() == "SamQ");
 
-    // Story: Chapter 0 (Training) first; a new player starts on it with
-    // Chapter 1 as the skip; afterwards the focus is on the next chapter.
+    // Story: the chapters done and the next (Training is on X, not a chapter).
     auto story = story_chapters({}, 15);
-    assert(story.size() == 2 && story[0].action == "command:chapter:0" && story[0].focus &&
-           story[0].note == "start here" && story[1].note == "skip training" && !story[1].focus);
-    assert(story[1].action == "command:stages:1");
+    assert(story.size() == 1 && story[0].action == "command:stages:1" && story[0].focus && story[0].note == "next");
     {
         // A chapter's stages: the whole episode, then the stages done and the next.
         auto stages = story_stages(2, {1, 2}, {40.5, 0.0, 0.0});
@@ -122,19 +119,18 @@ int main(int argc, char** argv) {
         assert(proper_case(game_quotes("ONLY FUSE COMBOS GET YOUR %X% COUNT UP")) == "Only fuse combos get your \u2018X\u2019 count up");
     }
     story = story_chapters({0}, 15);
-    assert(story.size() == 2 && story[0].note == "completed" && story[1].focus && story[1].note == "next");
+    assert(story.size() == 1 && story[0].focus && story[0].note == "next");
     story = story_chapters({1, 2}, 15);
-    assert(story.size() == 4 && story[0].note == "start here" && !story[0].focus && story[3].focus &&
-           story[3].label == "Chapter 3");
+    assert(story.size() == 3 && story[2].focus && story[2].label == "Chapter 3" && story[0].note == "completed");
     story = story_chapters({0, 15}, 15);
-    assert(story.size() == 16 && story[1].focus && story[1].note == "next" && story[2].note.empty() &&
-           story[15].note == "completed");
+    assert(story.size() == 15 && story[0].focus && story[0].note == "next" && story[1].note.empty() &&
+           story[14].note == "completed");
 
-    auto puzzle = puzzle_chapters(false);
-    assert(puzzle.size() == 2 && puzzle[0].focus && puzzle[0].action == "command:puzzle_chapter:0" &&
-           puzzle[1].note == "skip training");
-    puzzle = puzzle_chapters(true);
-    assert(!puzzle[0].focus && puzzle[1].focus && puzzle[0].note == "completed");
+    auto lessons = story_training(false, false);
+    assert(lessons.size() == 2 && lessons[0].focus && lessons[0].action == "command:training" &&
+           lessons[0].note == "start here" && !lessons[1].focus && lessons[1].action == "command:training_advanced");
+    lessons = story_training(true, false);
+    assert(!lessons[0].focus && lessons[1].focus && lessons[0].note == "completed");
 
     auto confirm = delete_confirmation(store, "1");
     assert(confirm.size() == 2 && confirm[0].action == "command:profile_delete_confirmed:1" &&

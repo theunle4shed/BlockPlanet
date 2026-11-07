@@ -1152,8 +1152,7 @@ void publish_game_text() {
         static int card_right = 0;
         if (card_lines.empty()) card_right = 0;
         for (const auto& [y, idx] : card_lines)
-            if (y != card_lines.begin()->first)
-                for (std::size_t i : idx) card_right = std::max(card_right, texts[i].x + texts[i].width);
+            for (std::size_t i : idx) card_right = std::max(card_right, texts[i].x + texts[i].width);
         std::set<std::size_t> joined_away;
         std::map<std::size_t, std::vector<std::pair<std::string, std::string>>> joined;
         // The heading line stays a line; the body becomes one paragraph, in
@@ -1195,7 +1194,7 @@ void publish_game_text() {
                 out.width = 0;  // laid out as text, from its start
                 if (i == body_first && body_left < (1 << 20))
                 {
-                    const int right = std::max(card_right + 3, body_left < 160 ? 320 - body_left - 4 : 0);
+                    const int right = std::max(card_right + 10, body_left < 160 ? 320 - body_left - 4 : 0);
                     if (right > body_left) out.wrap = float(right - body_left) / 320.0f * area_w / frame->window_w;
                 }
             }
@@ -2536,6 +2535,7 @@ bool handle_profile_command(const std::string& command) {
                 case 9: mode = LaunchMode::Lines; break;
                 case 3:
                     if (state.training_type == 1) mode = LaunchMode::TrainingBasics;
+                    if (state.training_type == 2) mode = LaunchMode::TrainingAdvanced;
                     if (state.training_type == 3) mode = LaunchMode::TrainingPuzzle;
                     break;
                 default: break;
@@ -2576,27 +2576,32 @@ bool handle_profile_command(const std::string& command) {
                                : *command == "casual" ? PlayVariant::Casual
                                : *command == "time_attack" ? PlayVariant::TimeAttack : PlayVariant::ScoreAttack;
                 auto choices = chapter_choices();
-                if (variant_competes(menu_variant) && !choices.empty() && choices.front().id == "chapter0") {
-                    choices.erase(choices.begin());  // no Training in the attacks
-                    for (auto& c : choices) c.note = c.note == "skip training" ? "" : c.note;
-                    if (!choices.empty() && std::none_of(choices.begin(), choices.end(), [](const auto& c) { return c.focus; }))
-                        choices.front().focus = true;
-                }
                 blockplanet::ui::set_text("chapters_title", menu_variant == PlayVariant::Story ? "Campaign" : variant_title(menu_variant));
+                blockplanet::ui::set_text("chapters_subtitle", "Choose a chapter");
                 blockplanet::ui::set_list("chapters", choices);
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
-            if (*command == "puzzle") {
-                const auto found = profile_data.progress.chapters_completed.find("puzzle");
-                const bool done = profile_save && found != profile_data.progress.chapters_completed.end() &&
-                                  found->second.count(0) != 0;
-                blockplanet::ui::set_text("chapters_title", "Puzzle");
-                blockplanet::ui::set_list("chapters", puzzle_chapters(done));
+            if (*command == "training_story") {
+                // X on Story: its Training lessons.
+                const auto done = [&](const char* mode) {
+                    const auto found = profile_data.progress.chapters_completed.find(mode);
+                    return profile_save && found != profile_data.progress.chapters_completed.end() && found->second.count(0) != 0;
+                };
+                blockplanet::ui::set_text("chapters_title", "Training");
+                blockplanet::ui::set_text("chapters_subtitle", "Learn from Wheels");
+                blockplanet::ui::set_list("chapters", story_training(done("rescue"), done("training_advanced")));
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
-            if (*command == "puzzles") {
+            if (*command == "training" || *command == "training_advanced") {
+                single_stage.reset();
+                continue_mode.reset();
+                chapter_zero_lesson.clear();  // back to the menus afterwards
+                launch_mode(*command == "training" ? LaunchMode::TrainingBasics : LaunchMode::TrainingAdvanced);
+                continue;
+            }
+            if (*command == "puzzle" || *command == "puzzles") {
                 auto& records = profile_data.progress.episode_records;
                 const auto& times = records["puzzle"][0].best_levels;
                 const auto& moves = records["puzzle_moves"][0].best_levels;
@@ -2619,7 +2624,7 @@ bool handle_profile_command(const std::string& command) {
             }
             if (command->rfind("puzzle_chapter:", 0) == 0) {
                 const bool training = std::atoi(command->c_str() + 15) == 0;
-                chapter_zero_lesson = training ? "puzzle" : "";
+                chapter_zero_lesson.clear();  // Training from X: back to the menus afterwards
                 continue_mode.reset();
                 launch_mode(training ? LaunchMode::TrainingPuzzle : LaunchMode::Puzzle);
                 continue;

@@ -219,6 +219,8 @@ bool record_game_event(ProfileProgress& progress, const GameEvent& event) {
         if (text(event, "lesson") == "basics") progress.chapters_completed["rescue"].insert(0);
         // Puzzle's Chapter 0 is Training Puzzle.
         if (text(event, "lesson") == "puzzle") progress.chapters_completed["puzzle"].insert(0);
+        // Training Advanced has no chapter of its own.
+        if (text(event, "lesson") == "advanced") progress.chapters_completed["training_advanced"].insert(0);
         return true;
     } else if (event.name == "puzzle_solved") {
         ++s.puzzles_solved;

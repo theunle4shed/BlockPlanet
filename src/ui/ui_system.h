@@ -37,6 +37,8 @@ void set_text(const std::string& name, const std::string& text);
 // Whether the player is using a controller (true) or the keyboard; screens
 // get the class "pad" while a controller is used.
 void set_pad(bool pad);
+// The menus' Alt button, as "[family:name]" (k, x, p or n: drawn as in the cards).
+void set_alt_button(const std::string& spec);
 
 // Reports a command as if a menu item had been chosen (for typed text).
 void send_command(const std::string& command);

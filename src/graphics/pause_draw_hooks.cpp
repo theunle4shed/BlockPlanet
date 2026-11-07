@@ -262,7 +262,9 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
                 std::lock_guard lock(text_mutex);
                 bool found = false;
                 for (auto& e : texts)
-                    if (e.text.x == t.x && e.text.y == t.y && e.text.text == t.text) e.at = now, e.text = t, found = true;
+                    // One text per place: a newer string there replaces the
+                    // older (a card word typing in, "pu" then "puz").
+                    if (e.text.x == t.x && e.text.y == t.y && e.text.font == t.font) e.at = now, e.text = t, found = true;
                 if (!found && texts.size() < 256) texts.push_back({t, now});
             }
             return true;

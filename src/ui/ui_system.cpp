@@ -67,10 +67,14 @@ struct TextRequest {
     std::string name;
     std::string text;
 };
+struct AltButtonRequest {
+    std::string spec;  // "[family:name]", as in the cards
+};
 struct PadRequest {
     bool pad;
 };
-using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest>;
+using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest,
+                             AltButtonRequest>;
 std::mutex requests_mutex;
 std::deque<Request> requests;
 std::deque<std::string> commands;
@@ -106,6 +110,8 @@ bool start(std::uint32_t width, std::uint32_t height) {
     return true;
 }
 
+std::string with_buttons(const std::string& escaped_text);
+
 // Applies queued requests to the navigator.
 void apply_requests() {
     std::deque<Request> pending;
@@ -127,6 +133,8 @@ void apply_requests() {
             navigator->set_pad(pad->pad);
         } else if (auto* text = std::get_if<TextRequest>(&request)) {
             navigator->set_text(text->name, text->text);
+        } else if (auto* alt = std::get_if<AltButtonRequest>(&request)) {
+            navigator->set_alt_button(with_buttons(alt->spec));
         } else {
             navigator->handle(std::get<Action>(request));
         }
@@ -224,8 +232,8 @@ std::string with_buttons(const std::string& escaped_text) {
         out += escaped_text.substr(at, open - at);
         const char family = escaped_text[open + 1];
         const std::string name = escaped_text.substr(open + 3, close - open - 3);
-        const bool shoulder = family != 'k' && (name.size() == 2 && (name[0] == 'L' || name[0] == 'R' || name[0] == 'Z')
-                                                || name == "L" || name == "R");
+        const bool shoulder = family != 'k' && ((name.size() == 2 && (name[0] == 'L' || name[0] == 'R' || name[0] == 'Z')) ||
+                                                name == "L" || name == "R");
         if (shoulder) {  // bumpers and triggers: a dark rounded bar with its name
             out += "<span class='btn shoulder'>" + name + "</span>";
         } else if (family == 'k') {
@@ -620,6 +628,11 @@ void set_list(const std::string& name, std::vector<ListItem> items) {
 void set_text(const std::string& name, const std::string& text) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(TextRequest{name, text});
+}
+
+void set_alt_button(const std::string& spec) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(AltButtonRequest{spec});
 }
 
 void set_pad(bool pad) {

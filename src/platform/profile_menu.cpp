@@ -158,15 +158,12 @@ std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& compl
     for (int chapter : completed)
         if (chapter >= 1) last = std::max(last, chapter + 1);
     last = std::min(last, chapters);
-    const bool fresh = completed.empty();
-    items.push_back({"chapter0", "Chapter 0: Training", completed.count(0) ? "completed" : "start here",
-                     "command:chapter:0", true, 1, fresh});
-    bool focused = fresh;
+    bool focused = false;
     for (int chapter = 1; chapter <= last; ++chapter) {
         const bool done = completed.count(chapter) != 0;
         const bool next = !done && !focused;
         items.push_back({"chapter" + std::to_string(chapter), "Chapter " + std::to_string(chapter),
-                         done ? "completed" : chapter == 1 && fresh ? "skip training" : next ? "next" : "",
+                         done ? "completed" : next ? "next" : "",
                          "command:stages:" + std::to_string(chapter), true, 1, next});
         focused = focused || next;
     }
@@ -199,11 +196,14 @@ std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<
     return items;
 }
 
-std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done) {
-    return {{"chapter0", "Chapter 0: Puzzle Training", training_done ? "completed" : "start here",
-             "command:puzzle_chapter:0", true, 1, !training_done},
-            {"puzzles", "Puzzles", training_done ? "" : "skip training", "command:puzzles", true, 1,
-             training_done}};
+std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool advanced_done) {
+    blockplanet::ui::ListItem basics{"basics", "Basics", basics_done ? "completed" : "start here",
+                                     "command:training", true, 1, !basics_done || advanced_done};
+    basics.description = "Wheels shows you how to play: the shadow, sliding, dropping, combos and magic.";
+    blockplanet::ui::ListItem advanced{"advanced", "Advanced", advanced_done ? "completed" : "",
+                                       "command:training_advanced", true, 1, basics_done && !advanced_done};
+    advanced.description = "Crystal pieces, the X count, gravity combos and fuse combos.";
+    return {basics, advanced};
 }
 
 std::string next_profile_name(const ProfileStore& store) {

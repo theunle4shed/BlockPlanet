@@ -72,10 +72,9 @@ private:
 };
 constexpr int keyboard_columns = 10;
 
-// Story's chapter list: Chapter 0 (Training Basics), then the chapters
-// completed and the next one (up to `chapters`). The focus starts on
-// Chapter 0 for a player who has done nothing yet, and otherwise on the
-// next chapter. `completed` holds Story chapter numbers (0 is Training).
+// Story's chapter list: the chapters completed and the next one (up to
+// `chapters`), focused on the next. `completed` holds Story chapter numbers
+// (0, Training Basics, is ignored: Training is on the menus' X button).
 std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters);
 
 // A Story chapter's stage list: "Whole episode", then each stage completed
@@ -85,9 +84,9 @@ std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& compl
 std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<int>& levels_done,
                                                    const std::vector<double>& best_levels, int levels = 10);
 
-// Puzzle's list: Chapter 0 (Training Puzzle), then the puzzles. A new
-// player starts on Chapter 0; once it is done, on the puzzles.
-std::vector<blockplanet::ui::ListItem> puzzle_chapters(bool training_done);
+// Story's Training lessons (X on Story in the menus): Basics and Advanced,
+// focused on the first not yet done.
+std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool advanced_done);
 // The puzzles to choose from: each solved one (with its best time and fewest
 // moves, when known) and the next unsolved, up to `count`; the next is focused.
 // The game's all-capitals text in BlockPlanet's style: short labels (three

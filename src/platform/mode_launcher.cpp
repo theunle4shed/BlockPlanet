@@ -14,6 +14,7 @@ constexpr std::uint32_t submenu_row = 0x800E1220u;  // Options and similar pages
 constexpr std::int16_t single = 0;
 constexpr std::int16_t training = 4;
 constexpr std::int16_t basics = 0;
+constexpr std::int16_t advanced = 1;
 constexpr std::int16_t puzzle_training = 2;
 constexpr std::int16_t start = 0;
 constexpr std::uint16_t button_a = 0x8000;
@@ -33,6 +34,7 @@ std::int16_t row_for(LaunchMode mode) {
     case LaunchMode::VsCpu: return 4;
     case LaunchMode::Lines: return 5;
     case LaunchMode::TrainingBasics: return 0;
+    case LaunchMode::TrainingAdvanced: return 0;
     case LaunchMode::TrainingPuzzle: return 0;
     }
     return 0;
@@ -48,6 +50,7 @@ std::optional<LaunchMode> launch_mode_for_command(const std::string& command) {
     if (command == "versus") return LaunchMode::VsCpu;
     if (command == "lines") return LaunchMode::Lines;
     if (command == "training") return LaunchMode::TrainingBasics;
+    if (command == "training_advanced") return LaunchMode::TrainingAdvanced;
     if (command == "training_puzzle") return LaunchMode::TrainingPuzzle;
     return std::nullopt;
 }
@@ -61,6 +64,7 @@ const char* launch_mode_name(LaunchMode mode) {
     case LaunchMode::VsCpu: return "vs_cpu";
     case LaunchMode::Lines: return "lines";
     case LaunchMode::TrainingBasics: return "training_basics";
+    case LaunchMode::TrainingAdvanced: return "training_advanced";
     case LaunchMode::TrainingPuzzle: return "training_puzzle";
     }
     return "";
@@ -90,10 +94,11 @@ ModeLauncher::Result ModeLauncher::update(std::uint8_t* rdram, Clock::time_point
     // Put the original menus' cursor where the next press should act, then
     // press: on the main menu (or title) SINGLE, on the player page START,
     // in the mode list the mode's row.
-    if (*mode_ == LaunchMode::TrainingBasics || *mode_ == LaunchMode::TrainingPuzzle) {
-        // Main menu TRAINING, then BASICS or PUZZLE on the Training page.
+    if (*mode_ == LaunchMode::TrainingBasics || *mode_ == LaunchMode::TrainingAdvanced || *mode_ == LaunchMode::TrainingPuzzle) {
+        // Main menu TRAINING, then BASICS, ADVANCED or PUZZLE on the Training page.
         if (load16(rdram, submenu_row) < 0) store16(rdram, main_row, training);
-        else store16(rdram, submenu_row, *mode_ == LaunchMode::TrainingBasics ? basics : puzzle_training);
+        else store16(rdram, submenu_row, *mode_ == LaunchMode::TrainingBasics ? basics
+                                         : *mode_ == LaunchMode::TrainingAdvanced ? advanced : puzzle_training);
     } else if (load16(rdram, player_page_row) < 0) {
         store16(rdram, main_row, single);
     } else if (load16(rdram, mode_row) < 0) {

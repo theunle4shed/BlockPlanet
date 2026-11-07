@@ -22,7 +22,7 @@
 
 namespace tetrisphere {
 
-enum class LaunchMode { Rescue, HideAndSeek, Puzzle, TimeTrial, VsCpu, Lines, TrainingBasics, TrainingPuzzle };
+enum class LaunchMode { Rescue, HideAndSeek, Puzzle, TimeTrial, VsCpu, Lines, TrainingBasics, TrainingAdvanced, TrainingPuzzle };
 
 // The menu command (see assets/ui/screens) for a mode, if it is one.
 std::optional<LaunchMode> launch_mode_for_command(const std::string& command);

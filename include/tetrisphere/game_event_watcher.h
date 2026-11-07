@@ -39,6 +39,9 @@ constexpr std::uint32_t training_page = 0x80103958;  // u32 start of the instruc
 // never shows it.
 constexpr std::uint32_t basics_last_page = 0x800EF2B4;
 constexpr std::uint32_t basics_text_end = 0x800EF318;  // the next lesson's text
+// The same for Training Advanced (type 2): its last page, in the fuse lesson.
+constexpr std::uint32_t advanced_last_page = 0x800EF8D9;
+constexpr std::uint32_t advanced_text_end = 0x800EF910;  // Puzzle's text
 // The same for Training Puzzle (type 3), whose text starts at 0x800EF910.
 constexpr std::uint32_t puzzle_last_page = 0x800EFB00;
 constexpr std::uint32_t puzzle_text_end = 0x800EFB28;  // the next string

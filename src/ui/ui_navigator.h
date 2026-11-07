@@ -10,6 +10,8 @@
 //   back          go back one screen
 //   close         close the menus
 //   command:NAME  report NAME to the game (take_command)
+// An item's data-alt is what Alt does (same forms), and data-alt-label names
+// it: the #description then ends with a hint, the Alt button and the label.
 //
 // Setting rows: class "item value", data-setting="NAME" and
 // data-options="value:Label,value:Label". Left and Right (or Confirm) cycle
@@ -68,6 +70,8 @@ public:
     void set_list(const std::string& name, std::vector<ListItem> items);
     void set_text(const std::string& name, const std::string& text);
     void set_pad(bool pad);
+    // The Alt button as RML (a button badge), for the hints.
+    void set_alt_button(const std::string& rml);
 
     // Commands chosen by the player (command:NAME), oldest first.
     std::optional<std::string> take_command();
@@ -88,7 +92,7 @@ private:
     void pop();
     std::vector<Rml::Element*> items(const Screen& screen) const;
     void set_focus(Screen& screen, std::size_t index);
-    void activate(Screen& screen);
+    void activate(Screen& screen, const char* attribute = "data-action");
     void change_value(Screen& screen, int direction);
     void fill(Screen& screen);
     void fill_text(Screen& screen);
@@ -111,6 +115,7 @@ private:
     std::map<std::string, std::vector<ListItem>> lists_;
     std::map<std::string, std::string> texts_;
     bool pad_ = false;
+    std::string alt_button_;
 };
 
 } // namespace blockplanet::ui

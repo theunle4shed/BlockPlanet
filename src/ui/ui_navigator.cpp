@@ -116,8 +116,12 @@ void Navigator::set_focus(Screen& screen, std::size_t index) {
     // #description (menus explain each mode and sub-mode).
     if (Rml::Element* description = screen.document->GetElementById("description")) {
         const auto text = list[screen.focus]->GetAttribute<Rml::String>("data-description", "");
-        description->SetInnerRML(escaped(text));
-        description->SetClass("empty", text.empty());
+        const auto alt = list[screen.focus]->GetAttribute<Rml::String>("data-alt-label", "");
+        std::string rml = escaped(text);
+        if (!alt.empty())
+            rml += "<div class='alt-hint'>" + alt_button_ + "<span> " + escaped(alt) + "</span></div>";
+        description->SetInnerRML(rml);
+        description->SetClass("empty", text.empty() && alt.empty());
     }
 }
 
@@ -220,14 +224,20 @@ void Navigator::set_list(const std::string& name, std::vector<ListItem> items) {
     }
 }
 
-void Navigator::activate(Screen& screen) {
+void Navigator::set_alt_button(const std::string& rml) {
+    alt_button_ = rml;
+    if (!stack_.empty()) set_focus(stack_.back(), stack_.back().focus);  // refresh the hint
+}
+
+void Navigator::activate(Screen& screen, const char* attribute) {
     const auto list = items(screen);
     if (list.empty()) return;
-    if (list[screen.focus]->IsClassSet("value")) {
+    const bool alt = std::string(attribute) != "data-action";
+    if (!alt && list[screen.focus]->IsClassSet("value")) {
         change_value(screen, 1);
         return;
     }
-    const std::string action = list[screen.focus]->GetAttribute<Rml::String>("data-action", "");
+    const std::string action = list[screen.focus]->GetAttribute<Rml::String>(attribute, "");
     if (action.rfind("open:", 0) == 0) {
         push(action.substr(5));
     } else if (action == "back") {
@@ -255,6 +265,9 @@ void Navigator::handle(Action action) {
         break;
     case Action::Back:
         pop();
+        break;
+    case Action::Alt:
+        activate(screen, "data-alt");
         break;
     }
 }

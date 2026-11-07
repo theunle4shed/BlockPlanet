@@ -137,6 +137,8 @@ std::vector<GameEvent> GameEventWatcher::update(const GameStateSnapshot& now) {
         const auto page = now.training_page;
         if (now.training_type == 1 && page >= game_state::basics_last_page && page < game_state::basics_text_end)
             training_finished_ = "basics";
+        if (now.training_type == 2 && page >= game_state::advanced_last_page && page < game_state::advanced_text_end)
+            training_finished_ = "advanced";
         if (now.training_type == 3 && page >= game_state::puzzle_last_page && page < game_state::puzzle_text_end)
             training_finished_ = "puzzle";
     }

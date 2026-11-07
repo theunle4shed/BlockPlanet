@@ -49,6 +49,15 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         pad = !pad;
         blockplanet::ui::set_pad(pad);
     }
+    // The Alt button's badge in the menus' hints, following the device in use.
+    {
+        static std::string shown;
+        const auto family = active_controller_family();
+        const char f = family == ControllerFamily::Xbox ? 'x' : family == ControllerFamily::PlayStation ? 'p' : 'n';
+        const std::string spec = !pad ? std::string("[k:T]")
+                                      : std::string("[") + f + ":" + physical_button_label(family, bindings.face_left) + "]";
+        if (spec != shown) blockplanet::ui::set_alt_button(shown = spec);
+    }
     auto send = [](Action action) {
         blockplanet::ui::queue_action(action);
         return true;
@@ -93,6 +102,8 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         case SDL_SCANCODE_ESCAPE:
         case SDL_SCANCODE_BACKSPACE:
             return event.key.repeat ? true : send(Action::Back);
+        case SDL_SCANCODE_T:
+            return event.key.repeat ? true : send(Action::Alt);
         default: return true;  // other keys do nothing while the menus are open
         }
     }
@@ -102,6 +113,7 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         const auto button = static_cast<SDL_GameControllerButton>(event.cbutton.button);
         if (button == sdl_button(bindings.confirm)) return send(Action::Confirm);
         if (button == sdl_button(bindings.cancel)) return send(Action::Back);
+        if (button == sdl_button(bindings.face_left)) return send(Action::Alt);
         switch (button) {
         case SDL_CONTROLLER_BUTTON_DPAD_UP: return send(Action::Up);
         case SDL_CONTROLLER_BUTTON_DPAD_DOWN: return send(Action::Down);
