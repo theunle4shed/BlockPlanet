@@ -540,8 +540,27 @@ void draw_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
     }
     const std::uint32_t saved = load32(rdram, robot_texture_global);
     if (robot_texture != 0) put32(rdram, robot_texture_global, robot_texture);
+    const std::uint32_t dl_before = load32(rdram, display_list_pointer);
     for (const std::uint32_t scene : title_scenes)
         if (scene >= 0x80000000u && scene < 0x80800000u) call4(rdram, ctx, func_8002D93C, scene, elapsed, 0, 0);
+    // Research: BLOCKPLANET_TITLE_DL_LOG=1 logs the scene's commands once.
+    static bool logged = std::getenv("BLOCKPLANET_TITLE_DL_LOG") == nullptr;
+    if (!logged) {
+        logged = true;
+        const std::uint32_t dl_after = load32(rdram, display_list_pointer);
+        std::fprintf(stdout, "{\"event\":\"title_dl\",\"commands\":%u}\n", (dl_after - dl_before) / 8u);
+        for (const std::uint32_t scene : title_scenes) {
+            const std::uint32_t objects = load32(rdram, scene + 0x14u);
+            const int count = static_cast<int>(load32(rdram, scene + 0x10u));
+            std::fprintf(stdout, "SCENE %08X objects %08X count %d:", scene, objects, count);
+            for (int k = 0; k < 40; ++k)
+                std::fprintf(stdout, " %02X", rdram[((objects + 0x120u * std::uint32_t(k) + 0x80u) & 0x00FFFFFFu) ^ 3u]);
+            std::fprintf(stdout, "\n");
+        }
+        for (std::uint32_t a = dl_before; a < dl_after && a < dl_before + 8u * 400u; a += 8u)
+            std::fprintf(stdout, "DL %08X %08X\n", load32(rdram, a), load32(rdram, a + 4u));
+        std::fflush(stdout);
+    }
     put32(rdram, robot_texture_global, saved);
 }
 } // namespace
