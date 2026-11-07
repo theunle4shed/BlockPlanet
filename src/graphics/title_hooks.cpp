@@ -229,7 +229,42 @@ extern "C" void blockplanet_title_letters(std::uint8_t* rdram, recomp_context*) 
     }
 }
 
-extern "C" void blockplanet_title_letters_end(std::uint8_t*, recomp_context*) { drawing.store(false); }
+namespace { std::uint32_t letters_dl_start = 0; }
+
+// The letters a little brighter, to stand apart from the ring: the lights the
+// letters scene loaded this frame are copied (into BlockPlanet's memory, so
+// nothing compounds from frame to frame), brightened, and pointed to.
+extern "C" void blockplanet_title_letters_end(std::uint8_t* rdram, recomp_context*) {
+    drawing.store(false);
+    if (title_freeze_frame() < 0 || letters_dl_start == 0) return;
+    const std::uint32_t to = load32(rdram, 0x800F22B4u);
+    static bool logged = std::getenv("BLOCKPLANET_TITLE_DL_LOG") == nullptr;
+    if (!logged) {
+        logged = true;
+        for (std::uint32_t a = letters_dl_start; a < to && a < letters_dl_start + 8u * 300u; a += 8u)
+            std::fprintf(stdout, "LDL %08X %08X\n", load32(rdram, a), load32(rdram, a + 4u));
+        std::fflush(stdout);
+    }
+    // Their lights are already at full strength (texture x shade), so the
+    // combiner adds a small warm lift instead: its second cycle's added term
+    // becomes the environment colour, set just before the letters (in the
+    // freeze hook) and put back to 0 after them.
+    for (std::uint32_t a = letters_dl_start; a + 8u <= to && a < letters_dl_start + 8u * 16384u; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+        if (w0 == 0xFC26A004u && w1 == 0x1F0C93FFu) {
+            const std::uint32_t lifted = (w1 & ~(7u << 6)) | (5u << 6);
+            std::memcpy(rdram + ((a + 4u) & 0x00FFFFFFu), &lifted, 4);
+        }
+    }
+    {
+        const std::uint32_t env0 = 0xFB000000u, env1 = 0;
+        std::memcpy(rdram + (to & 0x00FFFFFFu), &env0, 4);
+        std::memcpy(rdram + ((to + 4u) & 0x00FFFFFFu), &env1, 4);
+        const std::uint32_t next = to + 8u;
+        std::memcpy(rdram + (0x800F22B4u & 0x00FFFFFFu), &next, 4);
+    }
+    letters_dl_start = 0;
+}
 
 // BLOCKPLANET_TITLE_FREEZE=frame: just before the title advances and draws the
 // letters scene (0x80069460, a1 = frames elapsed, from 0x800E1208 - 0x800E1210),
@@ -239,6 +274,15 @@ extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ct
     static const int freeze = title_freeze_frame();
     if (freeze < 0) return;
     title_routine_ms.store(now_ms());
+    {
+        const std::uint32_t dl = load32(rdram, 0x800F22B4u);
+        const std::uint32_t env0 = 0xFB000000u, env1 = 0x2A200C00u;  // the letters' lift: (42, 32, 12)
+        std::memcpy(rdram + (dl & 0x00FFFFFFu), &env0, 4);
+        std::memcpy(rdram + ((dl + 4u) & 0x00FFFFFFu), &env1, 4);
+        const std::uint32_t next = dl + 8u;
+        std::memcpy(rdram + (0x800F22B4u & 0x00FFFFFFu), &next, 4);
+    }
+    letters_dl_start = load32(rdram, 0x800F22B4u);
     const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r4);
     if (scene < 0x80000000u || scene >= 0x80800000u) return;
     const int frame = static_cast<int>(load32(rdram, scene + 0x24));
@@ -358,8 +402,11 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
     }
     if (projection == 0) return;
     const auto cmd = [&](std::uint32_t w0, std::uint32_t w1) { put32(rdram, dl, w0); put32(rdram, dl + 4u, w1); dl += 8u; };
-    // Where the light comes from (behind Wheels), in the frame's centred units, y up.
-    const float lx = 7.0f, ly = 6.0f;
+    // The exposed core tile, a little right of centre and up (behind Wheels),
+    // in the frame's centred units, y up. Its light spreads to the left only,
+    // as streaks of lavender and pale blue in a blue-purple haze; the right of
+    // the opening stays clear, so the background's squares show there.
+    const float lx = 13.0f, ly = 15.0f, hw = 27.0f, hh = 20.0f;
     const float ix = st.outer_x - st.rim - 2.0f, iy = st.outer_y - st.rim * st.rim_vertical - 2.0f;
     const float c = std::cos(st.tilt), sn = std::sin(st.tilt);
     const auto edge = [&](float a) {  // a point on the opening's edge
@@ -368,31 +415,44 @@ void draw_title_light(std::uint8_t* rdram, const RingStyle& st) {
     };
     std::vector<std::array<LightVertex, 3>> tris;
     const auto tri = [&](LightVertex a, LightVertex b, LightVertex d) { tris.push_back({a, b, d}); };
-    // The glow: a fan from the light to the opening's edge, white fading to the
-    // purple of the blurred squares.
-    const int n = 48;
+    const float pi = 3.1415927f;
+    // A faint shade over the whole opening, so the background reads as behind it.
+    for (int k = 0; k < 48; ++k) {
+        const auto e0 = edge(2 * pi * k / 48), e1 = edge(2 * pi * (k + 1) / 48);
+        tri({0, 0, 0.04f, 0.03f, 0.10f, 0.35f}, {e0[0], e0[1], 0.04f, 0.03f, 0.10f, 0.35f}, {e1[0], e1[1], 0.04f, 0.03f, 0.10f, 0.35f});
+    }
+    // The haze: from the tile's left side to the left half of the edge.
+    const int n = 32;
     for (int k = 0; k < n; ++k) {
-        const auto e0 = edge(6.2831853f * k / n), e1 = edge(6.2831853f * (k + 1) / n);
-        tri({lx, ly, 1.0f, 0.98f, 0.92f, 0.85f}, {e0[0], e0[1], 0.55f, 0.32f, 0.70f, 0.0f}, {e1[0], e1[1], 0.55f, 0.32f, 0.70f, 0.0f});
+        const float a0 = pi * 0.5f + pi * k / n, a1 = pi * 0.5f + pi * (k + 1) / n;
+        const auto e0 = edge(a0), e1 = edge(a1);
+        const float t0 = std::sin(pi * k / n), t1 = std::sin(pi * (k + 1) / n);  // strongest straight left
+        tri({lx - hw, ly, 0.70f, 0.62f, 1.0f, 0.55f * (t0 + t1) / 2.0f},
+            {e0[0], e0[1], 0.36f, 0.30f, 0.82f, 0.32f * t0}, {e1[0], e1[1], 0.36f, 0.30f, 0.82f, 0.32f * t1});
     }
-    // The rays: thin wedges from the light to the edge, brighter at the light.
-    const int rays = 14;
-    for (int k = 0; k < rays; ++k) {
-        const float a = 6.2831853f * (k + 0.35f * std::sin(k * 2.1f)) / rays, w = 0.05f + 0.03f * std::sin(k * 1.7f);
+    // The streaks: from the tile's left half out to the left, lavender and blue.
+    const float streaks[][4] = {  // angle (degrees, 180 = left), width, which colour, length (share of the way to the edge)
+        {150, 5.0f, 0, 0.92f}, {161, 3.5f, 1, 0.80f}, {172, 4.5f, 0, 1.0f}, {183, 3.0f, 1, 0.85f}, {196, 4.5f, 0, 0.97f},
+        {206, 3.5f, 1, 0.80f}, {215, 5.0f, 0, 0.95f}, {227, 3.5f, 1, 0.75f}, {238, 4.0f, 0, 0.82f}, {140, 3.0f, 1, 0.70f},
+    };
+    for (const auto& r : streaks) {
+        const float a = r[0] * pi / 180.0f, w = r[1] * pi / 180.0f;
         const auto e0 = edge(a - w), e1 = edge(a + w);
-        tri({lx, ly, 1.0f, 1.0f, 1.0f, 0.75f}, {e0[0], e0[1], 0.9f, 0.85f, 1.0f, 0.0f}, {e1[0], e1[1], 0.9f, 0.85f, 1.0f, 0.0f});
+        const float len = r[3];
+        const float sx = lx - hw * 0.6f, sy = ly;
+        const float cr = r[2] == 0 ? 0.80f : 0.70f, cg = r[2] == 0 ? 0.58f : 0.86f, cb = 1.0f;
+        tri({sx, sy, 1.0f, 1.0f, 1.0f, 0.85f},
+            {sx + (e0[0] - sx) * len, sy + (e0[1] - sy) * len, cr, cg, cb, 0.10f},
+            {sx + (e1[0] - sx) * len, sy + (e1[1] - sy) * len, cr, cg, cb, 0.10f});
     }
-    // The exposed core tile: a white square, turned a little, with a bright rim.
-    const float h = 15.0f, t = 0.12f;
-    std::array<std::array<float, 2>, 4> sq;
-    for (int k = 0; k < 4; ++k) {
-        const float a = t + 1.5707963f * k + 0.785398f;
-        sq[std::size_t(k)] = {lx + h * 1.4142f * std::cos(a), ly + h * 1.4142f * std::sin(a) * 0.82f};
-    }
-    for (int k = 0; k < 2; ++k) {
-        const auto& a = sq[0]; const auto& b = sq[std::size_t(k + 1)]; const auto& d = sq[std::size_t(k + 2)];
-        tri({a[0], a[1], 1, 1, 1, 0.95f}, {b[0], b[1], 1, 1, 1, 0.95f}, {d[0], d[1], 1, 1, 1, 0.95f});
-    }
+    // The tile: a white square, its left edge brightest.
+    const float tilt = 0.06f;
+    const auto corner = [&](float x, float y) {
+        return std::array<float, 2>{lx + x * std::cos(tilt) - y * std::sin(tilt), ly + x * std::sin(tilt) + y * std::cos(tilt)};
+    };
+    const auto p0 = corner(-hw, -hh), p1 = corner(hw, -hh), p2 = corner(hw, hh), p3 = corner(-hw, hh);
+    tri({p0[0], p0[1], 1, 1, 1, 1}, {p1[0], p1[1], 0.95f, 0.95f, 1, 1}, {p2[0], p2[1], 0.95f, 0.95f, 1, 1});
+    tri({p0[0], p0[1], 1, 1, 1, 1}, {p2[0], p2[1], 0.95f, 0.95f, 1, 1}, {p3[0], p3[1], 1, 1, 1, 1});
     const std::uint32_t proj = 0x807EFE00u, model = 0x807EFE40u;
     const float p[4][4] = {{1.0f / 160.0f, 0, 0, 0}, {0, 1.0f / 120.0f, 0, 0}, {0, 0, 1.0f / 512.0f, 0}, {0, 0, 0, 1}};
     const float id[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
@@ -470,7 +530,8 @@ void draw_title_ring(std::uint8_t* rdram) {
     cmd(0x01060040u, model);                   // modelview: load, push
     // Vertices: strips in chunks of 8 pairs (16 vertices), 14 triangles each.
     std::uint32_t vtx = ring_memory + 0x100u;
-    for (const auto& strip : strips) {
+    for (std::size_t si = 1; si < strips.size(); ++si) {  // not strip 0, the opening: the background shows through
+        const auto& strip = strips[si];
         for (std::size_t start = 0; start + 2 < strip.size(); start += 14) {
             const std::size_t count = std::min<std::size_t>(16, strip.size() - start);
             const std::uint32_t base = vtx;
@@ -543,7 +604,7 @@ std::vector<TitleSceneSpec> title_scene_list() {
     const char* off = std::getenv("BLOCKPLANET_TITLE_CHARACTERS");
     if (off != nullptr && std::atoi(off) == 0) return list;
     const char* v = std::getenv("BLOCKPLANET_TITLE_SCENE");
-    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0xc9:0x27@0/0.67/-0.06/1.25";
+    if (v == nullptr) v = "0x1b:0x28@0/-0.40/-0.12/0.82,0xc9:0x27@0/0.50/0.28/0.80";
     std::string text(v);
     std::size_t at = 0;
     while (at < text.size()) {
