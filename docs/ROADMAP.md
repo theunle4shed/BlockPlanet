@@ -212,6 +212,8 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 
 **Join codes for streamers (idea, 2026-11-06).** Friend and lobby codes shown hidden (`••••••`) with a reveal button and a **Copy** button that works while hidden; a **streamer mode** setting hides codes everywhere by default (lobby, notifications) and perhaps friends' names. See REDESIGN.md, section 4.
 
+**Animated title characters (nice to have, idea 2026-11-07).** Turbine and Wheels are held on one frame of their scenes; letting them move (an idle loop: tentacles swaying, a wheel turning, the Bombs drifting) would bring the title to life. The scene code already animates them; what is needed is a short loop that stays inside the ring, and Wheels' own scene.
+
 **Real lighting and shadows (nice to have, once everything else is done; idea 2026-11-07).** The game's lights are N64 lights: a few directional lights and an ambient level, worked out per vertex, so sides facing a light brighten but nothing casts shadows. Steps, by effort: (1) light BlockPlanet's own geometry properly (the title ring and rebuilt title parts) and use the game's lights on its models, done with the title work; (2) per-pixel lighting for crisp highlights (RT64 or a separate modern pass); (3) real shadows, such as the letters on the ring or blocks on the inside of the sphere, which would make the Escape mode's view from inside readable (a light at the core, blocks shading the inner surface). Step 3 likely means extending RT64; its code needs a look before any promise. BlockPlanet builds the sphere's geometry itself, so the sphere is the easiest place to experiment.
 
 ## Single player first
