@@ -22,9 +22,35 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 Set-Location $root
 
 function Step([string]$text) { Write-Host "`n== $text" -ForegroundColor Cyan }
+# Runs a command with its output in this window. While it runs, a line every
+# 30 seconds says how long it has taken and how much CPU the build's programs
+# have used since the last line, so a quiet step can be told from a stuck one
+# (for example a program held by an antivirus check, which uses no CPU).
+$buildTools = @('cmake', 'ninja', 'cl', 'link', 'N64Recomp', 'RSPRecomp', 'python', 'MSBuild', 'git')
+function Get-BuildCpu {
+    $total = 0.0
+    foreach ($p in (Get-Process -Name $buildTools -ErrorAction SilentlyContinue)) {
+        try { $total += $p.TotalProcessorTime.TotalSeconds } catch { }
+    }
+    return $total
+}
 function Run([string]$exe, [string[]]$arguments) {
-    & $exe @arguments
-    if ($LASTEXITCODE -ne 0) { throw "$exe failed ($LASTEXITCODE): $($arguments -join ' ')" }
+    Write-Host "[$(Get-Date -Format HH:mm:ss)] $exe $($arguments -join ' ')" -ForegroundColor DarkGray
+    $quoted = foreach ($a in $arguments) { if ($a -match '[\s"]') { '"' + ($a -replace '"', '\"') + '"' } else { $a } }
+    if (Test-Path -LiteralPath $exe) { $exe = (Resolve-Path -LiteralPath $exe).Path }
+    $started = Get-Date
+    $p = Start-Process -FilePath $exe -ArgumentList ($quoted -join ' ') -NoNewWindow -PassThru
+    $null = $p.Handle  # keeps the exit code readable after it ends
+    $cpu = Get-BuildCpu
+    while (-not $p.WaitForExit(30000)) {
+        $now = Get-BuildCpu
+        $used = [math]::Max(0, [math]::Round($now - $cpu))
+        $cpu = $now
+        $note = if ($used -lt 1) { ' - no CPU used: if this repeats, check for an antivirus prompt (Norton CyberCapture)' } else { '' }
+        Write-Host ("  ... still running, {0:mm\:ss} so far, {1} CPU-seconds in the last 30 s{2}" -f ((Get-Date) - $started), $used, $note) -ForegroundColor DarkGray
+    }
+    if ($p.ExitCode -ne 0) { throw "$exe failed ($($p.ExitCode)): $($arguments -join ' ')" }
+    Write-Host ("  done in {0:mm\:ss}" -f ((Get-Date) - $started)) -ForegroundColor DarkGray
 }
 
 Step 'Checking tools'
