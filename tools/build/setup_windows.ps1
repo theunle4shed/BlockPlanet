@@ -127,7 +127,7 @@ if (-not $SkipDependencies) {
 Step 'Building the recompilers (N64Recomp, RSPRecomp)'
 $toolBuild = '.local\m1\toolchain\n64recomp-build'
 Run $cmake @('-S', '.local\deps\N64Recomp', '-B', $toolBuild, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release')
-Run $cmake @('--build', $toolBuild, '--target', 'N64Recomp', 'RSPRecomp')
+Run $cmake @('--build', $toolBuild, '--target', 'N64RecompCLI', 'RSPRecomp')  # N64RecompCLI makes N64Recomp.exe; the N64Recomp target is its library
 
 Step 'Generating the game code from your ROM'
 if (Test-Path '.local\m1\linux-generated') { Remove-Item -Recurse -Force '.local\m1\linux-generated' }
