@@ -1626,7 +1626,7 @@ void publish_game_text() {
                 text = tetrisphere::fix_wording(text);
                 constexpr const char* orange = "#ff8c1aff";
                 constexpr const char* yellow = "#ffd23cff";
-                struct Word { std::string text; bool yellow = false; bool line_before = false; };
+                struct Word { std::string text; bool yellow = false; bool line_before = false; bool coded = false; };
                 std::vector<Word> words;
                 Word word;
                 bool next_yellow = false, line = false;
@@ -1651,10 +1651,59 @@ void publish_game_text() {
                 }
                 flush();
                 if (words.empty()) return;
+                // Highlights: the game's key terms, the same everywhere (the owner's
+                // choice), each on its first mention in a page; no other words.
+                {
+                    static const std::vector<std::pair<std::vector<std::string>, std::string>> glossary = [] {
+                        std::vector<std::pair<std::vector<std::string>, std::string>> g;
+                        const auto add = [&](std::initializer_list<const char*> phrase, const char* term) {
+                            g.push_back({std::vector<std::string>(phrase.begin(), phrase.end()), term});
+                        };
+                        // Longer phrases first, so "combo counter" wins over "combo".
+                        add({"COMBO", "COUNTER"}, "combo counter"); add({"POWER", "COMBO"}, "power combo");
+                        add({"POWER", "COMBOS"}, "power combo"); add({"GRAVITY", "COMBO"}, "gravity combo");
+                        add({"GRAVITY", "COMBOS"}, "gravity combo"); add({"FUSE", "COMBO"}, "fuse combo");
+                        add({"FUSE", "COMBOS"}, "fuse combo"); add({"POWER", "BRICK"}, "power brick");
+                        add({"POWER", "BRICKS"}, "power brick"); add({"CRYSTAL", "BRICK"}, "crystal brick");
+                        add({"CRYSTAL", "BRICKS"}, "crystal brick"); add({"X", "COUNT"}, "x count");
+                        add({"MAGIC", "BOX"}, "magic box");
+                        add({"SHADOW"}, "shadow"); add({"SLIDE"}, "slide"); add({"SLIDING"}, "slide");
+                        add({"COMBO"}, "combo"); add({"COMBOS"}, "combo"); add({"FUSE"}, "fuse");
+                        add({"MAGIC"}, "magic"); add({"WILDCARD"}, "wildcard"); add({"HEARTS"}, "hearts");
+                        add({"LIVES"}, "lives"); add({"CORE"}, "core"); add({"LAYERS"}, "layers");
+                        add({"DROPS"}, "drops"); add({"SLIDES"}, "slides"); add({"DRILL"}, "drill"); add({"DRILLS"}, "drill");
+                        return g;
+                    }();
+                    const auto bare = [](const std::string& w) {
+                        std::string b;
+                        for (char ch : w)
+                            if (std::isalnum(static_cast<unsigned char>(ch))) b += ch;
+                        return b;
+                    };
+                    for (auto& w : words) w.coded = w.yellow, w.yellow = false;
+                    std::set<std::string> seen;
+                    for (std::size_t i = 0; i < words.size();) {
+                        bool matched = false;
+                        for (const auto& [phrase, term] : glossary) {
+                            if (i + phrase.size() > words.size()) continue;
+                            bool same = true;
+                            for (std::size_t k = 0; k < phrase.size() && same; ++k) same = bare(words[i + k].text) == phrase[k];
+                            // Within one phrase only (not across a line break).
+                            for (std::size_t k = 1; k < phrase.size() && same; ++k) same = !words[i + k].line_before;
+                            if (!same) continue;
+                            if (seen.insert(term).second)
+                                for (std::size_t k = 0; k < phrase.size(); ++k) words[i + k].yellow = true;
+                            i += phrase.size();
+                            matched = true;
+                            break;
+                        }
+                        if (!matched) ++i;
+                    }
+                }
                 std::size_t body = 0;
                 while (body < words.size() && (body == 0 || !words[body].line_before)) ++body;
                 bool all_yellow = true;
-                for (std::size_t w = 0; w < body; ++w) all_yellow = all_yellow && words[w].yellow;
+                for (std::size_t w = 0; w < body; ++w) all_yellow = all_yellow && words[w].coded;  // the game's own highlight marks
                 const bool heading = body < words.size() && ((!words[body - 1].text.empty() && words[body - 1].text.back() == ':') ||
                                                              (body <= 3 && all_yellow));
                 if (!heading) body = 0;

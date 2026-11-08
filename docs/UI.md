@@ -108,3 +108,8 @@ BlockPlanet's HUD (design in [HUD_DESIGN.md](HUD_DESIGN.md)) is a separate RmlUi
 Hiding the original HUD: hooks mark the game's single-player HUD routine (`func_80075CD8`), and while BlockPlanet's HUD is shown the draw filter skips the 2D helpers called inside it; the 3D piece queue (`func_800A3E6C`) is skipped too. Checked at 16:9, 4:3, 21:9 and portrait (600 × 840).
 
 **Case (decided 2026-11-07):** no all-capitals text. BlockPlanet's own screens use Title Case for labels and sentence case for sentences, and the game's own capitals are converted the same way (`tetrisphere::proper_case`). The title's notice and the pause screen's heading follow it too. The one exception: a warning may use capitals for emphasis (sparingly). The name keyboard's SHIFT label shows capitals on.
+
+
+## Key terms (highlights in speech and cards)
+
+The game's key terms are highlighted in Training's speech and on every card, each on its first mention in a page, and no other words are (the owner's choice, 2026-11-08). The glossary is in `publish_game_text`, `linux_main.cpp`: shadow, slide and sliding, combo, combo counter, power combo, power brick, gravity combo, fuse and fuse combo, crystal brick, magic and Magic box, X count, wildcard, hearts, lives, core, layers, drops and slides, drill. A new term joins the glossary rather than being highlighted by hand.
