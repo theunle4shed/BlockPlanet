@@ -174,32 +174,6 @@ void finish_cell(GuestMemory& m, std::int32_t row, std::int32_t column,
     m.write32(out_plane16, static_cast<std::uint32_t>(index) * 2u + m.read32(board_plane16));
     m.write32(out_plane8, static_cast<std::uint32_t>(index) + m.read32(board_plane8));
     m.write32(out_plane32, static_cast<std::uint32_t>(index) * 4u + m.read32(board_plane32));
-
-    // Training's spheres are covered in one plain filler brick (part 7 of its
-    // material, the same in every cell), which draws as a smooth surface with
-    // no outlines. Drawing only: it is shown as a field of 2 x 2 squares, each
-    // cell as the matching corner of a square of the same material (parts
-    // 0xC top left, 0xB top right, 0xA bottom left, 0x9 bottom right, as the
-    // game's own square pieces), lined up with the board so the squares meet
-    // the lesson's pit edges. The values are handed to the drawing code from a
-    // small scratch area; the board is untouched. BLOCKPLANET_TRAINING_PLAIN=1
-    // keeps the plain filler.
-    static const bool plain = std::getenv("BLOCKPLANET_TRAINING_PLAIN") != nullptr;
-    if (!plain && m.read16(0x800E44A8u) == 3) {
-        const std::uint32_t p16 = m.read32(out_plane16);
-        const std::uint16_t value = static_cast<std::uint16_t>(m.read16(p16));
-        if ((value & 0xFu) == 0x7u && (value & 0xFF0u) != 0u) {
-            constexpr std::uint32_t scratch16 = 0x807DFF00u, scratch8 = 0x807DFF10u, scratch32 = 0x807DFF20u;
-            const bool top_row = (board_y & 1) != 0, left = (board_x & 1) == 0;
-            const std::uint16_t corner = top_row ? (left ? 0xCu : 0xBu) : (left ? 0xAu : 0x9u);
-            m.write16(scratch16, static_cast<std::int16_t>((value & ~0xFu) | corner));
-            m.write8(scratch8, m.read8(m.read32(out_plane8)));
-            m.write32(scratch32, m.read32(m.read32(out_plane32)));
-            m.write32(out_plane16, scratch16);
-            m.write32(out_plane8, scratch8);
-            m.write32(out_plane32, scratch32);
-        }
-    }
 }
 
 } // namespace
