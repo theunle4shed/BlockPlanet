@@ -132,6 +132,17 @@ void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
 }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    // Story hides its score (decided 2026-11-08): the game's score bubbles
+    // that rise over breaking bricks (its "1x" to "20x" pictures, 25 to 27
+    // by 17) are not drawn there.
+    if (helper == 0x8003396Cu && hud_hidden.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
+        guest16(rdram, 0x800E44A8u) == 1) {
+        const auto image = static_cast<std::uint32_t>(ctx->r5);
+        if ((image >> 24) == 0x80u) {
+            const int w = guest16(rdram, image), h = guest16(rdram, image + 2);
+            if (w >= 25 && w <= 27 && h == 17) return true;
+        }
+    }
     // Story's combo counter (the game's teal number at the top right, drawn
     // as text at about (268, 32)): BlockPlanet's HUD shows it instead.
     if ((helper == 0x800382B4u || helper == 0x80038478u) && static_cast<std::uint32_t>(ctx->r4) == 0x800F22B4u &&
