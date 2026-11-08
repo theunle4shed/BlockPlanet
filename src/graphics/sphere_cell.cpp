@@ -1,7 +1,10 @@
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_extended.h"
 
+#include <algorithm>
 #include <array>
+#include <chrono>
+#include <cstdlib>
 
 namespace tetrisphere::sphere {
 namespace {
@@ -89,9 +92,51 @@ void finish_cell(GuestMemory& m, std::int32_t row, std::int32_t column,
         (static_cast<std::uint32_t>(row) + m.read32(context + board_column_offset)) & 0x1Fu);
     const std::int32_t board_y = static_cast<std::int32_t>(
         (static_cast<std::uint32_t>(column) + m.read32(context + board_row_offset)) & 0x1Fu);
-    const std::int32_t cell = (board_y << 5) + board_x;
+    std::int32_t cell = (board_y << 5) + board_x;
+    std::uint8_t packed = m.read8(m.read32(board_pointer) + static_cast<std::uint32_t>(cell));
+    // Training's spheres (mode 3) leave single-cell gaps between bricks around
+    // the lesson's pit, which read as stripes running round the sphere (the
+    // owner's report). Drawing only: a gap with bricks on both sides is drawn
+    // as its left neighbour, so the bricks round the pit form a solid surface.
+    // The game's board is untouched, so play and the lessons' demonstrations
+    // are as they were. BLOCKPLANET_TRAINING_GAPS=1 draws the gaps.
+    // Never inside the lesson's pit (the box round the board's wide empty runs,
+    // three or more cells across; the stripes' gaps are single cells), where
+    // its demonstrations happen: a gap made in play there is drawn as it is.
+    // The pit is found again a few times a second.
+    static const bool keep_gaps = std::getenv("BLOCKPLANET_TRAINING_GAPS") != nullptr;
+    if (!keep_gaps && packed == 0 && m.read16(0x800E44A8u) == 3) {
+        const std::uint32_t map = m.read32(board_pointer);
+        static std::uint32_t pit_map = 0;
+        static auto pit_time = std::chrono::steady_clock::time_point{};
+        static std::int32_t pit_x0 = 0, pit_x1 = -1, pit_y0 = 0, pit_y1 = -1;
+        const auto now = std::chrono::steady_clock::now();
+        if (map != pit_map || now - pit_time > std::chrono::milliseconds(250)) {
+            pit_map = map;
+            pit_time = now;
+            pit_x0 = pit_y0 = 32;
+            pit_x1 = pit_y1 = -1;
+            for (std::int32_t y = 0; y < 32; ++y)
+                for (std::int32_t x = 0; x < 32;) {
+                    std::int32_t run = 0;
+                    while (x + run < 32 && m.read8(map + static_cast<std::uint32_t>((y << 5) + x + run)) == 0) ++run;
+                    if (run >= 3) {
+                        pit_x0 = std::min(pit_x0, x), pit_x1 = std::max(pit_x1, x + run - 1);
+                        pit_y0 = std::min(pit_y0, y), pit_y1 = std::max(pit_y1, y);
+                    }
+                    x += std::max(run, 1);
+                }
+        }
+        const bool in_pit = board_x >= pit_x0 && board_x <= pit_x1 && board_y >= pit_y0 && board_y <= pit_y1;
+        const std::int32_t left = (board_y << 5) + ((board_x - 1) & 0x1F);
+        const std::int32_t right = (board_y << 5) + ((board_x + 1) & 0x1F);
+        const std::uint8_t lp = m.read8(map + static_cast<std::uint32_t>(left));
+        if (!in_pit && lp != 0 && m.read8(map + static_cast<std::uint32_t>(right)) != 0) {
+            cell = left;
+            packed = lp;
+        }
+    }
     m.write16(out_cell, s16(cell - 1024));  // the game stores it biased first
-    const std::uint8_t packed = m.read8(m.read32(board_pointer) + static_cast<std::uint32_t>(cell));
     m.write16(out_kind, packed);
     std::int16_t height = static_cast<std::int16_t>(packed >> 4);
     m.write16(out_height, height);
