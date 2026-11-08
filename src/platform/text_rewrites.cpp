@@ -82,8 +82,8 @@ std::optional<std::string> text_rewrite(const std::string& original) {
         {0x14569c0da1551077ull, "-1CRYSTAL -1TOWER-0UNCOVER THE PICTURE UNDER THE -1CRYSTAL -1TOWER, WITHOUT -1BREAKING THE TOWER."},
         {0x15634a6cf522e289ull, "-1LINES -1RULES:-0LINE UP -1THREE BRICKS ACROSS OR DOWN TO REMOVE THEM. CLEAR ENOUGH OF THE -1CORE FOR YOUR FRIEND TO ESCAPE."},
         {0xf48685f98512540bull, "-1VS -1RULES: -0UNCOVER THE -1CORE AREA BEFORE YOUR OPPONENT. YOUR COMBOS SEND -1DARK BRICKS TO THEIR SPHERE. DARK BRICKS ONLY BREAK AS PART OF A -1COMBO."},
-        {0x77e89fde4f16ab6bull, "NEW TO TETRISPHERE?"},
-        {0xf3e802d7fbd98cd0ull, "TRY TRAINING FROM THE STORY MENU."},
+        {0x77e89fde4f16ab6bull, ""},  // the game-over hint: dropped (Training is in the menu)
+        {0xf3e802d7fbd98cd0ull, ""},
     };
     const auto found = rewrites.find(text_fingerprint(original));
     if (found == rewrites.end()) return std::nullopt;
