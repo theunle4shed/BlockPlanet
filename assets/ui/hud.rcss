@@ -170,6 +170,12 @@ div { display: block; }
 /* Differences against best times: green ahead, red behind. */
 .ahead { color: #5ad46a; }
 .behind { color: #f05a4a; }
+/* Story: the combo counter, live while it builds; gold at 20 or more (magic). */
+#combo { display: block; font-size: 40dp; font-weight: bold; color: #f8f8f8; }
+#combo-group.live #combo { color: #ffd23c; }
+#combo-group.magic #combo { color: #ffc61a; font-effect: glow(1dp 6dp 0dp 0dp #ffb01899); }
+#combo-magic { display: block; font-size: 18dp; font-weight: bold; color: #ffc61a; }
+#combo-best { display: block; font-size: 18dp; color: #9aa6c8; margin-top: 2dp; }
 /* Story: the last five points added, under the score, newest first. */
 #gains { display: block; margin-top: 6dp; }
 #gains .gain { display: block; font-size: 18dp; color: #9aa6c8; }

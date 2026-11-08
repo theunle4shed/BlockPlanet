@@ -74,6 +74,11 @@ struct HudView {
     // ("+2,800"), newest first (empty: not shown).
     std::string story_score;
     std::vector<std::string> story_gains;
+    // Story: the combo counter (the owner's choice, 2026-11-08): the combo
+    // building now (live), else the last one; and the stage's best.
+    int combo = 0;             // 0: no combo yet this stage (not shown)
+    bool combo_live = false;   // counting up now
+    int combo_best = 0;
     std::string score_best;    // e.g. "Best 482,000 · 6:11" (empty: none)
     std::string time_label;    // the Time section's title (default "Time")
     std::string best;          // a single stage: "Best 0:42" (empty: not shown)

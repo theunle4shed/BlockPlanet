@@ -545,6 +545,15 @@ std::string hud_rml_parts(const HudView& hud) {
         }
         rml += "</div></div>";
     }
+    if (hud.combo > 0) {
+        const bool magic = hud.combo >= 20;  // 20 or more gives magic
+        rml += std::string("<div class='rule'><div class='line'/></div><div id='combo-group' class='group") + (hud.combo_live ? " live" : "") +
+               (magic ? " magic" : "") + "'><div class='label'>" + (hud.combo_live ? "Combo" : "Last combo") + "</div><div id='combo'>" +
+               std::to_string(hud.combo) + "</div>";
+        if (magic) rml += "<div id='combo-magic'>+ Magic</div>";
+        if (hud.combo_best > 0) rml += "<div id='combo-best'>Best " + std::to_string(hud.combo_best) + "</div>";
+        rml += "</div>";
+    }
     if (!hud.story_score.empty()) {
         rml += "<div class='rule'><div class='line'/></div><div id='story-score' class='group'><div class='label'>Score</div><div id='score'>" +
                escape(hud.story_score) + "</div><div id='gains'>";

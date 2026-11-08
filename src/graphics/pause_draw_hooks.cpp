@@ -132,6 +132,14 @@ void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
 }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    // Story's combo counter (the game's teal number at the top right, drawn
+    // as text at about (268, 32)): BlockPlanet's HUD shows it instead.
+    if ((helper == 0x800382B4u || helper == 0x80038478u) && static_cast<std::uint32_t>(ctx->r4) == 0x800F22B4u &&
+        hud_hidden.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 && guest16(rdram, 0x800E44A8u) == 1) {
+        const int x = static_cast<int>(helper == 0x800382B4u ? ctx->r6 : ctx->r5);
+        const int y = static_cast<int>(helper == 0x800382B4u ? ctx->r7 : ctx->r6);
+        if (y >= 24 && y <= 40 && x >= 230 && x <= 300) return true;
+    }
     if (game_menu_hidden.load(std::memory_order_relaxed) && is_2d_helper(helper) && guest16(rdram, 0x800E121Cu) >= 0) return true;
     // Training draws its speech (text and bubble) and its pointing arrows in
     // the HUD routine too: they stay when the original HUD is hidden (the

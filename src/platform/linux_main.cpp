@@ -921,6 +921,15 @@ void update_hud() {
         }
         last_score = score;
         view.story_score = hud_number(score);
+        {
+            // The combo counter: +0x2AE0 counts up as bricks clear, +0x2B14
+            // keeps the last combo, +0x2C78 the stage's best.
+            const int running = guest::load16(guest_rdram, 0x80110220u + 0x2AE0);
+            const int last = guest::load16(guest_rdram, 0x80110220u + 0x2B14);
+            view.combo_live = running > 0;
+            view.combo = running > 0 ? running : last;
+            view.combo_best = guest::load16(guest_rdram, 0x80110220u + 0x2C78);
+        }
         for (const long long g : gains) view.story_gains.push_back("+" + hud_number(g));
     } else if (state.mode == 9) {
         // Lines: the stage's play time against the best for it (records
