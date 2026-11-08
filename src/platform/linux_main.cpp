@@ -109,6 +109,10 @@ bool log_game_events = false;
 
 // Every Story episode and stage open in the menus (--unlock-all, testing).
 bool unlock_all_testing = false;
+// Start-up screens (the owner's choice, 2026-11-08): title, then who is
+// playing (P1), then the main menu; Back goes back through them.
+bool profile_picked = false;  // P1 chosen this session (or given on the command line)
+
 // The active profile's save file (progress and preferences); none for a
 // guest. Progress is not recorded with --start-chapter (a testing option).
 std::unique_ptr<ProfileSave> profile_save;
@@ -2391,11 +2395,9 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                  run_options.guest ? "" : profiles.active().id.c_str(), run_options.guest ? "true" : "false",
                  profiles.profiles().size());
     std::fflush(stdout);
-    // With several profiles, ask who is playing (unless the command line said).
-    if (profiles.profiles().size() > 1 && !run_options.profile && !run_options.guest) {
-        blockplanet::ui::set_list("profiles", profile_list(profiles, false));
-        blockplanet::ui::request_open("profiles");
-    }
+    // Who is playing is asked after the title (the owner's choice), unless
+    // the command line said (as it does when the game restarts as a profile).
+    profile_picked = run_options.profile.has_value() || run_options.guest;
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
         std::exit(74);
@@ -2839,14 +2841,28 @@ bool handle_profile_command(const std::string& command) {
         if (command.rfind(text, 0) != 0) return std::nullopt;
         return command.substr(text.size());
     };
+    // The start-up screens: who is playing, and Back through them.
+    if (command == "profile_picked") {
+        profile_picked = true;
+        blockplanet::ui::request_open("main");
+        return true;
+    }
+    if (command == "back_to_profiles") {
+        profile_picked = false;
+        blockplanet::ui::request_close();  // the picker opens in its place
+        return true;
+    }
+    // The original menu has no way back to the title, so the game restarts
+    // (the intro plays again; Start skips it) as the same profile.
+    if (command == "back_to_title") restart_as(std::nullopt, guest_session);
     if (command == "profiles") {
-        blockplanet::ui::set_list("profiles", profile_list(store, guest_session));
+        blockplanet::ui::set_list("profiles", profile_list(store, guest_session, !profile_picked));
         blockplanet::ui::request_show("profiles");
         return true;
     }
     // Refreshes the lists that show this profile.
     const auto refresh = [&](const std::string& id) {
-        blockplanet::ui::set_list("profiles", profile_list(store, guest_session));
+        blockplanet::ui::set_list("profiles", profile_list(store, guest_session, !profile_picked));
         blockplanet::ui::set_list("profile_actions", profile_actions(store, id, guest_session));
         blockplanet::ui::set_list("characters", character_choices(store, id));
     };
@@ -2959,7 +2975,7 @@ bool handle_profile_command(const std::string& command) {
         const std::string name = profile->name;
         if (!store.remove(name, error)) std::fprintf(stderr, "Could not delete the profile: %s\n", error.c_str());
         // Back to the (updated) profile list.
-        blockplanet::ui::set_list("profiles", profile_list(store, guest_session));
+        blockplanet::ui::set_list("profiles", profile_list(store, guest_session, !profile_picked));
         blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
         blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
         return true;
@@ -3556,8 +3572,14 @@ bool handle_profile_command(const std::string& command) {
             const bool at_game_menu = guest_rdram != nullptr && title_seen && !title_now &&
                                       guest::load16(guest_rdram, 0x800E121C) >= 0;
             if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !mode_launcher.active() &&
-                !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0)
-                blockplanet::ui::request_open("main");
+                !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0) {
+                if (profile_picked || !profile_store) {
+                    blockplanet::ui::request_open("main");
+                } else {
+                    blockplanet::ui::set_list("profiles", profile_list(*profile_store, guest_session, true));
+                    blockplanet::ui::request_open("profiles");
+                }
+            }
             blockplanet::set_game_menu_hidden(!original_menus && at_game_menu &&
                                               (blockplanet::ui::menus_open() || mode_launcher.active()));
         }

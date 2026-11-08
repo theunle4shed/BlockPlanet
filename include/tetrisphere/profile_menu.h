@@ -28,7 +28,9 @@ namespace tetrisphere {
 
 // The playing profile first (marked "playing now"), then the others, then
 // New profile and Play as guest. `guest` is true when playing as a guest.
-std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, bool guest);
+// `picker`: the start-up choice of who plays (after the title): choosing the
+// playing profile carries on to the main menu, another restarts as it.
+std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, bool guest, bool picker = false);
 // Keep playing (for the playing profile) or Play as NAME, then Rename,
 // Character and Delete.
 std::vector<blockplanet::ui::ListItem> profile_actions(const ProfileStore& store, const std::string& id, bool guest);

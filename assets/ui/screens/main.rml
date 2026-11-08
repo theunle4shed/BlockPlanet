@@ -3,7 +3,7 @@
     <title>Main menu</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body class="compact">
+<body class="compact" data-back="command:back_to_profiles">
     <div id="panel">
         <div class="title">Tetrisphere™</div>
         <div class="version" id="version"></div>

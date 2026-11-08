@@ -12,19 +12,21 @@ const Profile* profile_by_id(const ProfileStore& store, const std::string& id) {
     return nullptr;
 }
 
-std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, bool guest) {
+std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, bool guest, bool picker) {
     std::vector<blockplanet::ui::ListItem> items;
     const auto add = [&](const Profile& profile, bool playing) {
         std::string note = character_label(profile.character);
-        if (playing) note += note.empty() ? "playing now" : " \u00B7 playing now";
-        items.push_back({"profile" + profile.id, profile.name, note, "command:profile:" + profile.id, true});
+        if (playing && !picker) note += note.empty() ? "playing now" : " \u00B7 playing now";
+        const std::string action = !picker ? "command:profile:" + profile.id
+                                   : playing ? "command:profile_picked" : "command:profile_play:" + profile.id;
+        items.push_back({"profile" + profile.id, profile.name, note, action, true});
     };
     if (!guest) add(store.active(), true);
     for (const auto& profile : store.profiles())
         if (guest || profile.id != store.active().id) add(profile, false);
     items.push_back({"new", "New profile", "", "command:profile_new", true});
-    items.push_back({"guest", "Play as guest", guest ? "playing now" : "nothing is saved",
-                     guest ? "close" : "command:profile_guest", true});
+    items.push_back({"guest", "Play as guest", guest && !picker ? "playing now" : "nothing is saved",
+                     guest ? (picker ? "command:profile_picked" : "close") : "command:profile_guest", true});
     return items;
 }
 

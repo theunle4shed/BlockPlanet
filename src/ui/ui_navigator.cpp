@@ -268,6 +268,13 @@ void Navigator::handle(Action action) {
         activate(screen);
         break;
     case Action::Back:
+        // On the first screen, the document's data-back (a command) when it
+        // has one: the start-up screens go back through each other.
+        if (stack_.size() == 1 && screen.document->HasAttribute("data-back")) {
+            const auto back = screen.document->GetAttribute<Rml::String>("data-back", "");
+            if (back.rfind("command:", 0) == 0) commands_.push_back(back.substr(8));
+            break;
+        }
         pop();
         break;
     case Action::Alt:

@@ -3,7 +3,7 @@
     <title>Profiles</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-back="command:back_to_title">
     <div id="panel">
         <div class="title">Profiles</div>
         <div class="subtitle">Who is playing?</div>
