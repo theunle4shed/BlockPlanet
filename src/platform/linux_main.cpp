@@ -107,6 +107,8 @@ GameEventWatcher game_event_watcher;
 std::unique_ptr<GameOptionApplier> game_option_applier;
 bool log_game_events = false;
 
+// Every Story episode and stage open in the menus (--unlock-all, testing).
+bool unlock_all_testing = false;
 // The active profile's save file (progress and preferences); none for a
 // guest. Progress is not recorded with --start-chapter (a testing option).
 std::unique_ptr<ProfileSave> profile_save;
@@ -2365,6 +2367,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // folder: the save stays in memory and no trophies are earned.
     profile_store = std::make_unique<ProfileStore>(user_path);
     guest_session = run_options.guest;
+    unlock_all_testing = run_options.unlock_all;
     auto& profiles = *profile_store;
     std::string profile_error;
     if (!profiles.load(profile_error) ||
@@ -2751,7 +2754,7 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
         const auto found = profile_data.progress.chapters_completed.find("rescue");
         if (found != profile_data.progress.chapters_completed.end()) completed = found->second;
     }
-    return story_chapters(completed, rescue_chapters);
+    return story_chapters(completed, rescue_chapters, unlock_all_testing);
 }
 
 void launch_mode(LaunchMode mode, bool keep_music = false) {
@@ -3391,7 +3394,7 @@ bool handle_profile_command(const std::string& command) {
                 if (menu_variant == PlayVariant::ScoreAttack) best.clear();  // points, not times: not shown as times
                 blockplanet::ui::set_text("stages_title", "Chapter " + std::to_string(chapter));
                 blockplanet::ui::set_text("stages_subtitle", "The whole episode, or one stage");
-                blockplanet::ui::set_list("stages", story_stages(chapter, done, best));
+                blockplanet::ui::set_list("stages", story_stages(chapter, done, best, 10, unlock_all_testing));
                 blockplanet::ui::request_show("stages");
                 continue;
             }

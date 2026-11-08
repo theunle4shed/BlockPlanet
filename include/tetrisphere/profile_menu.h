@@ -75,14 +75,15 @@ constexpr int keyboard_columns = 10;
 // Story's chapter list: the chapters completed and the next one (up to
 // `chapters`), focused on the next. `completed` holds Story chapter numbers
 // (0, Training Basics, is ignored: Training is on the menus' X button).
-std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters);
+std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters, bool all_open = false);
 
 // A Story chapter's stage list: "Whole episode", then each stage completed
 // and the next one (up to `levels`), with its best time as a note
 // (best_levels: seconds per stage, 0 = none). Actions: chapter:N (the whole
 // episode) and stage:N:L (one stage).
 std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<int>& levels_done,
-                                                   const std::vector<double>& best_levels, int levels = 10);
+                                                   const std::vector<double>& best_levels, int levels = 10,
+                                                   bool all_open = false);
 
 // Story's Training lessons (X on Story in the menus): Basics and Advanced,
 // focused on the first not yet done.

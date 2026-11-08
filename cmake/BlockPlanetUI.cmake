@@ -89,7 +89,7 @@ endfunction()
 # Navigator logic test (RmlUi with a renderer that draws nothing).
 add_executable(ui_navigator_test "${CMAKE_SOURCE_DIR}/tests/ui_navigator_test.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/ui_navigator.cpp")
-target_include_directories(ui_navigator_test PRIVATE "${CMAKE_SOURCE_DIR}/src/ui")
+target_include_directories(ui_navigator_test PRIVATE "${CMAKE_SOURCE_DIR}/src/ui" "${CMAKE_SOURCE_DIR}/include")
 target_link_libraries(ui_navigator_test PRIVATE RmlUi::RmlUi)
 if(MSVC)
     target_compile_options(ui_navigator_test PRIVATE /UNDEBUG)

@@ -153,12 +153,12 @@ std::vector<blockplanet::ui::ListItem> NameEditor::keyboard() const {
     return items;
 }
 
-std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters) {
+std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters, bool all_open) {
     std::vector<blockplanet::ui::ListItem> items;
     int last = 1;  // the next chapter to play
     for (int chapter : completed)
         if (chapter >= 1) last = std::max(last, chapter + 1);
-    last = std::min(last, chapters);
+    last = all_open ? chapters : std::min(last, chapters);  // all_open: --unlock-all (testing)
     bool focused = false;
     for (int chapter = 1; chapter <= last; ++chapter) {
         const bool done = completed.count(chapter) != 0;
@@ -172,14 +172,14 @@ std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& compl
 }
 
 std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<int>& levels_done,
-                                                   const std::vector<double>& best_levels, int levels) {
+                                                   const std::vector<double>& best_levels, int levels, bool all_open) {
     std::vector<blockplanet::ui::ListItem> items;
     const auto c = std::to_string(chapter);
     items.push_back({"episode", "Whole episode", "", "command:chapter:" + c, true, 1, true});
     int last = 1;
     for (int level : levels_done)
         if (level >= 1) last = std::max(last, level + 1);
-    last = std::min(last, levels);
+    last = all_open ? levels : std::min(last, levels);
     for (int level = 1; level <= last; ++level) {
         const auto i = std::size_t(level - 1);
         std::string note;

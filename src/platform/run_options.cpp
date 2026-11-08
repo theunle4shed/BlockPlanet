@@ -118,6 +118,10 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             result.casual = true;
             continue;
         }
+        if (argument == "--unlock-all") {
+            result.unlock_all = true;
+            continue;
+        }
         if (argument == "--start-chapter" || argument.starts_with("--start-chapter=")) {
             const auto value = argument == "--start-chapter"
                 ? (index + 1 < argc ? std::string_view(argv[++index]) : std::string_view{})
@@ -162,6 +166,7 @@ const char* run_options_help() {
            "  --casual                         No game over: hearts refill, Time Trial clock\n"
            "                                   stops at 30 s. Trophies are paused\n"
            "  --start-chapter=N                Start Rescue at chapter N (testing). Trophies are paused\n"
+           "  --unlock-all                     Every Story episode and stage open in the menus (testing)\n"
            "  --perf-log                       Report frame timings every 5 seconds\n"
            "  --help                           Show this help\n"
            "Examples: tetrisphere --fullscreen --msaa4x\n"
