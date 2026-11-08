@@ -422,3 +422,7 @@ Read from the generated code while moving Score Attack onto Story's stages:
 - **Game over by hearts:** `0x800CEDE8`: hearts (`+0x2D7E`) at 0 become -1, the game over. BlockPlanet's Score Attack ends a run by setting hearts to 0 (checked: the game over and the scores screen follow).
 - **Sphere bonus:** `func_800C7C90` (mode 2 only, clock above 0, once per sphere): `func_800C7AF8(n)` is 1 for the first sphere and doubles each sphere (2, 4, 8...), capped at 32; the score gains that × 100 × the multiplier (`+0x2AE6` + `+0x2AE8` + 1), shown × 10, and the same value goes to the floating number routine `func_800B363C`.
 - **Time gained by combos:** no other store to `+0x2B0C` was found, so how combos add time is still open (perhaps through the frame step or a copy of the context).
+
+### The game over sequence (2026-11-08)
+
+Watched (`BLOCKPLANET_WATCH`): hearts (`+0x2D7E`) go to -1 and the 3D GAME OVER scene plays, still in play (main row `0x800E121C` = -1), for about 7 seconds; then the end menu's row (`0x800E1228`) becomes 0, a fade starts (`0x800DFF08` = 4, `0x800E11FA` = 255) with its level `0x800E1202` rising 0 to 255 over about 0.8 s, then `0x800DFF08` = 1 and the end menu screen (Wheels; Try Again, Exit, Training) shows. Holding `0x800E1202` at 0 from BlockPlanet's main loop (`BLOCKPLANET_HOLD_GAMEOVER=1`, research) did not stop the fade: the sequence that leaves GAME OVER is driven elsewhere. Holding the GAME OVER scene for BlockPlanet's own end panel (the owner's wish) needs that routine found first.

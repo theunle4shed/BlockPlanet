@@ -684,7 +684,12 @@ void update_hud() {
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
         return;
     }
-    blockplanet::set_original_hud_hidden(story);
+    // After the last heart (hearts -1) the game plays its GAME OVER scene in
+    // play: the original HUD stays hidden there too (it flashed up, the
+    // owner's report), with BlockPlanet's HUD gone.
+    const bool game_over = !original && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                           std::int16_t(guest::load16(guest_rdram, 0x80110220u + 0x2D7E)) < 0;
+    blockplanet::set_original_hud_hidden(story || game_over);
     if (!story) {
         show_hud(std::nullopt);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
@@ -3662,6 +3667,15 @@ bool handle_profile_command(const std::string& command) {
             }
             blockplanet::set_game_menu_hidden(!original_menus && at_game_menu &&
                                               (blockplanet::ui::menus_open() || mode_launcher.active()));
+        }
+        // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
+        // over (0x800E1202 back to 0 while the end menu fades in), to see
+        // whether the GAME OVER scene stays on screen.
+        {
+            static const bool hold = std::getenv("BLOCKPLANET_HOLD_GAMEOVER") != nullptr;
+            if (hold && guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E1228) >= 0 &&
+                guest::load16(guest_rdram, 0x800DFF08) == 4 && std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) < 0)
+                guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x800E1202, 0);
         }
         const auto now = std::chrono::steady_clock::now();
         if (perf_log_enabled && now - perf_window_start >= perf_interval) {
