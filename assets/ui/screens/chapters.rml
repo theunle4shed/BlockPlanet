@@ -3,7 +3,7 @@
     <title>Story</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body class="compact lists">
     <div id="panel">
         <div class="title" data-text="chapters_title">Story</div>
         <div class="subtitle" data-text="chapters_subtitle">Choose a chapter</div>

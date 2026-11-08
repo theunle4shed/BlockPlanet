@@ -232,6 +232,8 @@ body.over-pause { background-color: #00000000; }
     border-radius: 14dp;
 }
 .description.empty { visibility: hidden; }
+/* Chapter and stage lists: no empty description box under the list. */
+body.lists .description.empty { display: none; }
 
 /* The Alt button's hint at the end of a description ("[X] Training"). */
 .alt-hint { display: block; margin-top: 8dp; color: #f2c14e; }
