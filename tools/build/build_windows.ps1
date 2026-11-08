@@ -4,14 +4,14 @@ param(
     [Parameter(Mandatory = $true)][string]$BuildRoot,
     [Parameter(Mandatory = $true)][string]$CMakeExe,
     [Parameter(Mandatory = $true)][string]$PythonExe,
-    [string]$GitBin = 'C:\msys64\usr\bin',
+    [string]$GitBin = '',
     [Parameter(Mandatory = $true)][string]$Rom,
     [Parameter(Mandatory = $true)][string]$GeneratedDir,
     [Parameter(Mandatory = $true)][string]$GenerationManifest,
     [Parameter(Mandatory = $true)][string]$RspRecompSource,
-    [Parameter(Mandatory = $true)][string]$GraphicsSnapshot,
-    [Parameter(Mandatory = $true)][string]$GraphicsCommands,
-    [Parameter(Mandatory = $true)][string]$AudioSnapshot
+    [string]$GraphicsSnapshot = '',
+    [string]$GraphicsCommands = '',
+    [string]$AudioSnapshot = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,6 +32,11 @@ function Require-Directory([string]$Path, [string]$Name) {
 $SourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
 $CMakeExe = (Resolve-Path -LiteralPath $CMakeExe).Path
 $PythonExe = (Resolve-Path -LiteralPath $PythonExe).Path
+if (-not $GitBin) {
+    # Git for Windows (or MSYS2): the folder holding git.exe.
+    $found = Get-Command git.exe -ErrorAction SilentlyContinue
+    $GitBin = if ($found) { Split-Path $found.Source } else { 'C:\msys64\usr\bin' }
+}
 Require-File (Join-Path $GitBin 'git.exe') 'Git executable'
 $env:PATH = "$GitBin;$env:PATH"
 $gitExe = Join-Path $GitBin 'git.exe'
@@ -56,12 +61,17 @@ Require-Directory $GeneratedDir 'N64Recomp generated directory'
 foreach ($item in @(
     @($Rom, 'authorized ROM'),
     @($GenerationManifest, 'generation manifest'),
-    @($RspRecompSource, 'RSPRecomp source'),
+    @($RspRecompSource, 'RSPRecomp source')
+)) {
+    Require-File $item[0] $item[1]
+}
+# The live microcode captures only feed an optional diagnostic: all three or none.
+foreach ($item in @(
     @($GraphicsSnapshot, 'graphics snapshot'),
     @($GraphicsCommands, 'graphics commands'),
     @($AudioSnapshot, 'audio snapshot')
 )) {
-    Require-File $item[0] $item[1]
+    if ($item[0]) { Require-File $item[0] $item[1] }
 }
 
 New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null

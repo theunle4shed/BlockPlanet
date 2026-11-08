@@ -28,7 +28,7 @@ UI_ANCHORS = ROOT / "config/recomp/ui_anchor_callsites.json"
 SYMBOLS = ROOT / "config/recomp/symbols.toml"
 SECTIONS = ROOT / "config/recomp/sections.json"
 LOCK = ROOT / "config/dependencies-m1.json"
-PINNED_RECOMPILER = ROOT / ".local/m1/toolchain/n64recomp-build/N64Recomp"
+PINNED_RECOMPILER = ROOT / ".local/m1/toolchain/n64recomp-build" / ("N64Recomp.exe" if os.name == "nt" else "N64Recomp")
 BUILD_RECEIPT = ROOT / ".local/m1/toolchain/N64Recomp-receipt.json"
 PINNED_NAME = "N64Recomp"
 
