@@ -209,3 +209,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Options, Graphics and Audio explain each setting in a box under the list, as the main menu does (the owner's request).
 - Windows: three double-click files in the repository's folder: `Play BlockPlanet.bat`, `Play BlockPlanet (all unlocked).bat` (with `--unlock-all`) and `Update BlockPlanet.bat` (gets the latest changes and rebuilds). After the first setup, `setup_windows.ps1` no longer needs `-Rom`: it uses the copy in `.local\m0`.
 - F5 restarts the game from the title, anywhere, as the same profile and with the same launch options (for testing, when stuck; the owner's request).
+- Fixed (the owner's report): BlockPlanet's main menu opened during the N64 logo animation at launch, and the animation smeared behind it. The menu now waits until the title screen has been shown.

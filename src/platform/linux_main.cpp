@@ -3548,8 +3548,13 @@ bool handle_profile_command(const std::string& command) {
         // original menus (F1 still opens BlockPlanet's).
         {
             static const bool original_menus = std::getenv("BLOCKPLANET_ORIGINAL_MENUS") != nullptr;
-            const bool at_game_menu = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) >= 0 &&
-                                      !blockplanet_title_recent(nullptr);
+            // Only once the title has been shown: before it (the logo
+            // animation) the menu row already reads as a menu.
+            static bool title_seen = false;
+            const bool title_now = blockplanet_title_recent(nullptr);
+            title_seen = title_seen || title_now;
+            const bool at_game_menu = guest_rdram != nullptr && title_seen && !title_now &&
+                                      guest::load16(guest_rdram, 0x800E121C) >= 0;
             if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !mode_launcher.active() &&
                 !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0)
                 blockplanet::ui::request_open("main");
