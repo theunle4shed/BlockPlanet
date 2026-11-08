@@ -47,3 +47,10 @@ Training's speech bubble is a 150 × 115 one-byte image drawn by the image helpe
 ## Rewrite review (2026-11-07)
 
 The owner chose to review only the lines Claude would change, rewritten freely in BlockPlanet's voice and never wordy. The review is a private page for the owner (not in the repository, as it quotes the game's text from the owner's ROM). It covers 58 lines: Training (Basics, Advanced, Puzzle), Hide & Seek's goals, the Lines and VS rules, and the game-over hint. For each, the owner chooses: use the suggestion, keep the original (with the fixes already applied), or their own wording. The decisions are then applied as replacements keyed by each line's place in the game's text. Open point raised there: BlockPlanet's HUD says "Health" where the game says "lives". The suggestion is to label the HUD "Lives".
+
+Applied 2026-11-08 (`text_rewrites.cpp`). Points from the owner's notes:
+- **"Combine with next/previous" (the fuse pages):** the two lines sit either side of a demonstration and a scripted arrow, so they stay separate pages. Each is shortened so they read on together.
+- **"Where does the combo counter show?":** by the sphere, where the combo happens. The rewrite says so.
+- **"Mention where the magic appears":** "in the Magic box at the bottom of the screen" (Training's HUD row).
+- **"Do we need to explain power bricks, or give a demo?":** the lesson already demonstrates a power combo right after. A "your turn" step for it could follow.
+- **"Is zoom true for every mode?":** zoom is explained in Puzzle Training. Whether it works outside Puzzle is still to check.

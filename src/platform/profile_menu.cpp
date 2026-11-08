@@ -260,6 +260,8 @@ std::string fix_wording(const std::string& text) {
         }
     };
     replace_word("BALL", "SPHERE");
+    replace_word("PIECES", "BRICKS");  // the owner's word for them
+    replace_word("PIECE", "BRICK");
     replace_word("TALLYS", "TALLIES");
     replace_word("CAN NOT", "CANNOT");
     replace_word("WITH LESS THAN", "WITH FEWER THAN");
@@ -323,7 +325,7 @@ std::string proper_case(const std::string& text) {
     const bool title = letters_words <= 3;
     static const char* keep[] = {"VS", "CPU", "HUD", "TV", "OK", "N64", "H2O", "TM", "X", "I"};
     // Names keep their capital wherever they fall.
-    static const char* names[] = {"WHEELS", "TURBINE", "TETRISPHERE", "NINTENDO"};
+    static const char* names[] = {"WHEELS", "TURBINE", "TETRISPHERE", "NINTENDO", "STORY", "TRAINING"};  // names, and menu names
     std::string out;
     bool sentence_start = true;
     for (std::size_t k = 0; k < words.size(); ++k) {

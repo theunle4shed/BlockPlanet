@@ -14,6 +14,7 @@
 #include "tetrisphere/game_options.h"
 #include "tetrisphere/close_game_menu.h"
 #include "tetrisphere/crash_report.h"
+#include "tetrisphere/text_rewrites.h"
 
 #include "tetrisphere/rt64_context.h"
 #include "tetrisphere/run_options.h"
@@ -1313,14 +1314,14 @@ std::string how_to_play(int mode) {
     const std::string magic = magic_control_label(family, magic_control());
     const std::string move = family == ControllerFamily::Keyboard ? "the arrow keys" : "the stick or d-pad";
     const std::string basics =
-        "Move the shadow over the sphere with " + move + ". It has the shape of your next piece.\n"
-        "Drop your piece (" + a + ") onto pieces of the same shape. Two together are ready; a third breaks them.\n"
-        "To slide a piece, line the shadow up with it, hold " + b + " and move.\n"
-        "Dropping where no two pieces match costs a heart.\n";
+        "Move the shadow over the sphere with " + move + ". It has the shape of your next brick.\n"
+        "Drop your brick (" + a + ") onto bricks of the same shape. Two together are ready; a third breaks them.\n"
+        "To slide a brick, line the shadow up with it, hold " + b + " and move.\n"
+        "Dropping where no two bricks match costs a heart.\n";
     switch (mode) {
     case 1: {
         std::string text = "Dig through the sphere to its core: clear a big enough area to finish the stage.\n" + basics +
-                           "Three or more pieces breaking together make a combo. Smaller combos give power pieces; 20 or more give magic, used with " +
+                           "Three or more bricks breaking together make a combo. Smaller combos give power bricks; 20 or more give magic, used with " +
                            magic + ".";
         if (play_variant == PlayVariant::TimeAttack) text += "\nTime Attack: finish each stage as fast as you can. Your splits show against your best.";
         if (play_variant == PlayVariant::ScoreAttack) text += "\nScore Attack: the clock counts down. Combos add time, and time left becomes points.";
@@ -1328,9 +1329,9 @@ std::string how_to_play(int mode) {
         return text;
     }
     case 4:
-        return "Clear every piece on the sphere with only the drops and slides shown.\n"
-               "Your piece is a wildcard: it fits any shape.\n"
-               "To slide a piece, line the shadow up with it, hold " + b + " and move.\n"
+        return "Clear every brick on the sphere with only the drops and slides shown.\n"
+               "Your brick is a wildcard: it fits any shape.\n"
+               "To slide a brick, line the shadow up with it, hold " + b + " and move.\n"
                "Zoom in and out with the shoulder buttons. Start the puzzle again from the pause menu.";
     case 5: {
         const std::string goal = hide_and_seek_goal(guest::load16(guest_rdram, 0x800E44A4));
@@ -1339,9 +1340,9 @@ std::string how_to_play(int mode) {
     }
     case 6:
         return "Uncover the core area before your opponent does.\n" + basics +
-               "Your combos send dark pieces to your opponent's sphere. Dark pieces break only as part of a combo.";
+               "Your combos send dark bricks to your opponent's sphere. Dark bricks break only as part of a combo.";
     default:
-        return "Line up three pieces in a row, across or down, to remove them.\n"
+        return "Line up three bricks in a row, across or down, to remove them.\n"
                "Clear a big enough area of the core for your friend to escape.";
     }
 }
@@ -1356,6 +1357,12 @@ void publish_game_text() {
         if (t.font == 1 && t.r == 255 && t.g == 255 && t.b == 255 && !t.text.empty() &&
             t.text.find_first_not_of("0123456789") == std::string::npos)
             t.font = 0;
+    // Hint lines the owner's review rewrote (the game-over hint): the new
+    // wording, or the line dropped when the rewrite is empty.
+    for (auto& t : texts)
+        if (t.font == 1)
+            if (const auto rewrite = tetrisphere::text_rewrite(t.text)) t.text = *rewrite;
+    texts.erase(std::remove_if(texts.begin(), texts.end(), [](const blockplanet::GameText& t) { return t.text.empty(); }), texts.end());
     const auto frame = picture_frame();
     const auto box = blockplanet::recent_card_box();
     // Inside BlockPlanet's card panel (Training), the card's text starts a
@@ -1412,6 +1419,9 @@ void publish_game_text() {
                 const std::size_t n = std::strlen(code);
                 for (std::size_t at; (at = text.find(code)) != std::string::npos;) text.replace(at, n, std::string("[") + f + ":" + name + "]");
             }
+            // The movement controls, for the player's input (BlockPlanet's own wording).
+            for (std::size_t at; (at = text.find("%MOVE%")) != std::string::npos;)
+                text.replace(at, 6, family == ControllerFamily::Keyboard ? "THE ARROW KEYS" : "THE STICK OR D-PAD");
             // Any other % is the font's apostrophe or quote mark ("LET%S", "%X%").
             return tetrisphere::game_quotes(tetrisphere::fix_wording(text));
         };
@@ -1611,6 +1621,8 @@ void publish_game_text() {
             // or is a short line all in yellow; `title` replaces it), then the
             // paragraph, with line breaks only before a list's items.
             const auto add_text = [&](std::string text, const std::string& title) {
+                // The movement controls first, so the words are cased as one sentence.
+                for (std::size_t at; (at = text.find("%MOVE%")) != std::string::npos;) text.replace(at, 6, buttons("%MOVE%"));
                 text = tetrisphere::fix_wording(text);
                 constexpr const char* orange = "#ff8c1aff";
                 constexpr const char* yellow = "#ffd23cff";
@@ -1677,7 +1689,7 @@ void publish_game_text() {
                         if (pg.skip) continue;
                         std::string text;
                         for (std::uint32_t a = pg.start; a < pg.end; ++a) text += char(guest::load8(guest_rdram, a));
-                        add_text(text, "");
+                        add_text(tetrisphere::text_rewrite(text).value_or(text), "");  // the owner's reviewed wording
                     }
             // A rules or goal card (Hide & Seek, Lines, VS): found in the game's
             // memory from its heading's first word, which types in first, and
@@ -1687,7 +1699,7 @@ void publish_game_text() {
                 for (char ch : texts[card_lines.begin()->second.front()].text)
                     if (std::isalpha(static_cast<unsigned char>(ch))) first += ch; else break;
                 if (const auto found = find_card_text(first)) {
-                    add_text(*found, hide_and_seek_title(*found));
+                    add_text(tetrisphere::text_rewrite(*found).value_or(*found), hide_and_seek_title(*found));
                     card_found = true;
                 }
             }

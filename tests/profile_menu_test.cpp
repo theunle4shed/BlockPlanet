@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
         assert(proper_case("TRY AGAIN") == "Try Again" && proper_case("EXIT") == "Exit");
         assert(proper_case("HIDE&SEEK") == "Hide & Seek" && proper_case("VS CPU") == "VS CPU");
         assert(proper_case("CLOSE GAME") == "Close Game" && proper_case("PLAYER 1") == "Player 1");
-        assert(proper_case("YOU MAY WANT TO TRY TRAINING") == "You may want to try training");
+        assert(proper_case("YOU MAY WANT TO TRY TRAINING") == "You may want to try Training");  // a menu name keeps its capital
         assert(proper_case("ONE. TWO THREE FOUR") == "One. Two three four");
         assert(proper_case("Already fine") == "Already fine" && proper_case("1:23") == "1:23");
         assert(proper_case("DIG WITH THE [A] BUTTON. THEN GO") == "Dig with the [A] button. Then go");
@@ -115,6 +115,7 @@ int main(int argc, char** argv) {
         assert(game_quotes("LET%S GO !") == "LET\u2019S GO!");
         assert(fix_wording("AROUND THE BALL. THE -1BALL%S CORE, BALLOON") == "AROUND THE SPHERE. THE -1SPHERE%S CORE, BALLOON");
         assert(fix_wording("IT TALLYS. YOU CAN NOT! WHY ?? YES !!") == "IT TALLIES. YOU CANNOT! WHY ? YES !");
+        assert(fix_wording("TWO PIECES, ONE -1PIECE") == "TWO BRICKS, ONE -1BRICK");
         assert(game_quotes("YOUR %X% COUNT ??") == "YOUR \u2018X\u2019 COUNT??");
         assert(proper_case(game_quotes("HI! MY NAME IS WHEELS. I WILL SHOW YOU TETRISPHERE. I%M HERE")) ==
                "Hi! My name is Wheels. I will show you Tetrisphere. I\u2019m here");
