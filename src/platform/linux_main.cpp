@@ -1363,6 +1363,18 @@ void publish_game_text() {
         if (t.font == 1)
             if (const auto rewrite = tetrisphere::text_rewrite(t.text)) t.text = *rewrite;
     texts.erase(std::remove_if(texts.begin(), texts.end(), [](const blockplanet::GameText& t) { return t.text.empty(); }), texts.end());
+    // The game-over menu (Try Again, Exit, Training) in a straight column, as
+    // BlockPlanet's menus are, instead of the original's diagonal stagger.
+    {
+        std::vector<blockplanet::GameText*> items;
+        for (auto& t : texts)
+            if (t.font == 0 && (t.text == "TRY AGAIN" || t.text == "EXIT" || t.text == "TRAINING")) items.push_back(&t);
+        if (items.size() == 3) {
+            int left = 1 << 20;
+            for (const auto* t : items) left = std::min(left, t->x);
+            for (auto* t : items) t->x = left, t->width = 0;
+        }
+    }
     const auto frame = picture_frame();
     const auto box = blockplanet::recent_card_box();
     // Inside BlockPlanet's card panel (Training), the card's text starts a
@@ -1540,7 +1552,14 @@ void publish_game_text() {
                 std::snprintf(c, sizeof c, "#%02x%02x%02x%02x", w.r, w.g, w.b, w.a);
                 const std::size_t owner = heading ? idx[0] : (body_first == texts.size() ? idx[k] : body_first);
                 if (!heading && body_first == texts.size()) body_first = idx[k];
-                joined[owner].emplace_back(cased[idx[k]], c);
+                // A line that ends a sentence: the next starts on a new line
+                // (the game-over hint's question, then its suggestion).
+                auto& parts = joined[owner];
+                if (k == 0 && !parts.empty() && !parts.back().first.empty()) {
+                    const char end = parts.back().first.back();
+                    if (end == '?' || end == '!' || end == '.') parts.emplace_back("\n", "");
+                }
+                parts.emplace_back(cased[idx[k]], c);
                 if (owner != idx[k]) joined_away.insert(idx[k]);
             }
         }
@@ -1753,7 +1772,7 @@ void publish_game_text() {
                 }
             }
             if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
-            if (box->prompt == 2) panel.hint = "Watch";
+            if (box->prompt == 2) panel.hint = "Wheels is showing you\u2026";  // a demonstration: it moves on by itself
             // A rules or goal card closes with A: say so, the same on every card.
             if (box->kind == 1 && panel.hint.empty()) panel.hint = buttons("%A%") + " Start";
             {

@@ -331,7 +331,7 @@ div { display: block; }
     color: #c8ccd8;
     font-weight: bold;
     font-size: 0.78em;
-    margin-top: 0.15em;
+    margin-top: 0.75em;  /* clear of the text above */
 }
 .card-tail {
     position: absolute;

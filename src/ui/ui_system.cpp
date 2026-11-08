@@ -392,10 +392,15 @@ std::string game_text_rml(const HudView& hud) {
         if (t.parts.empty()) {
             body = with_buttons(escape(t.text));
         } else {
-            for (std::size_t k = 0; k < t.parts.size(); ++k)
+            for (std::size_t k = 0; k < t.parts.size(); ++k) {
+                if (t.parts[k].first == "\n") {  // a line break
+                    body += "<br/>";
+                    continue;
+                }
                 // The space goes inside the span (spaces between elements are dropped).
                 body += std::string("<span style='color: ") + t.parts[k].second + ";'>" + with_buttons(escape(t.parts[k].first)) +
-                        (k + 1 < t.parts.size() ? " " : "") + "</span>";
+                        (k + 1 < t.parts.size() && t.parts[k + 1].first != "\n" ? " " : "") + "</span>";
+            }
         }
         const std::string wrap = t.wrap > 0 ? "width: " + pct(t.wrap) + "; white-space: normal; line-height: 1.3;" : "";
         rml += "<div class='game-text' data-w='" + std::to_string(t.width) + "' style='left: " + pct(t.x) + "; top: " +
