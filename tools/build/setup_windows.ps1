@@ -42,11 +42,14 @@ function Run([string]$exe, [string[]]$arguments) {
     $p = Start-Process -FilePath $exe -ArgumentList ($quoted -join ' ') -NoNewWindow -PassThru
     $null = $p.Handle  # keeps the exit code readable after it ends
     $cpu = Get-BuildCpu
+    $quiet = 0
     while (-not $p.WaitForExit(30000)) {
+        # Compilers come and go, so the total can also drop: any change is work.
         $now = Get-BuildCpu
-        $used = [math]::Max(0, [math]::Round($now - $cpu))
+        $used = [math]::Round([math]::Abs($now - $cpu))
         $cpu = $now
-        $note = if ($used -lt 1) { ' - no CPU used: if this repeats, check for an antivirus prompt (Norton CyberCapture)' } else { '' }
+        if ($used -lt 1) { $quiet++ } else { $quiet = 0 }
+        $note = if ($quiet -ge 2) { ' - nothing is using CPU: check for an antivirus prompt (Norton CyberCapture)' } else { '' }
         Write-Host ("  ... still running, {0:mm\:ss} so far, {1} CPU-seconds in the last 30 s{2}" -f ((Get-Date) - $started), $used, $note) -ForegroundColor DarkGray
     }
     if ($p.ExitCode -ne 0) { throw "$exe failed ($($p.ExitCode)): $($arguments -join ' ')" }
