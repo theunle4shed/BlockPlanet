@@ -343,7 +343,9 @@ std::string game_text_rml(const HudView& hud) {
                 }
                 const auto& colour = parts[k].second;
                 const bool yellow = colour.size() >= 7 && std::stoi(colour.substr(3, 2), nullptr, 16) > 170;
-                out += std::string("<span class='") + (yellow ? "hl" : "") + "' style='color: " + colour + ";'>" +
+                // "fe" alpha: a glossary term where it is introduced.
+                const bool introduced = yellow && colour.size() == 9 && colour.compare(7, 2, "fe") == 0;
+                out += std::string("<span class='") + (introduced ? "hl new" : yellow ? "hl" : "") + "' style='color: " + colour + ";'>" +
                        with_buttons(escape(parts[k].first)) + (k + 1 < parts.size() && parts[k + 1].first != "\n" ? " " : "") + "</span>";
             }
             return out;

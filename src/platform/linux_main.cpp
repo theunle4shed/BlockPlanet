@@ -1165,6 +1165,82 @@ std::optional<PictureFrame> picture_frame() {
 // 0x80103958. Codes: -0 a line break, -1 the next word in yellow, -2 a page
 // break (waiting for A), -5 a demonstration ("watch", then on by itself), -3
 // and -4 a scripted action as the page opens (an arrow, Wheels moving).
+// The game's key terms (the owner's choice), highlighted the same everywhere:
+// a phrase of words (as the game writes them, in capitals) and its term.
+// Longer phrases first, so "combo counter" wins over "combo".
+const std::vector<std::pair<std::vector<std::string>, std::string>>& glossary_table() {
+    static const std::vector<std::pair<std::vector<std::string>, std::string>> table = [] {
+
+    std::vector<std::pair<std::vector<std::string>, std::string>> g;
+    const auto add = [&](std::initializer_list<const char*> phrase, const char* term) {
+        g.push_back({std::vector<std::string>(phrase.begin(), phrase.end()), term});
+    };
+    // Longer phrases first, so "combo counter" wins over "combo".
+    add({"COMBO", "COUNTER"}, "combo counter"); add({"POWER", "COMBO"}, "power combo");
+    add({"POWER", "COMBOS"}, "power combo"); add({"GRAVITY", "COMBO"}, "gravity combo");
+    add({"GRAVITY", "COMBOS"}, "gravity combo"); add({"FUSE", "COMBO"}, "fuse combo");
+    add({"FUSE", "COMBOS"}, "fuse combo"); add({"POWER", "BRICK"}, "power brick");
+    add({"POWER", "BRICKS"}, "power brick"); add({"CRYSTAL", "BRICK"}, "crystal brick");
+    add({"CRYSTAL", "BRICKS"}, "crystal brick"); add({"X", "COUNT"}, "x count");
+    add({"MAGIC", "BOX"}, "magic box");
+    add({"SHADOW"}, "shadow"); add({"SLIDE"}, "slide"); add({"SLIDING"}, "slide");
+    add({"COMBO"}, "combo"); add({"COMBOS"}, "combo"); add({"FUSE"}, "fuse");
+    add({"MAGIC"}, "magic"); add({"WILDCARD"}, "wildcard"); add({"HEARTS"}, "hearts");
+    add({"LIVES"}, "lives"); add({"CORE"}, "core");
+    add({"DROPS"}, "drops"); add({"SLIDES"}, "slides"); add({"DRILL"}, "drill"); add({"DRILLS"}, "drill");
+    return g;
+    }();
+    return table;
+}
+
+// A term's heading, over the page that introduces it.
+std::string glossary_heading(const std::string& term) {
+    static const std::map<std::string, std::string> names = {
+        {"shadow", "Your Shadow"}, {"slide", "Sliding"}, {"combo", "Combos"}, {"combo counter", "Combo Counter"},
+        {"power combo", "Power Combos"}, {"gravity combo", "Gravity Combos"}, {"fuse combo", "Fuse Combos"},
+        {"fuse", "Fuse Combos"}, {"power brick", "Power Bricks"}, {"crystal brick", "Crystal Bricks"},
+        {"x count", "The X Count"}, {"magic", "Magic"}, {"magic box", "The Magic Box"}, {"wildcard", "The Wildcard"},
+        {"hearts", "Lives"}, {"lives", "Lives"}, {"core", "The Core"}, {"drops", "Drops and Slides"},
+        {"slides", "Drops and Slides"}, {"drill", "Drills"}};
+    const auto found = names.find(term);
+    return found != names.end() ? found->second : term;
+}
+
+// The glossary terms in a card's text, in order of first mention.
+std::vector<std::string> glossary_terms(std::string text) {
+    text = tetrisphere::fix_wording(text);
+    std::vector<std::string> words;
+    std::string word;
+    for (std::size_t c = 0; c <= text.size(); ++c) {
+        if (c < text.size() && text[c] == '-' && c + 1 < text.size() && std::isdigit(static_cast<unsigned char>(text[c + 1]))) {
+            if (text[c + 1] == '0' && !word.empty()) words.push_back(word), word.clear();  // a line break
+            ++c;
+            continue;
+        }
+        if (c == text.size() || text[c] == ' ') {
+            if (!word.empty()) words.push_back(word), word.clear();
+            continue;
+        }
+        if (std::isalnum(static_cast<unsigned char>(text[c]))) word += char(std::toupper(static_cast<unsigned char>(text[c])));
+    }
+    std::vector<std::string> terms;
+    for (std::size_t i = 0; i < words.size();) {
+        bool matched = false;
+        for (const auto& [phrase, term] : glossary_table()) {
+            if (i + phrase.size() > words.size()) continue;
+            bool same = true;
+            for (std::size_t k = 0; k < phrase.size() && same; ++k) same = words[i + k] == phrase[k];
+            if (!same) continue;
+            if (std::find(terms.begin(), terms.end(), term) == terms.end()) terms.push_back(term);
+            i += phrase.size();
+            matched = true;
+            break;
+        }
+        if (!matched) ++i;
+    }
+    return terms;
+}
+
 struct TrainingPage {
     std::uint32_t start = 0, end = 0;  // the page's text, up to its break code
     char ends = 0;                     // '2', '5', or 0 (the string's end)
@@ -1641,13 +1717,21 @@ void publish_game_text() {
             // panel blocks: a heading (the first line, when it ends with a colon
             // or is a short line all in yellow; `title` replaces it), then the
             // paragraph, with line breaks only before a list's items.
-            const auto add_text = [&](std::string text, const std::string& title) {
+            // `intro`: the glossary terms this page introduces (their first mention in
+            // the lesson's card): drawn as new, and the first one heads the page
+            // when it has no heading of its own (the owner's choice).
+            const auto add_text = [&](std::string text, const std::string& title, const std::vector<std::string>& intro) {
                 // The movement controls first, so the words are cased as one sentence.
                 for (std::size_t at; (at = text.find("%MOVE%")) != std::string::npos;) text.replace(at, 6, buttons("%MOVE%"));
                 text = tetrisphere::fix_wording(text);
                 constexpr const char* orange = "#ff8c1aff";
                 constexpr const char* yellow = "#ffd23cff";
-                struct Word { std::string text; bool yellow = false; bool line_before = false; bool coded = false; };
+                // Game terms in their own colour, apart from the yellow headings
+                // (the owner's choice); "fe" alpha marks a term being introduced
+                // (the panel adds a glow).
+                constexpr const char* term_colour = "#86d8ffff";
+                constexpr const char* term_colour_new = "#86d8fffe";
+                struct Word { std::string text; bool yellow = false; bool line_before = false; bool coded = false; bool fresh = false; };
                 std::vector<Word> words;
                 Word word;
                 bool next_yellow = false, line = false;
@@ -1675,26 +1759,7 @@ void publish_game_text() {
                 // Highlights: the game's key terms, the same everywhere (the owner's
                 // choice), each on its first mention in a page; no other words.
                 {
-                    static const std::vector<std::pair<std::vector<std::string>, std::string>> glossary = [] {
-                        std::vector<std::pair<std::vector<std::string>, std::string>> g;
-                        const auto add = [&](std::initializer_list<const char*> phrase, const char* term) {
-                            g.push_back({std::vector<std::string>(phrase.begin(), phrase.end()), term});
-                        };
-                        // Longer phrases first, so "combo counter" wins over "combo".
-                        add({"COMBO", "COUNTER"}, "combo counter"); add({"POWER", "COMBO"}, "power combo");
-                        add({"POWER", "COMBOS"}, "power combo"); add({"GRAVITY", "COMBO"}, "gravity combo");
-                        add({"GRAVITY", "COMBOS"}, "gravity combo"); add({"FUSE", "COMBO"}, "fuse combo");
-                        add({"FUSE", "COMBOS"}, "fuse combo"); add({"POWER", "BRICK"}, "power brick");
-                        add({"POWER", "BRICKS"}, "power brick"); add({"CRYSTAL", "BRICK"}, "crystal brick");
-                        add({"CRYSTAL", "BRICKS"}, "crystal brick"); add({"X", "COUNT"}, "x count");
-                        add({"MAGIC", "BOX"}, "magic box");
-                        add({"SHADOW"}, "shadow"); add({"SLIDE"}, "slide"); add({"SLIDING"}, "slide");
-                        add({"COMBO"}, "combo"); add({"COMBOS"}, "combo"); add({"FUSE"}, "fuse");
-                        add({"MAGIC"}, "magic"); add({"WILDCARD"}, "wildcard"); add({"HEARTS"}, "hearts");
-                        add({"LIVES"}, "lives"); add({"CORE"}, "core"); add({"LAYERS"}, "layers");
-                        add({"DROPS"}, "drops"); add({"SLIDES"}, "slides"); add({"DRILL"}, "drill"); add({"DRILLS"}, "drill");
-                        return g;
-                    }();
+                    const auto& glossary = glossary_table();
                     const auto bare = [](const std::string& w) {
                         std::string b;
                         for (char ch : w)
@@ -1712,8 +1777,10 @@ void publish_game_text() {
                             // Within one phrase only (not across a line break).
                             for (std::size_t k = 1; k < phrase.size() && same; ++k) same = !words[i + k].line_before;
                             if (!same) continue;
-                            if (seen.insert(term).second)
-                                for (std::size_t k = 0; k < phrase.size(); ++k) words[i + k].yellow = true;
+                            if (seen.insert(term).second) {
+                                const bool fresh = std::find(intro.begin(), intro.end(), term) != intro.end();
+                                for (std::size_t k = 0; k < phrase.size(); ++k) words[i + k].yellow = true, words[i + k].fresh = fresh;
+                            }
                             i += phrase.size();
                             matched = true;
                             break;
@@ -1741,26 +1808,39 @@ void publish_game_text() {
                     for (std::size_t w = from; w < to; ++w) {
                         const std::string& t = split.size() == to - from ? split[w - from] : buttons(words[w].text);
                         if (w > from && words[w].line_before && std::isdigit(static_cast<unsigned char>(t[0]))) out.push_back({"\n", ""});
-                        out.push_back({t, is_title ? yellow : words[w].yellow ? yellow : orange});
+                        out.push_back({t, is_title ? yellow : words[w].yellow ? (words[w].fresh ? term_colour_new : term_colour) : orange});
                     }
                     return out;
                 };
                 if (heading) {
                     if (!title.empty()) panel.blocks.push_back({true, {{title, yellow}}});
                     else panel.blocks.push_back({true, runs(0, body, true)});
+                } else if (!intro.empty()) {
+                    panel.blocks.push_back({true, {{glossary_heading(intro.front()), yellow}}});
                 }
                 if (body < words.size()) panel.blocks.push_back({false, runs(body, words.size(), false)});
             };
             // Training: the whole group of pages, read from the lesson's text.
             if (box->kind == 0 && guest::load16(guest_rdram, 0x800E44A8) == 3)
-                if (const auto g = training_group())
+                if (const auto g = training_group()) {
+                    // Which page of the card introduces each term: its first mention.
+                    std::vector<std::vector<std::string>> intro(g->pages.size());
+                    std::set<std::string> met;
+                    for (std::size_t i = 0; i < g->pages.size(); ++i) {
+                        if (g->pages[i].skip) continue;
+                        std::string text;
+                        for (std::uint32_t a = g->pages[i].start; a < g->pages[i].end; ++a) text += char(guest::load8(guest_rdram, a));
+                        for (const auto& term : glossary_terms(tetrisphere::text_rewrite(text).value_or(text)))
+                            if (met.insert(term).second) intro[i].push_back(term);
+                    }
                     for (std::size_t i = g->first; i <= g->last; ++i) {
                         const auto& pg = g->pages[i];
                         if (pg.skip) continue;
                         std::string text;
                         for (std::uint32_t a = pg.start; a < pg.end; ++a) text += char(guest::load8(guest_rdram, a));
-                        add_text(tetrisphere::text_rewrite(text).value_or(text), "");  // the owner's reviewed wording
+                        add_text(tetrisphere::text_rewrite(text).value_or(text), "", intro[i]);  // the owner's reviewed wording
                     }
+                }
             // A rules or goal card (Hide & Seek, Lines, VS): found in the game's
             // memory from its heading's first word, which types in first, and
             // shown whole at once.
@@ -1769,7 +1849,7 @@ void publish_game_text() {
                 for (char ch : texts[card_lines.begin()->second.front()].text)
                     if (std::isalpha(static_cast<unsigned char>(ch))) first += ch; else break;
                 if (const auto found = find_card_text(first)) {
-                    add_text(tetrisphere::text_rewrite(*found).value_or(*found), hide_and_seek_title(*found));
+                    add_text(tetrisphere::text_rewrite(*found).value_or(*found), hide_and_seek_title(*found), {});
                     card_found = true;
                 }
             }

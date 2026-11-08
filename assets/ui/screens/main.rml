@@ -5,7 +5,7 @@
 </head>
 <body class="compact">
     <div id="panel">
-        <div class="title">Tetrisphere</div>
+        <div class="title">Tetrisphere™</div>
         <div class="version" id="version"></div>
         <div class="subtitle">Main menu</div>
         <div data-list="continue"></div>

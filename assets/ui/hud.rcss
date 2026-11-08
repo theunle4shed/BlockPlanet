@@ -325,6 +325,8 @@ div { display: block; }
     font-weight: normal;
 }
 .card-body .hl { font-weight: bold; }
+/* A game term where Wheels or a card introduces it: a soft glow. */
+.card-body .hl.new { font-effect: glow(1dp 4dp 0dp 0dp #3fa8ff90); }
 .card-hint {
     display: block;
     text-align: left;  /* the tail is under the right of the bottom edge */
