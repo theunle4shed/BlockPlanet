@@ -3532,6 +3532,13 @@ bool handle_profile_command(const std::string& command) {
 // address range (hex), with the storing function, the value and the time.
 extern "C" const char* blockplanet_trap_caller = "";  // set before calls the research build marks
 extern "C" const char* blockplanet_trap_caller2 = "";
+extern "C" const char* blockplanet_trap_caller3 = "";
+// Research: a function's arguments (a0 to a3), logged when BLOCKPLANET_STORE_TRAP is set.
+extern "C" void blockplanet_arg_trap(const char* function, std::uint64_t a0, std::uint64_t a1, std::uint64_t a2, std::uint64_t a3) {
+    if (std::getenv("BLOCKPLANET_STORE_TRAP") == nullptr) return;
+    std::fprintf(stdout, "{\"event\":\"args\",\"function\":\"%s\",\"caller\":\"%s\",\"a0\":\"0x%08X\",\"a1\":%d,\"a2\":%d,\"a3\":%d}\n",
+                 function, blockplanet_trap_caller3, std::uint32_t(a0), int(std::int16_t(a1)), int(std::int16_t(a2)), int(std::int16_t(a3)));
+}
 extern "C" void blockplanet_store_trap(std::uint32_t address, std::int32_t value, int size, const char* function) {
     static const std::pair<std::uint32_t, std::uint32_t> range = [] {
         const char* spec = std::getenv("BLOCKPLANET_STORE_TRAP");
