@@ -40,9 +40,27 @@ $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
 cmd /c "`"$devcmd`" -arch=amd64 -host_arch=amd64 >nul && set" | ForEach-Object {
     if ($_ -match '^([^=]+)=(.*)$') { Set-Item -Path "env:$($Matches[1])" -Value $Matches[2] }
 }
-foreach ($tool in @('cmake', 'ninja', 'cl')) {
-    if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool was not found in the Visual Studio environment." }
+if (-not (Get-Command cl -ErrorAction SilentlyContinue)) {
+    throw 'The C++ compiler (cl) was not found. In the Visual Studio Installer, choose Modify and tick "Desktop development with C++".'
 }
+# CMake and Ninja are optional parts of Visual Studio's C++ workload. Use
+# Visual Studio's copies when they are there, else install them for this user
+# from Python's package index.
+$vsCMake = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake'
+foreach ($dir in @((Join-Path $vsCMake 'CMake\bin'), (Join-Path $vsCMake 'Ninja'))) {
+    if (Test-Path $dir) { $env:Path = "$dir;$env:Path" }
+}
+if (-not (Get-Command cmake -ErrorAction SilentlyContinue) -or -not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+    Write-Host 'CMake or Ninja is missing from Visual Studio; installing them with pip (for this user only).'
+    Run python @('-m', 'pip', 'install', '--user', '--upgrade', 'cmake', 'ninja')
+    $userScripts = (& python -c "import sysconfig; print(sysconfig.get_path('scripts', 'nt_user'))").Trim()
+    $env:Path = "$userScripts;$env:Path"
+}
+foreach ($tool in @('cmake', 'ninja')) {
+    if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool could not be found or installed." }
+}
+Write-Host "cmake: $((Get-Command cmake).Source)"
+Write-Host "ninja: $((Get-Command ninja).Source)"
 $python = (Get-Command python).Source
 $cmake = (Get-Command cmake).Source
 
