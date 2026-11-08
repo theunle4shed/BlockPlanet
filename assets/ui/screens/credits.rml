@@ -1,0 +1,19 @@
+<rml>
+<head>
+    <title>Credits</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body class="credits">
+    <div id="panel">
+        <div class="title">Credits</div>
+        <div class="subtitle">The people who made Tetrisphere</div>
+        <div id="credits-scroll" class="credits-scroll">
+            <div class="credit-lead"/>
+            <div data-text="credits" data-credits="1"></div>
+            <div class="credit-tail"/>
+        </div>
+        <div class="hint for-pad">Up and down to move through them, B to go back</div>
+        <div class="hint for-keys">Arrow keys to move through them, Esc to go back</div>
+    </div>
+</body>
+</rml>

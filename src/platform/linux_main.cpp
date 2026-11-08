@@ -3269,15 +3269,37 @@ bool handle_profile_command(const std::string& command) {
             std::fprintf(stdout, "{\"event\":\"ui_command\",\"command\":\"%s\"}\n", command->c_str());
             std::fflush(stdout);
             if (*command == "exit") close_game();
-            // Credits (the main menu): the game plays its credits from the
-            // title screen (its name code CREDITS goes back to the title and
-            // sets the title's sequence, 0x800E122E, to 0). The original menu
-            // cannot go back to the title, so the game restarts as the same
-            // profile with --credits, and they start when the title shows.
-            if (*command == "credits") {
-                std::optional<std::string> name;
-                if (!guest_session && profile_store) name = profile_store->active().name;
-                restart_as(name, guest_session, {}, {"--credits"});
+            // Credits (the main menu): BlockPlanet's own credits screen (the
+            // owner's choice, 2026-11-08), built from the game's credits data
+            // in memory (from the player's ROM): 125 entries, name pointers at
+            // 0x800E031C, each entry's role group at 0x800E0512 and its line
+            // layout at 0x800E0618 (2: a two-line entry). The game's own
+            // credits sequence still plays with --credits (research).
+            if (*command == "credits" && guest_rdram != nullptr) {
+                std::vector<tetrisphere::CreditEntry> entries;
+                int previous_layout = 0;
+                bool previous_first = false;
+                for (std::uint32_t k = 0; k < 125; ++k) {
+                    tetrisphere::CreditEntry entry;
+                    entry.group = guest::load16(guest_rdram, 0x800E0512u + 2 * k);
+                    const int layout = guest::load16(guest_rdram, 0x800E0618u + 2 * k);
+                    std::uint32_t at = guest::load32(guest_rdram, 0x800E031Cu + 4 * k);
+                    for (int n = 0; n < 64 && at != 0; ++n, ++at) {
+                        const char c = char(guest::load8(guest_rdram, at));
+                        if (c == 0) break;
+                        entry.name += c;
+                    }
+                    entry.line2 = layout == 2 && previous_layout == 2 && previous_first &&
+                                  !entries.empty() && entries.back().group == entry.group;
+                    previous_first = layout == 2 && !entry.line2;
+                    previous_layout = layout;
+                    entries.push_back(entry);
+                }
+                std::string text;
+                for (const auto& line : tetrisphere::credit_lines(entries)) text += line + "\n";
+                blockplanet::ui::set_text("credits", text);
+                blockplanet::ui::request_show("credits");
+                continue;
             }
             // F5 (testing): restart the game from the title, as the same
             // profile (or guest), with the same launch options.

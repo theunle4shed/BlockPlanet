@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/relaunch.h"
 
@@ -9,6 +10,24 @@
 using namespace tetrisphere;
 
 int main(int argc, char** argv) {
+    {
+        // Credits: names in Title Case, roles gathered, a memorial line.
+        using tetrisphere::credit_name;
+        assert(credit_name("JON SCOTT MCBAIN") == "Jon Scott McBain");
+        assert(credit_name("KEN LOBB, NOA") == "Ken Lobb, NOA");
+        assert(credit_name("SAM HOSIER III") == "Sam Hosier III");
+        assert(credit_name("MR. ARAKAWA") == "Mr. Arakawa");
+        std::vector<tetrisphere::CreditEntry> e = {
+            {2, "DAVID PRIDIE", false}, {3, "BEN SMITH", false}, {2, "TIM KRAUSE", false},
+            {7, "ROY CLARKE BAILEY", false}, {7, "[1948-1993]", false},
+            {99, "TETRISPHERE WAS INSPIRED", false}, {99, "BY THE ORIGINAL TETRIS", true}};
+        const auto lines = tetrisphere::credit_lines(e);
+        assert(lines[0] == "#Programmers" && lines[1] == "David Pridie" && lines[2] == "Tim Krause");
+        assert(std::find(lines.begin(), lines.end(), "#In Memory Of") != lines.end());
+        assert(std::find(lines.begin(), lines.end(), "Roy Clarke Bailey") != lines.end());
+        assert(lines.back() == ">Tetrisphere was inspired by the original Tetris");
+    }
+
     assert(argc == 2);
     const auto data = std::filesystem::path(argv[1]) /
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <map>
 
 namespace tetrisphere {
 
@@ -372,6 +373,133 @@ std::string proper_case(const std::string& text) {
         }
     }
     return out;
+}
+
+} // namespace tetrisphere
+
+namespace tetrisphere {
+namespace {
+// The game's credit groups and BlockPlanet's titles for them (generic job
+// titles, the owner's choice 2026-11-08; read from the role pictures).
+const char* credit_role(int group) {
+    switch (group) {
+    case 1: return "Lead Graphic Artist";
+    case 2: return "Programmers";
+    case 3: return "Product Testers";
+    case 4: return "Executive Producer";
+    case 5: return "Administrator";
+    case 6: return "Product Coordinators";
+    case 7: return "Thanks To";
+    case 8: return "Technical Support";
+    case 9: return "Lead Programmer";
+    case 10: return "Soundtrack Producer / Composer";
+    case 11: return "Original Game Concept";
+    case 13: return "Utilities Programmers";
+    case 14: return "Graphic Artist";
+    case 15: return "3D Modellers / Animators";
+    case 16: return "Additional Contributions";
+    case 19: return "Special Thanks To";
+    case 20: return "Director";
+    default: return "";
+    }
+}
+} // namespace
+
+std::string credit_name(const std::string& name) {
+    std::string out;
+    std::size_t at = 0;
+    while (at < name.size()) {
+        std::size_t end = name.find(' ', at);
+        if (end == std::string::npos) end = name.size();
+        std::string word = name.substr(at, end - at);
+        std::string core = word;
+        while (!core.empty() && (core.back() == ',' || core.back() == '.')) core.pop_back();
+        const bool roman = !core.empty() && core.find_first_not_of("IVX") == std::string::npos && core.size() >= 2;
+        if (!(core == "NOA" || roman)) {
+            bool first = true;
+            for (std::size_t i = 0; i < word.size(); ++i) {
+                const unsigned char c = static_cast<unsigned char>(word[i]);
+                if (std::isalpha(c)) {
+                    word[i] = first ? char(std::toupper(c)) : char(std::tolower(c));
+                    // McBain, McCall
+                    if (!first && i >= 2 && (word[i - 2] == 'M' || word[i - 2] == 'm') && word[i - 1] == 'c' && i == 2) word[i] = char(std::toupper(c));
+                    first = false;
+                } else if (c == '-' || c == '[') {
+                    first = true;
+                }
+            }
+        }
+        if (word.size() >= 2 && word.front() == '[' && word.back() == ']') word = "\u201C" + word.substr(1, word.size() - 2) + "\u201D";
+        word.erase(std::remove(word.begin(), word.end(), '\\'), word.end());
+        if (!out.empty()) out += ' ';
+        out += word;
+        at = end + 1;
+    }
+    return out;
+}
+
+std::vector<std::string> credit_lines(const std::vector<CreditEntry>& entries) {
+    // Join two-line entries, then gather each role's names.
+    std::vector<CreditEntry> joined;  // line2 set here: a joined two-line entry (a sentence)
+    for (const auto& e : entries) {
+        if (e.line2 && !joined.empty() && joined.back().group == e.group) {
+            joined.back().name += " " + e.name;
+            joined.back().line2 = true;
+        } else {
+            joined.push_back(e);
+            joined.back().line2 = false;
+        }
+    }
+    std::vector<int> order;
+    std::map<int, std::vector<std::string>> names;
+    std::vector<std::string> memorial, closing;
+    for (std::size_t i = 0; i < joined.size(); ++i) {
+        const auto& e = joined[i];
+        if (e.name.find_first_not_of(' ') == std::string::npos) continue;
+        // "[1948-1993]" after a name: an "In Memory Of" line for that name.
+        if (e.name.front() == '[' && e.name.back() == ']' && !names[e.group].empty()) {
+            std::string years = e.name.substr(1, e.name.size() - 2);
+            if (const auto dash = years.find('-'); dash != std::string::npos) years.replace(dash, 1, "\u2013");
+            memorial.push_back(names[e.group].back());
+            memorial.push_back(years);
+            names[e.group].pop_back();
+            continue;
+        }
+        if (credit_role(e.group)[0] == '\0') {
+            // No role: a closing line ("Tetrisphere was inspired by the original Tetris").
+            std::string line = proper_case(e.name);
+            for (const char* word : {"tetris"}) {
+                for (std::size_t at = 0; (at = line.find(word, at)) != std::string::npos; ++at)
+                    if (at > 0 && line[at - 1] == ' ' && (at + 6 >= line.size() || !std::isalpha(static_cast<unsigned char>(line[at + 6])))) line[at] = 'T';
+            }
+            closing.push_back(line);
+            continue;
+        }
+        if (std::find(order.begin(), order.end(), e.group) == order.end()) order.push_back(e.group);
+        if (e.line2)
+            names[e.group].push_back(proper_case(e.name));  // a sentence ("The amazing product testers at Nintendo")
+        else
+            names[e.group].push_back(credit_name(e.name));
+    }
+    std::vector<std::string> lines;
+    for (const int group : order) {
+        if (!lines.empty()) lines.push_back("");
+        lines.push_back(std::string("#") + credit_role(group));
+        for (const auto& n : names[group]) lines.push_back(n);
+    }
+    if (!memorial.empty()) {
+        lines.push_back("");
+        lines.push_back("#In Memory Of");
+        for (std::size_t i = 0; i + 1 < memorial.size(); i += 2) {
+            lines.push_back(memorial[i]);
+            lines.push_back(memorial[i + 1]);
+        }
+    }
+    for (const auto& c : closing) {
+        lines.push_back("");
+        lines.push_back(">" + c);
+    }
+    return lines;
 }
 
 } // namespace tetrisphere

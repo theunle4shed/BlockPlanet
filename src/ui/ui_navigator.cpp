@@ -260,6 +260,15 @@ void Navigator::handle(Action action) {
     switch (action) {
     case Action::Up:
     case Action::Down:
+        // A scrolling text (the credits): Up and Down move it.
+        if (Rml::Element* scroll = screen.document->GetElementById("credits-scroll")) {
+            const float step = scroll->GetClientHeight() * 0.25f;
+            scroll->SetScrollTop(scroll->GetScrollTop() + (action == Action::Down ? step : -step));
+            manual_scroll_at_ = std::chrono::steady_clock::now();
+            break;
+        }
+        if (count != 0) move(screen, action);
+        break;
     case Action::Left:
     case Action::Right:
         if (count != 0) move(screen, action);
@@ -380,6 +389,22 @@ void Navigator::fill_text(Screen& screen) {
     for (Rml::Element* element : all) {
         const auto found = texts_.find(element->GetAttribute<Rml::String>("data-text", ""));
         const Rml::String text = found == texts_.end() ? Rml::String() : found->second;
+        if (element->HasAttribute("data-credits")) {
+            // The credits: "#Role" a heading, ">text" a closing line, "" a gap.
+            Rml::String rml;
+            std::size_t at = 0;
+            while (at < text.size()) {
+                const std::size_t end = std::min(text.find('\n', at), text.size());
+                const Rml::String line = text.substr(at, end - at);
+                if (line.empty()) rml += "<div class='credit-gap'/>";
+                else if (line[0] == '#') rml += "<div class='credit-role'>" + escaped(line.substr(1)) + "</div>";
+                else if (line[0] == '>') rml += "<div class='credit-closing'>" + escaped(line.substr(1)) + "</div>";
+                else rml += "<div class='credit-name'>" + escaped(line) + "</div>";
+                at = end + 1;
+            }
+            element->SetInnerRML(rml);
+            continue;
+        }
         if (element->HasAttribute("data-paragraphs")) {
             // One paragraph per line.
             Rml::String rml;

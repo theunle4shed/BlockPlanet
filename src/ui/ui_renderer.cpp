@@ -31,7 +31,7 @@ struct PushConstants {
 static_assert(sizeof(PushConstants) == 96);
 
 // Frames a released resource is kept for (RT64 renders up to three ahead).
-constexpr std::uint64_t retire_frames = 4;
+constexpr std::uint64_t retire_frames = 16;  // frames a released texture or buffer is kept, for frames still in flight (4 was too few on slow drivers)
 // Row pitch alignment for texture uploads (Direct3D needs 256 bytes).
 constexpr std::uint32_t row_alignment_pixels = 64;
 

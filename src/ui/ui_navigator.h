@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 
 // Screens and focus for BlockPlanet's menus (docs/UI.md). Works on an RmlUi
 // context only, so it can be tested without RT64.
@@ -116,6 +117,13 @@ private:
     std::map<std::string, std::string> texts_;
     bool pad_ = false;
     std::string alt_button_;
+public:
+    // The last time Up or Down moved a scrolling text, and the document on
+    // top (the credits' auto-scroll waits a moment after a manual move).
+    std::chrono::steady_clock::time_point manual_scroll_at() const { return manual_scroll_at_; }
+    Rml::ElementDocument* top_document() const { return stack_.empty() ? nullptr : stack_.back().document; }
+private:
+    std::chrono::steady_clock::time_point manual_scroll_at_{};
 };
 
 } // namespace blockplanet::ui

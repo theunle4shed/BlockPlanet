@@ -827,6 +827,18 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
         }
         context->Update();
         apply_card_scroll(float(height));
+        // The credits scroll by themselves, about a fifteenth of the window a
+        // second, pausing two seconds after Up or Down.
+        if (auto* doc = navigator->top_document()) {
+            if (Rml::Element* scroll = doc->GetElementById("credits-scroll")) {
+                static auto last = std::chrono::steady_clock::now();
+                const auto now = std::chrono::steady_clock::now();
+                const float dt = std::min(0.1f, std::chrono::duration<float>(now - last).count());
+                last = now;
+                if (now - navigator->manual_scroll_at() > std::chrono::seconds(2))
+                    scroll->SetScrollTop(scroll->GetScrollTop() + scroll->GetClientHeight() / 15.0f * dt);
+            }
+        }
         context->Render();
     }
     renderer->end_frame();

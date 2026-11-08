@@ -104,6 +104,20 @@ std::string game_quotes(const std::string& text);
 // The original's wording fixed, on the game's capitals (codes kept): "sphere"
 // for "ball", "bricks" for "pieces", "tallies", "cannot", "fewer than", single ! and ?.
 std::string fix_wording(const std::string& text);
+
+// BlockPlanet's credits, built from the game's credits data (read from the
+// player's ROM at run time). Each entry: the game's group (its role) and the
+// name as the game writes it (capitals); `line2` marks the second of a
+// two-line entry, to be joined to the one before.
+struct CreditEntry { int group = 0; std::string name; bool line2 = false; };
+// A name in Title Case ("JON SCOTT MCBAIN" -> "Jon Scott McBain"; NOA and
+// Roman numerals stay in capitals; [nickname] in quotes).
+std::string credit_name(const std::string& name);
+// The credits as lines for the credits screen: "#Role" a heading, "" a gap,
+// ">text" a closing line, anything else a name. Roles are BlockPlanet's own
+// generic titles; each role's names are listed together (the original splits
+// long roles over several screens), in the order the roles first appear.
+std::vector<std::string> credit_lines(const std::vector<CreditEntry>& entries);
 std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
                                                    const std::vector<double>& best_moves, int count = 100);
 
