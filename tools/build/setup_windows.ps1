@@ -78,6 +78,9 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue) -or -not (Get-Command
 foreach ($tool in @('cmake', 'ninja')) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool could not be found or installed." }
 }
+# CMake 4 refuses projects that ask for a version before 3.5, which some of
+# the pinned dependencies still do. This lets them build.
+$env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
 Write-Host "cmake: $((Get-Command cmake).Source)"
 Write-Host "ninja: $((Get-Command ninja).Source)"
 $cmake = (Get-Command cmake).Source
