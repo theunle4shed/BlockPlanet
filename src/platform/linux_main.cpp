@@ -1693,6 +1693,8 @@ void publish_game_text() {
             }
             if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
             if (box->prompt == 2) panel.hint = "Watch";
+            // A rules or goal card closes with A: say so, the same on every card.
+            if (box->kind == 1 && panel.hint.empty()) panel.hint = buttons("%A%") + " Start";
             {
                 auto family = active_family.load();
                 if (const char* o = std::getenv("BLOCKPLANET_BUTTON_FAMILY"))  // research, as for the cards' buttons
