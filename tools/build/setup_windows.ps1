@@ -31,6 +31,13 @@ Step 'Checking tools'
 foreach ($tool in @('git', 'python')) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool is not on PATH. Install it and open a new PowerShell." }
 }
+# Windows ships a "python" shortcut that only opens the Microsoft Store.
+$pythonVersion = ''
+try { $pythonVersion = (& python -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null | Out-String).Trim() } catch { }
+if ($pythonVersion -notmatch '^3\.(\d+)$' -or [int]$Matches[1] -lt 11) {
+    throw 'Python 3.11 or newer is not installed (the "python" found is Windows'' Store shortcut, or too old). Install it from https://www.python.org/downloads/ with "Add python.exe to PATH" ticked, then open a new PowerShell.'
+}
+Write-Host "python: $pythonVersion"
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 if (-not (Test-Path $vswhere)) { throw 'Visual Studio 2022 (or its Build Tools) is not installed.' }
 $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
