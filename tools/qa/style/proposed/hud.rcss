@@ -1,0 +1,388 @@
+/* BlockPlanet's in-game HUD (docs/HUD_DESIGN.md): placeholder art until the
+   owner's designs are in. Priority 1 in a container on the left, priority 2 in
+   one on the right, each centred vertically beside the sphere (placed by
+   ui_system.cpp); on portrait screens they are rows above and below.
+   Sizes in dp, laid out for a 1080-pixel-high screen. */
+
+body {
+    width: 100%;
+    height: 100%;
+    font-family: LatoLatin;
+    color: #f8f8f8;
+    font-effect: outline(1dp #1a0c04);
+    pointer-events: none;
+}
+
+div { display: block; }
+#hud { width: 100%; height: 100%; }
+
+/* The containers: tinted (the menus' colours), no border, round corners.
+   The tint is on the groups, not the container, so the magic group can leave
+   the item box clear. */
+.side { position: absolute; }
+#left { width: 232dp; }
+#right { width: 248dp; text-align: right; }
+
+.group, .rule, #magic .band, #magic .edge { background-color: #0b1020c0; }
+.group { padding: 16dp 24dp 20dp 24dp; }
+
+/* Floating numbers: points rising from where blocks cleared. */
+#popups { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.popup {
+    position: absolute;
+    width: 400dp;
+    text-align: center;
+    transform-origin: 50% 50%;
+}
+.popup .points {
+    display: block;
+    font-size: 44dp;
+    font-weight: bold;
+    color: #ffd23c;
+    font-effect: outline(3dp #3a1a04);
+}
+.popup .note {
+    display: block;
+    font-size: 24dp;
+    font-weight: bold;
+    color: #f8f8f8;
+    font-effect: outline(2dp #1a0c04);
+}
+
+/* Section titles, for new and returning players. */
+.label {
+    display: block;
+    font-size: 20dp;
+    font-weight: bold;
+    color: #9aa6c8;
+    margin-bottom: 8dp;
+    font-effect: none;
+}
+.side > :first-child { border-top-left-radius: 24dp; border-top-right-radius: 24dp; }
+.side > :last-child { border-bottom-left-radius: 24dp; border-bottom-right-radius: 24dp; }
+/* Magic as the last group (Lines has no queue): its tinted bands carry the corners. */
+#magic:last-child .band:last-child { border-bottom-left-radius: 24dp; border-bottom-right-radius: 24dp; }
+
+/* Dividers between groups: a thin light line across the tint, with room
+   either side. */
+.rule { padding: 10dp 18dp; }
+.rule .line { height: 2dp; background-color: #3a4260; }
+
+/* Hearts: three red tiles, a lost one dark. */
+#hearts, .hearts { height: 48dp; }
+.heart {
+    display: inline-block;
+    width: 40dp;
+    height: 40dp;
+    margin-right: 10dp;
+    border-radius: 12dp;
+    background-color: #e02838;
+    border: 3dp #f8f8f8;
+}
+.heart.lost { background-color: #20202880; border-color: #808080; }
+
+/* Bars: a dark track with a fill. */
+.bar {
+    display: block;
+    height: 16dp;
+    background-color: #05081080;
+    border: 2dp #f0f0f0a0;
+    border-radius: 8dp;
+}
+.bar .fill {
+    display: block;
+    height: 100%;
+    border-radius: 6dp;
+    background-color: #38c8f0;
+}
+
+/* The drop timer, below the hearts; it turns red when time is short. */
+#drop { width: 150dp; margin-top: 12dp; }
+#drop .fill { background-color: #f5c21f; }
+#drop.hurry .fill { background-color: #f05a4a; }
+
+/* Magic: a clear window for the item (the game draws its 3D model there),
+   framed by tinted bands, with the meter beneath. */
+#magic .band { height: auto; padding: 16dp 24dp 0dp 24dp; }
+#magic .band:last-child { padding: 10dp 24dp 20dp 24dp; }
+#magic .side-meter #meter-v { display: none; }
+#magic .window { height: 136dp; }
+#magic .edge { display: inline-block; width: 24dp; height: 136dp; vertical-align: top; }
+/* 24 + 184 (180 + a 2dp border each side) + 24 = the container's 232dp. The
+   box's tint is drawn by the game behind the magic's model (magic_hooks.cpp),
+   so the box itself is clear; square corners there, so only a small radius. */
+#item {
+    display: inline-block;
+    vertical-align: top;
+    width: 180dp;
+    height: 132dp;
+    border: 2dp #f0f0f040;
+    border-radius: 4dp;
+    background-color: #0b1020b0;
+}
+#item.held { background-color: transparent; }
+#item .name {
+    display: block;
+    padding-top: 50dp;
+    text-align: center;
+    font-size: 24dp;
+    font-weight: bold;
+    color: #f5821f;
+}
+#meter { width: 184dp; }
+#magic .window { white-space: nowrap; }
+#meter .fill { background-color: #9c5cf0; }
+
+/* Puzzle: drops and slides left, large. */
+.count { display: block; font-size: 64dp; font-weight: bold; line-height: 68dp; }
+
+/* Next pieces: the next one first and larger. */
+.piece {
+    display: block;
+    position: relative;
+    margin-bottom: 18dp;
+}
+.piece:last-child { margin-bottom: 0dp; }
+.piece .cell {
+    position: absolute;
+    border-radius: 5dp;
+    border: 2dp #00000060;
+}
+.piece .random-block {
+    display: block;
+    font-size: 44dp;
+    font-weight: bold;
+    color: #f5821f;
+}
+
+/* Right: mode and stage, the episode's time, progress. */
+#where .label { color: #e8b818; font-size: 24dp; }
+#stage { display: block; font-size: 64dp; font-weight: bold; }
+#time { display: block; font-size: 44dp; font-weight: bold; }
+/* Time Trial: the clock (red and pulsing in the last 30 seconds) and the score. */
+#clock { display: block; font-size: 44dp; font-weight: bold; }
+#clock.low { color: #f05a4a; animation: 0.5s sine-in-out infinite alternate pulse; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.55; } }
+#score { display: block; font-size: 40dp; font-weight: bold; }
+#score-best { display: block; font-size: 20dp; color: #c8d0e8; margin-top: 4dp; }
+.clock-inline { display: none; }
+
+/* Differences against best times: green ahead, red behind. */
+.ahead { color: #5ad46a; }
+.behind { color: #f05a4a; }
+/* Story: the combo counter, live while it builds; gold at 20 or more (magic). */
+#combo { display: block; font-size: 44dp; font-weight: bold; color: #f8f8f8; }
+#combo-group.live #combo { color: #ffd23c; }
+#combo-group.magic #combo { color: #ffd23c; font-effect: glow(1dp 6dp 0dp 0dp #ffb01899); }
+#combo-magic { display: block; font-size: 20dp; font-weight: bold; color: #ffd23c; }
+#combo-best { display: block; font-size: 20dp; color: #9aa6c8; margin-top: 2dp; }
+/* Story: the last five points added, under the score, newest first. */
+#gains { display: block; margin-top: 6dp; }
+#gains .gain { display: block; font-size: 20dp; color: #9aa6c8; }
+#gains .gain.newest { font-size: 20dp; color: #e8b818; }
+#best { display: block; font-size: 20dp; color: #c8d0e8; margin-top: 6dp; }
+#net { display: block; font-size: 26dp; font-weight: bold; margin-top: -2dp; }
+/* Splits, LiveSplit style: stage, difference, time; the current one highlighted. */
+#splits { display: block; margin-top: 12dp; }
+.split { display: block; font-size: 20dp; line-height: 28dp; color: #c8d0e8; white-space: nowrap; }
+.split .stage { display: inline-block; width: 52dp; white-space: nowrap; text-align: left; color: #9aa6c8; }
+.split .delta { display: inline-block; width: 70dp; text-align: right; font-weight: bold; }
+.split .t { display: inline-block; width: 80dp; text-align: right; }
+.split.current { color: #f8f8f8; font-weight: bold; }
+.split.current .stage { color: #e8b818; }
+#progress { height: 18dp; }
+#where .sublabel { display: block; font-size: 20dp; font-weight: bold; color: #9aa6c8; font-effect: none; margin: 8dp 0dp 6dp 0dp; }
+#progress .fill { background-color: #5ad46a; }
+/* Hide & Seek: the level's goal, in words. */
+#goal { display: block; font-size: 26dp; font-weight: bold; color: #f8f8f8; }
+
+/* VS: a narrower column per player at the outer edges. */
+.side.versus { width: 176dp; }
+.versus .group { padding: 12dp 18dp 14dp 18dp; }
+.versus .label { font-size: 20dp; margin-bottom: 6dp; }
+.versus .heart { width: 32dp; height: 32dp; margin-right: 8dp; border-radius: 10dp; }
+.versus .hearts { height: 38dp; }
+.versus .count { font-size: 44dp; line-height: 48dp; }
+.versus .rule { padding: 6dp 14dp; }
+#right.versus { text-align: right; }
+.vs-drop { width: 128dp; margin-top: 8dp; }
+#right .vs-drop { margin-left: auto; }
+.vs-drop .fill { background-color: #f5c21f; }
+.vs-drop.hurry .fill { background-color: #f05a4a; }
+.vs-item { display: block; height: 30dp; font-size: 24dp; font-weight: bold; color: #f5821f; }
+.vs-meter { margin-top: 8dp; }
+.vs-meter .fill { background-color: #9c5cf0; }
+#right.versus .piece { margin-left: auto; }
+
+/* Portrait (taller than wide): the containers become rows, the groups side by
+   side with dividers between them. */
+@media (orientation: portrait) {
+    /* Every section is 136dp tall (padding included), so the row's tint is
+       even; the magic meter is a column beside the item box, filling upwards,
+       so the row stays thin. */
+    #left, #right { width: auto; text-align: left; white-space: nowrap; }
+    .side > div { display: inline-block; vertical-align: top; }
+    .side > :first-child { border-radius: 0dp; border-top-left-radius: 24dp; border-bottom-left-radius: 24dp; }
+    .side > :last-child { border-radius: 0dp; border-top-right-radius: 24dp; border-bottom-right-radius: 24dp; }
+    .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
+    .rule { padding: 14dp 10dp; height: 108dp; }
+    .rule .line { width: 2dp; height: 108dp; }
+    #magic .band { height: auto; padding: 14dp 16dp 0dp 16dp; }
+    #magic .band:last-child { height: 3dp; padding: 0dp; }
+    #magic .band:last-child #meter { display: none; }
+    #magic .window { height: 92dp; }
+    #magic .edge { width: 16dp; height: 92dp; }
+    #magic .side-meter { width: 42dp; }
+    #magic .side-meter #meter-v {
+        display: block;
+        position: relative;
+        width: 12dp;
+        height: 88dp;
+        margin-left: 12dp;
+    }
+    #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
+    #item { width: 116dp; height: 88dp; }
+    #item .name { padding-top: 32dp; font-size: 18dp; }
+    #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
+    #stage { font-size: 40dp; line-height: 44dp; }
+    #time { font-size: 40dp; }
+    #where .sublabel { display: none; }
+    #goal { font-size: 24dp; margin-top: 4dp; }
+    .count { font-size: 48dp; line-height: 52dp; }
+    #progress { width: 120dp; margin-top: 8dp; height: 14dp; }
+    #net { display: inline-block; margin-left: 12dp; }
+    #time { display: inline-block; }
+    #clock-group, #clock-rule { display: none; }
+    .clock-inline { display: block; font-size: 26dp; font-weight: bold; margin-top: 6dp; }
+    .clock-inline.low { color: #f05a4a; }
+    #score { font-size: 32dp; }
+    #splits { margin-top: 2dp; }
+    .split { display: none; font-size: 18dp; line-height: 22dp; }
+    .split:last-child, .split.last-done { display: block; }
+}
+
+/* The title screen: the original game's notice and BlockPlanet's disclaimer. */
+#title-notice { position: absolute; text-align: center; font-effect: outline(2dp #05081a); }
+#title-notice .notice { display: block; font-size: 24dp; line-height: 30dp; color: #4fb3d0; letter-spacing: 1dp; }
+#title-notice .disclaimer { display: block; margin-top: 8dp; font-size: 20dp; line-height: 24dp; color: #9aa6c8; }
+@media (orientation: portrait) {
+    /* The title's notice on narrow screens: smaller, one line each. */
+    #title-notice .notice { font-size: 13dp; line-height: 17dp; letter-spacing: 0dp; }
+    #title-notice .disclaimer { font-size: 11dp; line-height: 14dp; margin-top: 5dp; }
+}
+
+/* The game's own text in BlockPlanet's font, placed as the game placed it. */
+.game-text {
+    position: absolute;
+    white-space: nowrap;
+    font-weight: bold;
+    font-effect: outline(2dp #1a0c04);
+}
+
+/* Button symbols in the game's text (ui_system.cpp, with_buttons). Sized in
+   em, so they follow the text. */
+.btn {
+    display: inline-block;
+    min-width: 1.15em;
+    height: 1.15em;
+    line-height: 1.15em;
+    padding: 0em 0.12em;
+    margin: 0em 0.08em;
+    text-align: center;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #f8f8f8;
+    font-effect: none;
+    vertical-align: middle;
+}
+.btn.key { border: 0.1em #e8e8f0; border-radius: 0.25em; background-color: #2a2e3c; padding: 0em 0.3em; }
+.btn.pad { border-radius: 0.6em; }
+.btn.shoulder { background-color: #2a2c34; border: 0.08em #b8bcc8; border-radius: 0.35em 0.35em 0.2em 0.2em; padding: 0em 0.3em; }
+.btn.nx { background-color: #3a3c44; border: 0.08em #d8d8e0; }
+.btn.ps { background-color: #1e2028; border: 0.08em #9098b0; position: relative; width: 1.15em; padding: 0em; }
+.ps-cross, .ps-circle, .ps-square, .ps-triangle { display: block; position: absolute; }
+.ps-cross { left: 0.22em; top: 0.22em; width: 0.7em; height: 0.7em; }
+.ps-cross .bar { display: block; position: absolute; left: 0em; top: 0.3em; width: 0.7em; height: 0.12em; background-color: #7aa8ff; }
+.ps-cross .bar.a { transform: rotate(45deg); }
+.ps-cross .bar.b { transform: rotate(-45deg); }
+.ps-circle { left: 0.27em; top: 0.27em; width: 0.45em; height: 0.45em; border: 0.1em #ff6680; border-radius: 0.35em; }
+.ps-square { left: 0.3em; top: 0.3em; width: 0.42em; height: 0.42em; border: 0.1em #e080d0; }
+.ps-triangle { left: 0.25em; top: 0.3em; width: 0em; height: 0em; border-left: 0.32em transparent; border-right: 0.32em transparent; border-bottom: 0.52em #40c8a0; border-top: 0em transparent; }
+
+/* A card's panel in the menus' style (Training's speech bubble, replaced):
+   the menus' tint and white rim, holding its text, growing upwards from its
+   bottom edge. The tail is a square turned 45 degrees with the rim on two
+   sides, half inside the panel, so panel and tail read as one shape. */
+.card-panel {
+    position: absolute;
+    padding: 0.7em 0.95em 0.35em 0.95em;
+    background-color: #0b1020f0;
+    border: 3dp #f0f0f0;
+    border-radius: 24dp;
+    font-effect: none;
+    white-space: normal;
+    line-height: 1.32;
+}
+.card-heading {
+    display: block;
+    font-weight: bold;
+    font-size: 1em;
+    margin-bottom: 0.35em;
+}
+.card-body {
+    display: block;
+    font-style: italic;
+    font-weight: normal;
+}
+.card-body .hl { font-weight: bold; }
+/* A game term where Wheels or a card introduces it: a soft glow. */
+.card-body .hl.new { font-effect: glow(1dp 4dp 0dp 0dp #3fa8ff90); }
+.card-hint {
+    display: block;
+    text-align: left;  /* the tail is under the right of the bottom edge */
+    color: #e8b818;
+    font-weight: normal;
+    font-size: 0.6em;
+    margin-top: 0.75em;  /* clear of the text above */
+}
+.card-tail {
+    position: absolute;
+    margin-left: -2.6vh;
+    margin-bottom: -2.6vh;
+    width: 5.2vh;
+    height: 5.2vh;
+    background-color: #0b1020f0;
+    border-right: 3dp #f0f0f0;
+    border-bottom: 3dp #f0f0f0;
+    transform: rotate(45deg);
+}
+.card-scroll {
+    display: block;
+    overflow-y: hidden;  /* scrolled by BlockPlanet (right stick, Page Up / Down, wheel) */
+}
+
+/* Training: one row along the bottom (as the portrait rows), holding only
+   what Wheels has introduced. A part just introduced glows for a moment. */
+#left.row { width: auto; text-align: left; transform: scale(1.3); transform-origin: 50% 100%; }
+#left.row > div { display: inline-block; vertical-align: top; }
+#left.row > :first-child { border-radius: 0dp; border-top-left-radius: 24dp; border-bottom-left-radius: 24dp; }
+#left.row > :last-child { border-radius: 0dp; border-top-right-radius: 24dp; border-bottom-right-radius: 24dp; }
+#left.row .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
+#left.row .rule { padding: 14dp 10dp; height: 108dp; }
+#left.row .rule .line { width: 2dp; height: 108dp; }
+#left.row #magic .band { height: auto; padding: 14dp 16dp 0dp 16dp; }
+#left.row #magic .band:last-child { height: 3dp; padding: 0dp; }
+#left.row #magic .band:last-child #meter { display: none; }
+#left.row #magic .window { height: 92dp; }
+#left.row #magic .edge { width: 16dp; height: 92dp; }
+#left.row #magic .side-meter { width: 42dp; }
+#left.row #magic .side-meter #meter-v { display: block; position: relative; width: 12dp; height: 88dp; margin-left: 12dp; }
+#left.row #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
+#left.row #item { width: 116dp; height: 88dp; }
+#left.row #item .name { padding-top: 32dp; font-size: 18dp; }
+#left.row #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
+#left.row #progress { width: 160dp; margin-top: 18dp; height: 14dp; }
+#left.row .count { font-size: 48dp; line-height: 52dp; }
+#left.row .intro { background-color: #e8b81838; }
+#left.row .intro .label { color: #e8b818; }
+.card-para + .card-para, .card-para + .card-heading { margin-top: 0.55em; }
