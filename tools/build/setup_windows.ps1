@@ -134,12 +134,19 @@ Run $cmake @('-S', '.local\deps\N64Recomp', '-B', $toolBuild, '-G', 'Ninja', '-D
 Run $cmake @('--build', $toolBuild, '--target', 'N64RecompCLI', 'RSPRecomp')  # N64RecompCLI makes N64Recomp.exe; the N64Recomp target is its library
 
 Step 'Generating the game code from your ROM'
-if (Test-Path '.local\m1\linux-generated') { Remove-Item -Recurse -Force '.local\m1\linux-generated' }
-if (Test-Path '.local\m1\linux-generated-manifest.json') { Remove-Item -Force '.local\m1\linux-generated-manifest.json' }
-Run $python @('-m', 'tools.recomp.generate', 'create-receipt')
-Run $python @('-m', 'tools.recomp.generate', 'generate', '--rom', $romCopy,
-    '--output', '.local\m1\linux-generated', '--manifest', '.local\m1\linux-generated-manifest.json',
-    '--recompiler', (Join-Path $toolBuild 'N64Recomp.exe'))
+# Only when something it is made from changed (the recompiler settings, or the
+# recompiler): regenerated files make the whole game code compile again.
+& $python 'tools\build\generated_is_current.py' '.local\m1\linux-generated-manifest.json' '.local\m1\linux-generated\functions' (Join-Path $toolBuild 'N64Recomp.exe')
+if ($LASTEXITCODE -eq 0) {
+    Write-Host 'Skipped: nothing it is made from has changed.'
+} else {
+    if (Test-Path '.local\m1\linux-generated') { Remove-Item -Recurse -Force '.local\m1\linux-generated' }
+    if (Test-Path '.local\m1\linux-generated-manifest.json') { Remove-Item -Force '.local\m1\linux-generated-manifest.json' }
+    Run $python @('-m', 'tools.recomp.generate', 'create-receipt')
+    Run $python @('-m', 'tools.recomp.generate', 'generate', '--rom', $romCopy,
+        '--output', '.local\m1\linux-generated', '--manifest', '.local\m1\linux-generated-manifest.json',
+        '--recompiler', (Join-Path $toolBuild 'N64Recomp.exe'))
+}
 
 Step 'Generating the audio microcode from your ROM'
 Run $python @('tools\build\extract_audio_ucode.py', '--rom', $romCopy)
