@@ -2392,7 +2392,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // folder: the save stays in memory and no trophies are earned.
     profile_store = std::make_unique<ProfileStore>(user_path);
     guest_session = run_options.guest;
-    unlock_all_testing = run_options.unlock_all;
+    unlock_all_testing = run_options.unlock_all || std::getenv("BLOCKPLANET_UNLOCK_ALL") != nullptr;
     auto& profiles = *profile_store;
     std::string profile_error;
     if (!profiles.load(profile_error) ||

@@ -94,9 +94,15 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 /* Long lists scroll inside the panel. */
 .list {
     display: block;
-    max-height: 600dp;
+    width: 100%;          /* full width, so names do not wrap */
+    max-height: 52vh;     /* fits smaller windows; the rest scrolls */
     overflow-y: auto;
 }
+/* The scrollbar of a long list: a thin orange bar on a faint track. */
+scrollbarvertical { width: 8dp; margin-left: 8dp; }
+scrollbarvertical slidertrack { background-color: #ffffff14; border-radius: 4dp; }
+scrollbarvertical sliderbar { background-color: #f5821fcc; border-radius: 4dp; min-height: 32dp; }
+scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0dp; height: 0dp; }
 
 /* A wider panel, for the name screen's keyboard. */
 #panel.wide { width: 860dp; }
