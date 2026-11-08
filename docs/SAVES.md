@@ -95,6 +95,7 @@ Agreed layout (2026-11-02):
   | Local and online battles won and lost | `battle_result` (local VS with people now; online later) |
   | Magic (power weapons) used | `magic_used` |
   | Blocks destroyed by magic | `blocks_destroyed` with `by_magic` |
+- **Before anyone is chosen** (the intro, the title and "Who is playing?"), the game runs as the profile played last, so its audio levels (and controls) apply; choosing it carries on, and choosing another restarts as them (the owner's choice, 2026-11-08). In local multiplayer, Player 1's profile sets the sound: there is one set of speakers.
 - **`settings.dat` stays shared by the PC:** resolution, window, aspect, filters, sphere detail, audio output.
 - **`records.json`, shared by the PC:** best times, high scores and Time Trial runs per mode, each entry tagged with the profile that set it, viewable for everyone or one profile. Guests do not set records. Daily challenges and online leaderboards can build on it.
 - Decoding the cartridge save, so its scores and names can appear in the new menus and be copied into `records.json`.
