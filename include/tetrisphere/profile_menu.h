@@ -118,6 +118,9 @@ std::string credit_name(const std::string& name);
 // generic titles; each role's names are listed together (the original splits
 // long roles over several screens), in the order the roles first appear.
 std::vector<std::string> credit_lines(const std::vector<CreditEntry>& entries);
+// BlockPlanet's own credits, after the game's: the port, Blocksphere, and the
+// projects it is built on (the README's credits), in the same line format.
+std::vector<std::string> blockplanet_credit_lines();
 std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
                                                    const std::vector<double>& best_moves, int count = 100);
 

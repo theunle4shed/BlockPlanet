@@ -3297,6 +3297,7 @@ bool handle_profile_command(const std::string& command) {
                 }
                 std::string text;
                 for (const auto& line : tetrisphere::credit_lines(entries)) text += line + "\n";
+                for (const auto& line : tetrisphere::blockplanet_credit_lines()) text += line + "\n";
                 blockplanet::ui::set_text("credits", text);
                 blockplanet::ui::request_show("credits");
                 continue;

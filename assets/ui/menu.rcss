@@ -268,15 +268,18 @@ body.compact .subtitle { margin-bottom: 16dp; }
 
 /* The credits (credits.rml): one centred column that scrolls by itself;
    roles as headings (yellow, bold), names under them (Body). */
-body.credits #panel { left: 50%; margin-left: -400dp; width: 800dp; top: 40dp; padding: 40dp 56dp; text-align: center; }
-.credits-scroll { display: block; height: 62vh; overflow-y: auto; }
+/* Centred both ways: 7% of the window above and below; the list fills the rest. */
+body.credits #panel { left: 50%; margin-left: -400dp; width: 800dp; top: 7vh; height: 86vh; padding: 40dp 56dp;
+                      text-align: center; display: flex; flex-direction: column; box-sizing: border-box; }
+body.credits .subtitle { margin-bottom: 28dp; }
+.credits-scroll { display: block; flex: 1; overflow-y: auto; }
 .credits-scroll scrollbarvertical { width: 0dp; }
 .credit-lead, .credit-tail { display: block; height: 58vh; }
 .credit-role { display: block; font-size: 30dp; font-weight: bold; color: #e8b818; margin-bottom: 8dp; }
 .credit-name { display: block; font-size: 26dp; line-height: 36dp; color: #f0f2f8; }
 .credit-gap { display: block; height: 40dp; }
 .credit-closing { display: block; font-size: 26dp; font-style: italic; color: #c8d0e8; }
-body.credits .hint { margin-top: 16dp; text-align: center; }
+body.credits .hint { margin-top: 28dp; text-align: center; }
 body.credits .hint.for-pad { display: none; }
 body.credits.pad .hint.for-pad { display: block; }
 body.credits .hint.for-keys { display: block; }

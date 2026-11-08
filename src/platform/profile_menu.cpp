@@ -375,6 +375,32 @@ std::string proper_case(const std::string& text) {
     return out;
 }
 
+std::vector<std::string> blockplanet_credit_lines() {
+    return {
+        "", "", "#BlockPlanet", ">A recompiled Tetrisphere for PC", "",
+        "#Created By", "theunle4shed", "",
+        "#Built On", "Blocksphere, by djultra64", "",
+        "#Recompilation and Runtime",
+        "N64Recomp and RSPRecomp \u00B7 Wiseguy and contributors",
+        "N64ModernRuntime \u00B7 N64Recomp contributors", "",
+        "#Rendering", "RT64 \u00B7 RT64 contributors", "plume and re-spirv \u00B7 renderbag and contributors", "",
+        "#Interface", "RmlUi \u00B7 RmlUi contributors", "FreeType \u00B7 The FreeType Project", "Lato \u00B7 \u0141ukasz Dziedzic", "",
+        "#Input and Sound", "SDL2 \u00B7 Sam Lantinga and contributors", "SDL_GameControllerDB \u00B7 community contributors", "",
+        "#Libraries",
+        "ELFIO \u00B7 {fmt} \u00B7 Rabbitizer \u00B7 SLJIT \u00B7 toml++",
+        "miniz \u00B7 o1heap \u00B7 xxHash \u00B7 Zstandard",
+        "nlohmann/json \u00B7 stb \u00B7 Dear ImGui \u00B7 volk",
+        "Vulkan Memory Allocator \u00B7 D3D12 Memory Allocator",
+        "SPIRV-Cross \u00B7 DirectX Shader Compiler", "",
+        "#Research",
+        "splat \u00B7 spimdisasm \u00B7 ares \u00B7 Ghidra",
+        "n64tetristools and dcm2xm \u00B7 Chris Gilmore", "",
+        "#Developed With", "Claude Code (Anthropic)", "Blocksphere: OpenAI Codex", "",
+        "#Thanks", "The N64 recompilation, emulation and preservation communities", "",
+        ">Tetrisphere is a trademark of Nintendo. BlockPlanet is an unofficial fan project.",
+    };
+}
+
 } // namespace tetrisphere
 
 namespace tetrisphere {
@@ -459,7 +485,6 @@ std::vector<std::string> credit_lines(const std::vector<CreditEntry>& entries) {
         // "[1948-1993]" after a name: an "In Memory Of" line for that name.
         if (e.name.front() == '[' && e.name.back() == ']' && !names[e.group].empty()) {
             std::string years = e.name.substr(1, e.name.size() - 2);
-            if (const auto dash = years.find('-'); dash != std::string::npos) years.replace(dash, 1, "\u2013");
             memorial.push_back(names[e.group].back());
             memorial.push_back(years);
             names[e.group].pop_back();
