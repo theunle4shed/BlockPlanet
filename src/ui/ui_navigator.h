@@ -72,6 +72,7 @@ public:
     void set_text(const std::string& name, const std::string& text);
     void set_pad(bool pad);
     // The Alt button as RML (a button badge), for the hints.
+    void set_rml(const std::string& name, const std::string& rml);  // for [data-buttons] elements
     void set_alt_button(const std::string& rml);
 
     // Commands chosen by the player (command:NAME), oldest first.
@@ -115,6 +116,7 @@ private:
     std::map<std::string, std::string> settings_;
     std::map<std::string, std::vector<ListItem>> lists_;
     std::map<std::string, std::string> texts_;
+    std::map<std::string, std::string> rmls_;  // ready-made RML (button hints)
     bool pad_ = false;
     std::string alt_button_;
 public:

@@ -12,8 +12,7 @@
             <div data-text="credits" data-credits="1"></div>
             <div class="credit-tail"/>
         </div>
-        <div class="hint for-pad">Up and down to move through them, B to go back</div>
-        <div class="hint for-keys">Arrow keys to move through them, Esc to go back</div>
+        <div class="hint" data-buttons="move_back"></div>
     </div>
 </body>
 </rml>

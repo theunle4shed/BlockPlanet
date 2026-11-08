@@ -33,6 +33,9 @@ void set_setting(const std::string& name, const std::string& value);
 void set_list(const std::string& name, std::vector<ListItem> items);
 // Text for elements with data-text="NAME". Applied at the next frame.
 void set_text(const std::string& name, const std::string& text);
+// As set_text, with [family:name] tokens drawn as button icons (data-buttons
+// elements): [k:Esc] a key cap, [x:B] an Xbox button, [d:pad] a d-pad.
+void set_button_text(const std::string& name, const std::string& text);
 
 // Whether the player is using a controller (true) or the keyboard; screens
 // get the class "pad" while a controller is used.

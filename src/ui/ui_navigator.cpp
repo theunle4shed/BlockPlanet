@@ -383,7 +383,20 @@ void Navigator::set_text(const std::string& name, const std::string& text) {
     for (auto& screen : stack_) fill_text(screen);
 }
 
+void Navigator::set_rml(const std::string& name, const std::string& rml) {
+    rmls_[name] = rml;
+    for (auto& screen : stack_) fill_text(screen);
+}
+
 void Navigator::fill_text(Screen& screen) {
+    {
+        Rml::ElementList with_rml;
+        screen.document->QuerySelectorAll(with_rml, "[data-buttons]");
+        for (Rml::Element* element : with_rml) {
+            const auto found = rmls_.find(element->GetAttribute<Rml::String>("data-buttons", ""));
+            element->SetInnerRML(found == rmls_.end() ? Rml::String() : found->second);
+        }
+    }
     Rml::ElementList all;
     screen.document->QuerySelectorAll(all, "[data-text]");
     for (Rml::Element* element : all) {

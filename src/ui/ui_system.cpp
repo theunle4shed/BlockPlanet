@@ -73,6 +73,7 @@ struct ListRequest {
 struct TextRequest {
     std::string name;
     std::string text;
+    bool buttons = false;  // render [family:name] tokens as button icons
 };
 struct AltButtonRequest {
     std::string spec;  // "[family:name]", as in the cards
@@ -118,6 +119,7 @@ bool start(std::uint32_t width, std::uint32_t height) {
 }
 
 std::string with_buttons(const std::string& escaped_text);
+std::string escape(const std::string& text);
 
 // The card panel's scrolling (presentation thread): the page shown (its
 // heading and first words), how far it is scrolled, whether it follows the
@@ -218,7 +220,8 @@ void apply_requests() {
         } else if (auto* pad = std::get_if<PadRequest>(&request)) {
             navigator->set_pad(pad->pad);
         } else if (auto* text = std::get_if<TextRequest>(&request)) {
-            navigator->set_text(text->name, text->text);
+            if (text->buttons) navigator->set_rml(text->name, with_buttons(escape(text->text)));
+            else navigator->set_text(text->name, text->text);
         } else if (auto* alt = std::get_if<AltButtonRequest>(&request)) {
             navigator->set_alt_button(with_buttons(alt->spec));
         } else {
@@ -332,7 +335,9 @@ std::string with_buttons(const std::string& escaped_text) {
         const std::string name = escaped_text.substr(open + 3, close - open - 3);
         const bool shoulder = family != 'k' && ((name.size() == 2 && (name[0] == 'L' || name[0] == 'R' || name[0] == 'Z')) ||
                                                 name == "L" || name == "R");
-        if (shoulder) {  // bumpers and triggers: a dark rounded bar with its name
+        if (family == 'd') {  // the d-pad: a small cross on a dark cap
+            out += "<span class='btn pad dpad'><span class='dpad-cross'><span class='arm h'/><span class='arm v'/></span></span>";
+        } else if (shoulder) {  // bumpers and triggers: a dark rounded bar with its name
             out += "<span class='btn shoulder'>" + name + "</span>";
         } else if (family == 'k') {
             out += "<span class='btn key'>" + name + "</span>";
@@ -899,6 +904,11 @@ void set_list(const std::string& name, std::vector<ListItem> items) {
 void set_text(const std::string& name, const std::string& text) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(TextRequest{name, text});
+}
+
+void set_button_text(const std::string& name, const std::string& text) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(TextRequest{name, text, true});
 }
 
 void set_alt_button(const std::string& spec) {

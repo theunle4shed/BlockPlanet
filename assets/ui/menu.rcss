@@ -256,6 +256,12 @@ body.lists .description.empty { display: none; }
 .btn.nx { background-color: #3a3c44; border: 0.08em #d8d8e0; }
 .btn.ps { background-color: #1e2028; border: 0.08em #9098b0; position: relative; width: 1.15em; padding: 0em; }
 .ps-cross, .ps-circle, .ps-square, .ps-triangle { display: block; position: absolute; }
+/* The d-pad: a light cross on a dark cap. */
+.btn.dpad { background-color: #2a2c34; border: 0.08em #b8bcc8; position: relative; width: 1.15em; padding: 0em; }
+.dpad-cross { display: block; position: absolute; left: 0.2em; top: 0.2em; width: 0.75em; height: 0.75em; }
+.dpad-cross .arm { display: block; position: absolute; background-color: #e8ecf6; border-radius: 0.05em; }
+.dpad-cross .arm.h { left: 0em; top: 0.27em; width: 0.75em; height: 0.21em; }
+.dpad-cross .arm.v { left: 0.27em; top: 0em; width: 0.21em; height: 0.75em; }
 
 /* Long lists (the main menu): smaller rows so the description fits. */
 body.compact #panel { top: 40dp; padding: 40dp 48dp; }
@@ -280,7 +286,4 @@ body.credits .subtitle { margin-bottom: 28dp; }
 .credit-gap { display: block; height: 40dp; }
 .credit-closing { display: block; font-size: 26dp; font-style: italic; color: #c8d0e8; }
 body.credits .hint { margin-top: 28dp; text-align: center; }
-body.credits .hint.for-pad { display: none; }
-body.credits.pad .hint.for-pad { display: block; }
-body.credits .hint.for-keys { display: block; }
-body.credits.pad .hint.for-keys { display: none; }
+

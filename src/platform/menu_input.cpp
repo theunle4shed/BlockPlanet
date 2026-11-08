@@ -62,6 +62,11 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         const std::string spec = !pad ? std::string("[k:T]")
                                       : std::string("[") + f + ":" + physical_button_label(family, bindings.face_left) + "]";
         if (spec != shown) blockplanet::ui::set_alt_button(shown = spec);
+        // The credits' hint: move and back, in the device's own buttons.
+        static std::string hint;
+        const std::string now = !pad ? std::string("[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back")
+                                     : std::string("[d:pad] Move\u00A0\u00A0\u00A0[") + f + ":" + physical_button_label(family, bindings.cancel) + "] Back";
+        if (now != hint) blockplanet::ui::set_button_text("move_back", hint = now);
     }
     auto send = [](Action action) {
         blockplanet::ui::queue_action(action);
