@@ -49,6 +49,9 @@ struct RunOptions {
     std::optional<int> start_chapter;
     // Every Story episode and stage open in the menus, for testing.
     bool unlock_all = false;
+    // Play the credits once the title shows (Credits on the main menu
+    // restarts the game with this; not kept on later restarts).
+    bool credits = false;
 };
 
 RunOptions parse_run_options(int argc, const char* const argv[]);

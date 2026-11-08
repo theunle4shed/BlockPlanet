@@ -52,7 +52,7 @@ std::vector<std::string> relaunch_arguments(const std::vector<std::string>& orig
                                             const std::optional<std::string>& profile, bool guest) {
     std::vector<std::string> result;
     for (const auto& argument : original) {
-        if (argument == "--guest" || argument.rfind("--profile=", 0) == 0) continue;
+        if (argument == "--guest" || argument == "--credits" || argument.rfind("--profile=", 0) == 0) continue;
         result.push_back(argument);
     }
     if (guest) result.insert(result.begin(), "--guest");

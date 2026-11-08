@@ -112,6 +112,7 @@ bool unlock_all_testing = false;
 // Start-up screens (the owner's choice, 2026-11-08): title, then who is
 // playing (P1), then the main menu; Back goes back through them.
 bool profile_picked = false;  // P1 chosen this session (or given on the command line)
+bool credits_pending = false; // --credits: play them when the title shows
 
 // The active profile's save file (progress and preferences); none for a
 // guest. Progress is not recorded with --start-chapter (a testing option).
@@ -2435,6 +2436,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // Who is playing is asked after the title (the owner's choice), unless
     // the command line said (as it does when the game restarts as a profile).
     profile_picked = run_options.profile.has_value() || run_options.guest;
+    credits_pending = run_options.credits;
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
         std::exit(74);
@@ -2848,7 +2850,8 @@ void shut_down() {
 // Restarts the game as another profile or as a guest (the game reads its
 // cartridge save while booting). `remove_id`, if set, is a profile deleted
 // once nothing is using its folder any more.
-[[noreturn]] void restart_as(std::optional<std::string> profile, bool guest, const std::string& remove_id = {}) {
+[[noreturn]] void restart_as(std::optional<std::string> profile, bool guest, const std::string& remove_id = {},
+                             const std::vector<std::string>& extra = {}) {
     std::fprintf(stdout, "{\"event\":\"profile_restart\",\"profile\":\"%s\",\"guest\":%s}\n",
                  profile ? profile->c_str() : "", guest ? "true" : "false");
     std::fflush(stdout);
@@ -2862,7 +2865,9 @@ void shut_down() {
         }
         if (!guest) profile = profile_store->active().name;
     }
-    if (!relaunch(relaunch_arguments(launch_arguments(), profile, guest))) {
+    auto arguments = relaunch_arguments(launch_arguments(), profile, guest);
+    arguments.insert(arguments.end(), extra.begin(), extra.end());
+    if (!relaunch(arguments)) {
         std::fprintf(stderr, "Could not restart BlockPlanet.\n");
         std::exit(75);
     }
@@ -3264,6 +3269,16 @@ bool handle_profile_command(const std::string& command) {
             std::fprintf(stdout, "{\"event\":\"ui_command\",\"command\":\"%s\"}\n", command->c_str());
             std::fflush(stdout);
             if (*command == "exit") close_game();
+            // Credits (the main menu): the game plays its credits from the
+            // title screen (its name code CREDITS goes back to the title and
+            // sets the title's sequence, 0x800E122E, to 0). The original menu
+            // cannot go back to the title, so the game restarts as the same
+            // profile with --credits, and they start when the title shows.
+            if (*command == "credits") {
+                std::optional<std::string> name;
+                if (!guest_session && profile_store) name = profile_store->active().name;
+                restart_as(name, guest_session, {}, {"--credits"});
+            }
             // F5 (testing): restart the game from the title, as the same
             // profile (or guest), with the same launch options.
             if (*command == "reset") restart_as(std::nullopt, guest_session);
@@ -3606,8 +3621,13 @@ bool handle_profile_command(const std::string& command) {
             static bool title_seen = false;
             const bool title_now = blockplanet_title_recent(nullptr);
             title_seen = title_seen || title_now;
+            if (credits_pending && title_now && guest_rdram != nullptr) {
+                credits_pending = false;
+                guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x800E122E, 0);
+            }
             const bool at_game_menu = guest_rdram != nullptr && title_seen && !title_now &&
-                                      guest::load16(guest_rdram, 0x800E121C) >= 0;
+                                      guest::load16(guest_rdram, 0x800E121C) >= 0 &&
+                                      guest::load16(guest_rdram, 0x800E122E) < 0;  // not in the credits
             if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !mode_launcher.active() &&
                 !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0) {
                 if (profile_picked || !profile_store) {

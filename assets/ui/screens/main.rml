@@ -16,7 +16,7 @@
         <div class="item" id="media" data-action="command:media_player">Media Player<span class="note">coming later</span></div>
         <div class="item" id="trophies" data-action="command:trophies">Trophies<span class="note">coming later</span></div>
         <div class="item" id="options" data-action="open:options" data-description="Graphics, sound, controls and more.">Options</div>
-        <div class="item" id="credits" data-action="command:credits">Credits<span class="note">coming later</span></div>
+        <div class="item" id="credits" data-action="command:credits" data-description="The people who made Tetrisphere.">Credits</div>
         <div class="item" id="exit" data-action="command:exit">Exit</div>
         <div id="description" class="description"></div>
     </div>

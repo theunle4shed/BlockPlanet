@@ -118,6 +118,10 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             result.casual = true;
             continue;
         }
+        if (argument == "--credits") {
+            result.credits = true;
+            continue;
+        }
         if (argument == "--unlock-all") {
             result.unlock_all = true;
             continue;
