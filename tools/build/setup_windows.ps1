@@ -12,7 +12,7 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Rom,
+    [string]$Rom = '',  # optional after the first run: the copy in .local\m0 is used
     [switch]$SkipDependencies
 )
 
@@ -117,7 +117,11 @@ $cmake = (Get-Command cmake).Source
 Step 'Your ROM (kept private in .local\m0)'
 New-Item -ItemType Directory -Force -Path '.local\m0' | Out-Null
 $romCopy = Join-Path $root '.local\m0\tetrisphere-us.z64'
-Copy-Item -LiteralPath $Rom -Destination $romCopy -Force
+if ($Rom) {
+    if ((Resolve-Path -LiteralPath $Rom).Path -ne [System.IO.Path]::GetFullPath($romCopy)) { Copy-Item -LiteralPath $Rom -Destination $romCopy -Force }
+} elseif (-not (Test-Path -LiteralPath $romCopy)) {
+    throw 'Give your ROM the first time: -Rom C:\path\to\Tetrisphere.z64'
+}
 
 if (-not $SkipDependencies) {
     Step 'Fetching the pinned dependencies (N64Recomp, N64ModernRuntime, RT64)'
