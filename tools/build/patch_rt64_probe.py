@@ -484,6 +484,9 @@ def replace_once(source: str, anchor: str, replacement: str) -> str:
 
 
 def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True) -> bytes:
+    # Git for Windows may check files out with CRLF line ends: the pinned
+    # hashes are of the LF files, so compare (and patch) those.
+    raw = raw.replace(b"\r\n", b"\n")
     actual = hashlib.sha256(raw).hexdigest()
     if actual != expected_sha256:
         raise ValueError(f"RT64 {name} SHA256 mismatch: {actual}")

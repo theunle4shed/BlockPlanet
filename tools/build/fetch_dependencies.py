@@ -127,7 +127,9 @@ def fetch_dependency(root: Path, entry: dict) -> list[str]:
     checkout = root / entry["name"]
     if checkout.exists():
         return verify_checkout(checkout, entry)
-    cloned = subprocess.run(["git", "clone", "--no-checkout", entry["repository"],
+    # Line ends as committed (Git for Windows would turn them into CRLF), so
+    # files match their pinned hashes.
+    cloned = subprocess.run(["git", "clone", "-c", "core.autocrlf=false", "--no-checkout", entry["repository"],
                              str(checkout)], text=True, capture_output=True, check=False)
     if cloned.returncode:
         return ["clone_failed: " + cloned.stderr.strip().splitlines()[-1]]
