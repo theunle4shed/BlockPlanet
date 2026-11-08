@@ -3535,6 +3535,21 @@ bool handle_profile_command(const std::string& command) {
             launch_mode(continue_mode->mode, continue_mode->keep_music);
             if (mode_launcher.active()) continue_mode.reset();
         }
+        // BlockPlanet's menus in place of the original's (the owner's choice,
+        // 2026-11-08): whenever the game is at its own menus (after the title,
+        // after quitting), BlockPlanet's main menu opens, and the original
+        // menu is not drawn behind it. BLOCKPLANET_ORIGINAL_MENUS=1 keeps the
+        // original menus (F1 still opens BlockPlanet's).
+        {
+            static const bool original_menus = std::getenv("BLOCKPLANET_ORIGINAL_MENUS") != nullptr;
+            const bool at_game_menu = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) >= 0 &&
+                                      !blockplanet_title_recent(nullptr);
+            if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !mode_launcher.active() &&
+                !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0)
+                blockplanet::ui::request_open("main");
+            blockplanet::set_game_menu_hidden(!original_menus && at_game_menu &&
+                                              (blockplanet::ui::menus_open() || mode_launcher.active()));
+        }
         const auto now = std::chrono::steady_clock::now();
         if (perf_log_enabled && now - perf_window_start >= perf_interval) {
             auto& metrics = perf_metrics();

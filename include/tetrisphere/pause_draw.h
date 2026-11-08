@@ -16,6 +16,9 @@ void set_pause_menu_shown(bool shown);
 // 2D draws and the 3D piece queue is not drawn, so BlockPlanet's own HUD can
 // replace them. The routine's logic (magic launch, jingles) still runs.
 void set_original_hud_hidden(bool hidden);
+// While BlockPlanet's menus are open over the game's own menus: skip the
+// original menu's 2D drawing.
+void set_game_menu_hidden(bool hidden);
 
 // The game's text in BlockPlanet's font (docs/ROADMAP.md, every screen in
 // BlockPlanet's style): strings the game draws with its text routine

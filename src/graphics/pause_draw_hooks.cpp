@@ -83,6 +83,9 @@ const Settings& settings() {
 
 std::atomic<bool> menu_shown{false};
 std::atomic<bool> hud_hidden{false};
+// While BlockPlanet's menus are open over the game's own menus: their 2D
+// drawing (frame, lines, logo, hints, text) is skipped.
+std::atomic<bool> game_menu_hidden{false};
 // Set while func_80075CD8 runs (game thread only).
 bool in_hud = false;
 
@@ -125,9 +128,11 @@ std::optional<CardBox> recent_card_box() {
 }
 void set_pause_menu_shown(bool shown) { menu_shown.store(shown); }
 void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
+void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
 }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    if (game_menu_hidden.load(std::memory_order_relaxed) && is_2d_helper(helper) && guest16(rdram, 0x800E121Cu) >= 0) return true;
     // Training draws its speech (text and bubble) and its pointing arrows in
     // the HUD routine too: they stay when the original HUD is hidden (the
     // speech is then captured and replaced below).
