@@ -3211,6 +3211,9 @@ bool handle_profile_command(const std::string& command) {
             std::fprintf(stdout, "{\"event\":\"ui_command\",\"command\":\"%s\"}\n", command->c_str());
             std::fflush(stdout);
             if (*command == "exit") close_game();
+            // F5 (testing): restart the game from the title, as the same
+            // profile (or guest), with the same launch options.
+            if (*command == "reset") restart_as(std::nullopt, guest_session);
             if (handle_audio_setting(*command)) continue;
             if (handle_hud_setting(*command)) continue;
             if (handle_text_setting(*command)) continue;

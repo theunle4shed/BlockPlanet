@@ -31,6 +31,11 @@ std::map<std::pair<SDL_JoystickID, int>, int> stick;
 } // namespace
 
 bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBindings& bindings) {
+    // F5: restart the game from the title (for testing, when stuck).
+    if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_F5) {
+        blockplanet::ui::send_command("reset");
+        return true;
+    }
     if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_F1) {
         if (blockplanet::ui::menus_open()) blockplanet::ui::request_close();
         else if (in_play.load()) blockplanet::ui::send_command("pause");
