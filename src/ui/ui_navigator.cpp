@@ -145,6 +145,7 @@ void Navigator::fill(Screen& screen) {
             element->SetAttribute("data-action", entry.action);
             if (entry.focus) element->SetAttribute("data-focus", true);
             if (!entry.description.empty()) element->SetAttribute("data-description", entry.description);
+            if (!entry.alt.empty()) element->SetAttribute("data-alt", entry.alt);
             if (entry.span > 1) {
                 element->SetAttribute("data-span", entry.span);
                 element->SetClass("span" + std::to_string(entry.span), true);

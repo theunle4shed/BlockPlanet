@@ -2442,6 +2442,9 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // the command line said (as it does when the game restarts as a profile).
     profile_picked = run_options.profile.has_value() || run_options.guest;
     credits_pending = run_options.credits;
+    // The menus' button hints before any input (menu_input.cpp then follows the device).
+    blockplanet::ui::set_button_text("new_profile_hint", "[k:T] New profile");
+    blockplanet::ui::set_button_text("move_back", "[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back");
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
         std::exit(74);

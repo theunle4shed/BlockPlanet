@@ -67,6 +67,8 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         const std::string now = !pad ? std::string("[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back")
                                      : std::string("[d:pad] Move\u00A0\u00A0\u00A0[") + f + ":" + physical_button_label(family, bindings.cancel) + "] Back";
         if (now != hint) blockplanet::ui::set_button_text("move_back", hint = now);
+        static std::string new_hint;
+        if (spec + " New profile" != new_hint) blockplanet::ui::set_button_text("new_profile_hint", new_hint = spec + " New profile");
     }
     auto send = [](Action action) {
         blockplanet::ui::queue_action(action);

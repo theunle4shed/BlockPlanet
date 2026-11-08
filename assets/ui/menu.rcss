@@ -287,3 +287,7 @@ body.credits .subtitle { margin-bottom: 28dp; }
 .credit-closing { display: block; font-size: 26dp; font-style: italic; color: #c8d0e8; }
 body.credits .hint { margin-top: 28dp; text-align: center; }
 
+
+/* A screen alone on the screen (Who is playing?): centred. */
+body.centred #panel { left: 50%; margin-left: -360dp; top: 26vh; }
+body.centred .hint { display: block; margin-top: 20dp; }

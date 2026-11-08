@@ -40,16 +40,17 @@ int main(int argc, char** argv) {
     assert(store.use("Sam", error));
     const auto sam = store.active().id;
 
-    // The playing profile comes first, then the others, New and Guest.
+    // The playing profile comes first, then the others and Guest; New
+    // profile is every item's Alt button.
     auto list = profile_list(store, false);
-    assert(list.size() == 5);
+    assert(list.size() == 4);
     assert(list[0].label == "Sam" && list[0].note == "playing now" && list[0].action == "command:profile:" + sam);
     assert(list[1].label == "Player 1" && list[1].note.empty());
-    assert(list[3].action == "command:profile_new");
-    assert(list[4].action == "command:profile_guest");
+    assert(list[3].action == "command:profile_guest" && list[3].alt == "command:profile_new");
     // As a guest no profile is playing; Guest just closes the menus.
     list = profile_list(store, true);
-    assert(list.size() == 5 && list[0].label == "Player 1" && list[4].note == "playing now" && list[4].action == "close");
+    assert(list.size() == 4 && list[0].label == "Player 1" && list[3].note.find("playing now") != std::string::npos &&
+           list[3].action == "close");
 
     // The playing profile can be kept; another one restarts the game.
     auto actions = profile_actions(store, sam, false);

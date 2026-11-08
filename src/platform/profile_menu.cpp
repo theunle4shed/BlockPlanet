@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <map>
 
 namespace tetrisphere {
@@ -25,9 +26,12 @@ std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, b
     if (!guest) add(store.active(), true);
     for (const auto& profile : store.profiles())
         if (guest || profile.id != store.active().id) add(profile, false);
-    items.push_back({"new", "New profile", "", "command:profile_new", true});
-    items.push_back({"guest", "Play as guest", guest && !picker ? "playing now" : "nothing is saved",
+    // A guest plays as a character chosen at random (the owner's choice).
+    static const std::string guest_character = characters()[std::rand() % characters().size()].label;
+    items.push_back({"guest", "Play as guest", guest_character + (guest && !picker ? " \u00B7 playing now" : " \u00B7 nothing is saved"),
                      guest ? (picker ? "command:profile_picked" : "close") : "command:profile_guest", true});
+    // New profile is the Alt button's (the hint under the list), on every item.
+    for (auto& item : items) item.alt = "command:profile_new";
     return items;
 }
 
