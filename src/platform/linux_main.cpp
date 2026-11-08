@@ -1468,16 +1468,32 @@ void publish_game_text() {
         if (t.font == 1)
             if (const auto rewrite = tetrisphere::text_rewrite(t.text)) t.text = *rewrite;
     texts.erase(std::remove_if(texts.begin(), texts.end(), [](const blockplanet::GameText& t) { return t.text.empty(); }), texts.end());
-    // The game-over menu (Try Again, Exit, Training) in a straight column, as
-    // BlockPlanet's menus are, instead of the original's diagonal stagger.
+    // The game's end menus (game over: Try Again, Exit, Training; Versus' end:
+    // Continue, Exit) in a straight, steady column, as BlockPlanet's menus are.
+    // The original slides and staggers the items, so the column is held at the
+    // leftmost place seen since the menu appeared, not the current frame's
+    // (which moved the whole column sideways every few frames, the owner's
+    // report of 2026-11-08). The HUD's panels fade out meanwhile.
+    bool end_menu = false;
     {
+        static int column = 0;        // the held left edge, in the game's 320 columns
+        static int frames_without = 1000;
         std::vector<blockplanet::GameText*> items;
+        bool exit = false, other = false;
         for (auto& t : texts)
-            if (t.font == 0 && (t.text == "TRY AGAIN" || t.text == "EXIT" || t.text == "TRAINING")) items.push_back(&t);
-        if (items.size() == 3) {
+            if (t.font == 0 && (t.text == "TRY AGAIN" || t.text == "EXIT" || t.text == "TRAINING" || t.text == "CONTINUE")) {
+                items.push_back(&t);
+                (t.text == "EXIT" ? exit : other) = true;
+            }
+        if (exit && other && items.size() >= 2) {
             int left = 1 << 20;
             for (const auto* t : items) left = std::min(left, t->x);
-            for (auto* t : items) t->x = left, t->width = 0;
+            column = frames_without > 30 ? left : std::min(column, left);  // a new menu starts afresh
+            frames_without = 0;
+            for (auto* t : items) t->x = column, t->width = 0;
+            end_menu = true;
+        } else if (frames_without < 1000) {
+            ++frames_without;
         }
     }
     const auto frame = picture_frame();
@@ -1497,6 +1513,7 @@ void publish_game_text() {
             view = blockplanet::ui::HudView{};
             view->text_only = true;
         }
+        view->end_menu = end_menu;
         const float area_w = frame->h * 4.0f / 3.0f;
         const float area_x = frame->x + (frame->w - area_w) / 2.0f;
         // Case: no shouting capitals (the owner's choice). The cards (font 1)
@@ -1721,7 +1738,6 @@ void publish_game_text() {
             panel.bottom = 1.0f - fy(bottom);
             panel.w = fx(right) - fx(right - width);
             panel.tail = (tail_x - (right - width)) / width;
-            panel.text_size = 10.0f / 240.0f * frame->h / frame->window_h * 100.0f * card_text_scale();
             if (box->kind == 1) {
                 // A rules or goal card: centred where the game's box was (its
                 // middle column, from near its top), a little narrower, growing
@@ -1732,7 +1748,6 @@ void publish_game_text() {
                 panel.w = fx(centre + card_w / 2.0f) - fx(centre - card_w / 2.0f);
                 panel.top = fy(float(box->y) + 6.0f);
                 panel.tail = -1.0f;
-                panel.text_size *= 1.1f;
             }
             bool card_found = false;
             if (!card_lines.empty()) {
@@ -1751,8 +1766,9 @@ void publish_game_text() {
                 // The movement controls first, so the words are cased as one sentence.
                 for (std::size_t at; (at = text.find("%MOVE%")) != std::string::npos;) text.replace(at, 6, buttons("%MOVE%"));
                 text = tetrisphere::fix_wording(text);
-                constexpr const char* orange = "#ff8c1aff";
-                constexpr const char* yellow = "#ffd23cff";
+                // The menus' orange and yellow (docs/STYLE.md, D3).
+                constexpr const char* orange = "#f5821fff";
+                constexpr const char* yellow = "#e8b818ff";
                 // Game terms in their own colour, apart from the yellow headings
                 // (the owner's choice); "fe" alpha marks a term being introduced
                 // (the panel adds a glow).

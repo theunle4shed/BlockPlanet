@@ -19,7 +19,7 @@
              data-options="pixel:Pixel,linear:Smooth,nearest:Sharp">Scaling<span class="value"></span></div>
         <div class="item value" id="hud_distance" data-description="Where the score, hearts and other panels sit: near the sphere, at the screen edges, or moving with the sphere." data-setting="hud_distance"
              data-options="near:Near the sphere,edges:Screen edges,follow:Follow the sphere">HUD panels<span class="value"></span></div>
-        <div class="item value" id="text_size" data-description="The size of the text on cards and in Training, Wheels’ speech included." data-setting="text_size"
+        <div class="item value" id="text_size" data-description="The size of all text and panels: menus, the HUD, cards and Wheels’ speech." data-setting="text_size"
              data-options="small:Small,default:Default,large:Large,larger:Larger">Text size<span class="value"></span></div>
         <div class="item" id="back" data-action="back">Back</div>
         <div id="description" class="description"></div>

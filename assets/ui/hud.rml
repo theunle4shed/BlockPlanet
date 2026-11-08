@@ -6,5 +6,6 @@
 <body>
     <div id="popups"></div>
     <div id="hud"></div>
+    <div id="game-text"></div>
 </body>
 </rml>

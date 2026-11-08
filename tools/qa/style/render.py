@@ -8,9 +8,12 @@ import json, os, re, sys, html
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
 OUT = sys.argv[1]
-SHEETS = {'before': (f'{REPO}/assets/ui/menu.rcss', f'{REPO}/assets/ui/hud.rcss')}
+# The game's sheets; or other sheets to compare: render.py OUT MENU.rcss HUD.rcss
+SHEETS = {'now': (f'{REPO}/assets/ui/menu.rcss', f'{REPO}/assets/ui/hud.rcss')}
 if len(sys.argv) > 3:
-    SHEETS['after'] = (sys.argv[2], sys.argv[3])
+    SHEETS['other'] = (sys.argv[2], sys.argv[3])
+# Graphics > Text size: BLOCKPLANET_TEXT_SCALE=1.4 renders as Larger (it multiplies every dp).
+TEXT_SCALE = float(os.environ.get('BLOCKPLANET_TEXT_SCALE', '1'))
 
 def outline(width, colour):
     w = width
@@ -126,17 +129,15 @@ for variant, (menu_sheet, hud_sheet) in SHEETS.items():
         bcls, inner = fill_screen(open(f'{REPO}/assets/ui/screens/{s}.rml').read())
         for size, (w, h) in SIZES.items():
             name = f'{variant}-menu-{s}-{size}'
-            open(f'{OUT}/{name}.html', 'w').write(page(menu_sheet, h / 1080, bcls, inner, 'menu'))
+            open(f'{OUT}/{name}.html', 'w').write(page(menu_sheet, h / 1080 * TEXT_SCALE, bcls, inner, 'menu'))
             manifest.append({'name': name, 'w': w, 'h': h})
     hud_dir = os.path.dirname(os.path.abspath(__file__))
     for hfile in sorted(os.listdir(f'{hud_dir}/hud')):
         hname = hfile[:-5]
         inner = open(f'{hud_dir}/hud/{hfile}').read()
-        if variant == 'after':  # cards sized in dp (one size), as proposed
-            inner = inner.replace('font-size: 4.1667vh', 'font-size: 44dp').replace('font-size: 4.583vh', 'font-size: 44dp').replace('#ff8c1aff', '#f5821fff').replace('#ffd23cff', '#e8b818ff')
         for size, (w, h) in SIZES.items():
             name = f'{variant}-hud-{hname}-{size}'
-            open(f'{OUT}/{name}.html', 'w').write(page(hud_sheet, h / 1080, '', selfclose(inner), 'hud'))
+            open(f'{OUT}/{name}.html', 'w').write(page(hud_sheet, h / 1080 * TEXT_SCALE, '', selfclose(inner), 'hud'))
             manifest.append({'name': name, 'w': w, 'h': h})
 json.dump(manifest, open(f'{OUT}/manifest.json', 'w'))
 print(len(manifest), 'pages')

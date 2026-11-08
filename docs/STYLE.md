@@ -1,12 +1,12 @@
-# BlockPlanet style (proposal, 2026-11-08)
+# BlockPlanet style (decided 2026-11-08)
 
-**Status: proposed, waiting for the owner's decisions.** Nothing here is applied yet. The decisions are listed at the end (D1 to D10). Once they are made, this file is updated and then applied to `assets/ui/menu.rcss`, `assets/ui/hud.rcss` and the few styles set in code (step 3 of `docs/STYLE_REVIEW_BRIEF.md`).
+**Status: decided by the owner on 2026-11-08 (D1 to D10 at the end, all as recommended) and applied** to `assets/ui/menu.rcss`, `assets/ui/hud.rcss`, `assets/ui/hud.rml` and the styles set in code (`src/ui/ui_system.cpp`, `src/platform/linux_main.cpp`). New screens and HUD parts use these roles; a place that needs something else is added here first.
 
 One style for menus, the HUD and cards. All sizes are in dp: a screen 1080 pixels high has 1 dp = 1 pixel. The Text size setting multiplies all of them (D1).
 
 ## How this review was made
 
-The game could not be built or run for this review. The session had no ROM and no generated code, so CMake stops at `TETRISPHERE_GENERATED_DIR`. The captures were made a different way. `tools/qa/style/render.py` converts each RML screen and its RCSS into HTML, with dp turned into pixels, RmlUi's `font-effect` turned into text shadows, and sample data in place of the lists the game fills at run time. Chromium then renders each page with the game's Lato fonts. The HUD and card captures are hand-built pages that use the same markup as `src/ui/ui_system.cpp`, with sample values. These captures are close to the game but not identical. See "What was not captured".
+The game could not be built or run for this review. The session had no ROM and no generated code, so CMake stops at `TETRISPHERE_GENERATED_DIR`. The captures were made a different way. `tools/qa/style/render.py` converts each RML screen and its RCSS into HTML, with dp turned into pixels, RmlUi's `font-effect` turned into text shadows, and sample data in place of the lists the game fills at run time. Chromium then renders each page with the game's Lato fonts. The HUD and card captures are hand-built pages that use the same markup as `src/ui/ui_system.cpp`, with sample values. These captures are close to the game but not identical. See "What was not captured". The same tool now renders the applied style sheets (`BLOCKPLANET_TEXT_SCALE=1.4` for Larger text); the result still has to be checked in the game itself.
 
 ## Text roles
 
@@ -113,6 +113,7 @@ A button symbol, then one word in sentence case: `[A] Next`, `[A] Start`. Hints 
 - **The Text size setting only reaches cards.** Menus and the HUD size dp from the window height alone (`ui_system.cpp`, `SetDensityIndependentPixelRatio(height / 1080)`); cards multiply by `card_text_scale()` in `linux_main.cpp`. To make it reach everything, multiply that ratio by the same scale (D1). At Larger (1.4) the main menu (about 890 dp tall) no longer fits 1080 and needs its list to scroll; at Large (1.2) it just fits.
 - **The game's own menus jump sideways.** `publish_game_text()` lines up Try Again, Exit and Training on the smallest x of the current frame. The original slides those items, so that smallest x changes from frame to frame and the whole column moves with it. Versus' Continue and Exit are not handled at all. Fix: a fixed column (a set x in the game's 320 columns) for both menus, or BlockPlanet panels in their place (D10).
 - **Game over and Versus' end:** the HUD stays up. It should fade out over about 0.2 s when either menu appears.
+- **Applied, still to check in the game:** the end menus' column is held at the leftmost place seen since the menu appeared. Game over's items are matched as Try Again, Exit and Training; Versus' items are assumed to be Continue and Exit, which no capture has confirmed. The game's own text (its end menus) keeps the game's size and is not scaled by Text size, so it stays fitted to the game's layout. At Larger, the menu panels scroll (at most 90% of the window's height), and the HUD panels grow by 40%. `place_hud_sides` keeps them on screen, but on 4:3 windows they may cover more of the sphere.
 - **Lists:** the chapter and stage lists scroll in compact rows. The pause menu (up to six items) and the profile list fit at every size captured. The stage list (11 rows) scrolls at 16:9 and 4:3.
 
 ## What was not captured
@@ -125,7 +126,10 @@ A button symbol, then one word in sentence case: `[A] Next`, `[A] Start`. Hints 
 - Text sizes other than Default, scrolling, transitions, and RmlUi's exact text rendering (its outline and line height differ slightly from Chromium's).
 - Windows.
 
-## Decisions for the owner
+## Decisions (the owner, 2026-11-08)
+
+All ten were decided as recommended:
+
 
 - **D1:** Should Text size scale menus and the HUD too, not just cards? Recommended: yes, with the main menu scrolling at Larger.
 - **D2:** One card size, 44, for speech and rules cards, with headings the same size, bold and Yellow? Now it is about 45 for speech, about 50 for rules cards, and headings 1.12×.

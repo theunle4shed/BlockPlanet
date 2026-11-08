@@ -1,3 +1,9 @@
+/* Style: docs/STYLE.md (decided 2026-11-08). One set of roles for menus,
+   HUD and cards: Hero 96, Display 64, Figure 44, Card 44, Item 40/34, Body 26,
+   Note 24, Small 20; colours White #F8F8F8, Orange #F5821F, Yellow #E8B818,
+   Gold #FFD23C (live feedback only), Term #86D8FF, Soft #C8D0E8, Muted #9AA6C8,
+   Green #5AD46A, Red #F05A4A. Sizes in dp; Graphics > Text size multiplies
+   every dp (ui_system.cpp), so the HUD and cards grow with the menus. */
 /* BlockPlanet's in-game HUD (docs/HUD_DESIGN.md): placeholder art until the
    owner's designs are in. Priority 1 in a container on the left, priority 2 in
    one on the right, each centred vertically beside the sphere (placed by
@@ -9,12 +15,19 @@ body {
     height: 100%;
     font-family: LatoLatin;
     color: #f8f8f8;
-    font-effect: outline(2dp #1a0c04);
+    font-effect: outline(1dp #1a0c04);
     pointer-events: none;
 }
 
 div { display: block; }
-#hud { width: 100%; height: 100%; }
+#hud { width: 100%; height: 100%; transition: opacity 0.2s cubic-out; }
+/* Under the game's end menus (game over, Versus' end) the panels fade out. */
+#hud.ended { opacity: 0; }
+/* The game's own text and the cards, above the panels and never faded. */
+#game-text { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+/* Digits of a changing number, each in a box of one width (Lato's figures
+   are proportional, so a clock would jiggle). */
+.d { display: inline-block; width: 0.5em; text-align: center; }
 
 /* The containers: tinted (the menus' colours), no border, round corners.
    The tint is on the groups, not the container, so the magic group can leave
@@ -23,7 +36,7 @@ div { display: block; }
 #left { width: 232dp; }
 #right { width: 248dp; text-align: right; }
 
-.group, .rule, #magic .band, #magic .edge { background-color: #0b1020b0; }
+.group, .rule, #magic .band, #magic .edge { background-color: #0b1020c0; }
 .group { padding: 16dp 24dp 20dp 24dp; }
 
 /* Floating numbers: points rising from where blocks cleared. */
@@ -38,7 +51,7 @@ div { display: block; }
     display: block;
     font-size: 44dp;
     font-weight: bold;
-    color: #ffd84a;
+    color: #ffd23c;
     font-effect: outline(3dp #3a1a04);
 }
 .popup .note {
@@ -52,16 +65,16 @@ div { display: block; }
 /* Section titles, for new and returning players. */
 .label {
     display: block;
-    font-size: 19dp;
+    font-size: 20dp;
     font-weight: bold;
     color: #9aa6c8;
     margin-bottom: 8dp;
     font-effect: none;
 }
-.side > :first-child { border-top-left-radius: 22dp; border-top-right-radius: 22dp; }
-.side > :last-child { border-bottom-left-radius: 22dp; border-bottom-right-radius: 22dp; }
+.side > :first-child { border-top-left-radius: 24dp; border-top-right-radius: 24dp; }
+.side > :last-child { border-bottom-left-radius: 24dp; border-bottom-right-radius: 24dp; }
 /* Magic as the last group (Lines has no queue): its tinted bands carry the corners. */
-#magic:last-child .band:last-child { border-bottom-left-radius: 22dp; border-bottom-right-radius: 22dp; }
+#magic:last-child .band:last-child { border-bottom-left-radius: 24dp; border-bottom-right-radius: 24dp; }
 
 /* Dividers between groups: a thin light line across the tint, with room
    either side. */
@@ -99,7 +112,7 @@ div { display: block; }
 /* The drop timer, below the hearts; it turns red when time is short. */
 #drop { width: 150dp; margin-top: 12dp; }
 #drop .fill { background-color: #f5c21f; }
-#drop.hurry .fill { background-color: #f04030; }
+#drop.hurry .fill { background-color: #f05a4a; }
 
 /* Magic: a clear window for the item (the game draws its 3D model there),
    framed by tinted bands, with the meter beneath. */
@@ -125,7 +138,7 @@ div { display: block; }
     display: block;
     padding-top: 50dp;
     text-align: center;
-    font-size: 22dp;
+    font-size: 24dp;
     font-weight: bold;
     color: #f5821f;
 }
@@ -150,20 +163,20 @@ div { display: block; }
 }
 .piece .random-block {
     display: block;
-    font-size: 48dp;
+    font-size: 44dp;
     font-weight: bold;
     color: #f5821f;
 }
 
 /* Right: mode and stage, the episode's time, progress. */
-#where .label { color: #e8b818; font-size: 22dp; }
+#where .label { color: #e8b818; font-size: 24dp; }
 #stage { display: block; font-size: 64dp; font-weight: bold; }
 #time { display: block; font-size: 44dp; font-weight: bold; }
 /* Time Trial: the clock (red and pulsing in the last 30 seconds) and the score. */
-#clock { display: block; font-size: 46dp; font-weight: bold; }
+#clock { display: block; font-size: 44dp; font-weight: bold; }
 #clock.low { color: #f05a4a; animation: 0.5s sine-in-out infinite alternate pulse; }
 @keyframes pulse { from { opacity: 1; } to { opacity: 0.55; } }
-#score { display: block; font-size: 36dp; font-weight: bold; }
+#score { display: block; font-size: 40dp; font-weight: bold; }
 #score-best { display: block; font-size: 20dp; color: #c8d0e8; margin-top: 4dp; }
 .clock-inline { display: none; }
 
@@ -171,16 +184,16 @@ div { display: block; }
 .ahead { color: #5ad46a; }
 .behind { color: #f05a4a; }
 /* Story: the combo counter, live while it builds; gold at 20 or more (magic). */
-#combo { display: block; font-size: 40dp; font-weight: bold; color: #f8f8f8; }
+#combo { display: block; font-size: 44dp; font-weight: bold; color: #f8f8f8; }
 #combo-group.live #combo { color: #ffd23c; }
-#combo-group.magic #combo { color: #ffc61a; font-effect: glow(1dp 6dp 0dp 0dp #ffb01899); }
-#combo-magic { display: block; font-size: 18dp; font-weight: bold; color: #ffc61a; }
-#combo-best { display: block; font-size: 18dp; color: #9aa6c8; margin-top: 2dp; }
+#combo-group.magic #combo { color: #ffd23c; font-effect: glow(1dp 6dp 0dp 0dp #ffb01899); }
+#combo-magic { display: block; font-size: 20dp; font-weight: bold; color: #ffd23c; }
+#combo-best { display: block; font-size: 20dp; color: #9aa6c8; margin-top: 2dp; }
 /* Story: the last five points added, under the score, newest first. */
 #gains { display: block; margin-top: 6dp; }
-#gains .gain { display: block; font-size: 18dp; color: #9aa6c8; }
+#gains .gain { display: block; font-size: 20dp; color: #9aa6c8; }
 #gains .gain.newest { font-size: 20dp; color: #e8b818; }
-#best { display: block; font-size: 22dp; color: #c8d0e8; margin-top: 6dp; }
+#best { display: block; font-size: 20dp; color: #c8d0e8; margin-top: 6dp; }
 #net { display: block; font-size: 26dp; font-weight: bold; margin-top: -2dp; }
 /* Splits, LiveSplit style: stage, difference, time; the current one highlighted. */
 #splits { display: block; margin-top: 12dp; }
@@ -191,15 +204,15 @@ div { display: block; }
 .split.current { color: #f8f8f8; font-weight: bold; }
 .split.current .stage { color: #e8b818; }
 #progress { height: 18dp; }
-#where .sublabel { display: block; font-size: 17dp; font-weight: bold; color: #9aa6c8; font-effect: none; margin: 8dp 0dp 6dp 0dp; }
-#progress .fill { background-color: #48d060; }
+#where .sublabel { display: block; font-size: 20dp; font-weight: bold; color: #9aa6c8; font-effect: none; margin: 8dp 0dp 6dp 0dp; }
+#progress .fill { background-color: #5ad46a; }
 /* Hide & Seek: the level's goal, in words. */
 #goal { display: block; font-size: 26dp; font-weight: bold; color: #f8f8f8; }
 
 /* VS: a narrower column per player at the outer edges. */
 .side.versus { width: 176dp; }
 .versus .group { padding: 12dp 18dp 14dp 18dp; }
-.versus .label { font-size: 17dp; margin-bottom: 6dp; }
+.versus .label { font-size: 20dp; margin-bottom: 6dp; }
 .versus .heart { width: 32dp; height: 32dp; margin-right: 8dp; border-radius: 10dp; }
 .versus .hearts { height: 38dp; }
 .versus .count { font-size: 44dp; line-height: 48dp; }
@@ -208,7 +221,7 @@ div { display: block; }
 .vs-drop { width: 128dp; margin-top: 8dp; }
 #right .vs-drop { margin-left: auto; }
 .vs-drop .fill { background-color: #f5c21f; }
-.vs-drop.hurry .fill { background-color: #f04030; }
+.vs-drop.hurry .fill { background-color: #f05a4a; }
 .vs-item { display: block; height: 30dp; font-size: 24dp; font-weight: bold; color: #f5821f; }
 .vs-meter { margin-top: 8dp; }
 .vs-meter .fill { background-color: #9c5cf0; }
@@ -222,8 +235,8 @@ div { display: block; }
        so the row stays thin. */
     #left, #right { width: auto; text-align: left; white-space: nowrap; }
     .side > div { display: inline-block; vertical-align: top; }
-    .side > :first-child { border-radius: 0dp; border-top-left-radius: 22dp; border-bottom-left-radius: 22dp; }
-    .side > :last-child { border-radius: 0dp; border-top-right-radius: 22dp; border-bottom-right-radius: 22dp; }
+    .side > :first-child { border-radius: 0dp; border-top-left-radius: 24dp; border-bottom-left-radius: 24dp; }
+    .side > :last-child { border-radius: 0dp; border-top-right-radius: 24dp; border-bottom-right-radius: 24dp; }
     .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
     .rule { padding: 14dp 10dp; height: 108dp; }
     .rule .line { width: 2dp; height: 108dp; }
@@ -242,29 +255,29 @@ div { display: block; }
     }
     #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
     #item { width: 116dp; height: 88dp; }
-    #item .name { padding-top: 32dp; font-size: 18dp; }
+    #item .name { padding-top: 32dp; font-size: 20dp; }
     #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
     #stage { font-size: 40dp; line-height: 44dp; }
     #time { font-size: 40dp; }
     #where .sublabel { display: none; }
-    #goal { font-size: 22dp; margin-top: 4dp; }
-    .count { font-size: 48dp; line-height: 52dp; }
+    #goal { font-size: 24dp; margin-top: 4dp; }
+    .count { font-size: 44dp; line-height: 52dp; }
     #progress { width: 120dp; margin-top: 8dp; height: 14dp; }
     #net { display: inline-block; margin-left: 12dp; }
     #time { display: inline-block; }
     #clock-group, #clock-rule { display: none; }
     .clock-inline { display: block; font-size: 26dp; font-weight: bold; margin-top: 6dp; }
     .clock-inline.low { color: #f05a4a; }
-    #score { font-size: 32dp; }
+    #score { font-size: 34dp; }
     #splits { margin-top: 2dp; }
-    .split { display: none; font-size: 18dp; line-height: 22dp; }
+    .split { display: none; font-size: 20dp; line-height: 24dp; }
     .split:last-child, .split.last-done { display: block; }
 }
 
 /* The title screen: the original game's notice and BlockPlanet's disclaimer. */
 #title-notice { position: absolute; text-align: center; font-effect: outline(2dp #05081a); }
-#title-notice .notice { display: block; font-size: 22dp; line-height: 28dp; color: #4fb3d0; letter-spacing: 1dp; }
-#title-notice .disclaimer { display: block; margin-top: 8dp; font-size: 17dp; line-height: 22dp; color: #9aa6c8; }
+#title-notice .notice { display: block; font-size: 24dp; line-height: 30dp; color: #4fb3d0; letter-spacing: 1dp; }
+#title-notice .disclaimer { display: block; margin-top: 8dp; font-size: 20dp; line-height: 24dp; color: #9aa6c8; }
 @media (orientation: portrait) {
     /* The title's notice on narrow screens: smaller, one line each. */
     #title-notice .notice { font-size: 13dp; line-height: 17dp; letter-spacing: 0dp; }
@@ -316,18 +329,19 @@ div { display: block; }
 .card-panel {
     position: absolute;
     padding: 0.7em 0.95em 0.35em 0.95em;
-    background-color: #0d1222;
-    border: 0.35vh #f0f0f0;
-    border-radius: 2.2vh;
+    background-color: #0b1020f0;
+    border: 3dp #f0f0f0;
+    border-radius: 24dp;
+    font-effect: none;
     white-space: normal;
+    font-size: 44dp;  /* Card: one size for every card and Wheels' speech */
     line-height: 1.32;
 }
 .card-heading {
     display: block;
     font-weight: bold;
-    font-size: 1.12em;
+    font-size: 1em;
     margin-bottom: 0.35em;
-    font-effect: outline(1dp #1a0c04);
 }
 .card-body {
     display: block;
@@ -340,20 +354,20 @@ div { display: block; }
 .card-hint {
     display: block;
     text-align: left;  /* the tail is under the right of the bottom edge */
-    color: #c8ccd8;
-    font-weight: bold;
-    font-size: 0.78em;
+    color: #e8b818;
+    font-weight: normal;
+    font-size: 0.6em;
     margin-top: 0.75em;  /* clear of the text above */
 }
 .card-tail {
     position: absolute;
-    margin-left: -2.6vh;
-    margin-bottom: -2.6vh;
-    width: 5.2vh;
-    height: 5.2vh;
-    background-color: #0d1222;
-    border-right: 0.35vh #f0f0f0;
-    border-bottom: 0.35vh #f0f0f0;
+    margin-left: -28dp;
+    margin-bottom: -28dp;
+    width: 56dp;
+    height: 56dp;
+    background-color: #0b1020f0;
+    border-right: 3dp #f0f0f0;
+    border-bottom: 3dp #f0f0f0;
     transform: rotate(45deg);
 }
 .card-scroll {
@@ -365,8 +379,8 @@ div { display: block; }
    what Wheels has introduced. A part just introduced glows for a moment. */
 #left.row { width: auto; text-align: left; transform: scale(1.3); transform-origin: 50% 100%; }
 #left.row > div { display: inline-block; vertical-align: top; }
-#left.row > :first-child { border-radius: 0dp; border-top-left-radius: 22dp; border-bottom-left-radius: 22dp; }
-#left.row > :last-child { border-radius: 0dp; border-top-right-radius: 22dp; border-bottom-right-radius: 22dp; }
+#left.row > :first-child { border-radius: 0dp; border-top-left-radius: 24dp; border-bottom-left-radius: 24dp; }
+#left.row > :last-child { border-radius: 0dp; border-top-right-radius: 24dp; border-bottom-right-radius: 24dp; }
 #left.row .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
 #left.row .rule { padding: 14dp 10dp; height: 108dp; }
 #left.row .rule .line { width: 2dp; height: 108dp; }
@@ -379,10 +393,10 @@ div { display: block; }
 #left.row #magic .side-meter #meter-v { display: block; position: relative; width: 12dp; height: 88dp; margin-left: 12dp; }
 #left.row #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
 #left.row #item { width: 116dp; height: 88dp; }
-#left.row #item .name { padding-top: 32dp; font-size: 18dp; }
+#left.row #item .name { padding-top: 32dp; font-size: 20dp; }
 #left.row #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
 #left.row #progress { width: 160dp; margin-top: 18dp; height: 14dp; }
-#left.row .count { font-size: 48dp; line-height: 52dp; }
-#left.row .intro { background-color: #f2c14e40; }
-#left.row .intro .label { color: #ffe08a; }
+#left.row .count { font-size: 44dp; line-height: 52dp; }
+#left.row .intro { background-color: #e8b81838; }
+#left.row .intro .label { color: #e8b818; }
 .card-para + .card-para, .card-para + .card-heading { margin-top: 0.55em; }

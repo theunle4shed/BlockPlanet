@@ -1,18 +1,18 @@
-/* Type scale (2026-11-08, the owner's request): every menu text uses one of
-   these, so screens stay in step. Sizes are in dp (they follow the window).
-     Hero      96  bold   the pause menu's PAUSED (.header)
+/* Style: docs/STYLE.md (decided 2026-11-08), shared with the HUD and cards
+   (hud.rcss). Every menu text uses one of these roles; sizes in dp, laid out
+   for a 1080-pixel-high screen. Graphics > Text size multiplies every dp
+   (ui_system.cpp), so whole panels grow evenly.
+     Hero      96  bold   the pause menu's Paused (.header)
      Display   64  bold   screen titles (.title)
      Item      40         menu choices (.item); 34 in long lists (body.compact)
-     Subtitle  26         under a title, yellow (.subtitle)
-     Body      26         descriptions and paragraphs (.description, .howto .para)
-     Note      22         notes beside items, hints, labels, the version (.note, .hint, .section, .version)
+     Body      26         descriptions and paragraphs (.description, .howto .para);
+                          subtitles in Yellow (.subtitle)
+     Note      24         notes beside items, values, hints, the version
    Special cases: the name being typed (56) and the on-screen keyboard (34).
-   The HUD and the card panels (hud.rcss) size their text from the window and
-   the Text size setting; their headings, body and hints follow the same roles. */
-/* BlockPlanet menus: placeholder layout until the art direction is set
-   (docs/UI.md), in the original game's menu colours: orange items, the
-   selected one white, dark-outlined text, a white-outlined box and yellow
-   hints. Sizes are in dp, laid out for a 1080-pixel-high screen. */
+   Colours: items Orange #F5821F, the focused one White #F8F8F8 on a pill
+   (no change of weight); notes, values, subtitles and hints Yellow #E8B818;
+   descriptions Soft #C8D0E8; the version Muted #9AA6C8. Text inside the
+   panel has no outline. */
 
 body {
     width: 100%;
@@ -20,7 +20,7 @@ body {
     font-family: LatoLatin;
     color: #f8f8f8;
     background-color: #05081080;
-    font-effect: outline(2dp #1a0c04);
+    font-effect: none;
 }
 
 @keyframes enter {
@@ -39,10 +39,15 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     left: 120dp;
     top: 60dp;
     width: 720dp;
-    padding: 48dp 56dp;
-    background-color: #0b1020d0;
+    padding: 48dp 48dp;
+    background-color: #0b1020d8;
     border: 3dp #f0f0f0;
-    border-radius: 28dp;
+    border-radius: 24dp;
+    /* At a larger Text size a tall screen (the main menu) scrolls inside its
+       panel instead of running off the bottom of the window. */
+    box-sizing: border-box;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .title {
@@ -53,8 +58,8 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 /* "BlockPlanet v0.1" under the main menu's title. */
 .version {
     display: block;
-    font-size: 22dp;
-    color: #a8b0c8;
+    font-size: 24dp;
+    color: #9aa6c8;
     margin-top: -4dp;
     margin-bottom: 12dp;
 }
@@ -77,23 +82,16 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 .item { color: #f5821f; }  /* the original #E06018, brightened a little */
 .item.focused {
     color: #f8f8f8;
-    background-color: #ffffff1a;
-    font-weight: bold;
+    background-color: #ffffff24;
 }
 .item .note {
-    font-size: 22dp;
+    font-size: 24dp;
     color: #e8b818;
     margin-left: 16dp;
     font-weight: normal;
 }
 .item.focused .note { color: #e8b818; }
 
-.hint {
-    display: block;
-    margin-top: 32dp;
-    font-size: 22dp;
-    color: #e8b818;
-}
 
 /* Setting rows: label on the left, value on the right. */
 .item.value .value {
@@ -126,12 +124,12 @@ scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0dp;
     padding: 12dp 24dp;
     margin-bottom: 8dp;
     border-radius: 14dp;
-    background-color: #ffffff14;
+    background-color: #ffffff10;
     min-height: 68dp;
 }
 .name-field-hint {
     display: block;
-    font-size: 22dp;
+    font-size: 24dp;
     color: #e8b818;
     margin-bottom: 20dp;
     min-height: 30dp;
@@ -147,7 +145,7 @@ scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0dp;
     margin: 0dp 1.8% 8dp 0dp;
     text-align: center;
     font-size: 34dp;
-    background-color: #ffffff0c;
+    background-color: #ffffff10;
 }
 .keys .item.focused { background-color: #ffffff26; }
 .keys .item.span2 { width: 17.8%; font-size: 26dp; padding: 17dp 0dp; }
@@ -167,7 +165,7 @@ scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0dp;
 .tiles .item .note {
     display: block;
     margin-left: 0dp;
-    font-size: 22dp;
+    font-size: 24dp;
 }
 
 /* Controller-only and keyboard-only parts (body.pad while a controller is used). */
@@ -186,7 +184,7 @@ body.over-pause { background-color: #00000000; }
     display: block;
     font-size: 96dp;
     font-weight: bold;
-    letter-spacing: 12dp;
+    letter-spacing: 4dp;
     margin-bottom: 4dp;
 }
 
@@ -216,18 +214,6 @@ body.over-pause { background-color: #00000000; }
 }
 .item.slider.focused .fill { background-color: #f8f8f8; }
 
-/* Section headings inside a screen (Options: Graphics, Audio). */
-.section {
-    display: block;
-    font-size: 22dp;
-    font-weight: bold;
-    letter-spacing: 3dp;
-    color: #e8b818;
-    padding: 6dp 28dp 4dp 28dp;
-    margin-top: 10dp;
-    border-bottom: 1dp #ffffff33;
-    margin-bottom: 6dp;
-}
 
 /* What the focused item is (data-description), under the list. */
 .description {
@@ -239,7 +225,7 @@ body.over-pause { background-color: #00000000; }
     line-height: 34dp;
     color: #c8d0e8;
     font-effect: none;
-    background-color: #ffffff0d;
+    background-color: #ffffff10;
     border-radius: 14dp;
 }
 .description.empty { visibility: hidden; }
@@ -247,7 +233,7 @@ body.over-pause { background-color: #00000000; }
 body.lists .description.empty { display: none; }
 
 /* The Alt button's hint at the end of a description ("[X] Training"). */
-.alt-hint { display: block; margin-top: 8dp; color: #f2c14e; }
+.alt-hint { display: block; margin-top: 8dp; color: #e8b818; }
 
 /* Button symbols, as in the HUD's game text (hud.rcss). */
 .btn {
@@ -272,10 +258,10 @@ body.lists .description.empty { display: none; }
 .ps-cross, .ps-circle, .ps-square, .ps-triangle { display: block; position: absolute; }
 
 /* Long lists (the main menu): smaller rows so the description fits. */
-body.compact #panel { top: 40dp; padding: 40dp 56dp; }
+body.compact #panel { top: 40dp; padding: 40dp 48dp; }
 body.compact .item { font-size: 34dp; padding: 6dp 28dp; margin-bottom: 2dp; }
 body.compact .subtitle { margin-bottom: 16dp; }
 
 /* How to Play (pause menu): short paragraphs to read. */
 .howto { display: block; margin: 12dp 0dp 20dp 0dp; }
-.howto .para { display: block; font-size: 26dp; line-height: 34dp; color: #dfe3ee; margin-bottom: 10dp; }
+.howto .para { display: block; font-size: 26dp; line-height: 34dp; color: #c8d0e8; margin-bottom: 10dp; }

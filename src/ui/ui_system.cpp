@@ -25,6 +25,13 @@ namespace {
 
 // Menus are laid out for a 1080-pixel-high screen and scaled to the window.
 constexpr float design_height = 1080.0f;
+// Graphics > Text size (docs/STYLE.md, D1): it multiplies every dp, so menus,
+// the HUD and cards grow together.
+float text_scale = 1.0f;
+float text_scale_of(const std::string& size) {
+    return size == "small" ? 0.85f : size == "large" ? 1.2f : size == "larger" ? 1.4f : 1.0f;
+}
+float dp_ratio(float height) { return height / design_height * text_scale; }
 
 class System final : public Rml::SystemInterface {
 public:
@@ -87,7 +94,7 @@ std::optional<HudView> hud_wanted;
 std::optional<std::array<float, 4>> hud_item;  // x, y, width, height in pixels
 std::array<float, 2> hud_item_frame{};          // the context's size then
 Rml::ElementDocument* hud_document = nullptr;
-std::string hud_shown_rml;
+std::string hud_shown_rml, game_text_shown_rml;
 
 std::string asset(const char* name) { return (assets_path / name).string(); }
 
@@ -103,7 +110,7 @@ bool start(std::uint32_t width, std::uint32_t height) {
     }
     context = Rml::CreateContext("main", Rml::Vector2i(int(width), int(height)));
     if (context == nullptr) return false;
-    context->SetDensityIndependentPixelRatio(float(height) / design_height);
+    context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
     navigator = std::make_unique<Navigator>(context, assets_path / "screens");
     std::fprintf(stdout, "{\"event\":\"ui_started\",\"width\":%u,\"height\":%u}\n", width, height);
     std::fflush(stdout);
@@ -202,6 +209,10 @@ void apply_requests() {
             navigator->close();
         } else if (auto* setting = std::get_if<SettingRequest>(&request)) {
             navigator->set_setting(setting->name, setting->value);
+            if (setting->name == "text_size") {
+                text_scale = text_scale_of(setting->value);
+                context->SetDensityIndependentPixelRatio(dp_ratio(float(context->GetDimensions().y)));
+            }
         } else if (auto* list = std::get_if<ListRequest>(&request)) {
             navigator->set_list(list->name, std::move(list->items));
         } else if (auto* pad = std::get_if<PadRequest>(&request)) {
@@ -232,6 +243,18 @@ const char* magic_name(int magic) {
 
 std::string percent(float value) {
     return std::to_string(int(std::clamp(value, 0.0f, 1.0f) * 1000.0f) / 10.0f) + "%";
+}
+
+// A number that changes while it is read (a clock, a score): each digit in a
+// box of one width, as Lato's figures are proportional and the number would
+// otherwise jiggle (docs/STYLE.md, Numbers).
+std::string digits(const std::string& escaped_text) {
+    std::string out;
+    for (char c : escaped_text) {
+        if (c >= '0' && c <= '9') out += std::string("<span class='d'>") + c + "</span>";
+        else out += c;
+    }
+    return out;
 }
 
 std::string escape(const std::string& text) {
@@ -280,7 +303,7 @@ std::string versus_column(const HudView::VersusPlayer& p, const char* id, const 
     rml += std::string("</div><div class='bar vs-drop") + (p.drop_left < 0.35f ? " hurry" : "") +
            "'><div class='fill' style='width: " + std::to_string(int(std::clamp(p.drop_left, 0.0f, 1.0f) * 100)) + "%;'/></div></div>";
     rml += "<div class='rule'><div class='line'/></div>";
-    rml += "<div class='group'><div class='label'>Attack</div><div class='count'>" + std::to_string(p.multiplier) + "x</div></div>";
+    rml += "<div class='group'><div class='label'>Attack</div><div class='count'>\u00D7" + std::to_string(p.multiplier) + "</div></div>";
     rml += "<div class='rule'><div class='line'/></div>";
     rml += std::string("<div class='group'><div class='label'>Magic</div><div class='vs-item'>") +
            (p.magic >= 0 ? magic_name(p.magic) : "") + "</div><div class='bar vs-meter'><div class='fill' style='width: " +
@@ -359,7 +382,7 @@ std::string game_text_rml(const HudView& hud) {
         const std::string anchor = p->top >= 0.0f ? "top: " + pct(p->top) : "bottom: " + pct(p->bottom);
         rml += std::string("<div class='card-panel") + (card_scroll.overflow ? " overflow" : "") + "' data-anchor='" +
                (p->top >= 0.0f ? "top" : "bottom") + "' style='right: " + pct(p->right) + "; " + anchor + "; width: " + pct(p->w) +
-               "; font-size: " + std::to_string(p->text_size) + "vh;'>";
+               ";'>";
         const std::string limit = card_scroll.max_px > 0.0f ? "max-height: " + std::to_string(int(card_scroll.max_px)) + "px;" : "";
         if (p->blocks.empty()) {
             if (!p->heading.empty()) rml += "<div class='card-heading'>" + runs(p->heading) + "</div>";
@@ -413,11 +436,6 @@ std::string game_text_rml(const HudView& hud) {
 
 std::string hud_rml_parts(const HudView& hud);
 
-std::string hud_rml(const HudView& hud) {
-    if (hud.text_only) return game_text_rml(hud);
-    return hud_rml_parts(hud) + game_text_rml(hud);
-}
-
 std::string hud_rml_parts(const HudView& hud) {
     std::string rml;
     if (!hud.title_notice.empty()) {
@@ -457,8 +475,8 @@ std::string hud_rml_parts(const HudView& hud) {
                             "</div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>");
         }
         if (hud.multiplier >= 1)
-            parts.push_back(std::string("<div id='xcount' class='group") + glow("xcount") + "'><div class='label'>X count</div><div class='count'>" +
-                            std::to_string(hud.multiplier) + "x</div></div>");
+            parts.push_back(std::string("<div id='xcount' class='group") + glow("xcount") + "'><div class='label'>X count</div><div class='count'>\u00D7" +
+                            std::to_string(hud.multiplier) + "</div></div>");
         if (hud.progress >= 0.0f)
             parts.push_back(std::string("<div id='core' class='group") + glow("progress") +
                             "'><div class='label'>To the core</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div></div>");
@@ -489,13 +507,13 @@ std::string hud_rml_parts(const HudView& hud) {
     rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div id='drop-fill' class='fill'/></div>";
     // On portrait screens the clock sits here, under the hearts, so the top row stays one line.
     if (!hud.clock.empty())
-        rml += std::string("<div class='clock-inline") + (hud.clock_low ? " low" : "") + "'>" + escape(hud.clock) + "</div>";
+        rml += std::string("<div class='clock-inline") + (hud.clock_low ? " low" : "") + "'>" + digits(escape(hud.clock)) + "</div>";
     rml += "</div>";
     rml += "<div class='rule'><div class='line'/></div>";
     // Score Attack: the clock, below health (the run ends when it runs out).
     if (!hud.clock.empty())
         rml += std::string("<div id='clock-group' class='group'><div class='label'>Time left</div><div id='clock'") +
-               (hud.clock_low ? " class='low'" : "") + ">" + escape(hud.clock) + "</div></div><div id='clock-rule' class='rule'><div class='line'/></div>";
+               (hud.clock_low ? " class='low'" : "") + ">" + digits(escape(hud.clock)) + "</div></div><div id='clock-rule' class='rule'><div class='line'/></div>";
     // While the game draws the magic's model in the box it draws the box's tint
     // too, behind the model (magic_hooks.cpp); otherwise the HUD tints it.
     const bool model = hud.magic >= 0 && hud.magic_model;
@@ -525,11 +543,11 @@ std::string hud_rml_parts(const HudView& hud) {
     rml += "</div>";
     if (!hud.score.empty())
         rml += "<div class='rule'><div class='line'/></div><div id='score-group' class='group'><div class='label'>Score</div><div id='score'>" +
-               escape(hud.score) + "</div>" + (hud.score_best.empty() ? "" : "<div id='score-best'>" + escape(hud.score_best) + "</div>") +
+               digits(escape(hud.score)) + "</div>" + (hud.score_best.empty() ? "" : "<div id='score-best'>" + escape(hud.score_best) + "</div>") +
                "</div>";
     if (!hud.time.empty()) {
         rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>" +
-               escape(hud.time_label.empty() ? std::string("Time") : hud.time_label) + "</div><div id='time'>" + escape(hud.time) + "</div>";
+               escape(hud.time_label.empty() ? std::string("Time") : hud.time_label) + "</div><div id='time'>" + digits(escape(hud.time)) + "</div>";
         if (!hud.time_delta.empty())
             rml += std::string("<div id='net' class='") + (hud.time_ahead ? "ahead" : "behind") + "'>" + escape(hud.time_delta) + "</div>";
         if (!hud.best.empty()) rml += "<div id='best'>" + escape(hud.best) + "</div>";
@@ -549,14 +567,14 @@ std::string hud_rml_parts(const HudView& hud) {
         const bool magic = hud.combo >= 20;  // 20 or more gives magic
         rml += std::string("<div class='rule'><div class='line'/></div><div id='combo-group' class='group") + (hud.combo_live ? " live" : "") +
                (magic ? " magic" : "") + "'><div class='label'>" + (hud.combo_live ? "Combo" : "Last combo") + "</div><div id='combo'>" +
-               std::to_string(hud.combo) + "</div>";
+               digits(std::to_string(hud.combo)) + "</div>";
         if (magic) rml += "<div id='combo-magic'>+ Magic</div>";
         if (hud.combo_best > 0) rml += "<div id='combo-best'>Best " + std::to_string(hud.combo_best) + "</div>";
         rml += "</div>";
     }
     if (!hud.story_score.empty()) {
         rml += "<div class='rule'><div class='line'/></div><div id='story-score' class='group'><div class='label'>Score</div><div id='score'>" +
-               escape(hud.story_score) + "</div><div id='gains'>";
+               digits(escape(hud.story_score)) + "</div><div id='gains'>";
         for (std::size_t k = 0; k < hud.story_gains.size(); ++k)
             rml += std::string("<div class='gain") + (k == 0 ? " newest" : "") + "'>" + escape(hud.story_gains[k]) + "</div>";
         rml += "</div></div>";
@@ -618,7 +636,7 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
     hud_left_scale = 1.0f;
     auto* left = hud_document->GetElementById("left");
     auto* right = hud_document->GetElementById("right");
-    const float dp = height / design_height;
+    const float dp = dp_ratio(height);
     const float margin = 24.0f * dp;
     if (hud.bottom_row && left != nullptr) {
         // Training's row: at the bottom, centred under the sphere's side of the
@@ -718,10 +736,18 @@ bool update_hud_document() {
             return false;
         }
     }
-    const auto rml = hud_rml(*hud);
+    // The HUD's panels and the game's text in layers of their own, so the
+    // panels can fade out under the game's end menus while its text stays.
+    const auto rml = hud->text_only ? std::string() : hud_rml_parts(*hud);
     if (rml != hud_shown_rml) {
         if (auto* root = hud_document->GetElementById("hud")) root->SetInnerRML(rml);
         hud_shown_rml = rml;
+    }
+    if (auto* root = hud_document->GetElementById("hud")) root->SetClass("ended", hud->end_menu);
+    const auto text_rml = game_text_rml(*hud);
+    if (text_rml != game_text_shown_rml) {
+        if (auto* layer = hud_document->GetElementById("game-text")) layer->SetInnerRML(text_rml);
+        game_text_shown_rml = text_rml;
     }
     set_hud_fills(*hud);
     place_popups(*hud);
@@ -797,7 +823,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
     if (navigator->is_open() || hud_visible) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
-            context->SetDensityIndependentPixelRatio(float(height) / design_height);
+            context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
         }
         context->Update();
         apply_card_scroll(float(height));
