@@ -3525,3 +3525,22 @@ bool handle_profile_command(const std::string& command) {
 }
 
 } // namespace tetrisphere
+
+// Research aid (2026-11-08, Training's lost bricks): when the generated code is
+// rebuilt with its stores routed here (a private, temporary rewrite of the
+// generated C), BLOCKPLANET_STORE_TRAP=from-to logs each store into that guest
+// address range (hex), with the storing function, the value and the time.
+extern "C" void blockplanet_store_trap(std::uint32_t address, std::int32_t value, int size, const char* function) {
+    static const std::pair<std::uint32_t, std::uint32_t> range = [] {
+        const char* spec = std::getenv("BLOCKPLANET_STORE_TRAP");
+        if (spec == nullptr) return std::pair<std::uint32_t, std::uint32_t>{1, 0};
+        const char* dash = std::strchr(spec, '-');
+        return std::pair<std::uint32_t, std::uint32_t>{std::uint32_t(std::strtoul(spec, nullptr, 16)),
+                                                       dash ? std::uint32_t(std::strtoul(dash + 1, nullptr, 16)) : 0u};
+    }();
+    if (address < range.first || address > range.second) return;
+    static const auto started = std::chrono::steady_clock::now();
+    std::fprintf(stdout, "{\"event\":\"store\",\"address\":\"0x%08X\",\"value\":%d,\"size\":%d,\"function\":\"%s\",\"ms\":%lld}\n", address,
+                 value, size, function,
+                 static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
+}
