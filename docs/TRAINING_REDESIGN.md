@@ -77,4 +77,15 @@ So something in the game as it runs here clears Training's bricks, which real ha
 2. 8 MB of memory instead of 4 (the game may choose a different layout).
 3. A recompilation fault in a Training-only routine.
 
-Next: find the routine that writes the zeros, by trapping writes to one cell in the recompiled code. Until then, the drawing fills single-cell gaps outside the pit (`sphere_cell.cpp`), which hides the stripes but not the cause. The watch log (`BLOCKPLANET_WATCH`) now prints the time of each change.
+**Found (2026-11-08): the routine that removes the bricks.** Writes to the brick layer were trapped in the recompiled code (a research build only, now removed):
+
+- `func_800CD3B8` (the per-frame sphere routine) calls `func_800CC408` every frame, unless `func_800B9090` says the board is busy. That routine is a board checker. It keeps a cursor in the player context (`+0x325A` x, `+0x325C` y) and checks 5 cells a frame on layers 1 to 7, so it covers the whole sphere about every 7 seconds.
+- For each cell, `func_800CC0D0` works out the brick's piece:
+  - the piece id is the cell value ÷ 9; Training's filler is `0x1A7`, piece 47;
+  - `func_80093214` finds the piece's origin from its shape table at `0x8014CC98`;
+  - `func_800924E0` checks that every cell of the shape is still there;
+  - if the check fails, it removes the piece's cells with `func_8008CA34`; an empty id is cleared outright.
+- In the run that showed stripes, it removed one band cell per row from its first pass: (20, 0), (18, 1), (16, 2) and so on, going back 2 columns a row. Each later pass removed more. That cascade is the stripes.
+- Ten later runs with the same script did not reproduce it. Every filler cell was checked, and each found its origin at its own centre and passed. The board loads identically in good and bad runs. So the starting point is still unknown: something occasionally makes a filler cell fail the check, and from then on the checker eats the band. The origin is always set, so it isn't reading leftover stack.
+
+Next, when it shows again: trap `func_800924E0`'s result in `func_800CC0D0` to see which cell fails first, and what is around it. Until then, the drawing fills single-cell gaps outside the pit (`sphere_cell.cpp`), which hides the stripes but not the cause. The watch log (`BLOCKPLANET_WATCH`) prints the time of each change.
