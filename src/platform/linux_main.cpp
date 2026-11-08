@@ -1014,8 +1014,10 @@ void poll_watches() {
                                                      : guest::load32(guest_rdram, watch.address);
         if (value == watch.last) continue;
         watch.last = value;
-        std::fprintf(stdout, "{\"event\":\"watch\",\"address\":\"0x%08X\",\"value\":%lld}\n", watch.address,
-                     static_cast<long long>(value));
+        static const auto started = std::chrono::steady_clock::now();
+        std::fprintf(stdout, "{\"event\":\"watch\",\"address\":\"0x%08X\",\"value\":%lld,\"ms\":%lld}\n", watch.address,
+                     static_cast<long long>(value),
+                     static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
         std::fflush(stdout);
     }
 }

@@ -62,3 +62,19 @@ Checked further the same day:
 - **Where the clip is set:** probably one of the game's scissor commands (`G_SETSCISSOR`, `0xED`), set in `func_8006FA28`, `func_800A43E0`, `func_800A4D60`, `func_800C25FC`, `func_800CB070` and `func_800CD3B8`. All of them cover the full height. `func_8006FA28`'s covers the full width (320); the others' widths are computed and not yet read.
 
 **Found and fixed:** a memory dump in Training shows the game's table of ready-made viewports and scissors around `0x80165000`. It holds scissors for the whole screen and for each half (x 0 to 160, x 160 to 320; VS's split screen). Training draws its sphere through the left-half scissor. In Training, BlockPlanet widens that scissor to the whole screen, and puts it back for every other mode (`update_training_scissor` in `linux_main.cpp`). The sphere is now whole and round. Switch `BLOCKPLANET_ORIGINAL_TRAINING_CLIP=1` keeps the original clip.
+
+## Research: Training's sphere loses bricks (2026-11-08)
+
+The owner's photos of Training on real hardware show a complete pink surface round the pit, with walls that join at the corners. In BlockPlanet the surface shows stripes and broken edges. Measured:
+
+- The lesson's board loads complete: every cell of the brick layer (layer 1 of the grid at `0x80116BF0`, value `0x1A7`) is filled, except the pit.
+- After play starts, single cells across the sphere are cleared, one by one, seconds apart (for example 41, 48, 52 and 61 seconds into a run), while the lesson waits on its first pages with no input. By the time the screenshots are taken, the band of columns above and below the pit has lost alternate cells: the stripes.
+- It happens with BlockPlanet's text, HUD, sphere drawing and Training clip all off (`BLOCKPLANET_ORIGINAL_TEXT=1`, `BLOCKPLANET_ORIGINAL_HUD=1`, `BLOCKPLANET_SPHERE=original`, `BLOCKPLANET_ORIGINAL_TRAINING_CLIP=1`), and without BlockPlanet's A presses. It is not BlockPlanet's presentation.
+- Story is not affected: watched cells stayed the same for 45 seconds without input.
+
+So something in the game as it runs here clears Training's bricks, which real hardware does not. Suspects, in order:
+1. A difference in timing (Training's demonstrations follow scripted inputs and timers).
+2. 8 MB of memory instead of 4 (the game may choose a different layout).
+3. A recompilation fault in a Training-only routine.
+
+Next: find the routine that writes the zeros, by trapping writes to one cell in the recompiled code. Until then, the drawing fills single-cell gaps outside the pit (`sphere_cell.cpp`), which hides the stripes but not the cause. The watch log (`BLOCKPLANET_WATCH`) now prints the time of each change.
