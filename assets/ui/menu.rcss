@@ -39,6 +39,14 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     font-size: 72dp;
     font-weight: bold;
 }
+/* "BlockPlanet v0.1" under the main menu's title. */
+.version {
+    display: block;
+    font-size: 24dp;
+    color: #a8b0c8;
+    margin-top: -4dp;
+    margin-bottom: 12dp;
+}
 .subtitle {
     display: block;
     font-size: 28dp;

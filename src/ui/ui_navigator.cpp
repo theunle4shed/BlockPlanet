@@ -1,4 +1,5 @@
 #include "ui_navigator.h"
+#include "tetrisphere/version.h"
 
 #include <RmlUi/Core/Element.h>
 
@@ -126,6 +127,9 @@ void Navigator::set_focus(Screen& screen, std::size_t index) {
 }
 
 void Navigator::fill(Screen& screen) {
+    // BlockPlanet's name and version, on screens that show it (the main menu).
+    if (Rml::Element* version = screen.document->GetElementById("version"))
+        version->SetInnerRML(std::string("BlockPlanet v") + blockplanet::kVersion);
     // Lists first, so their items get values and focus like any other.
     std::vector<Rml::Element*> lists;
     collect_lists(screen.document, lists);

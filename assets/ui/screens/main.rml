@@ -5,7 +5,8 @@
 </head>
 <body class="compact">
     <div id="panel">
-        <div class="title">BlockPlanet</div>
+        <div class="title">Tetrisphere</div>
+        <div class="version" id="version"></div>
         <div class="subtitle">Main menu</div>
         <div data-list="continue"></div>
         <div class="item" id="solo" data-action="open:solo" data-description="Play on your own: Story and its modes, Hide &amp; Seek, Puzzle and Lines.">Solo</div>

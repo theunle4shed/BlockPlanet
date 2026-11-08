@@ -140,7 +140,7 @@
       "trigger": { "stat": "best_score", "at_least": 1000000 }
     },
     {
-      "id": "platinum", "name": "BlockPlanet Master", "tier": "platinum",
+      "id": "platinum", "name": "Tetrisphere Master", "tier": "platinum",
       "description": "Earn every other trophy.",
       "trigger": { "all_of": [] }
     }
