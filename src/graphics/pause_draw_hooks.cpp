@@ -205,6 +205,13 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
             return list;
         }();
         const auto model = static_cast<std::uint32_t>(ctx->r4);
+        // Losing a life: the original HUD's skull, drawn where the held magic
+        // sits (matrix 0x801309A8) while no magic is held (losing a life
+        // also loses it). Hidden with the original HUD in Story.
+        if (hud_hidden.load(std::memory_order_relaxed) && static_cast<std::uint32_t>(ctx->r7) == 0x801309A8u &&
+            guest16(rdram, 0x800E121Cu) == -1 && guest16(rdram, 0x800E44A8u) == 1 &&
+            rdram[((0x80110220u + 0x702u) & 0x7FFFFFu) ^ 3u] == 0xFFu)
+            return true;
         if (model_log) {
             static std::mutex mutex;
             static std::set<std::uint32_t> seen;
