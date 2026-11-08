@@ -50,7 +50,7 @@ std::string current_screen();
 struct HudPieceView {
     std::string colour;                        // CSS colour, e.g. "#e8c020"
     std::vector<std::pair<int, int>> cells;    // cell positions (column, row)
-    bool mystery = false;                      // the "?" piece
+    bool random_block = false;                      // the "?" piece
 };
 struct HudView {
     int hearts = 3;            // 0 to 3

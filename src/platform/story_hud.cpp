@@ -84,7 +84,7 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
         const int index = load16(rdram, player1 + 0x2374 + 2u * slot);
         if (index < 0 || index >= 48) continue;
         HudPiece piece;
-        piece.mystery = index == 22;
+        piece.random_block = index == 22;
         const std::uint32_t record = load32(rdram, 0x8014CBC8u + 4u * index);
         if (record >= 0x80000000u && record < 0x80800000u) {
             piece.material = load16(rdram, record + 2);

@@ -150,7 +150,7 @@ A **seed number** for each level, so the same stage can be replayed exactly and 
 
 ### New block types (idea, saved for later, 2026-11-05)
 
-Investigate adding block types of our own. What is known: a board cell holds value = type × 9 + a variant (`func_8008A7EC` reads the type), so there is room for new type numbers; types seen so far are 1 (unknown), 7 (special, probably buried bonuses), 10 (the core), 32–37 (the colours), 38 (the "?" piece) and 47 (Puzzle's inert wall). Writing a type straight into the board already works (the type 47 test, the one-colour test). To find out: which code decides how each type looks (texture and model), how it matches and clears, how gravity and magic treat it, and whether the per-type checks (for example the 8 to 30 range in `func_8008A880`) leave free numbers. Then a new type is new art plus a behaviour hooked into those checks.
+Investigate adding block types of our own. What is known: a board cell holds value = type × 9 + a variant (`func_8008A7EC` reads the type), so there is room for new type numbers; types seen so far are 1 (unknown), 7 (special: probably the mystery block, the shimmering cell that gives magic), 10 (the core), 32–37 (the colours), 38 (the "?" Random Block) and 47 (Puzzle's inert wall). Writing a type straight into the board already works (the type 47 test, the one-colour test). To find out: which code decides how each type looks (texture and model), how it matches and clears, how gravity and magic treat it, and whether the per-type checks (for example the 8 to 30 range in `func_8008A880`) leave free numbers. Then a new type is new art plus a behaviour hooked into those checks.
 
 ### Arena walls for new game types (idea, saved for later)
 

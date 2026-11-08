@@ -259,8 +259,8 @@ std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count)
         for (const auto& [x, y] : piece.cells) width = std::max(width, x + 1), height = std::max(height, y + 1);
         rml += "<div class='piece' style='width: " + std::to_string(width * cell) + "dp; height: " +
                std::to_string(height * cell) + "dp;'>";
-        if (piece.mystery) {
-            rml += "<div class='mystery'>?</div>";
+        if (piece.random_block) {
+            rml += "<div class='random-block'>?</div>";
         } else {
             for (const auto& [x, y] : piece.cells)
                 rml += "<div class='cell' style='left: " + std::to_string(x * cell) + "dp; top: " +

@@ -476,7 +476,7 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     view.meter = state.meter;
     for (const auto& piece : state.next) {
         blockplanet::ui::HudPieceView p;
-        p.mystery = piece.mystery;
+        p.random_block = piece.random_block;
         p.colour = hud_material_colour(piece.material);
         p.cells = hud_piece_cells(piece.shape, piece.cells);
         view.next.push_back(std::move(p));
@@ -649,7 +649,7 @@ void update_hud() {
                 const int index = guest::load16(guest_rdram, ctx + 0x2374 + 2u * slot);
                 if (index < 0 || index >= 48) continue;
                 blockplanet::ui::HudPieceView piece;
-                piece.mystery = index == 22;
+                piece.random_block = index == 22;
                 const std::uint32_t record = guest::load32(guest_rdram, 0x8014CBC8u + 4u * index);
                 if (record >= 0x80000000u && record < 0x80800000u) {
                     piece.colour = hud_material_colour(guest::load16(guest_rdram, record + 2));
@@ -733,7 +733,7 @@ void update_hud() {
     view.meter = state.meter;
     for (const auto& piece : state.next) {
         blockplanet::ui::HudPieceView p;
-        p.mystery = piece.mystery;
+        p.random_block = piece.random_block;
         p.colour = hud_material_colour(piece.material);
         p.cells = hud_piece_cells(piece.shape, piece.cells);
         view.next.push_back(std::move(p));

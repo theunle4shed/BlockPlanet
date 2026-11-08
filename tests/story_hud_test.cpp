@@ -193,8 +193,8 @@ int main() {
     assert(read_story_hud(m, progress, state));
     assert(state.hearts == 2 && state.drop_left == 0.75f && state.magic == -1 && state.meter == 0.5f);
     assert(state.next.size() == 3);
-    assert(state.next[0].shape == 2 && state.next[0].material == 33 && state.next[0].cells == 4 && !state.next[0].mystery);
-    assert(state.next[1].mystery);
+    assert(state.next[0].shape == 2 && state.next[0].material == 33 && state.next[0].cells == 4 && !state.next[0].random_block);
+    assert(state.next[1].random_block);
     assert(state.next[2].shape == 1 && state.next[2].material == 32);
     assert(state.chapter == 1 && state.level == 3);
     store8(m, p1 + 0x702, 3);

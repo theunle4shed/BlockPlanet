@@ -148,7 +148,7 @@ div { display: block; }
     border-radius: 5dp;
     border: 2dp #00000060;
 }
-.piece .mystery {
+.piece .random-block {
     display: block;
     font-size: 48dp;
     font-weight: bold;

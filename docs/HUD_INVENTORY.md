@@ -20,7 +20,7 @@ Shown throughout gameplay. Hidden during pause, results, level intros and game o
 | Level digits | (42,42)–(67,59) | Left | 10×16 font glyphs | Updates when the level changes. |
 | Hearts (lives) | (35,79)–(80,94); Time Trial (35,89)–(80,104) | Left | 15×14 heart, 15×15 skull | Three hearts. A lost life turns a heart into a skull, right to left. Not shown in Puzzle. |
 | Heart backing | (27,78)–(87,103) | Left | 60×25 | Behind the hearts. |
-| Upcoming pieces | left column, about x 20–60, y 110–220 | (3D) | models | Next three pieces, newest at the bottom. A "?" stands for a mystery piece. |
+| Upcoming pieces | left column, about x 20–60, y 110–220 | (3D) | models | Next three pieces, newest at the bottom. A "?" stands for a Random Block. |
 | Score | right-aligned, ending at (255,25)–(255,41) | Right | 10×16 font glyphs | Total score, updates on every scoring move. |
 | Score pop-up | under the score, about (200,40)–(255,56) | Right | font glyphs | Briefly shows the points from the last move, for example "2 800". |
 | Multiplier | (233,42)–(256,58) | Right | two 25×16 layers | "1x", "2x" and so on. Combo multiplier. |
@@ -69,7 +69,7 @@ These appear on top of gameplay at particular moments. Most are large text or 3D
 | Event | What appears | Where | When |
 | --- | --- | --- | --- |
 | Combo score | Large score, for example "3400", with a light burst | over the sphere, center | After a large combo. Fades after about a second. |
-| Mystery piece | "?" in the piece queue | piece queue | When the next piece is a mystery piece. |
+| Random Block | "?" in the piece queue | piece queue | When the next piece is a Random Block. |
 | Life lost | Heart turns into a skull | hearts | When a piece cannot be placed. |
 | Magic launch | The item flies out of the bowl towards the sphere | bowl to sphere | When magic is used. |
 | Level intro | Instruction box with mode name and goal, for example "MULTI: dig through the pieces…" | center | Start of Hide & Seek, Puzzle and Training levels. |

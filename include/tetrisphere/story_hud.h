@@ -15,7 +15,7 @@ struct HudPiece {
     int shape = 0;     // the shape record's ID (+8), the same in every level
     int material = 0;  // the block material (+2), which sets the colour
     int cells = 0;
-    bool mystery = false;  // the "?" piece
+    bool random_block = false;  // the "?" piece
 };
 
 struct StoryHudState {
