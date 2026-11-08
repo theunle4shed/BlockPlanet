@@ -7,15 +7,16 @@
     <div id="panel">
         <div class="title">Audio</div>
         <div class="subtitle">Track changes play straight away and last for this game</div>
-        <div class="item value slider" id="music_volume" data-setting="music_volume"
+        <div class="item value slider" id="music_volume" data-description="How loud the music is." data-setting="music_volume"
              data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Music<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
-        <div class="item value slider" id="effects_volume" data-setting="effects_volume"
+        <div class="item value slider" id="effects_volume" data-description="How loud the sound effects are." data-setting="effects_volume"
              data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Effects<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
-        <div class="item value" id="music_choice" data-setting="music_choice"
+        <div class="item value" id="music_choice" data-description="Auto plays the game’s own music for each stage. Random shuffles the tracks. Choose plays the track below." data-setting="music_choice"
              data-options="auto:Auto,random:Random,choose:Choose">Music order<span class="value"></span></div>
-        <div class="item value" id="track" data-setting="track"
+        <div class="item value" id="track" data-description="Pick a track: it plays straight away, for the rest of this game." data-setting="track"
              data-options="0:Prophetic,1:Azule Lux,2:Martist,3:Compliant Confuse,4:Faze,5:Flim Flam,6:Manicdrummix,7:Hallucid,8:Perpetuate303,9:Phony,10:T. Grey,11:Learn,12:Zyp Zyp,13:Extol,14:Magic Fluter,15:Spooky Baby,16:Zooming Car,17:Cheddar Funk,18:Snowy Mushrooms,19:Dog Robot,20:Sappy,21:Skank Bowl Fight,22:Birthday Bumps">Track<span class="value"></span></div>
         <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
     </div>
 </body>
 </rml>

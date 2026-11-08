@@ -7,13 +7,14 @@
     <div id="panel">
         <div class="title">Audio</div>
         <div class="subtitle">Changes apply and save straight away</div>
-        <div class="item value slider" id="music_volume" data-setting="music_volume"
+        <div class="item value slider" id="music_volume" data-description="How loud the music is." data-setting="music_volume"
              data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Music<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
-        <div class="item value slider" id="effects_volume" data-setting="effects_volume"
+        <div class="item value slider" id="effects_volume" data-description="How loud the sound effects are." data-setting="effects_volume"
              data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%">Effects<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
-        <div class="item value" id="music" data-setting="music"
+        <div class="item value" id="music" data-description="Auto plays the game’s own music for each stage. Random shuffles the tracks." data-setting="music"
              data-options="auto:Auto,random:Random">Music order<span class="value"></span></div>
         <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
     </div>
 </body>
 </rml>
