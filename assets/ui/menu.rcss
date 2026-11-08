@@ -1,3 +1,14 @@
+/* Type scale (2026-11-08, the owner's request): every menu text uses one of
+   these, so screens stay in step. Sizes are in dp (they follow the window).
+     Hero      96  bold   the pause menu's PAUSED (.header)
+     Display   64  bold   screen titles (.title)
+     Item      40         menu choices (.item); 34 in long lists (body.compact)
+     Subtitle  26         under a title, yellow (.subtitle)
+     Body      26         descriptions and paragraphs (.description, .howto .para)
+     Note      22         notes beside items, hints, labels, the version (.note, .hint, .section, .version)
+   Special cases: the name being typed (56) and the on-screen keyboard (34).
+   The HUD and the card panels (hud.rcss) size their text from the window and
+   the Text size setting; their headings, body and hints follow the same roles. */
 /* BlockPlanet menus: placeholder layout until the art direction is set
    (docs/UI.md), in the original game's menu colours: orange items, the
    selected one white, dark-outlined text, a white-outlined box and yellow
@@ -36,27 +47,27 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 
 .title {
     display: block;
-    font-size: 72dp;
+    font-size: 64dp;
     font-weight: bold;
 }
 /* "BlockPlanet v0.1" under the main menu's title. */
 .version {
     display: block;
-    font-size: 24dp;
+    font-size: 22dp;
     color: #a8b0c8;
     margin-top: -4dp;
     margin-bottom: 12dp;
 }
 .subtitle {
     display: block;
-    font-size: 28dp;
+    font-size: 26dp;
     color: #e8b818;
     margin-bottom: 24dp;
 }
 
 .item {
     display: block;
-    font-size: 44dp;
+    font-size: 40dp;
     padding: 10dp 28dp;
     margin-bottom: 4dp;
     border-radius: 14dp;
@@ -70,7 +81,7 @@ body.returning #panel { animation: 0.18s cubic-out return; }
     font-weight: bold;
 }
 .item .note {
-    font-size: 24dp;
+    font-size: 22dp;
     color: #e8b818;
     margin-left: 16dp;
     font-weight: normal;
@@ -80,7 +91,7 @@ body.returning #panel { animation: 0.18s cubic-out return; }
 .hint {
     display: block;
     margin-top: 32dp;
-    font-size: 24dp;
+    font-size: 22dp;
     color: #e8b818;
 }
 
@@ -120,7 +131,7 @@ scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0dp;
 }
 .name-field-hint {
     display: block;
-    font-size: 24dp;
+    font-size: 22dp;
     color: #e8b818;
     margin-bottom: 20dp;
     min-height: 30dp;
@@ -208,7 +219,7 @@ body.over-pause { background-color: #00000000; }
 /* Section headings inside a screen (Options: Graphics, Audio). */
 .section {
     display: block;
-    font-size: 24dp;
+    font-size: 22dp;
     font-weight: bold;
     letter-spacing: 3dp;
     color: #e8b818;
@@ -262,9 +273,9 @@ body.lists .description.empty { display: none; }
 
 /* Long lists (the main menu): smaller rows so the description fits. */
 body.compact #panel { top: 40dp; padding: 40dp 56dp; }
-body.compact .item { font-size: 38dp; padding: 6dp 28dp; margin-bottom: 2dp; }
+body.compact .item { font-size: 34dp; padding: 6dp 28dp; margin-bottom: 2dp; }
 body.compact .subtitle { margin-bottom: 16dp; }
 
 /* How to Play (pause menu): short paragraphs to read. */
 .howto { display: block; margin: 12dp 0dp 20dp 0dp; }
-.howto .para { display: block; font-size: 24dp; line-height: 34dp; color: #dfe3ee; margin-bottom: 10dp; }
+.howto .para { display: block; font-size: 26dp; line-height: 34dp; color: #dfe3ee; margin-bottom: 10dp; }
