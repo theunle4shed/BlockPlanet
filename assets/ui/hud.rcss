@@ -170,6 +170,10 @@ div { display: block; }
 /* Differences against best times: green ahead, red behind. */
 .ahead { color: #5ad46a; }
 .behind { color: #f05a4a; }
+/* Story: the last five points added, under the score, newest first. */
+#gains { display: block; margin-top: 6dp; }
+#gains .gain { display: block; font-size: 18dp; color: #9aa6c8; }
+#gains .gain.newest { font-size: 20dp; color: #e8b818; }
 #best { display: block; font-size: 22dp; color: #c8d0e8; margin-top: 6dp; }
 #net { display: block; font-size: 26dp; font-weight: bold; margin-top: -2dp; }
 /* Splits, LiveSplit style: stage, difference, time; the current one highlighted. */

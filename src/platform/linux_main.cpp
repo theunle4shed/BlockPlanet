@@ -908,8 +908,20 @@ void update_hud() {
             view.splits.push_back(split);
         }
     } else if (state.mode == 1) {
-        // Story: the episode's time only (the speedrun timing is Time Attack's).
+        // Story: the episode's time, and under it the score with the last
+        // five points added (the owner's choice, 2026-11-08).
         view.time = hud_time(splits.view().total);
+        static long long last_score = -1;
+        static std::deque<long long> gains;
+        const long long score = static_cast<long long>(state.score) * 10;  // the game keeps tens
+        if (last_score < 0 || score < last_score) gains.clear();  // a new game
+        else if (score > last_score) {
+            gains.push_front(score - last_score);
+            if (gains.size() > 5) gains.pop_back();
+        }
+        last_score = score;
+        view.story_score = hud_number(score);
+        for (const long long g : gains) view.story_gains.push_back("+" + hud_number(g));
     } else if (state.mode == 9) {
         // Lines: the stage's play time against the best for it (records
         // "lines", by chapter).

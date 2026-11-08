@@ -545,6 +545,13 @@ std::string hud_rml_parts(const HudView& hud) {
         }
         rml += "</div></div>";
     }
+    if (!hud.story_score.empty()) {
+        rml += "<div class='rule'><div class='line'/></div><div id='story-score' class='group'><div class='label'>Score</div><div id='score'>" +
+               escape(hud.story_score) + "</div><div id='gains'>";
+        for (std::size_t k = 0; k < hud.story_gains.size(); ++k)
+            rml += std::string("<div class='gain") + (k == 0 ? " newest" : "") + "'>" + escape(hud.story_gains[k]) + "</div>";
+        rml += "</div></div>";
+    }
     rml += "</div>";
     return rml;
 }
