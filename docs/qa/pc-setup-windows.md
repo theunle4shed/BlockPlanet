@@ -6,7 +6,7 @@ From a fresh checkout and your own ROM to a running build. Everything made from 
 
 1. **Visual Studio 2022 Community** (or the free "Build Tools for Visual Studio 2022"). In the installer, tick **Desktop development with C++**. It brings the compiler, CMake and Ninja.
 2. **Git for Windows**: https://git-scm.com/download/win (the defaults are fine).
-3. **Python 3.11 or newer**: https://www.python.org/downloads/. Tick **Add python.exe to PATH** on the installer's first page.
+3. **Python 3.11 or newer**: https://www.python.org/downloads/. Ticking **Add python.exe to PATH** helps, but the setup also finds Python through the `py` launcher.
 4. The **Microsoft Visual C++ Redistributable (x64)**, if it isn't already installed: https://aka.ms/vc14/vc_redist.x64.exe
 
 Open a **new** PowerShell window afterwards, so the new tools are on PATH.

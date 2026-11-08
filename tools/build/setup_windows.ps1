@@ -28,16 +28,28 @@ function Run([string]$exe, [string[]]$arguments) {
 }
 
 Step 'Checking tools'
-foreach ($tool in @('git', 'python')) {
-    if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool is not on PATH. Install it and open a new PowerShell." }
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'git is not on PATH. Install Git for Windows and open a new PowerShell.' }
+# Find a real Python 3.11+. Windows ships a "python" shortcut that only opens
+# the Microsoft Store, and python.org's installer leaves PATH alone unless asked,
+# so ask the "py" launcher first, then "python".
+function Find-Python {
+    $tries = @()
+    if (Get-Command py -ErrorAction SilentlyContinue) { $tries += ,@('py', '-3') }
+    if (Get-Command python -ErrorAction SilentlyContinue) { $tries += ,@('python') }
+    foreach ($t in $tries) {
+        $exe = $t[0]; $pre = @($t | Select-Object -Skip 1)
+        try {
+            $out = (& $exe @pre -c "import sys; print('%d.%d|%s' % (sys.version_info[0], sys.version_info[1], sys.executable))" 2>$null | Out-String).Trim()
+        } catch { continue }
+        if ($out -match '^3\.(\d+)\|(.+)$' -and [int]$Matches[1] -ge 11) { return $Matches[2] }
+    }
+    return $null
 }
-# Windows ships a "python" shortcut that only opens the Microsoft Store.
-$pythonVersion = ''
-try { $pythonVersion = (& python -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null | Out-String).Trim() } catch { }
-if ($pythonVersion -notmatch '^3\.(\d+)$' -or [int]$Matches[1] -lt 11) {
-    throw 'Python 3.11 or newer is not installed (the "python" found is Windows'' Store shortcut, or too old). Install it from https://www.python.org/downloads/ with "Add python.exe to PATH" ticked, then open a new PowerShell.'
+$python = Find-Python
+if (-not $python) {
+    throw 'Python 3.11 or newer was not found (the "python" command may be Windows'' Store shortcut). Install it from https://www.python.org/downloads/, then open a new PowerShell.'
 }
-Write-Host "python: $pythonVersion"
+Write-Host "python: $python"
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 if (-not (Test-Path $vswhere)) { throw 'Visual Studio 2022 (or its Build Tools) is not installed.' }
 $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
@@ -59,8 +71,8 @@ foreach ($dir in @((Join-Path $vsCMake 'CMake\bin'), (Join-Path $vsCMake 'Ninja'
 }
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue) -or -not (Get-Command ninja -ErrorAction SilentlyContinue)) {
     Write-Host 'CMake or Ninja is missing from Visual Studio; installing them with pip (for this user only).'
-    Run python @('-m', 'pip', 'install', '--user', '--upgrade', 'cmake', 'ninja')
-    $userScripts = (& python -c "import sysconfig; print(sysconfig.get_path('scripts', 'nt_user'))").Trim()
+    Run $python @('-m', 'pip', 'install', '--user', '--upgrade', 'cmake', 'ninja')
+    $userScripts = (& $python -c "import sysconfig; print(sysconfig.get_path('scripts', 'nt_user'))").Trim()
     $env:Path = "$userScripts;$env:Path"
 }
 foreach ($tool in @('cmake', 'ninja')) {
@@ -68,7 +80,6 @@ foreach ($tool in @('cmake', 'ninja')) {
 }
 Write-Host "cmake: $((Get-Command cmake).Source)"
 Write-Host "ninja: $((Get-Command ninja).Source)"
-$python = (Get-Command python).Source
 $cmake = (Get-Command cmake).Source
 
 Step 'Your ROM (kept private in .local\m0)'
