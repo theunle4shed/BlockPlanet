@@ -7,3 +7,8 @@ if not exist tetrisphere-m1.exe (
   exit /b 1
 )
 tetrisphere-m1.exe %*
+if errorlevel 1 (
+  echo.
+  echo The game stopped with an error. If it says an option is unknown, run Update BlockPlanet.bat first.
+  pause
+)
