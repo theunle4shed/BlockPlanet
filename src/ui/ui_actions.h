@@ -20,6 +20,7 @@ struct ListItem {
     bool focus = false;   // focused when the screen opens
     std::string description;  // shown in the screen's #description while focused
     std::string alt;          // data-alt: what the Alt button does on this item
+    std::string icon;         // an icon before the label (a character of the menus' icon font, UTF-8)
 };
 
 } // namespace blockplanet::ui

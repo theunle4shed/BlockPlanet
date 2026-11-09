@@ -208,9 +208,11 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
     blockplanet::ui::ListItem basics{"basics", "Basics", basics_done ? "completed" : "start here",
                                      "command:training", true, 1, !basics_done || advanced_done};
     basics.description = "Wheels shows you how to play: the shadow, sliding, dropping, combos and magic.";
+    basics.icon = "\uE1EB";  // a sprout
     blockplanet::ui::ListItem advanced{"advanced", "Advanced", advanced_done ? "completed" : "",
                                        "command:training_advanced", true, 1, basics_done && !advanced_done};
     advanced.description = "Crystal pieces, the X count, gravity combos and fuse combos.";
+    advanced.icon = "\uE1B4";  // a bolt
     return {basics, advanced};
 }
 
