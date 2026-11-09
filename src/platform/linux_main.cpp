@@ -3761,15 +3761,24 @@ bool handle_profile_command(const std::string& command) {
             // rather than a black screen fading in).
             const bool faded_in = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E1202) == 0;
             static std::optional<std::chrono::steady_clock::time_point> clear_since;
+            // How long after the fade reads clear the load is done: Story's
+            // stage still fades in for about 1 s after 0x800E1202 reads 0
+            // (recorded 2026-11-09), so the grid holds over it
+            // (BLOCKPLANET_GRID_LOAD_MS, default 1200).
+            static const int settle_ms = [] {
+                const char* text = std::getenv("BLOCKPLANET_GRID_LOAD_MS");
+                return text != nullptr ? std::max(0, std::atoi(text)) : 1200;
+            }();
             if (loading_active) {
                 if (mode_launcher.active() || continue_mode || !in_play_now) playing_since.reset();
                 else if (!playing_since) playing_since = now_l;
                 if (!playing_since || !faded_in) clear_since.reset();
                 else if (!clear_since) clear_since = now_l;
-                // Done 0.4 s after the fade is clear in play; 3 s into play in
-                // any case (a mode whose fade reads otherwise); 20 s at most.
-                if ((clear_since && now_l - *clear_since > std::chrono::milliseconds(400)) ||
-                    (playing_since && now_l - *playing_since > std::chrono::seconds(3)) ||
+                // Done settle_ms after the fade is clear in play; 4 s into
+                // play in any case (a mode whose fade reads otherwise); 20 s
+                // at most.
+                if ((clear_since && now_l - *clear_since > std::chrono::milliseconds(settle_ms)) ||
+                    (playing_since && now_l - *playing_since > std::chrono::seconds(4)) ||
                     now_l - loading_since > std::chrono::seconds(20))
                     loading_active = false;
             }
