@@ -108,7 +108,7 @@ bool start(std::uint32_t width, std::uint32_t height) {
     Rml::SetSystemInterface(system_interface.get());
     Rml::SetRenderInterface(renderer.get());
     if (!Rml::Initialise()) return false;
-    for (const char* font : {"fonts/LatoLatin-Regular.ttf", "fonts/LatoLatin-Bold.ttf", "fonts/LatoLatin-Italic.ttf", "fonts/LatoLatin-BoldItalic.ttf"}) {
+    for (const char* font : {"fonts/LatoLatin-Regular.ttf", "fonts/LatoLatin-Bold.ttf", "fonts/LatoLatin-Italic.ttf", "fonts/LatoLatin-BoldItalic.ttf", "fonts/lucide.ttf"}) {
         if (!Rml::LoadFontFace(asset(font))) std::fprintf(stderr, "{\"event\":\"ui_font_missing\",\"font\":\"%s\"}\n", font);
     }
     context = Rml::CreateContext("main", Rml::Vector2i(int(width), int(height)));

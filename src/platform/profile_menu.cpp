@@ -388,7 +388,7 @@ std::vector<std::string> blockplanet_credit_lines() {
         "N64Recomp and RSPRecomp \u00B7 Wiseguy and contributors",
         "N64ModernRuntime \u00B7 N64Recomp contributors", "",
         "#Rendering", "RT64 \u00B7 RT64 contributors", "plume and re-spirv \u00B7 renderbag and contributors", "",
-        "#Interface", "RmlUi \u00B7 RmlUi contributors", "FreeType \u00B7 The FreeType Project", "Lato \u00B7 \u0141ukasz Dziedzic", "",
+        "#Interface", "RmlUi \u00B7 RmlUi contributors", "FreeType \u00B7 The FreeType Project", "Lato \u00B7 \u0141ukasz Dziedzic", "Lucide icons \u00B7 Lucide contributors", "",
         "#Input and Sound", "SDL2 \u00B7 Sam Lantinga and contributors", "SDL_GameControllerDB \u00B7 community contributors", "",
         "#Libraries",
         "ELFIO \u00B7 {fmt} \u00B7 Rabbitizer \u00B7 SLJIT \u00B7 toml++",

@@ -7,11 +7,11 @@
     <div id="panel">
         <div class="title">Solo</div>
         <div class="subtitle">Play on your own</div>
-        <div class="item" id="story" data-action="command:open_story" data-alt="command:training_story" data-alt-label="Training" data-description="Break through each sphere to its core, episode by episode. Play the campaign, race the clock, chase points or play without a game over.">Story</div>
-        <div class="item" id="hide_and_seek" data-action="command:hide_and_seek" data-description="Dig away the blocks to find the pictures hidden in each sphere.">Hide &amp; Seek</div>
-        <div class="item" id="puzzle" data-action="command:puzzle" data-alt="command:puzzle_chapter:0" data-alt-label="Puzzle Training" data-description="Clear set spheres with the pieces you are given. Think before you drop.">Puzzle</div>
-        <div class="item" id="lines" data-action="command:lines" data-description="A different game on the sphere, with its own levels.">Lines</div>
-        <div class="item" id="multiphasic" data-action="command:multiphasic" data-description="One long run: each core you open becomes the next sphere. How far can you go?">Multiphasic<span class="note">coming later</span></div>
+        <div class="item" id="story" data-action="command:open_story" data-alt="command:training_story" data-alt-label="Training" data-description="Break through each sphere to its core, episode by episode. Play the campaign, race the clock, chase points or play without a game over."><span class="icon"></span>Story</div>
+        <div class="item" id="hide_and_seek" data-action="command:hide_and_seek" data-description="Dig away the blocks to find the pictures hidden in each sphere."><span class="icon"></span>Hide &amp; Seek</div>
+        <div class="item" id="puzzle" data-action="command:puzzle" data-alt="command:puzzle_chapter:0" data-alt-label="Puzzle Training" data-description="Clear set spheres with the pieces you are given. Think before you drop."><span class="icon"></span>Puzzle</div>
+        <div class="item" id="lines" data-action="command:lines" data-description="A different game on the sphere, with its own levels."><span class="icon"></span>Lines</div>
+        <div class="item" id="multiphasic" data-action="command:multiphasic" data-description="One long run: each core you open becomes the next sphere. How far can you go?"><span class="icon"></span>Multiphasic<span class="note">coming later</span></div>
         <div class="item" id="back" data-action="back">Back</div>
         <div id="description" class="description"></div>
     </div>

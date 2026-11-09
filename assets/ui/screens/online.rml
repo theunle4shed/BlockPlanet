@@ -7,8 +7,8 @@
     <div id="panel">
         <div class="title">Online</div>
         <div class="subtitle">Play over the internet</div>
-        <div class="item" id="host" data-action="command:online_host" data-description="Start a game and share its join code with friends. In streamer mode the code stays hidden; Copy still works.">Host a game<span class="note">coming later</span></div>
-        <div class="item" id="join" data-action="command:online_join" data-description="Join a friend's game with their code.">Join with a code<span class="note">coming later</span></div>
+        <div class="item" id="host" data-action="command:online_host" data-description="Start a game and share its join code with friends. In streamer mode the code stays hidden; Copy still works."><span class="icon"></span>Host a game<span class="note">coming later</span></div>
+        <div class="item" id="join" data-action="command:online_join" data-description="Join a friend's game with their code."><span class="icon"></span>Join with a code<span class="note">coming later</span></div>
         <div class="item" id="back" data-action="back">Back</div>
         <div id="description" class="description"></div>
     </div>
