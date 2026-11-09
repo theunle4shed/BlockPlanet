@@ -3775,22 +3775,22 @@ bool handle_profile_command(const std::string& command) {
         // The menu grid (docs/UI.md, Menu grid) over the game's own pause
         // animations, in the pause's colours: from the Start press that
         // pauses (before the game's own fade and tiles show), while paused,
-        // and after Resume until the game has faded back in (its screen fade
-        // 0x800E1202 back to 0, 255 while paused) and a moment more
-        // (BLOCKPLANET_GRID_RESUME_MS, default 200); and after Quit until
-        // BlockPlanet's menus open again. Measured on the test machine
-        // (2026-11-09): after Resume the fade is clear within about 0.4 s,
-        // and the pause row 0x800E1228 clears about 1.3 s later still.
-        // BLOCKPLANET_GRID_RESUME=row waits for the row instead (as before;
-        // then about 1200 ms more), for comparison.
+        // and after Resume until the pause row 0x800E1228 clears and a moment
+        // more (BLOCKPLANET_GRID_RESUME_MS, default 100); and after Quit
+        // until BlockPlanet's menus open again. Measured on the test machine
+        // (2026-11-09): after Resume the game's screen fade (0x800E1202, 255
+        // while paused) is clear within about 0.4 s, then its own pause tiles
+        // fly out over the game (0x800DFF08 = 5) for about 1.3 s, and the row
+        // clears when they have gone. BLOCKPLANET_GRID_RESUME=fade leaves
+        // once the fade is clear instead (then 200 ms), for comparison.
         {
             static const bool after_row = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME");
-                return text != nullptr && std::string(text) == "row";
+                return text == nullptr || std::string(text) != "fade";
             }();
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
-                return text != nullptr ? std::max(0, std::atoi(text)) : (after_row ? 1200 : 200);
+                return text != nullptr ? std::max(0, std::atoi(text)) : (after_row ? 100 : 200);
             }();
             static bool was_paused = false;
             static std::optional<std::chrono::steady_clock::time_point> unpaused_at, start_at;
