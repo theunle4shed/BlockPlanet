@@ -422,6 +422,15 @@ func = "func_80029938"
 before_vram = 0x800299A0
 text = "blockplanet_audio_frame(rdram, ctx);"
 
+# Direct starts (src/graphics/direct_start_hooks.cpp): where the top-level
+# loop checks the game's own Training start, once a frame outside the intro,
+# title, attract demo and endings, BlockPlanet starts the mode it asked for
+# without the original menus.
+[[patches.hook]]
+func = "func_80070118"
+before_vram = 0x80070288
+text = "blockplanet_direct_start(rdram, ctx);"
+
 # Music and effects levels (Options): every call that sets a music player's
 # volume (background music, fades, jingles) or the effects volume is scaled
 # by the player's setting (src/graphics/audio_hooks.cpp).

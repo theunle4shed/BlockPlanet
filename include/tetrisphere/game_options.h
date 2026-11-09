@@ -49,6 +49,14 @@ public:
     // for the game being started.
     void set_menu_casual(bool on) { menu_casual_ = on; }
     bool menu_casual() const { return menu_casual_; }
+    // Where the next Rescue start begins (1-based chapter and level): the
+    // chapter chosen in the menus, else --start-chapter, else 1. For direct
+    // starts, which set it themselves at the moment the game is built.
+    int rescue_start_chapter() const {
+        if (chosen_chapter_ && *chosen_chapter_ > 0) return *chosen_chapter_;
+        return options_.start_chapter.value_or(1);
+    }
+    int rescue_start_level() const { return chosen_level_.value_or(1); }
 
 private:
     GameOptions options_;

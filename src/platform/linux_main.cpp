@@ -33,6 +33,7 @@
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
 #include "tetrisphere/mode_launcher.h"
+#include "tetrisphere/direct_start.h"
 #include "ui_system.h"
 #include "tetrisphere/profile_save.h"
 #include "tetrisphere/sphere_mesh.h"
@@ -2172,6 +2173,14 @@ std::atomic<bool> menus_block_game{false};
 // Buttons the mode launcher presses on port 1 (bit 16 set while active).
 std::atomic<std::uint32_t> launcher_buttons{0};
 ModeLauncher mode_launcher;
+// A direct start (without the original menus) waiting for the game's thread;
+// if it is refused the launch falls back to mode_launcher.
+struct DirectWait {
+    LaunchMode mode;
+    std::chrono::steady_clock::time_point since;
+};
+std::optional<DirectWait> direct_wait;
+bool launching() { return mode_launcher.active() || direct_wait.has_value(); }
 
 // BlockPlanet's pause menu over the game's pause.
 PauseBridge pause_bridge;
@@ -2827,6 +2836,21 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
     return story_chapters(completed, rescue_chapters, unlock_all_testing);
 }
 
+// A start has been accepted: close BlockPlanet's menus, remember where the
+// player came from, and show the loading cover until play has started.
+void begin_launch_presentation(LaunchMode mode) {
+    blockplanet::ui::request_close();
+    // The loading cover (the owner's request): over the game's own menus
+    // while they are pressed through, or the stage's first frames after a
+    // direct start, until play has started.
+    static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
+                                  "Training", "Training", "Puzzle Training"};
+    loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
+    if (const auto path = blockplanet::ui::menu_path(); !path.empty()) launch_path = path;
+    loading_since = std::chrono::steady_clock::now();
+    loading_active = true;
+}
+
 void launch_mode(LaunchMode mode, bool keep_music = false) {
     if (guest_rdram == nullptr) return;
     if (game_option_applier) {
@@ -2837,19 +2861,27 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
         game_option_applier->set_menu_casual(casual);
         trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());
     }
+    if (direct_wait) return;  // a direct start is already on its way
     if (!keep_music) end_track_override();
-    const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
-    if (accepted) {
-        blockplanet::ui::request_close();
-        // The loading cover (the owner's request): over the game's own menus
-        // while they are pressed through, until play has started.
-        static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
-                                      "Training", "Training", "Puzzle Training"};
-        loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
-        if (const auto path = blockplanet::ui::menu_path(); !path.empty()) launch_path = path;
-        loading_since = std::chrono::steady_clock::now();
-        loading_active = true;
+    // Story starts directly, without the original menus, from the game's main
+    // menu (docs/research/blockplanet-game-state.md, "Starting modes
+    // directly"); BLOCKPLANET_LAUNCH=menus keeps the menu route.
+    if (mode == LaunchMode::Rescue && direct_start::enabled() && game_option_applier && !launching() &&
+        guest::load16(guest_rdram, 0x800E121C) >= 0) {
+        DirectStartRequest request;
+        request.chapter = game_option_applier->rescue_start_chapter() - 1;
+        request.level = game_option_applier->rescue_start_level() - 1;
+        if (direct_start::request(request)) {
+            direct_wait = DirectWait{mode, std::chrono::steady_clock::now()};
+            begin_launch_presentation(mode);
+            std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"started\",\"route\":\"direct\"}\n",
+                         launch_mode_name(mode));
+            std::fflush(stdout);
+            return;
+        }
     }
+    const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
+    if (accepted) begin_launch_presentation(mode);
     std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
                  launch_mode_name(mode), accepted ? "started" : "refused");
     std::fflush(stdout);
@@ -3569,6 +3601,27 @@ bool handle_profile_command(const std::string& command) {
             }
             if (const auto mode = launch_mode_for_command(*command)) launch_mode(*mode);
         }
+        if (direct_wait && guest_rdram != nullptr) {
+            if (const auto result = direct_start::take_result()) {
+                const auto mode = direct_wait->mode;
+                direct_wait.reset();
+                if (*result == direct_start::Result::Started) {
+                    std::fprintf(stdout, "{\"event\":\"mode_launch\",\"status\":\"playing\",\"route\":\"direct\"}\n");
+                    std::fflush(stdout);
+                } else {
+                    // Not possible from here: start through the original menus.
+                    const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
+                    if (!accepted) loading_active = false;
+                    std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\",\"route\":\"menus\"}\n",
+                                 launch_mode_name(mode), accepted ? "started" : "refused");
+                    std::fflush(stdout);
+                }
+            } else if (std::chrono::steady_clock::now() - direct_wait->since > std::chrono::seconds(2)) {
+                // The game has not reached its menu loop (the title, the
+                // intro): give up; the result arrives on the next pass.
+                direct_start::cancel();
+            }
+        }
         if (mode_launcher.active() && guest_rdram != nullptr) {
             std::uint16_t press = 0;
             const auto result = mode_launcher.update(const_cast<std::uint8_t*>(guest_rdram),
@@ -3580,7 +3633,7 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
             }
         }
-        if (!mode_launcher.active() && guest_rdram != nullptr) {
+        if (!launching() && guest_rdram != nullptr) {
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
                                                    start_pressed_recently());
@@ -3646,7 +3699,7 @@ bool handle_profile_command(const std::string& command) {
         publish_hud_settings();
         // Back at the game's menu after leaving play from BlockPlanet: open
         // BlockPlanet's menus (the stage list after a single stage).
-        if (return_to_menu_chapter && !continue_mode && !mode_launcher.active() && guest_rdram != nullptr &&
+        if (return_to_menu_chapter && !continue_mode && !launching() && guest_rdram != nullptr &&
             read_game_state(guest_rdram).scene >= 0) {
             const int chapter = *return_to_menu_chapter;
             return_to_menu_chapter.reset();
@@ -3670,14 +3723,14 @@ bool handle_profile_command(const std::string& command) {
         // A pending launch (after a Chapter 0, or Restart level) starts once
         // the game is back at its menu.
         static auto last_continue_try = std::chrono::steady_clock::time_point{};
-        if (continue_mode && !mode_launcher.active() && guest_rdram != nullptr && game_option_applier &&
+        if (continue_mode && !launching() && guest_rdram != nullptr && game_option_applier &&
             read_game_state(guest_rdram).scene >= 0 &&
             std::chrono::steady_clock::now() - last_continue_try > std::chrono::seconds(1)) {
             last_continue_try = std::chrono::steady_clock::now();
             if (continue_mode->start)
                 game_option_applier->choose_start(continue_mode->start->first, continue_mode->start->second);
             launch_mode(continue_mode->mode, continue_mode->keep_music);
-            if (mode_launcher.active()) continue_mode.reset();
+            if (launching()) continue_mode.reset();
         }
         // BlockPlanet's menus in place of the original's (the owner's choice,
         // 2026-11-08): whenever the game is at its own menus (after the title,
@@ -3698,7 +3751,7 @@ bool handle_profile_command(const std::string& command) {
             const bool at_game_menu = guest_rdram != nullptr && title_seen && !title_now &&
                                       guest::load16(guest_rdram, 0x800E121C) >= 0 &&
                                       guest::load16(guest_rdram, 0x800E122E) < 0;  // not in the credits
-            if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !mode_launcher.active() &&
+            if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !launching() &&
                 !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0) {
                 if (profile_picked && !launch_path.empty()) {
                     // Back from a game (game over, Exit, an episode's end): the menus it started from.
@@ -3711,14 +3764,14 @@ bool handle_profile_command(const std::string& command) {
                 }
             }
             blockplanet::set_game_menu_hidden(!original_menus && at_game_menu &&
-                                              (blockplanet::ui::menus_open() || mode_launcher.active()));
+                                              (blockplanet::ui::menus_open() || launching()));
         }
         // The game's attract demo starts after its menu sits idle; behind
         // BlockPlanet's menus it counts as play and launches were refused
         // (the owner's report). While BlockPlanet's menus are open over the
         // game's menu, its idle counters (frames on the page) are held at 10
         // seconds, past every page's own entrance timing.
-        if (guest_rdram != nullptr && blockplanet::ui::menus_open() && !mode_launcher.active() &&
+        if (guest_rdram != nullptr && blockplanet::ui::menus_open() && !launching() &&
             guest::load16(guest_rdram, 0x800E121C) >= 0) {
             auto* rd = const_cast<std::uint8_t*>(guest_rdram);
             for (const std::uint32_t counter : {0x800E1208u, 0x800E120Cu})
@@ -3737,7 +3790,7 @@ bool handle_profile_command(const std::string& command) {
             last = now_l;
             const bool in_play_now = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) == -1;
             if (loading_active) {
-                if (mode_launcher.active() || continue_mode || !in_play_now) playing_since.reset();
+                if (launching() || continue_mode || !in_play_now) playing_since.reset();
                 else if (!playing_since) playing_since = now_l;
                 if ((playing_since && now_l - *playing_since > std::chrono::milliseconds(400)) ||
                     now_l - loading_since > std::chrono::seconds(20))

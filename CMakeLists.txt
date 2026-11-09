@@ -309,6 +309,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/magic_hooks.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
+    src/graphics/direct_start_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
     assets/trophies/developer_records.json
@@ -440,6 +441,7 @@ add_executable(tetrisphere_diag
     src/graphics/magic_hooks.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
+    src/graphics/direct_start_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
     src/platform/pc_settings_menu.cpp
@@ -1105,6 +1107,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/magic_hooks.cpp
         src/graphics/title_hooks.cpp
         src/graphics/audio_hooks.cpp
+        src/graphics/direct_start_hooks.cpp
             src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp
         src/runtime/unsupported.cpp

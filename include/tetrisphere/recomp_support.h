@@ -52,6 +52,7 @@ void blockplanet_sphere_face_end(std::uint8_t* rdram, recomp_context* ctx, int f
 bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant);
 void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant);
 void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_scale_music_volume(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_scale_effects_volume(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, uint32_t helper);
