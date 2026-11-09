@@ -400,7 +400,9 @@ void MenuGrid::place(double now) {
         std::string transform = tile.transform;
         const auto& tuning = grid_tuning();
         const float in_place = std::clamp((fly_ - at.fly * tuning.fly_spread) / std::max(0.01f, tuning.fly_seconds), 0.0f, 1.0f);
-        const float away = 1.0f - in_place * in_place * (3.0f - 2.0f * in_place);
+        // Flying in, the tiles start nearer than past the viewer, so they show
+        // from the first frames (with the far background, the owner's note).
+        const float away = (leaving_ ? 1.0f : 0.75f) * (1.0f - in_place * in_place * (3.0f - 2.0f * in_place));
         const auto corners = grid_tile_corners(layout_, at, breath, grid_wave_offset(at, now), turn, away);
         const bool hidden = !corners || in_place <= 0.0f;
         if (tile.element != nullptr && hidden != tile.hidden) {
@@ -431,9 +433,10 @@ void MenuGrid::place(double now) {
     // The far background fades in and out with the tiles, unless they fly
     // out into the loading cover. Only on change: setting a property rebuilds
     // its shape, even to the same value.
-    // It is whole by half way, so it hides what is behind early on the way
-    // in (the game's own pause fade) and stays until the tiles are mostly gone.
-    const float present = std::clamp(presence() * 2.0f, 0.0f, 1.0f);
+    // On the way in it is whole by half way, hiding what is behind early (the
+    // game's own pause fade); on the way out it fades while the tiles are
+    // still leaving, so they reveal the game itself, not an empty background.
+    const float present = leaving_ ? std::clamp((presence() - 0.25f) / 0.45f, 0.0f, 1.0f) : std::clamp(presence() * 2.0f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
     std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);
     far.insert(3, "a");  // rgb( -> rgba(
