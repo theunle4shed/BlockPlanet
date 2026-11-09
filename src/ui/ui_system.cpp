@@ -729,6 +729,26 @@ std::string loading_text;
 float loading_opacity = 0.0f;
 Rml::ElementDocument* loading_document = nullptr;
 
+std::string build_label;  // under loading_mutex
+Rml::ElementDocument* label_document = nullptr;
+
+bool update_label_document() {
+    std::string text;
+    {
+        std::lock_guard lock(loading_mutex);
+        text = build_label;
+    }
+    if (text.empty()) return false;
+    if (label_document == nullptr) {
+        label_document = context->LoadDocument(asset("build_label.rml"));
+        if (label_document == nullptr) return false;
+        if (auto* e = label_document->GetElementById("label")) e->SetInnerRML(escape(text));
+    }
+    label_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
+    label_document->PullToFront();
+    return true;
+}
+
 bool update_loading_document() {
     std::string text;
     float opacity;
@@ -859,7 +879,8 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
     apply_requests();
     const bool hud_visible = update_hud_document();
     const bool loading_visible = update_loading_document();
-    if (navigator->is_open() || hud_visible || loading_visible) {
+    const bool label_visible = update_label_document();
+    if (navigator->is_open() || hud_visible || loading_visible || label_visible) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
             context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
@@ -943,6 +964,11 @@ std::vector<std::pair<std::string, std::size_t>> menu_path() {
 void request_restore(const std::vector<std::pair<std::string, std::size_t>>& path) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(RestoreRequest{path});
+}
+
+void set_build_label(const std::string& text) {
+    std::lock_guard lock(loading_mutex);
+    build_label = text;
 }
 
 void set_loading(const std::string& text, float opacity) {

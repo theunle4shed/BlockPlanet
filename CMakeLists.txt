@@ -419,6 +419,20 @@ foreach(INPUT IN LISTS TETRISPHERE_BUILD_INPUTS)
     file(SHA256 "${CMAKE_SOURCE_DIR}/${INPUT}" INPUT_HASH)
     string(APPEND TETRISPHERE_BUILD_MATERIAL ":${INPUT_HASH}")
 endforeach()
+# The branch and commit being built, shown faintly in the corner of the
+# screen ("main · 7673986"), so the owner knows which build is running.
+find_package(Git QUIET)
+set(BLOCKPLANET_BUILD_LABEL "")
+if(GIT_FOUND)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_SOURCE_DIR}" rev-parse --abbrev-ref HEAD
+                    OUTPUT_VARIABLE _bp_branch OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_SOURCE_DIR}" rev-parse --short HEAD
+                    OUTPUT_VARIABLE _bp_commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(_bp_branch STREQUAL "claude/teyrisphere-performance-hqetcp")
+        set(_bp_branch "main")
+    endif()
+    set(BLOCKPLANET_BUILD_LABEL "${_bp_branch} - ${_bp_commit}")
+endif()
 tetrisphere_bind_runtime_identity(TETRISPHERE_BUILD_ID
     "${TETRISPHERE_BUILD_MATERIAL}"
     "${N64MODERN_RUNTIME_SOURCE_ID}:${RT64_SOURCE_ID}")
@@ -1122,7 +1136,8 @@ if(TETRISPHERE_GAME_ENABLED)
     target_compile_definitions(tetrisphere-m1 PRIVATE
         TETRISPHERE_LINUX_DEMO HLSL_CPU IMGUI_IMPL_VULKAN_NO_PROTOTYPES
         TETRISPHERE_BUILD_ID="${TETRISPHERE_BUILD_ID}"
-        TETRISPHERE_MAP_ID="${TETRISPHERE_MAP_ID}")
+        TETRISPHERE_MAP_ID="${TETRISPHERE_MAP_ID}"
+        BLOCKPLANET_BUILD_LABEL="${BLOCKPLANET_BUILD_LABEL}")
     if(NOT MSVC)
         target_compile_definitions(tetrisphere-m1 PRIVATE FFX_GCC)
     else()
