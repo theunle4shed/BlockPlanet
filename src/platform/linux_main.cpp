@@ -3776,7 +3776,8 @@ bool handle_profile_command(const std::string& command) {
         // animations, in the pause's colours: from the Start press that
         // pauses (before the game's own fade and tiles show), while paused,
         // and after Resume until the pause row 0x800E1228 clears and a moment
-        // more (BLOCKPLANET_GRID_RESUME_MS, default 100); and after Quit
+        // more (BLOCKPLANET_GRID_RESUME_MS, default 450: the game draws dark
+        // for about 0.3 s just after the row clears); and after Quit
         // until BlockPlanet's menus open again. Measured on the test machine
         // (2026-11-09): after Resume the game's screen fade (0x800E1202, 255
         // while paused) is clear within about 0.4 s, then its own pause tiles
@@ -3790,7 +3791,7 @@ bool handle_profile_command(const std::string& command) {
             }();
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
-                return text != nullptr ? std::max(0, std::atoi(text)) : (after_row ? 100 : 200);
+                return text != nullptr ? std::max(0, std::atoi(text)) : (after_row ? 450 : 200);
             }();
             static bool was_paused = false;
             static std::optional<std::chrono::steady_clock::time_point> unpaused_at, start_at;
