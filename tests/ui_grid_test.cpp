@@ -318,6 +318,13 @@ void layout_tests() {
         grid_tuning() = GridTuning{};
     }
 
+    // By default every tile keeps one clock (as the original's do): its
+    // corners repeat exactly every wave period, whatever its own phase.
+    for (const auto& t : wide.tiles) {
+        const auto now = grid_tile_lifts(t, 7.3), later = grid_tile_lifts(t, 7.3 + double(grid_wave_seconds));
+        for (std::size_t k = 0; k < 4; ++k) assert(near(now[k], later[k], 0.05f));
+    }
+
     // The test screen's settings: each slider's value, in its own units,
     // matching the defaults, and setting one changes the tuning.
     {
@@ -328,7 +335,7 @@ void layout_tests() {
             return std::string("?");
         };
         assert(value_of("grid_wave_every") == "1.43" && value_of("grid_wave_step") == "350");
-        assert(value_of("grid_wave_depth") == "6" && value_of("grid_ripple") == "35");
+        assert(value_of("grid_wave_depth") == "6" && value_of("grid_ripple") == "0" && value_of("grid_speed_variation") == "0");
         assert(grid_lab_set("grid_ripple", "50") && near(grid_tuning().ripple, 0.5f, 1e-6f));
         assert(grid_lab_set("grid_wave_step", "100") && near(grid_tuning().wave_step, 0.1f, 1e-6f));
         assert(!grid_lab_set("grid_nothing", "1"));

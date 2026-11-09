@@ -136,9 +136,13 @@ struct GridTuning {
     // fps, 2026-11-09): a period of about 1.43 s, the same for every tile;
     // about 60 % of the motion not one travelling wave, neighbours barely
     // alike; about 0.35 s from one tile to the next along what wave there is.
-    float wave_every = grid_wave_seconds, wave_step = 0.35f, ripple = 0.35f;
+    // Compared with ours on the same screen: the original's brightness keeps
+    // one clock for every tile (its period spread 0.002 against our 0.12), so
+    // its tiles differ in phase only: no speed variation, no cross ripple of
+    // another period, and the tilt on the same clock.
+    float wave_every = grid_wave_seconds, wave_step = 0.35f, ripple = 0.0f;
     float wave_depth = grid_wave_depth;
-    float independence = 0.6f, speed_variation = 0.05f;
+    float independence = 0.6f, speed_variation = 0.0f;
     // How much an independent tile tilts against how much it rises (the
     // original's tiles tilt more than they rise, by the same measure).
     float tilt = 1.0f;

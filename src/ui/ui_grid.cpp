@@ -330,7 +330,8 @@ std::array<float, 4> grid_tile_lifts(const GridTile& tile, double time) {
     const double speed = 1.0 + double(t.speed_variation) * (2.0 * hash(1) - 1.0);
     const float phase = 2.0f * pi * hash(2), tilt_phase = 2.0f * pi * hash(3), tilt_dir = 2.0f * pi * hash(4);
     const float bob = std::sin(float(std::fmod(time * speed / every, 1.0)) * 2.0f * pi + phase);
-    const float tilt = t.tilt * std::sin(float(std::fmod(time * speed * 0.83 / every, 1.0)) * 2.0f * pi + tilt_phase);
+    // The tilt keeps the same clock as the bob (the original's tiles all keep one beat), at its own phase.
+    const float tilt = t.tilt * std::sin(float(std::fmod(time * speed / every, 1.0)) * 2.0f * pi + tilt_phase);
     const float sx[4] = {-1, 1, 1, -1}, sy[4] = {-1, -1, 1, 1};
     std::array<float, 4> lifts{};
     for (std::size_t k = 0; k < 4; ++k) {

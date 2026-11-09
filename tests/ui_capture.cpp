@@ -305,6 +305,37 @@ int main(int argc, char** argv) {
     const std::array<Rml::Vector2i, 4> sizes = {Rml::Vector2i(1440, 1080), Rml::Vector2i(1920, 1080), Rml::Vector2i(2560, 1080),
                                                 Rml::Vector2i(1080, 1350)};
     int failures = 0;
+    // UI_CAPTURE_SEQUENCE=SECONDS writes a frame sequence of "Who is
+    // playing?" over the grid (640 x 480, 30 a second) to the output folder,
+    // for tools/qa/grid_motion.py, instead of the stills.
+    if (const char* seconds = std::getenv("UI_CAPTURE_SEQUENCE")) {
+        const Rml::Vector2i size(640, 480);
+        Rml::Context* context = Rml::CreateContext("sequence", size);
+        context->SetDensityIndependentPixelRatio(float(size.y) / 1080.0f);
+        {
+            Navigator navigator(context, assets / "screens");
+            MenuGrid grid((assets / "grid.rml").string());
+            navigator.open("profiles");
+            double now = std::getenv("UI_CAPTURE_T0") ? std::atof(std::getenv("UI_CAPTURE_T0")) : 0.0;
+            for (const double end = now + 2.0; now < end; now += 1.0 / 60.0)
+                grid.update(context, grid_colour_of(navigator.documents()), now);
+            const int frames = int(std::atof(seconds) * 30.0);
+            for (int i = 0; i < frames; ++i, now += 1.0 / 30.0) {
+                grid.update(context, grid_colour_of(navigator.documents()), now);
+                for (auto* document : navigator.documents()) document->SetClass("on-grid", grid.visible());
+                context->Update();
+                renderer.resize(size.x, size.y);
+                renderer.clear_to_game();
+                context->Render();
+                char name[32];
+                std::snprintf(name, sizeof(name), "frame-%05d.png", i);
+                if (!renderer.write_png(out / name)) ++failures;
+            }
+        }
+        Rml::RemoveContext("sequence");
+        Rml::Shutdown();
+        return failures == 0 ? 0 : 1;
+    }
     for (const auto size : sizes) {
         Rml::Context* context = Rml::CreateContext("capture", size);
         context->SetDensityIndependentPixelRatio(float(size.y) / 1080.0f);
