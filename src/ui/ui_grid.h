@@ -115,7 +115,7 @@ constexpr float grid_fade_seconds = grid_flip_seconds + grid_ripple_seconds;  //
 // sinking on its own as the wave's phase travels across the grid from the
 // top left, tilting with the water's slope. (The original's whole sphere
 // also seemed to breathe; the owner chose the water alone.)
-constexpr float grid_wave_seconds = 1.5f;    // one rise and fall of a tile
+constexpr float grid_wave_seconds = 1.43f;   // one rise and fall of a tile (measured from the original)
 constexpr float grid_wave_depth = 0.06f;     // a tile's width, either way
 
 // The motion's settings, adjustable while the grid runs (the grid test
@@ -132,9 +132,16 @@ constexpr float grid_wave_depth = 0.06f;     // a tile's width, either way
 // more independent"). Flying out, a tile travels fly_out sphere radii
 // outwards and fly_toward viewer distances towards the viewer.
 struct GridTuning {
-    float wave_every = grid_wave_seconds, wave_step = 0.2f, ripple = 0.35f;
+    // Measured from the original (tools/qa/grid_motion.py, 390 frames at 30
+    // fps, 2026-11-09): a period of about 1.43 s, the same for every tile;
+    // about 60 % of the motion not one travelling wave, neighbours barely
+    // alike; about 0.35 s from one tile to the next along what wave there is.
+    float wave_every = grid_wave_seconds, wave_step = 0.35f, ripple = 0.35f;
     float wave_depth = grid_wave_depth;
-    float independence = 0.5f, speed_variation = 0.15f;
+    float independence = 0.6f, speed_variation = 0.05f;
+    // How much an independent tile tilts against how much it rises (the
+    // original's tiles tilt more than they rise, by the same measure).
+    float tilt = 1.0f;
     float fly_seconds = grid_fly_seconds, fly_spread = grid_fly_spread, fly_distance = 1.0f;
     float fly_out = 2.2f, fly_toward = 0.35f;
 };

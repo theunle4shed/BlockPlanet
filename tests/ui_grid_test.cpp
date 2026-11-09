@@ -311,7 +311,7 @@ void layout_tests() {
         bool differ = false;
         for (double time = 0; time < 6; time += 0.1) {
             const auto la = grid_tile_lifts(a, time), lb = grid_tile_lifts(b, time);
-            for (std::size_t k = 0; k < 4; ++k) assert(std::abs(la[k]) <= grid_wave_depth * a.width * 1.5f + 0.01f);
+            for (std::size_t k = 0; k < 4; ++k) assert(std::abs(la[k]) <= grid_wave_depth * a.width * 2.0f + 0.01f);
             if (std::abs(la[0] - lb[0]) > 2.0f) differ = true;
         }
         assert(differ);
@@ -322,12 +322,12 @@ void layout_tests() {
     // matching the defaults, and setting one changes the tuning.
     {
         const auto values = grid_lab_values();
-        assert(values.size() == 8);  // the water's and the flight's settings
+        assert(values.size() == 9);  // the water's and the flight's settings
         const auto value_of = [&](const char* name) {
             for (const auto& [n, v] : values) if (n == name) return v;
             return std::string("?");
         };
-        assert(value_of("grid_wave_every") == "1.5" && value_of("grid_wave_step") == "200");
+        assert(value_of("grid_wave_every") == "1.43" && value_of("grid_wave_step") == "350");
         assert(value_of("grid_wave_depth") == "6" && value_of("grid_ripple") == "35");
         assert(grid_lab_set("grid_ripple", "50") && near(grid_tuning().ripple, 0.5f, 1e-6f));
         assert(grid_lab_set("grid_wave_step", "100") && near(grid_tuning().wave_step, 0.1f, 1e-6f));

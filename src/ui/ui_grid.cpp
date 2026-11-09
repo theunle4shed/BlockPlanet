@@ -272,6 +272,7 @@ constexpr LabSetting lab_settings[] = {
     {"grid_wave_depth", &GridTuning::wave_depth, 100.0f},     // percent of a tile's width
     {"grid_independence", &GridTuning::independence, 100.0f},  // percent
     {"grid_speed_variation", &GridTuning::speed_variation, 100.0f},  // percent either way
+    {"grid_tilt", &GridTuning::tilt, 100.0f},                 // percent of the rise
     {"grid_fly_out", &GridTuning::fly_out, 1.0f},             // sphere radii
     {"grid_fly_toward", &GridTuning::fly_toward, 100.0f},     // percent of the viewer's distance
 };
@@ -329,7 +330,7 @@ std::array<float, 4> grid_tile_lifts(const GridTile& tile, double time) {
     const double speed = 1.0 + double(t.speed_variation) * (2.0 * hash(1) - 1.0);
     const float phase = 2.0f * pi * hash(2), tilt_phase = 2.0f * pi * hash(3), tilt_dir = 2.0f * pi * hash(4);
     const float bob = std::sin(float(std::fmod(time * speed / every, 1.0)) * 2.0f * pi + phase);
-    const float tilt = 0.5f * std::sin(float(std::fmod(time * speed * 0.83 / every, 1.0)) * 2.0f * pi + tilt_phase);
+    const float tilt = t.tilt * std::sin(float(std::fmod(time * speed * 0.83 / every, 1.0)) * 2.0f * pi + tilt_phase);
     const float sx[4] = {-1, 1, 1, -1}, sy[4] = {-1, -1, 1, 1};
     std::array<float, 4> lifts{};
     for (std::size_t k = 0; k < 4; ++k) {
