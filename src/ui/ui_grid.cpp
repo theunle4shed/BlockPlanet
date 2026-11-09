@@ -438,6 +438,7 @@ void MenuGrid::place(double now) {
     // still leaving, so they reveal the game itself, not an empty background.
     const float present = leaving_ ? std::clamp((presence() - 0.25f) / 0.45f, 0.0f, 1.0f) : std::clamp(presence() * 2.0f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
+    far_alpha_ = far_alpha;
     std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);
     far.insert(3, "a");  // rgb( -> rgba(
     far.back() = ',';

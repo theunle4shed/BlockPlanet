@@ -168,6 +168,10 @@ public:
     // How much of the loading cover may show: while the grid flies out into
     // it, the cover waits until the tiles have mostly passed; otherwise all of it.
     float cover_allowance() const;
+    // The far background's strength as last placed (0 to 1), and whether the
+    // grid is flying out (for the research log).
+    float far_alpha() const { return far_alpha_; }
+    bool leaving() const { return leaving_; }
     // For tests: whether a colour change is still under way, the colour a
     // tile shows, and how far it is turned (degrees, 0 face on).
     bool changing() const { return changing_; }
@@ -209,6 +213,7 @@ private:
     float fly_ = 0;             // 0 (gone) to the flight's total (in place)
     bool leaving_ = false;      // flying out (or gone)
     bool into_cover_ = false;
+    float far_alpha_ = 0;
     double last_now_ = 0;
     bool changing_ = false;
     bool visible_ = false;

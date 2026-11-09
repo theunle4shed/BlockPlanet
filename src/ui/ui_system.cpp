@@ -897,6 +897,15 @@ void update_grid() {
         cover = loading_opacity > 0.0f;
     }
     grid->update(context, colour, now, cover);
+    // Research: BLOCKPLANET_GRID_LOG=1 logs the grid's state every frame
+    // while it is drawn (and the frame it goes), to tell its own dark frames
+    // from the game's.
+    static const bool grid_log = std::getenv("BLOCKPLANET_GRID_LOG") != nullptr;
+    static bool was_visible = false;
+    if (grid_log && (grid->visible() || was_visible))
+        std::fprintf(stdout, "{\"event\":\"grid_frame\",\"t\":%.3f,\"asked\":\"%s\",\"visible\":%d,\"leaving\":%d,\"cover\":%d,\"presence\":%.2f,\"far\":%.2f}\n",
+                     now, colour.c_str(), int(grid->visible()), int(grid->leaving()), int(cover), grid->presence(), grid->far_alpha());
+    was_visible = grid->visible();
     for (auto* document : screens) document->SetClass("on-grid", grid->visible());
 }
 
