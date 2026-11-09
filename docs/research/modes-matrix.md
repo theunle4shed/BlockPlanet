@@ -64,3 +64,59 @@ La [guía contemporánea de M. Stoler (1997)](https://gamefaqs.gamespot.com/n64/
 La misma fuente describe la combinación L + C-right + C-down para revelar iconos en el editor; su descripción inicial usa R, una inconsistencia que debe resolverse con la ROM. No se codifica una combinación supuesta en el port. El inventario conserva el acceso como pendiente de contraste funcional.
 
 El aporte identificado de Baseman en [GameFAQs](https://gamefaqs.gamespot.com/n64/198946-tetrisphere/cheats) describe VORTEX como acceso a una animación en bucle mientras se mantiene Reset. Se cataloga como comportamiento de reset, no como modo normal ni desbloqueo de Jak. Falta contrastarlo en NTPE; no se aplica un reset para sustituir la prueba de guardado normal.
+
+## Gameplay variables per mode (BlockPlanet, English, started 2026-11-09)
+
+The catalogue for the roadmap entry "One game, many rulesets": every gameplay variable, where the game keeps it, its value in each mode, and whether it changes per stage. Descriptions and addresses only (NTPE rev0); values that come from the game's level records are described, never copied (AGENTS.md). Filled in as the direct-launch work finds what each mode sets before play ([blockplanet-game-state.md](blockplanet-game-state.md#starting-modes-directly-2026-11-09)). Sources: L = [level data](blockplanet-level-data.md), G = [game state](blockplanet-game-state.md), D = the mode page's confirm handler (`func_8004127C` at `0x800462D0`) read on 2026-11-09.
+
+Modes by their number at `0x800E44A8` (s16): 1 Rescue (Story), 2 Time Trial (BlockPlanet's Score Attack), 3 Training, 4 Puzzle, 5 Hide & Seek, 6 VS CPU, 9 Lines; 10 and 12 appear in the code (12 returns to a menu; 10 is treated like Training in the top-level loop) and are not identified yet.
+
+**Coverage so far:** of the owner's 16 named variables, 6 have an address and per-mode values (layers, objective in part, single stage or episode, lives, playfield size, opponent settings in part), 4 are partly known (block types, core to uncover, hidden pictures, default music), and 6 are still to find (background effect, drop timer speed, shot time limit, score and speed goals, friend inside, opponent intelligence per stage). Rescue (Story) is the best covered; Lines, Puzzle and Hide & Seek the least.
+
+### Per stage or per mode
+
+Each stage has a level record (L): 20 bytes, with flags, the playfield layers, block colours and a size byte, and goal text in goal levels. So everything held in that record is **per stage** already in the original; what the mode page or the game code sets is **per mode**. Record groups (L): Rescue 15 chapters × 10 levels; probably Score Attack's spheres; probably Hide & Seek (5 stages of 30); further groups not yet identified.
+
+### The owner's variables
+
+| Variable | Where the game keeps it | Per mode | Per stage? |
+| --- | --- | --- | --- |
+| Playfield layers | Level record byte 3 (L), copied to the level structure (`0x8013D170` + 0xC, `0x8013D17C`); the board has 9 layers of 32 × 32 cells (G, "Layers, core size and stacking") | Rescue: rises with the chapter (chapter 1 one layer above the core, chapter 10 up to six). Score Attack: 3 in the sphere records seen. Others: to read from their records | Yes (record) |
+| Block types | Block values in the board tables (`0x800E44D0`, 2 bytes per cell); colour count in the level record (L) | Rescue: colours rise with the chapter; special blocks (value 7, probably buried bonuses) from 1:2 on; the core is value 10 (L). Crystal pieces and power pieces exist (Training Advanced, manual). Per-mode use to catalogue | Yes (record) |
+| Objective | Mode code, plus the record's flags (`0x10`/`0x20` add goal text) and group byte (L) | Rescue: uncover an S × S square of the core (context `+0x23E4`). Time Trial: score in a clock. Puzzle: clear with limited moves. Hide & Seek: per-stage goals (MULTI, DRILL, core, SHIFT, CONNECT, TOWER, …). VS CPU: win the rounds. Lines: to describe | Yes (record) |
+| Single stage or episode | Mode; levels per chapter from `func_80089D04` (returns 5 for Rescue, 3 for Hide & Seek and VS CPU); chapter `0x800E44A0`, level context `+0x23BA` | Rescue: episodes of 10 levels (chapter-end menu after the tenth). Hide & Seek: its own chapter counter, not yet found. Puzzle: one puzzle after another (number in `+0x23BA`). Time Trial: spheres one after another until the clock ends | Per mode |
+| Background effect | Not found yet | — | — |
+| Default music | The song playing is the music player `0x80107290` + `0x157C` (G, 2026-11-09); level songs change from `func_800906E8` | Story 1:1 plays song 1. Others to record | Probably (changes between levels) |
+| Hidden pictures | Hide & Seek's goal pictures (G, "Hide & Seek goals and their pictures") | Hide & Seek only | Yes |
+| Core breaks / how much to uncover | Context `+0x23E4` = 2 × record byte 12, kept between 2 and 10: the side of the core square to uncover (G, "The core opening a level needs"); VS CPU adds a chapter-based amount first; 4, 6 or 8 also set `0x8015F4F0` to 0, 1 or 2 | Rescue, VS CPU (core area). Hide & Seek: "multiple cores" goals suggest separate core objects | Yes (record) |
+| Lives | Hearts, context `+0x2D7E` (G) | 3 at the start in Rescue, Time Trial, Hide & Seek; refilled at each retry; VS CPU refills each round | Per mode |
+| Drop timer speed | Candidates around context `+0x2DFC`–`+0x2E08` (values for 20, 10 and about 8 s), unconfirmed (L) | — | Probably |
+| Shot time limit | Not found yet | — | — |
+| Score and speed goals | Time Trial clock context `+0x2B0C`: starts at 18,059 frames (about 5:01) in mode 2 and counts down; modes 4, 5 and 7 count up (G, "The original Time Trial's clock") | Time Trial: clock and sphere bonus (`func_800C7C90`). Others: to find | Per mode so far |
+| Friend inside | The rescued robot (Rescue's chapter-end scene); not yet located in memory | Rescue | Per chapter |
+| Playfield size and shape | Fixed: 9 layers × 32 × 32 cells round a sphere (G) | All modes | No (engine limit) |
+| Opponent intelligence | Not found yet. VS CPU's start sets player 2 settings (below) | VS CPU | Owner wants per stage |
+
+### What the mode page sets per mode (D)
+
+All modes: `0x800DFD4C`, `0x8015D980`, `0x800DFD50`, `0x800DFD54` set to 1, the level counters, stage and chapter cleared, then the mode. Player 1's port, character, name and `0x80113323` come from the player page.
+
+| Mode | Extra settings at the start |
+| --- | --- |
+| Rescue (1) | None. With saved progress the game opens another page first (`0x800E1232`). |
+| Hide & Seek (5) | None at the confirm; its own page follows the hand-over (`0x800E1234`). |
+| Lines (9) | `0x800DFD4C` = 2 (meaning unknown). |
+| Puzzle (4) | None. |
+| Time Trial (2) | None at the confirm; skips the saved-progress check. |
+| VS CPU (6) | `0x800E44A4` = 1, `0x8015D980` = 2, player 1 context `+0x23D6` = 1, player 2 context `+0x23D6` = 0, `0x800E08A8` = 1, `0x800E08AC` = 0, `0x800E08B0` = 0, `0x800E088C` = 0; level counters cleared again at the hand-over. Practice and VS player menus also offer pieces, layers, core area and rounds (above). |
+| Training (3) | Started by the game's own direct start (`0x800DFE8C`): training type `0x800E44AC` (1 Basics, 2 Advanced, 3 Puzzle), `0x800DFDFC` = 1, character 4 and a default name. |
+
+### What only one mode has
+
+- **Rescue:** robots to rescue, a message scene after each chapter, endings after chapters 5 and 8, bonus episodes 9 and 10 (G).
+- **Time Trial:** the countdown clock and the doubling sphere bonus (G).
+- **Training:** the instructor's text pages and demos; a SKIP item in the pause menu (G).
+- **Puzzle:** the puzzle number in the HUD's level badge and a purple border on the board (G).
+- **Hide & Seek:** goal pictures and goal text per stage; its own chapter counter.
+- **VS CPU:** two players' contexts, rounds, and the second player's settings above.
+- **Lines:** to describe (its rules screen is the game's own).
