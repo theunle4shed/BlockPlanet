@@ -16,6 +16,9 @@ void set_pause_menu_shown(bool shown);
 // 2D draws and the 3D piece queue is not drawn, so BlockPlanet's own HUD can
 // replace them. The routine's logic (magic launch, jingles) still runs.
 void set_original_hud_hidden(bool hidden);
+// While the original HUD is hidden: still draw the game's queued 3D models
+// (the GAME OVER scene's flying blocks are among them).
+void set_original_hud_keep_models(bool keep);
 // While BlockPlanet's menus are open over the game's own menus: skip the
 // original menu's 2D drawing.
 void set_game_menu_hidden(bool hidden);

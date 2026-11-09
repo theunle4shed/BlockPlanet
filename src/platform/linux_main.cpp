@@ -711,6 +711,15 @@ void update_hud() {
     const bool game_over = !original && guest::load16(guest_rdram, 0x800E121C) == -1 &&
                            std::int16_t(guest::load16(guest_rdram, 0x80110220u + 0x2D7E)) < 0;
     blockplanet::set_original_hud_hidden(story || game_over);
+    // The GAME OVER scene's blocks are queued models: keep drawing them (the
+    // owner's report: they vanished mid-flight once the HUD was hidden there).
+    // From 0.6 s in: before that the old HUD's next pieces (also queued
+    // models) are still drawn for a moment.
+    static std::optional<std::chrono::steady_clock::time_point> game_over_since;
+    if (!game_over) game_over_since.reset();
+    else if (!game_over_since) game_over_since = std::chrono::steady_clock::now();
+    blockplanet::set_original_hud_keep_models(game_over_since &&
+                                             std::chrono::steady_clock::now() - *game_over_since > std::chrono::milliseconds(600));
     if (!story) {
         show_hud(std::nullopt);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);

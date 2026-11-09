@@ -83,6 +83,7 @@ const Settings& settings() {
 
 std::atomic<bool> menu_shown{false};
 std::atomic<bool> hud_hidden{false};
+std::atomic<bool> hud_keep_models{false};
 // While BlockPlanet's menus are open over the game's own menus: their 2D
 // drawing (frame, lines, logo, hints, text) is skipped.
 std::atomic<bool> game_menu_hidden{false};
@@ -128,6 +129,7 @@ std::optional<CardBox> recent_card_box() {
 }
 void set_pause_menu_shown(bool shown) { menu_shown.store(shown); }
 void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
+void set_original_hud_keep_models(bool keep) { hud_keep_models.store(keep); }
 void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
 }
 
@@ -449,7 +451,9 @@ extern "C" void blockplanet_hud_begin(std::uint8_t*, recomp_context*) { in_hud =
 extern "C" void blockplanet_hud_end(std::uint8_t*, recomp_context*) { in_hud = false; }
 
 extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
-    return hud_hidden.load(std::memory_order_relaxed);
+    // With models kept (the GAME OVER scene), only the HUD routine's own
+    // models (the next pieces, the bowl) stay hidden.
+    return hud_hidden.load(std::memory_order_relaxed) && (!hud_keep_models.load(std::memory_order_relaxed) || in_hud);
 }
 
 // Research: objects inside LightWave scenes (func_800321D4's a0 = scene,

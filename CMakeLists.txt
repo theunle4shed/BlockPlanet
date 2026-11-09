@@ -35,6 +35,10 @@ set(N64MODERN_RUNTIME_ROOT "${CMAKE_SOURCE_DIR}/.local/deps/N64ModernRuntime"
 if(MSVC)
     add_compile_options(
         "/experimental:deterministic"
+        # Source files are UTF-8: without this, MSVC read BlockPlanet's
+        # "\u..." text (icons, the middle dot) in the old code page and the
+        # menus showed boxes and gaps on Windows (the owner's report).
+        "$<$<COMPILE_LANGUAGE:C,CXX>:/utf-8>"
         "/pathmap:${CMAKE_SOURCE_DIR}=."
         "/pathmap:${N64MODERN_RUNTIME_ROOT}=deps/N64ModernRuntime"
         "/pathmap:${RT64_ROOT}=deps/rt64")
