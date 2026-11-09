@@ -175,11 +175,17 @@ std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layo
     const float c = std::cos(angle), s = std::sin(angle);
     const float lons[4] = {tile.lon0, tile.lon1, tile.lon1, tile.lon0};
     const float lats[4] = {tile.lat0, tile.lat0, tile.lat1, tile.lat1};
-    // Flying out: speeding up towards the viewer (past them at 1) and a
-    // little outwards, so the tiles part around the middle as they come.
+    // Flying out: speeding up towards the viewer and outwards from the
+    // screen's middle, so the tiles burst past the screen's edges rather than
+    // filling the screen as they come (each tile straight at the viewer would
+    // cover everything in its own colour; the test of 2026-11-09). A tile is
+    // gone at 1, and dropped once it is near the viewer.
+    if (away >= 1.0f) return std::nullopt;
     const float rush = away * away;
     const float distance = grid_tuning().fly_distance;
-    const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * 1.3f * distance} * rush + normal * (r * 0.6f * distance * rush);
+    const float spread = std::sqrt(normal.x * normal.x + normal.y * normal.y);
+    const Vec3 outwards = spread > 1e-4f ? Vec3{normal.x / spread, normal.y / spread, 0.0f} : Vec3{0.0f, -1.0f, 0.0f};
+    const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * 0.75f * distance} * rush + outwards * (r * 1.4f * distance * rush);
     std::array<GridPoint, 4> out{};
     for (int k = 0; k < 4; ++k) {
         // The corner on the sphere, turned about the axis through the tile's
@@ -188,7 +194,7 @@ std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layo
         const Vec3 v = centre_of_sphere + direction(lons[k], lats[k]) * r - middle;
         const Vec3 turned = v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1.0f - c));
         const Vec3 at = (middle + turned + normal * lift) * breath + flight;
-        if (at.z > layout.perspective * 0.8f) return std::nullopt;  // flown past the viewer
+        if (at.z > layout.perspective * 0.6f) return std::nullopt;  // near the viewer: dropped
         const float scale = layout.perspective / (layout.perspective - at.z);
         out[std::size_t(k)] = {layout.centre_x + at.x * scale, layout.centre_y + at.y * scale};
     }
@@ -436,7 +442,9 @@ void MenuGrid::place(double now) {
     // On the way in it is whole by half way, hiding what is behind early (the
     // game's own pause fade); on the way out it fades while the tiles are
     // still leaving, so they reveal the game itself, not an empty background.
-    const float present = leaving_ ? std::clamp((presence() - 0.25f) / 0.45f, 0.0f, 1.0f) : std::clamp(presence() * 2.0f, 0.0f, 1.0f);
+    // (Measured: flying out, the tiles cover about 70 % of the screen at 0.7
+    // of the way in place and almost none by 0.55, so it fades between those.)
+    const float present = leaving_ ? std::clamp((presence() - 0.55f) / 0.3f, 0.0f, 1.0f) : std::clamp(presence() * 2.0f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
     far_alpha_ = far_alpha;
     std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);

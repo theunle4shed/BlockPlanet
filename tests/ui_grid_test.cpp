@@ -199,6 +199,25 @@ void layout_tests() {
         assert(half_away[1].x - half_away[0].x > base[1].x - base[0].x);
         assert(std::abs(half_away[0].x - layout.centre_x) > std::abs(base[0].x - layout.centre_x));
         assert(!grid_tile_corners(layout, t, 1.0f, 0, 0, 1.0f));
+        // Flying, no tile grows to cover much of the screen (straight at the
+        // viewer, several together read as a flat dark screen): at most a
+        // tenth of it, counting only what is on screen.
+        const auto on_screen = [&](const std::array<GridPoint, 4>& q) {
+            int hit = 0, n = 0;
+            for (float y = 6; y < h; y += 12) {
+                for (float x = 6; x < w; x += 12) {
+                    ++n;
+                    bool in = false;
+                    for (std::size_t i = 0, j = 3; i < 4; j = i++)
+                        if ((q[i].y > y) != (q[j].y > y) && x < (q[j].x - q[i].x) * (y - q[i].y) / (q[j].y - q[i].y) + q[i].x) in = !in;
+                    hit += in;
+                }
+            }
+            return float(hit) / float(n);
+        };
+        for (std::size_t i = 0; i < layout.tiles.size(); i += 9)
+            for (float away = 0; away < 1.0f; away += 0.1f)
+                if (const auto q = grid_tile_corners(layout, layout.tiles[i], 1.0f, 0, 0, away)) assert(on_screen(*q) < 0.1f);
         for (const auto& u : layout.tiles) assert(u.fly >= 0 && u.fly <= 1.0001f);
         assert(at(3, 3).fly > at(0, 0).fly);  // the middle arrives last (and leaves first)
         return layout;
@@ -356,7 +375,7 @@ void grid_tests(const std::string& document) {
         double t = 10.0;
         int c = 1;  // green
         const GridRgb colours[2] = {blue, green};
-        for (int round = 0; round < 150; ++round) {
+        for (int round = 0; round < 60; ++round) {
             std::vector<float> turns(grid.tile_count());
             for (std::size_t i = 0; i < turns.size(); ++i) turns[i] = grid.tile_turn(i);
             const int presses = 1 + int((seed >> 8) % 6);

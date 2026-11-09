@@ -329,8 +329,15 @@ int main(int argc, char** argv) {
             frame("grid_lab");
             // Closing the menus: the grid flies out, revealing the game.
             navigator.close();
-            advance(now + grid_fly_total * 0.4);
-            frame("fly-out");
+            {
+                const double left = now;
+                for (const float at : {0.15f, 0.3f, 0.45f, 0.6f}) {
+                    advance(left + grid_fly_total * at);
+                    char name[32];
+                    std::snprintf(name, sizeof(name), "fly-out-%02d", int(at * 100));
+                    frame(name);
+                }
+            }
         }
         Rml::RemoveContext("capture");
     }
