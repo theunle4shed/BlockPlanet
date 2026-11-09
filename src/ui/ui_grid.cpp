@@ -78,17 +78,20 @@ std::optional<GridRgb> grid_colour(std::string_view name) {
     if (name == "cyan") return rgb(0x0a2029);
     if (name == "teal") return rgb(0x0a2420);
     if (name == "peach") return rgb(0x2e1713);
-    if (name == "pause-purple") return rgb(0x271728);  // the pause's, sampled from the original's
-    if (name == "pause-blue") return rgb(0x13192c);
-    if (name == "pause-teal") return rgb(0x142832);
-    if (name == "pause-peach") return rgb(0x2e1b1a);    // not yet sampled: to check
+    // The pause's, sampled from the original's pause background (its
+    // average colour, once a second for 40 seconds).
+    if (name == "pause-purple") return rgb(0x26152f);
+    if (name == "pause-blue") return rgb(0x0f1b2c);
+    if (name == "pause-grey") return rgb(0x262b30);
+    if (name == "pause-teal") return rgb(0x0f2131);
+    if (name == "pause-green") return rgb(0x242c25);
     return std::nullopt;
 }
 
 GridRgb grid_far_colour(GridRgb tile) { return {tile.r * 0.45f, tile.g * 0.45f, tile.b * 0.45f}; }
 
 std::vector<std::string_view> grid_cycle(std::string_view name) {
-    if (name == "pause") return {"pause-purple", "pause-blue", "pause-teal", "pause-peach"};
+    if (name == "pause") return {"pause-purple", "pause-blue", "pause-grey", "pause-teal", "pause-green"};
     return {};
 }
 

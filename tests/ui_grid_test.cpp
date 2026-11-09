@@ -200,16 +200,16 @@ void layout_tests() {
     const auto far = grid_far_colour(blue);
     assert(far.r < blue.r && far.g < blue.g && far.b < blue.b);
     const auto cycle = grid_cycle("pause");
-    assert(cycle.size() == 4 && cycle[0] == "pause-purple");
+    assert(cycle.size() == 5 && cycle[0] == "pause-purple");
     for (auto name : cycle) assert(grid_colour(name));
     assert(grid_cycle("blue").empty());
     // Smooth: each colour in turn, blended in between, back to the first.
     const auto purple = *grid_colour("pause-purple"), pblue = *grid_colour("pause-blue");
     assert(same(grid_cycle_colour(cycle, 0), purple) && same(grid_cycle_colour(cycle, grid_cycle_seconds), pblue));
-    assert(same(grid_cycle_colour(cycle, 4 * grid_cycle_seconds), purple));
+    assert(same(grid_cycle_colour(cycle, 5 * grid_cycle_seconds), purple));
     const auto half = grid_cycle_colour(cycle, grid_cycle_seconds / 2);
     assert(near(half.r, (purple.r + pblue.r) / 2, 0.002f) && near(half.b, (purple.b + pblue.b) / 2, 0.002f));
-    for (double time = 0; time < 4 * grid_cycle_seconds; time += 0.1) {
+    for (double time = 0; time < 5 * grid_cycle_seconds; time += 0.1) {
         const auto a = grid_cycle_colour(cycle, time), b = grid_cycle_colour(cycle, time + 0.1);
         assert(std::abs(a.r - b.r) < 0.003f && std::abs(a.g - b.g) < 0.003f && std::abs(a.b - b.b) < 0.003f);
     }

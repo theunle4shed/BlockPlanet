@@ -46,10 +46,11 @@ struct GridRgb {
 std::optional<GridRgb> grid_colour(std::string_view name);
 GridRgb grid_far_colour(GridRgb tile);
 // A named cycle of colours, fading smoothly from each to the next over
-// grid_cycle_seconds ("pause": purple, blue, teal, peach, after the
-// original pause's sphere grid). Empty when `name` is not a cycle.
+// grid_cycle_seconds ("pause": purple, blue, grey-blue, teal, green-grey,
+// sampled from the original pause's background, which loops in about 22 to
+// 25 seconds). Empty when `name` is not a cycle.
 std::vector<std::string_view> grid_cycle(std::string_view name);
-constexpr double grid_cycle_seconds = 7.0;
+constexpr double grid_cycle_seconds = 5.0;
 // A cycle's colour `time` seconds after it was first shown.
 GridRgb grid_cycle_colour(const std::vector<std::string_view>& cycle, double time);
 
