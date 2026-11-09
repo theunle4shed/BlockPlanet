@@ -146,6 +146,13 @@ struct GridTuning {
     // How much an independent tile tilts against how much it rises (the
     // original's tiles tilt more than they rise, by the same measure).
     float tilt = 1.0f;
+    // How much a tile's tilt on the water changes its light (0 to 1): leaning
+    // towards the light (upper left) brighter, away darker, each tile on its
+    // own. Off by default: measured on the grid alone, it moved ours away from
+    // the original (brightness independence 0.71 to 0.64, neighbours more
+    // alike, tilt against rise 1.93 to 1.11; the original's 0.71, 0.01,
+    // 2.02); kept on the test screen to judge by eye.
+    float tilt_light = 0.0f;
     float fly_seconds = grid_fly_seconds, fly_spread = grid_fly_spread, fly_distance = 1.0f;
     float fly_out = 2.2f, fly_toward = 0.35f;
 };
@@ -164,6 +171,9 @@ float grid_water(float u, float v, double time, float width);
 // bottom left) at `time`: the water at its corners blended, by
 // independence, with the tile bobbing and tilting on its own.
 std::array<float, 4> grid_tile_lifts(const GridTile& tile, double time);
+// How a tile's lifts change its light (a factor about 1), in steps of a
+// sixteenth so its colour (which rebuilds its shape) changes only now and then.
+float grid_tile_light(const GridTile& tile, const std::array<float, 4>& lifts);
 
 // The grid's colour for these open screens (first to top), as the rules
 // above say: empty when the first has no data-grid.

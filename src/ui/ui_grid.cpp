@@ -273,6 +273,7 @@ constexpr LabSetting lab_settings[] = {
     {"grid_independence", &GridTuning::independence, 100.0f},  // percent
     {"grid_speed_variation", &GridTuning::speed_variation, 100.0f},  // percent either way
     {"grid_tilt", &GridTuning::tilt, 100.0f},                 // percent of the rise
+    {"grid_tilt_light", &GridTuning::tilt_light, 100.0f},     // percent
     {"grid_fly_out", &GridTuning::fly_out, 1.0f},             // sphere radii
     {"grid_fly_toward", &GridTuning::fly_toward, 100.0f},     // percent of the viewer's distance
 };
@@ -340,6 +341,18 @@ std::array<float, 4> grid_tile_lifts(const GridTile& tile, double time) {
         lifts[k] = water[k] * (1.0f - own) + alone * own;
     }
     return lifts;
+}
+
+float grid_tile_light(const GridTile& tile, const std::array<float, 4>& lifts) {
+    const auto& t = grid_tuning();
+    if (t.tilt_light <= 0.0f || tile.width <= 0.0f || t.wave_depth <= 0.0f) return 1.0f;
+    // The tile's slope across and down, against the steepest the water makes.
+    const float across = ((lifts[1] + lifts[2]) - (lifts[0] + lifts[3])) / 2.0f;  // right side up: faces left
+    const float down = ((lifts[2] + lifts[3]) - (lifts[0] + lifts[1])) / 2.0f;    // lower side up: faces up
+    const float most = 2.0f * t.wave_depth * tile.width;
+    const float lean = std::clamp((across * 0.6f + down * 0.8f) / most, -1.0f, 1.0f);  // towards the light (upper left)
+    const float light = 1.0f + 0.5f * t.tilt_light * lean;
+    return std::round(light * 16.0f) / 16.0f;
 }
 
 std::string grid_colour_of(const std::vector<Rml::ElementDocument*>& screens) {
@@ -448,10 +461,12 @@ void MenuGrid::place(double now) {
         if (tile.flipping || !same(tile.face, target_)) active = true;
         tile.shown = shown;
         tile.turn = turn;
+        // Each corner on the water (its place in tiles from the top left).
+        const std::array<float, 4> lifts = grid_tile_lifts(at, now);
         // Turned towards edge on, a tile catches less light (in steps, so its
         // colour, which rebuilds its shape, changes only a few times a flip).
         const float edge = std::round(std::abs(std::cos(turn * pi / 180.0f)) * 6.0f) / 6.0f;
-        const float shade = at.shade * (0.35f + 0.65f * edge);
+        const float shade = at.shade * (0.35f + 0.65f * edge) * grid_tile_light(at, lifts);
         // Layers: the tile's place on the sphere, its part
         // in the wave (lifted outwards), its flip. Worked out here and given
         // to RmlUi as one matrix per tile.
@@ -459,8 +474,6 @@ void MenuGrid::place(double now) {
         const auto& tuning = grid_tuning();
         const float in_place = std::clamp((fly_ - at.fly * tuning.fly_spread) / std::max(0.01f, tuning.fly_seconds), 0.0f, 1.0f);
         const float away = 1.0f - in_place * in_place * (3.0f - 2.0f * in_place);
-        // Each corner on the water (its place in tiles from the top left).
-        const std::array<float, 4> lifts = grid_tile_lifts(at, now);
         auto corners = grid_tile_corners(layout_, at, lifts, turn, away);
         auto matrix = corners ? grid_quad_matrix(*corners, tile_element) : std::nullopt;
         if (corners && !matrix) {

@@ -30,6 +30,8 @@
              data-options="0:0 %,5:5 %,10:10 %,15:15 %,20:20 %,30:30 %,40:40 %,50:50 %">Speed variation<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="item value slider" id="grid_tilt" data-setting="grid_tilt" data-description="How much each independent tile tilts, against how much it rises and sinks (the original's tilt more than they rise)."
              data-options="0:0 %,25:25 %,50:50 %,75:75 %,100:100 %,150:150 %,200:200 %">Tilt<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_tilt_light" data-setting="grid_tilt_light" data-description="How much a tile's tilt changes its light: leaning towards the light brighter, away darker, each tile on its own."
+             data-options="0:0 %,15:15 %,25:25 %,35:35 %,50:50 %,75:75 %,100:100 %">Tilt lighting<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="item value slider" id="grid_fly_out" data-setting="grid_fly_out" data-description="Flying out (and in), how far the tiles spread outwards past the screen's edges (in sphere sizes)."
              data-options="0.5:0.5,1:1,1.4:1.4,1.8:1.8,2.2:2.2,2.6:2.6,3:3,4:4,5:5">Fly outwards<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="item value slider" id="grid_fly_toward" data-setting="grid_fly_toward" data-description="Flying out (and in), how far the tiles come towards you."

@@ -318,6 +318,21 @@ void layout_tests() {
         grid_tuning() = GridTuning{};
     }
 
+    // Tilt lighting: a tile leaning towards the light (its right and lower
+    // sides lifted) is brighter, away darker, flat unchanged, in sixteenths.
+    {
+        const auto& t = wide.tiles[10];
+        const float d = grid_wave_depth * t.width;
+        assert(grid_tile_light(t, {-d, d, d, -d}) == 1.0f);  // off by default
+        grid_tuning().tilt_light = 0.35f;
+        assert(grid_tile_light(t, {0, 0, 0, 0}) == 1.0f);
+        assert(grid_tile_light(t, {-d, d, d, -d}) > 1.0f && grid_tile_light(t, {d, -d, -d, d}) < 1.0f);
+        assert(grid_tile_light(t, {-d, -d, d, d}) > 1.0f);
+        const float l = grid_tile_light(t, {-0.3f * d, 0.7f * d, 0.2f * d, -0.1f * d});
+        assert(near(l * 16.0f, std::round(l * 16.0f), 1e-4f));
+        grid_tuning() = GridTuning{};
+    }
+
     // By default every tile keeps one clock (as the original's do): its
     // corners repeat exactly every wave period, whatever its own phase.
     for (const auto& t : wide.tiles) {
@@ -329,7 +344,7 @@ void layout_tests() {
     // matching the defaults, and setting one changes the tuning.
     {
         const auto values = grid_lab_values();
-        assert(values.size() == 9);  // the water's and the flight's settings
+        assert(values.size() == 10);  // the water's and the flight's settings
         const auto value_of = [&](const char* name) {
             for (const auto& [n, v] : values) if (n == name) return v;
             return std::string("?");

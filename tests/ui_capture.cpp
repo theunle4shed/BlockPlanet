@@ -305,9 +305,10 @@ int main(int argc, char** argv) {
     const std::array<Rml::Vector2i, 4> sizes = {Rml::Vector2i(1440, 1080), Rml::Vector2i(1920, 1080), Rml::Vector2i(2560, 1080),
                                                 Rml::Vector2i(1080, 1350)};
     int failures = 0;
-    // UI_CAPTURE_SEQUENCE=SECONDS writes a frame sequence of "Who is
-    // playing?" over the grid (640 x 480, 30 a second) to the output folder,
-    // for tools/qa/grid_motion.py, instead of the stills.
+    // UI_CAPTURE_SEQUENCE=SECONDS writes a frame sequence of the grid alone
+    // (the "Who is playing?" screen with its panels hidden; 640 x 480, 30 a
+    // second) to the output folder, for tools/qa/grid_motion.py, instead of
+    // the stills.
     if (const char* seconds = std::getenv("UI_CAPTURE_SEQUENCE")) {
         const Rml::Vector2i size(640, 480);
         Rml::Context* context = Rml::CreateContext("sequence", size);
@@ -316,6 +317,18 @@ int main(int argc, char** argv) {
             Navigator navigator(context, assets / "screens");
             MenuGrid grid((assets / "grid.rml").string());
             navigator.open("profiles");
+            // The grid alone: the screen's panels hidden.
+            for (auto* document : navigator.documents()) document->SetProperty("visibility", "hidden");
+            // UI_CAPTURE_SET=name=value,name=value sets test-screen values first.
+            if (const char* set = std::getenv("UI_CAPTURE_SET")) {
+                std::string list = set;
+                for (std::size_t at = 0; at < list.size();) {
+                    const auto end = std::min(list.find(',', at), list.size());
+                    const auto item = list.substr(at, end - at);
+                    if (const auto eq = item.find('='); eq != std::string::npos) grid_lab_set(item.substr(0, eq), item.substr(eq + 1));
+                    at = end + 1;
+                }
+            }
             double now = std::getenv("UI_CAPTURE_T0") ? std::atof(std::getenv("UI_CAPTURE_T0")) : 0.0;
             for (const double end = now + 2.0; now < end; now += 1.0 / 60.0)
                 grid.update(context, grid_colour_of(navigator.documents()), now);
