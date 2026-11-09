@@ -2,17 +2,25 @@
 
 // The menu grid (docs/UI.md, Menu grid; the owner's design, 2026-11-09): the
 // game's tiled grid as one background BlockPlanet draws itself, above the
-// game's picture and HUD and below the menus. Each tile is its own piece,
-// placed and tilted so the grid bulges outward like a sphere. Between screens
-// of the same colour it stays still; to a new colour the far background
-// fades to it and the tiles flip over in a ripple, one after another, showing
-// the new colour on their backs.
+// game's picture and HUD and below the menus. 8 x 8 tiles, each its own
+// piece, placed on part of a sphere (not quite a half) so the grid bulges
+// outward; the sphere stays round and is sized to cover the screen's longer
+// side. A wave rolls across it, each tile gently coming forward and sinking
+// back. Between screens of the same colour nothing else happens; to a new
+// colour the far background fades to it and the tiles flip over in a ripple,
+// one after another, showing the new colour on their backs. The wave carries
+// on through flips.
 //
 // A screen picks its colour with data-grid on its body ("blue", "green", ...;
-// see grid_colour). The grid is shown while the first screen open has one;
-// its colour is that of the highest open screen that has one (a screen
-// without one, such as a confirmation, keeps the colour under it). The menus
-// over a game (pause) have none, so no grid shows there.
+// see grid_colour), or a slow cycle of colours ("pause"; see grid_cycle). The
+// grid is shown while the first screen open has one; its colour is that of
+// the highest open screen that has one (a screen without one, such as a
+// confirmation, keeps the colour under it).
+//
+// Colour changes never queue and never wait: each tile always heads for the
+// newest colour. A tile not yet turned past edge-on carries on to it; one
+// already showing an older colour finishes and flips again in the newest
+// ripple.
 //
 // The layout and timing are plain functions, tested without RmlUi drawing
 // anything; MenuGrid places the tiles as RmlUi elements (ui/grid.rml).
@@ -31,36 +39,46 @@ struct GridRgb {
     float r = 0, g = 0, b = 0;  // 0 to 1
 };
 // A named colour's tile colour (the tiles' middle tone; the far background is
-// a darker version). Names: blue, green, red, purple, gold, grey.
+// a darker version). Names: blue, green, red, purple, gold, grey, cyan, teal,
+// peach.
 std::optional<GridRgb> grid_colour(std::string_view name);
 GridRgb grid_far_colour(GridRgb tile);
+// A named cycle of colours, each shown for grid_cycle_seconds ("pause":
+// purple, cyan, teal, peach). Empty when `name` is not a cycle.
+std::vector<std::string_view> grid_cycle(std::string_view name);
+constexpr double grid_cycle_seconds = 8.0;
 
-// One tile's place: its rectangle before tilting (pixels), how far it comes
-// towards the viewer (pixels), its tilt (degrees, CSS rotateX and rotateY),
-// its shading (1: as lit face on) and its texture variant.
+// One tile: its size, its centre's offset from the screen's centre (pixels,
+// CSS axes: x right, y down, z towards the viewer), its turn to face outwards
+// (degrees, CSS rotateY then rotateX), its shading (1: lit face on), texture
+// variant, ripple delay and place in the idle wave.
 struct GridTile {
-    float x = 0, y = 0, width = 0, height = 0;
-    float z = 0, tilt_x = 0, tilt_y = 0, shade = 1;
+    float width = 0, height = 0;
+    float x = 0, y = 0, z = 0;
+    float yaw = 0, pitch = 0, shade = 1;
     int column = 0, row = 0, variant = 0;
     float delay = 0;  // seconds after a colour change that this tile starts to flip
+    float phase = 0;  // the wave's phase here (radians)
 };
 struct GridLayout {
     int columns = 0, rows = 0;
-    float perspective = 0;  // pixels, from the screen's centre
+    float perspective = 0;  // the viewer's distance (pixels), facing the screen's centre
+    float radius = 0;       // the sphere's (pixels)
     std::vector<GridTile> tiles;
 };
-// 9 x 7 tiles on a 4:3 screen. Wider screens get more columns and taller
-// ones more rows (odd counts, so a tile sits in the middle), keeping the
-// tiles about as square as the original's.
+constexpr int grid_columns = 8, grid_rows = 8;
 GridLayout grid_layout(float width, float height);
 
 // Timing of a colour change (seconds).
 constexpr float grid_flip_seconds = 0.34f;     // one tile's flip
 constexpr float grid_ripple_seconds = 0.42f;   // from the first tile's start to the last's
 constexpr float grid_fade_seconds = grid_flip_seconds + grid_ripple_seconds;  // the far background
-// A tile's flip, 0 (not started) to 1 (done), `elapsed` seconds after the
-// change began.
-float grid_flip_progress(const GridTile& tile, float elapsed);
+// The idle wave: one cycle's length (seconds) and how far a tile comes forward
+// (a fraction of its width).
+constexpr float grid_wave_seconds = 5.0f;
+constexpr float grid_wave_depth = 0.14f;
+// How far a tile comes forward (pixels) at `time` seconds.
+float grid_wave_offset(const GridTile& tile, double time);
 
 // The grid's colour for these open screens (first to top), as the rules
 // above say: empty when the first has no data-grid.
@@ -70,27 +88,32 @@ class MenuGrid {
 public:
     // `document` is ui/grid.rml.
     explicit MenuGrid(std::string document) : path_(std::move(document)) {}
-    // Shows the grid in `colour` (a name for grid_colour), or hides it
-    // (empty or unknown). `now` in seconds. Call once a frame, before
-    // Context::Update.
+    // Shows the grid in `colour` (a name for grid_colour or grid_cycle), or
+    // hides it (empty or unknown). `now` in seconds. Call once a frame,
+    // before Context::Update.
     void update(Rml::Context* context, const std::string& colour, double now);
     bool visible() const { return visible_; }
-    // For tests: whether a colour change is still under way, and the colour
-    // a tile shows.
+    // For tests: whether a colour change is still under way, the colour a
+    // tile shows, and how far it is turned (degrees, 0 face on).
     bool changing() const { return changing_; }
     GridRgb tile_colour(std::size_t index) const;
+    float tile_turn(std::size_t index) const;
     std::size_t tile_count() const { return tiles_.size(); }
 
 private:
     struct Tile {
         Rml::Element* element = nullptr;
-        GridRgb from, to;
+        GridRgb face;          // the colour shown when still
+        GridRgb back;          // while flipping: the colour on its back
         bool flipping = false;
-        float start = 0;  // seconds after change_at_ that its flip starts
+        double flip_start = 0, flip_end = -1e9;
+        GridRgb shown;         // as last placed
+        float turn = 0;        // as last placed (degrees)
         std::string transform, colour;  // last set, to set properties only on change
     };
     void build(Rml::Context* context);
-    void place(float elapsed);
+    void place(double now);
+    void retarget(GridRgb colour, double now);
 
     std::string path_;
     Rml::ElementDocument* document_ = nullptr;
@@ -99,10 +122,12 @@ private:
     Rml::Vector2i size_{0, 0};
     GridLayout layout_;
     std::vector<Tile> tiles_;
-    std::string colour_;
+    std::string name_;          // as asked for (a colour or a cycle)
+    double shown_at_ = 0;       // when the grid was shown in this name (for cycles)
+    GridRgb target_;
     GridRgb far_from_, far_to_;
+    std::string far_css_;
     double change_at_ = 0;
-    float last_elapsed_ = 0;
     bool changing_ = false;
     bool visible_ = false;
     bool failed_ = false;  // ui/grid.rml is missing: no grid

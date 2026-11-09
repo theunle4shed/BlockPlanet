@@ -116,49 +116,91 @@ void texture_tests() {
 }
 
 void layout_tests() {
-    const auto check = [](float w, float h, int columns, int rows) {
+    const auto check = [](float w, float h) {
         const auto layout = grid_layout(w, h);
-        assert(layout.columns == columns && layout.rows == rows);
-        assert(layout.tiles.size() == std::size_t(columns * rows));
+        assert(layout.columns == 8 && layout.rows == 8 && layout.tiles.size() == 64u);
+        const float side = std::max(w, h);
+        float reach_x = 0, reach_y = 0;
         for (const auto& t : layout.tiles) {
-            assert(t.x >= 0 && t.y >= 0 && t.x + t.width <= w + 0.01f && t.y + t.height <= h + 0.01f);
-            assert(t.z >= 0 && t.shade > 0.5f && t.shade < 1.2f && t.variant >= 0 && t.variant < 4);
-            assert(std::abs(t.tilt_x) < 60 && std::abs(t.tilt_y) < 60);
+            assert(t.width > 0 && t.height > 0 && t.z <= 0.01f);
+            assert(t.shade > 0.4f && t.shade < 1.2f && t.variant >= 0 && t.variant < 4);
+            assert(std::abs(t.yaw) < 70 && std::abs(t.pitch) < 70);
+            // On the sphere: the same distance from its centre (0, 0, -radius).
+            const float d = std::sqrt(t.x * t.x + t.y * t.y + (t.z + layout.radius) * (t.z + layout.radius));
+            assert(near(d, layout.radius, 0.5f));
+            // Projected outer edge (seen from the viewer at the perspective distance).
+            const float scale = layout.perspective / (layout.perspective - t.z);
+            reach_x = std::max(reach_x, (std::abs(t.x) + t.width / 2 * std::cos(t.yaw * 3.14159f / 180)) * scale);
+            reach_y = std::max(reach_y, (std::abs(t.y) + t.height / 2 * std::cos(t.pitch * 3.14159f / 180)) * scale);
         }
-        // The middle tile faces the viewer and comes nearest; the sides
-        // turn outwards, mirrored.
-        const auto& middle = layout.tiles[std::size_t((rows / 2) * columns + columns / 2)];
-        assert(near(middle.tilt_x, 0) && near(middle.tilt_y, 0));
-        for (const auto& t : layout.tiles) assert(t.z <= middle.z + 0.01f);
-        const auto& left = layout.tiles[std::size_t((rows / 2) * columns)];
-        const auto& right = layout.tiles[std::size_t((rows / 2) * columns + columns - 1)];
-        assert(right.tilt_y > 10 && near(left.tilt_y, -right.tilt_y));
-        const auto& top = layout.tiles[std::size_t(columns / 2)];
-        const auto& bottom = layout.tiles[std::size_t((rows - 1) * columns + columns / 2)];
-        assert(bottom.tilt_x < -5 && near(top.tilt_x, -bottom.tilt_x));
+        // Round: the same reach across and down, about half the longer side
+        // (so it covers the screen along it), whatever the screen's shape.
+        assert(near(reach_x, reach_y, 1.0f));
+        assert(reach_x > side / 2 * 0.95f && reach_x < side / 2 * 1.15f);
+        // Symmetric: the tiles mirror left to right and top to bottom, and face outwards.
+        for (const auto& t : layout.tiles) {
+            const auto& m = layout.tiles[std::size_t(t.row * 8 + (7 - t.column))];
+            assert(near(t.x, -m.x, 0.1f) && near(t.yaw, -m.yaw, 0.01f) && near(t.y, m.y, 0.1f));
+            const auto& v = layout.tiles[std::size_t((7 - t.row) * 8 + t.column)];
+            assert(near(t.y, -v.y, 0.1f) && near(t.pitch, -v.pitch, 0.01f));
+            if (t.column >= 4) assert(t.x > 0 && t.yaw > 0);
+            if (t.row >= 4) assert(t.y > 0 && t.pitch < 0);
+        }
+        // Neighbours never overlap: centres further apart than the tiles' half widths.
+        for (const auto& t : layout.tiles) {
+            if (t.column == 7) continue;
+            const auto& n = layout.tiles[std::size_t(t.row * 8 + t.column + 1)];
+            const float gap = std::sqrt((n.x - t.x) * (n.x - t.x) + (n.y - t.y) * (n.y - t.y) + (n.z - t.z) * (n.z - t.z));
+            assert(gap > (t.width + n.width) / 2);
+        }
         // The ripple: top left first, bottom right last.
         assert(layout.tiles.front().delay == 0 && near(layout.tiles.back().delay, grid_ripple_seconds));
+        return layout;
     };
-    check(1440, 1080, 9, 7);   // 4:3, the original's grid
-    check(640, 480, 9, 7);
-    check(1920, 1080, 13, 7);  // 16:9
-    check(2560, 1080, 17, 7);  // 21:9
-    check(1080, 1080, 9, 9);   // square
-    check(1080, 1920, 9, 17);  // portrait
+    const auto square = check(1080, 1080);
+    const auto wide = check(1920, 1080);
+    check(2560, 1080);
+    check(1440, 1080);
+    const auto tall = check(1080, 1920);
+    // The same sphere for the same longer side: a wide screen crops it top and
+    // bottom, a tall one at the sides; never stretched.
+    const auto big = check(1920, 1920);
+    assert(near(wide.radius, big.radius, 0.01f) && near(tall.radius, big.radius, 0.01f) && square.radius < big.radius);
     assert(grid_layout(0, 0).tiles.empty());
 
+    // The idle wave: tiles come forward and back, never behind their place,
+    // and neighbours along the wave are out of step.
+    const auto& t0 = wide.tiles[0];
+    const auto& t1 = wide.tiles[9];
+    float most = 0;
+    bool apart = false;
+    for (double time = 0; time < grid_wave_seconds; time += 0.05) {
+        const float o = grid_wave_offset(t0, time);
+        assert(o >= 0 && o <= grid_wave_depth * t0.width + 0.01f);
+        most = std::max(most, o);
+        if (std::abs(o - grid_wave_offset(t1, time)) > 1.0f) apart = true;
+    }
+    assert(most > grid_wave_depth * t0.width * 0.9f && apart);
+    assert(near(grid_wave_offset(t0, 1.0), grid_wave_offset(t0, 1.0 + grid_wave_seconds), 0.01f));
+
     assert(grid_colour("blue") && grid_colour("green") && grid_colour("red") && grid_colour("purple") && grid_colour("gold") &&
-           grid_colour("grey"));
-    assert(!grid_colour("") && !grid_colour("pink"));
+           grid_colour("grey") && grid_colour("cyan") && grid_colour("teal") && grid_colour("peach"));
+    assert(!grid_colour("") && !grid_colour("pink") && !grid_colour("pause"));
     const auto blue = *grid_colour("blue");
     assert(near(blue.r, 0x0d / 255.0f) && near(blue.g, 0x15 / 255.0f) && near(blue.b, 0x1f / 255.0f));
     const auto far = grid_far_colour(blue);
     assert(far.r < blue.r && far.g < blue.g && far.b < blue.b);
+    const auto cycle = grid_cycle("pause");
+    assert(cycle.size() == 4 && cycle[0] == "purple");
+    for (auto name : cycle) assert(grid_colour(name));
+    assert(grid_cycle("blue").empty());
+}
 
-    GridTile tile;
-    tile.delay = 0.1f;
-    assert(grid_flip_progress(tile, 0.0f) == 0.0f && grid_flip_progress(tile, 0.1f) == 0.0f);
-    assert(near(grid_flip_progress(tile, 0.1f + grid_flip_seconds / 2), 0.5f) && grid_flip_progress(tile, 5.0f) == 1.0f);
+// Turns, as seen: the same flip modulo half a turn (edge-on either way looks the same).
+float turn_step(float before, float after) {
+    float d = std::fmod(after - before + 270.0f, 180.0f);
+    if (d < 0) d += 180.0f;
+    return d - 90.0f;
 }
 
 void grid_tests(const std::string& document) {
@@ -173,13 +215,16 @@ void grid_tests(const std::string& document) {
         auto* main = context->LoadDocumentFromMemory("<rml><body data-grid='blue'/></rml>");
         auto* solo = context->LoadDocumentFromMemory("<rml><body data-grid='green'/></rml>");
         auto* confirm = context->LoadDocumentFromMemory("<rml><body/></rml>");
-        auto* pause = context->LoadDocumentFromMemory("<rml><body/></rml>");
+        auto* game = context->LoadDocumentFromMemory("<rml><body/></rml>");
+        auto* pause = context->LoadDocumentFromMemory("<rml><body data-grid='pause'/></rml>");
         assert(grid_colour_of({}).empty());
         assert(grid_colour_of({main}) == "blue");
         assert(grid_colour_of({main, solo}) == "green");
         assert(grid_colour_of({main, solo, confirm}) == "green");  // keeps the colour under it
-        assert(grid_colour_of({pause}).empty());                  // over a game: none
-        assert(grid_colour_of({pause, main}).empty());            // Options from the pause menu
+        assert(grid_colour_of({game}).empty());                   // a screen without one first: none
+        assert(grid_colour_of({game, main}).empty());
+        assert(grid_colour_of({pause, confirm}) == "pause");
+        assert(grid_colour_of({pause, main}) == "blue");
 
         MenuGrid grid(document);
         grid.update(context, "", 0.0);
@@ -187,10 +232,10 @@ void grid_tests(const std::string& document) {
         grid.update(context, "blue", 0.0);
         context->Update();
         const auto blue = *grid_colour("blue"), green = *grid_colour("green");
-        assert(grid.visible() && grid.tile_count() == 63 && !grid.changing());
-        assert(same(grid.tile_colour(0), blue) && same(grid.tile_colour(62), blue));
-        grid.update(context, "blue", 0.5);  // the same colour: still
-        assert(!grid.changing());
+        assert(grid.visible() && grid.tile_count() == 64 && !grid.changing());
+        assert(same(grid.tile_colour(0), blue) && same(grid.tile_colour(63), blue));
+        grid.update(context, "blue", 0.5);  // the same colour: no flips
+        assert(!grid.changing() && grid.tile_turn(0) == 0);
 
         // A new colour: the tiles flip one after another.
         grid.update(context, "green", 1.0);
@@ -199,29 +244,66 @@ void grid_tests(const std::string& document) {
         assert(same(grid.tile_colour(0), blue));
         grid.update(context, "green", 1.0 + grid_flip_seconds * 0.6);
         context->Update();
-        assert(same(grid.tile_colour(0), green) && same(grid.tile_colour(62), blue));
+        assert(same(grid.tile_colour(0), green) && same(grid.tile_colour(63), blue));
         grid.update(context, "green", 1.0 + grid_fade_seconds + 0.01);
-        assert(!grid.changing() && same(grid.tile_colour(0), green) && same(grid.tile_colour(62), green));
+        assert(!grid.changing() && same(grid.tile_colour(0), green) && same(grid.tile_colour(63), green));
 
-        // Back to blue, then green again part way through: no tile is left behind.
-        grid.update(context, "blue", 3.0);
-        grid.update(context, "blue", 3.0 + grid_flip_seconds * 0.6);
-        assert(same(grid.tile_colour(0), blue) && same(grid.tile_colour(62), green));
-        grid.update(context, "green", 3.0 + grid_flip_seconds * 0.7);
-        grid.update(context, "green", 10.0);
-        assert(!grid.changing());
-        for (std::size_t i = 0; i < grid.tile_count(); ++i) assert(same(grid.tile_colour(i), green));
+        // Back and forth quickly (the owner's report): every tile ends on the
+        // newest colour, nothing waits for a ripple to finish, and no tile
+        // jumps between frames.
+        std::uint32_t seed = 7;
+        double t = 10.0;
+        int c = 1;  // green
+        const GridRgb colours[2] = {blue, green};
+        for (int round = 0; round < 150; ++round) {
+            std::vector<float> turns(grid.tile_count());
+            for (std::size_t i = 0; i < turns.size(); ++i) turns[i] = grid.tile_turn(i);
+            const int presses = 1 + int((seed >> 8) % 6);
+            for (int k = 0; k < presses; ++k) {
+                seed = seed * 1103515245u + 12345u;
+                c ^= 1;
+                const int frames = 1 + int((seed >> 16) % 25);  // 1 to 25 frames apart
+                for (int f = 0; f < frames; ++f) {
+                    t += 1.0 / 60.0;
+                    grid.update(context, c ? "green" : "blue", t);
+                    for (std::size_t i = 0; i < turns.size(); ++i) {
+                        assert(std::abs(turn_step(turns[i], grid.tile_turn(i))) < 30.0f);
+                        turns[i] = grid.tile_turn(i);
+                    }
+                }
+            }
+            // Settled within two ripples of the last press, on the newest colour.
+            for (int f = 0; f < 60 * 2; ++f) {
+                t += 1.0 / 60.0;
+                grid.update(context, c ? "green" : "blue", t);
+            }
+            assert(!grid.changing());
+            for (std::size_t i = 0; i < grid.tile_count(); ++i)
+                assert(same(grid.tile_colour(i), colours[c]) && grid.tile_turn(i) == 0);
+        }
+
+        // The pause's cycle: purple, then cyan after a while, flipping in.
+        grid.update(context, "", 900.0);
+        grid.update(context, "pause", 1000.0);
+        assert(same(grid.tile_colour(20), *grid_colour("purple")) && !grid.changing());
+        grid.update(context, "pause", 1000.0 + grid_cycle_seconds + 0.01);
+        assert(grid.changing());
+        grid.update(context, "pause", 1000.0 + grid_cycle_seconds + 2.0);
+        assert(!grid.changing() && same(grid.tile_colour(20), *grid_colour("cyan")));
+        grid.update(context, "pause", 1000.0 + 4 * grid_cycle_seconds + 0.01);  // back to the first
+        grid.update(context, "pause", 1000.0 + 4 * grid_cycle_seconds + 2.0);
+        assert(same(grid.tile_colour(20), *grid_colour("purple")));
 
         // Hidden, then shown again: straight in its colour, no flip.
-        grid.update(context, "", 11.0);
+        grid.update(context, "", 1100.0);
         assert(!grid.visible());
-        grid.update(context, "blue", 12.0);
+        grid.update(context, "blue", 1101.0);
         assert(grid.visible() && !grid.changing() && same(grid.tile_colour(30), blue));
 
         // A wider window: the tiles are laid out again.
         context->SetDimensions(Rml::Vector2i(1920, 1080));
-        grid.update(context, "blue", 13.0);
-        assert(grid.tile_count() == 13 * 7);
+        grid.update(context, "blue", 1102.0);
+        assert(grid.tile_count() == 64);
         context->Update();
         context->Render();
 

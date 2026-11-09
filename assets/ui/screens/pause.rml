@@ -3,7 +3,7 @@
     <title>Paused</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body class="over-pause">
+<body data-grid="pause" class="over-pause">
     <div id="panel">
         <div class="header">Paused</div>
         <div class="subtitle" data-text="pause_where"></div>
