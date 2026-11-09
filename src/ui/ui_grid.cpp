@@ -219,6 +219,12 @@ std::optional<std::array<float, 16>> grid_quad_matrix(const std::array<GridPoint
     const float a = q[1].x - q[0].x + g * q[1].x, b = q[3].x - q[0].x + h * q[3].x, c = q[0].x;
     const float d = q[1].y - q[0].y + g * q[1].y, e = q[3].y - q[0].y + h * q[3].y, f = q[0].y;
     if (!std::isfinite(g) || !std::isfinite(h)) return std::nullopt;
+    // The depth (w) must stay positive across the element: a quad folded by
+    // perspective (a tile nearly edge on at the sphere's rim, lifted unevenly
+    // by the water or turning) gives w crossing zero inside it, and a GPU
+    // then stretches the part near zero across the whole screen (seen on the
+    // test machine as a dark screen; software drawing hid it).
+    if (std::min({1.0f, 1.0f + g, 1.0f + h, 1.0f + g + h}) < 0.02f) return std::nullopt;
     // u and v are the element's pixels over its size; z is kept as it is.
     return std::array<float, 16>{a / size, d / size, 0, g / size, b / size, e / size, 0, h / size, 0, 0, 1, 0, c, f, 0, 1};
 }
@@ -420,14 +426,20 @@ void MenuGrid::place(double now) {
         const float u0 = float(at.column), v0 = float(at.row);
         const std::array<float, 4> lifts = {grid_water(u0, v0, now, at.width), grid_water(u0 + 1, v0, now, at.width),
                                             grid_water(u0 + 1, v0 + 1, now, at.width), grid_water(u0, v0 + 1, now, at.width)};
-        const auto corners = grid_tile_corners(layout_, at, breath, lifts, turn, away);
-        const bool hidden = !corners || in_place <= 0.0f;
+        auto corners = grid_tile_corners(layout_, at, breath, lifts, turn, away);
+        auto matrix = corners ? grid_quad_matrix(*corners, tile_element) : std::nullopt;
+        if (corners && !matrix) {
+            // Folded by the water: drawn flat (lifted evenly) instead.
+            const float even = (lifts[0] + lifts[1] + lifts[2] + lifts[3]) / 4.0f;
+            corners = grid_tile_corners(layout_, at, breath, even, turn, away);
+            matrix = corners ? grid_quad_matrix(*corners, tile_element) : std::nullopt;
+        }
+        const bool hidden = !matrix || in_place <= 0.0f;
         if (tile.element != nullptr && hidden != tile.hidden) {
             tile.hidden = hidden;
             tile.element->SetProperty("visibility", hidden ? "hidden" : "visible");
         }
-        if (corners)
-        if (const auto m = grid_quad_matrix(*corners, tile_element)) {
+        if (const auto& m = matrix) {
             char text[400];
             std::snprintf(text, sizeof(text), "matrix3d(%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g)",
                           (*m)[0], (*m)[1], (*m)[2], (*m)[3], (*m)[4], (*m)[5], (*m)[6], (*m)[7], (*m)[8], (*m)[9], (*m)[10],

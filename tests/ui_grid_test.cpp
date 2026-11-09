@@ -249,6 +249,33 @@ void layout_tests() {
         assert(near(p.x, quad[std::size_t(k)].x, 0.05f) && near(p.y, quad[std::size_t(k)].y, 0.05f));
     }
     assert(!grid_quad_matrix({GridPoint{0, 0}, GridPoint{0, 0}, GridPoint{0, 0}, GridPoint{0, 0}}, 128));
+    // A quad folded by perspective (depth w crossing zero inside it, which a
+    // GPU stretches across the screen) gets no matrix: every matrix keeps w
+    // positive at the element's corners. On the water, every tile at rest
+    // still gets one, folded or not (flat when the water folds it).
+    {
+        const auto layout = grid_layout(1280, 720);
+        const auto positive = [](const std::array<float, 16>& m) {
+            for (float x : {0.0f, 128.0f})
+                for (float y : {0.0f, 128.0f})
+                    if (m[3] * x + m[7] * y + m[15] <= 0.0f) return false;
+            return true;
+        };
+        for (double time = 812345.0; time < 812348.0; time += 0.1) {
+            for (const auto& t : layout.tiles) {
+                const float u = float(t.column), v = float(t.row);
+                const std::array<float, 4> lifts = {grid_water(u, v, time, t.width), grid_water(u + 1, v, time, t.width),
+                                                    grid_water(u + 1, v + 1, time, t.width), grid_water(u, v + 1, time, t.width)};
+                const auto water = grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, lifts, 0.0f), 128);
+                if (water) assert(positive(*water));
+                const auto flat = grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, 0.0f, 0.0f), 128);
+                assert(flat && positive(*flat));
+            }
+        }
+        for (float turn = 0; turn < 90; turn += 3)
+            for (const auto& t : layout.tiles)
+                if (const auto m = grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, 0.0f, turn), 128)) assert(positive(*m));
+    }
     assert(grid_layout(0, 0).tiles.empty());
 
     // Breathing (off by default; on the test screen): the whole sphere swells

@@ -19,6 +19,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -85,16 +86,45 @@ public:
             y1 = std::min(y1, scissor_.Bottom());
         }
         for (std::size_t i = 0; i + 2 < g->indices.size(); i += 3) {
-            Corner c[3];
+            // As a GPU does: clip the triangle where its depth w falls to
+            // nearly zero (a folded transform), then project what is left.
+            struct Clip {
+                Rml::Vector4f p;
+                std::array<float, 4> colour;
+                float u, v;
+            };
+            std::vector<Clip> poly;
             for (int k = 0; k < 3; ++k) {
-                const Rml::Vertex& v = g->vertices[std::size_t(g->indices[i + k])];
-                const Rml::Vector4f p = transform_ * Rml::Vector4f(v.position.x + translation.x, v.position.y + translation.y, 0, 1);
-                const float w = p.w != 0 ? p.w : 1e-6f;
-                c[k] = {p.x / w, p.y / w, 1.0f / w,
-                        {v.colour.red / 255.0f, v.colour.green / 255.0f, v.colour.blue / 255.0f, v.colour.alpha / 255.0f},
-                        v.tex_coord.x, v.tex_coord.y};
+                const Rml::Vertex& v = g->vertices[std::size_t(g->indices[i + std::size_t(k)])];
+                poly.push_back({transform_ * Rml::Vector4f(v.position.x + translation.x, v.position.y + translation.y, 0, 1),
+                                {v.colour.red / 255.0f, v.colour.green / 255.0f, v.colour.blue / 255.0f, v.colour.alpha / 255.0f},
+                                v.tex_coord.x, v.tex_coord.y});
             }
-            triangle(c, t, x0, y0, x1, y1);
+            constexpr float near_w = 1e-5f;
+            std::vector<Clip> kept;
+            for (std::size_t a = 0; a < poly.size(); ++a) {
+                const Clip& p = poly[a];
+                const Clip& q = poly[(a + 1) % poly.size()];
+                if (p.p.w > near_w) kept.push_back(p);
+                if ((p.p.w > near_w) != (q.p.w > near_w)) {
+                    const float f = (near_w - p.p.w) / (q.p.w - p.p.w);
+                    Clip m;
+                    m.p = p.p + (q.p - p.p) * f;
+                    for (int ch = 0; ch < 4; ++ch) m.colour[std::size_t(ch)] = p.colour[std::size_t(ch)] + (q.colour[std::size_t(ch)] - p.colour[std::size_t(ch)]) * f;
+                    m.u = p.u + (q.u - p.u) * f;
+                    m.v = p.v + (q.v - p.v) * f;
+                    kept.push_back(m);
+                }
+            }
+            for (std::size_t a = 1; a + 1 < kept.size(); ++a) {
+                Corner c[3];
+                const Clip* parts[3] = {&kept[0], &kept[a], &kept[a + 1]};
+                for (int k = 0; k < 3; ++k) {
+                    const Clip& p = *parts[k];
+                    c[k] = {p.p.x / p.p.w, p.p.y / p.p.w, 1.0f / p.p.w, p.colour, p.u, p.v};
+                }
+                triangle(c, t, x0, y0, x1, y1);
+            }
         }
     }
 
@@ -282,7 +312,7 @@ int main(int argc, char** argv) {
         {
             Navigator navigator(context, assets / "screens");
             MenuGrid grid((assets / "grid.rml").string());
-            double now = 0.0;
+            double now = std::getenv("UI_CAPTURE_T0") ? std::atof(std::getenv("UI_CAPTURE_T0")) : 0.0;
             // The grid at 60 frames a second up to `to` (it flies in and out over time).
             const auto advance = [&](double to, bool cover = false) {
                 for (; now < to; now += 1.0 / 60.0) grid.update(context, grid_colour_of(navigator.documents()), now, cover);
@@ -297,9 +327,9 @@ int main(int argc, char** argv) {
                 if (!renderer.write_png(out / (name + suffix))) ++failures;
             };
             navigator.open("main");
-            advance(grid_fly_total * 0.5);
+            advance(now + grid_fly_total * 0.5);
             frame("fly-in");  // half way in, over the game
-            advance(2.0);
+            advance(now + 2.0);
             frame("main");
             navigator.show("solo");
             grid.update(context, grid_colour_of(navigator.documents()), now);  // the change starts
