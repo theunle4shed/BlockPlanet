@@ -298,3 +298,11 @@ body.centred .hint { display: block; margin-top: 20dp; }
    in the item's own colour, before its label. */
 .item .icon { font-family: lucide; font-weight: normal; font-style: normal; font-size: 0.9em;
               display: inline-block; width: 1.5em; vertical-align: middle; }
+
+/* The grid test screen: a narrow panel at the left, leaving the grid in view. */
+body.lab #panel { left: 40dp; width: 640dp; top: 20dp; padding: 28dp 36dp; max-height: 96vh; }
+body.lab .item { font-size: 26dp; padding: 3dp 20dp; }
+body.lab .description { font-size: 22dp; }
+body.lab .item.slider .value { top: 3dp; right: 20dp; }
+body.lab .item.slider .bar { top: 15dp; right: 120dp; width: 180dp; height: 8dp; }
+body.lab .item.slider .fill { height: 8dp; }

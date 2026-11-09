@@ -199,7 +199,7 @@ void layout_tests() {
         assert(half_away[1].x - half_away[0].x > base[1].x - base[0].x);
         assert(std::abs(half_away[0].x - layout.centre_x) > std::abs(base[0].x - layout.centre_x));
         assert(!grid_tile_corners(layout, t, 1.0f, 0, 0, 1.0f));
-        for (const auto& u : layout.tiles) assert(u.fly >= 0 && u.fly <= grid_fly_spread + 1e-4f);
+        for (const auto& u : layout.tiles) assert(u.fly >= 0 && u.fly <= 1.0001f);
         assert(at(3, 3).fly > at(0, 0).fly);  // the middle arrives last (and leaves first)
         return layout;
     };
@@ -254,6 +254,22 @@ void layout_tests() {
     assert(most > grid_wave_depth * t0.width * 0.9f && apart);
     assert(near(grid_wave_offset(t0, 1.0), grid_wave_offset(t0, 1.0 + grid_wave_seconds), 0.01f));
 
+    // The test screen's settings: each slider's value, in its own units,
+    // matching the defaults, and setting one changes the tuning.
+    {
+        const auto values = grid_lab_values();
+        assert(values.size() == 11);
+        const auto value_of = [&](const char* name) {
+            for (const auto& [n, v] : values) if (n == name) return v;
+            return std::string("?");
+        };
+        assert(value_of("grid_breath_in") == "0.75" && value_of("grid_breath_size") == "2.4" && value_of("grid_wave_step") == "50");
+        assert(value_of("grid_wave_depth") == "5" && value_of("grid_fly_seconds") == "0.45" && value_of("grid_fly_distance") == "1");
+        assert(grid_lab_set("grid_breath_size", "4") && near(grid_tuning().breath_scale, 0.02f, 1e-6f));
+        assert(grid_lab_set("grid_wave_step", "100") && near(grid_tuning().wave_step, 0.1f, 1e-6f));
+        assert(!grid_lab_set("grid_nothing", "1"));
+        grid_tuning() = GridTuning{};
+    }
     assert(grid_colour("blue") && grid_colour("green") && grid_colour("red") && grid_colour("purple") && grid_colour("gold") &&
            grid_colour("grey") && grid_colour("cyan") && grid_colour("teal") && grid_colour("peach"));
     assert(!grid_colour("") && !grid_colour("pink") && !grid_colour("pause"));

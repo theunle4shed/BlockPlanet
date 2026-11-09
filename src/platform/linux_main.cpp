@@ -3772,26 +3772,37 @@ bool handle_profile_command(const std::string& command) {
             }
             blockplanet::ui::set_loading(loading_title, opacity);
         }
-        // The menu grid (docs/UI.md, Menu grid) stays up over the game's own
-        // animations instead of flying out as the menus close: while the game
-        // is paused (its pause tiles), for a moment after Resume until they
-        // have gone, and after Quit until BlockPlanet's menus open again.
-        // BLOCKPLANET_GRID_RESUME_MS sets the moment after Resume (default 600).
+        // The menu grid (docs/UI.md, Menu grid) over the game's own pause
+        // animations, in the pause's colours: from the Start press that
+        // pauses (before the game's own fade and tiles show), while paused,
+        // and after Resume until play has resumed (the pause row back below
+        // 0) and a moment more (BLOCKPLANET_GRID_RESUME_MS, default 800: the
+        // game's picture fades back in); and after Quit until BlockPlanet's
+        // menus open again. Measured on the test machine (2026-11-09): the
+        // pause row stays set about 3 seconds after Resume.
         {
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
-                return text != nullptr ? std::max(0, std::atoi(text)) : 600;
+                return text != nullptr ? std::max(0, std::atoi(text)) : 800;
             }();
             static bool was_paused = false;
-            static std::optional<std::chrono::steady_clock::time_point> unpaused_at;
+            static std::optional<std::chrono::steady_clock::time_point> unpaused_at, start_at;
+            static std::int64_t start_seen = last_start_ms.load();
             const auto now_g = std::chrono::steady_clock::now();
-            bool paused = false;
+            bool paused = false, playing = false;
             if (guest_rdram != nullptr) {
-                const bool playing = guest::load16(guest_rdram, 0x800E121C) == -1;
+                playing = guest::load16(guest_rdram, 0x800E121C) == -1;
                 const auto row = std::int16_t(guest::load16(guest_rdram, 0x800E1228));
                 const bool game_over = std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) == -1;
                 paused = playing && row >= 0 && !game_over;
+                // A new Start press in play: the game is about to pause.
+                const auto start_ms = last_start_ms.load();
+                if (start_ms != start_seen) {
+                    start_seen = start_ms;
+                    if (playing && !paused && !game_over && !blockplanet::ui::menus_open() && !mode_launcher.active()) start_at = now_g;
+                }
             }
+            if (paused || (start_at && now_g - *start_at > std::chrono::milliseconds(1200))) start_at.reset();  // paused, or it did not
             if (was_paused && !paused) unpaused_at = now_g;
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
@@ -3799,7 +3810,8 @@ bool handle_profile_command(const std::string& command) {
             if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm") ||
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
                 grid_quit_at.reset();
-            blockplanet::ui::set_grid_hold(paused || unpaused_at.has_value() || grid_quit_at.has_value());
+            const bool over_pause = start_at || paused || unpaused_at || grid_quit_at;
+            blockplanet::ui::set_grid_override(over_pause && !mode_launcher.active() ? "pause" : "");
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
         // over (0x800E1202 back to 0 while the end menu fades in), to see

@@ -1,0 +1,43 @@
+<rml>
+<head>
+    <title>Grid test</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- A temporary screen for tuning the menu grid by eye (the owner's request,
+     2026-11-09; docs/UI.md, Menu grid). Its settings change the grid at once
+     and are not saved; each change is written to the log ("grid_tuning"). -->
+<body class="compact lab" data-grid="blue">
+    <div id="panel">
+        <div class="title">Grid test</div>
+        <div class="subtitle">For tuning. Not saved: note the values you like.</div>
+        <div class="item value" id="grid_theme" data-setting="grid_theme" data-description="The grid's colour."
+             data-options="blue:Blue,green:Green,red:Red,purple:Purple,gold:Gold,grey:Grey,cyan:Cyan,teal:Teal,peach:Peach,pause:Pause cycle">Colour<span class="value"></span></div>
+        <div class="item" id="fly_in" data-action="command:grid_fly_in" data-description="Fly the tiles in.">Fly in</div>
+        <div class="item" id="fly_out" data-action="command:grid_fly_out" data-description="Fly the tiles out (the game shows behind).">Fly out</div>
+        <div class="item value slider" id="grid_breath_in" data-setting="grid_breath_in" data-description="How long the sphere takes to swell."
+             data-options="0.25:0.25 s,0.5:0.5 s,0.75:0.75 s,1:1 s,1.25:1.25 s,1.5:1.5 s,2:2 s,2.5:2.5 s,3:3 s">Breathe in<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_breath_hold" data-setting="grid_breath_hold" data-description="How long it stays swollen before breathing out."
+             data-options="0:0 s,0.1:0.1 s,0.2:0.2 s,0.3:0.3 s,0.5:0.5 s,0.75:0.75 s,1:1 s,1.5:1.5 s,2:2 s">Hold<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_breath_out" data-setting="grid_breath_out" data-description="How long it takes to settle again."
+             data-options="0.25:0.25 s,0.5:0.5 s,0.75:0.75 s,1:1 s,1.25:1.25 s,1.5:1.5 s,2:2 s,2.5:2.5 s,3:3 s">Breathe out<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_breath_size" data-setting="grid_breath_size" data-description="How much the sphere swells, peak to peak."
+             data-options="0:0 %,0.5:0.5 %,1:1 %,1.5:1.5 %,2:2 %,2.4:2.4 %,3:3 %,4:4 %,5:5 %,6:6 %,8:8 %">Breath size<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_wave_every" data-setting="grid_wave_every" data-description="Time from one wave's start to the next (a wave may start while the last is still on screen)."
+             data-options="0.5:0.5 s,0.75:0.75 s,1:1 s,1.25:1.25 s,1.5:1.5 s,2:2 s,2.5:2.5 s,3:3 s,4:4 s,5:5 s,6:6 s,8:8 s,10:10 s">Wave every<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_wave_step" data-setting="grid_wave_step" data-description="How long each next tile waits before it rises (the wave starts at the top left)."
+             data-options="0:0 ms,10:10 ms,20:20 ms,30:30 ms,40:40 ms,50:50 ms,60:60 ms,80:80 ms,100:100 ms,120:120 ms,150:150 ms,200:200 ms,250:250 ms,300:300 ms">Wave tile delay<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_wave_rise" data-setting="grid_wave_rise" data-description="How long one tile takes to come forward and sink back."
+             data-options="0.25:0.25 s,0.5:0.5 s,0.75:0.75 s,1:1 s,1.5:1.5 s,2:2 s,2.5:2.5 s,3:3 s,4:4 s">Tile rise and fall<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_wave_depth" data-setting="grid_wave_depth" data-description="How far a tile comes forward, in a tile's width."
+             data-options="0:0 %,2:2 %,4:4 %,5:5 %,6:6 %,8:8 %,10:10 %,15:15 %,20:20 %,30:30 %">Wave height<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_fly_seconds" data-setting="grid_fly_seconds" data-description="How long one tile takes to fly in or out."
+             data-options="0.2:0.2 s,0.3:0.3 s,0.45:0.45 s,0.6:0.6 s,0.8:0.8 s,1:1 s,1.5:1.5 s,2:2 s">Fly time<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_fly_spread" data-setting="grid_fly_spread" data-description="Time from the first tile setting off to the last."
+             data-options="0:0 s,0.1:0.1 s,0.25:0.25 s,0.4:0.4 s,0.6:0.6 s,0.8:0.8 s,1:1 s,1.5:1.5 s">Fly spread<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value slider" id="grid_fly_distance" data-setting="grid_fly_distance" data-description="How far the tiles fly (1: just past the camera)."
+             data-options="0.5:0.5 x,0.75:0.75 x,1:1 x,1.25:1.25 x,1.5:1.5 x,2:2 x,3:3 x">Fly distance<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

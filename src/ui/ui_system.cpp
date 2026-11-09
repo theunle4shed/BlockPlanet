@@ -25,6 +25,9 @@
 namespace blockplanet::ui {
 namespace {
 
+// The grid test screen (below).
+bool grid_lab_command(const std::string& command);
+
 // Menus are laid out for a 1080-pixel-high screen and scaled to the window.
 constexpr float design_height = 1080.0f;
 // Graphics > Text size (docs/STYLE.md, D1): it multiplies every dp, so menus,
@@ -119,6 +122,8 @@ bool start(std::uint32_t width, std::uint32_t height) {
     context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
     navigator = std::make_unique<Navigator>(context, assets_path / "screens");
     grid = std::make_unique<MenuGrid>(asset("grid.rml"));
+    for (const auto& [name, value] : grid_lab_values()) navigator->set_setting(name, value);
+    navigator->set_setting("grid_theme", "blue");
     std::fprintf(stdout, "{\"event\":\"ui_started\",\"width\":%u,\"height\":%u}\n", width, height);
     std::fflush(stdout);
     return true;
@@ -237,7 +242,10 @@ void apply_requests() {
         }
     }
     std::lock_guard lock(requests_mutex);
-    while (auto command = navigator->take_command()) commands.push_back(*command);
+    while (auto command = navigator->take_command()) {
+        // The grid test screen's settings and buttons stay here.
+        if (!grid_lab_command(*command)) commands.push_back(*command);
+    }
     if (navigator->is_open()) shown_path = navigator->path();
     shown_screen = navigator->current_screen();
     // Keep the flag set while requests are still waiting.
@@ -866,16 +874,23 @@ bool update_hud_document() {
 
 // The menu grid behind the open screens, in the colour they ask for.
 // The menu grid behind the open screens, in the colour they ask for. With
-// no screen asking, it flies out (into the loading cover when one is
-// wanted), unless held (set_grid_hold): then it stays in the colour last shown.
-std::atomic<bool> grid_hold{false};
-std::string grid_last_colour;
+// no screen asking, the game's colour (set_grid_override), else it flies out
+// (into the loading cover when one is wanted).
+std::mutex grid_override_mutex;
+std::string grid_override;
+// The grid test screen (grid_lab.rml, for tuning): its colour, and whether
+// the grid is shown (its Fly in and Fly out buttons).
+std::string lab_theme = "blue";
+bool lab_present = true;
 void update_grid() {
     const auto screens = navigator->documents();
     const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     std::string colour = grid_colour_of(screens);
-    if (!colour.empty()) grid_last_colour = colour;
-    else if (grid_hold.load() && grid->visible() && !navigator->is_open()) colour = grid_last_colour;
+    if (navigator->current_screen() == "grid_lab") colour = lab_present ? lab_theme : "";
+    else if (colour.empty()) {
+        std::lock_guard lock(grid_override_mutex);
+        colour = grid_override;
+    }
     bool cover = false;
     {
         std::lock_guard lock(loading_mutex);
@@ -953,7 +968,38 @@ void hook_deinit() {
 
 void set_rom(std::span<const std::uint8_t> rom) { set_grid_rom(rom); }
 
-void set_grid_hold(bool hold) { grid_hold.store(hold); }
+namespace {
+
+// The grid test screen (assets/ui/screens/grid_lab.rml; the owner's request,
+// to tune the grid's motion by eye): its settings change grid_tuning at
+// once, its buttons fly the grid in and out. Returns whether `command` was
+// one of them. Each change is logged, so the values can be reported.
+bool grid_lab_command(const std::string& command) {
+    if (command == "grid_fly_in" || command == "grid_fly_out") {
+        lab_present = command == "grid_fly_in";
+        return true;
+    }
+    if (command.rfind("setting:grid_", 0) != 0) return false;
+    const auto equals = command.find('=');
+    if (equals == std::string::npos) return true;
+    const std::string name = command.substr(8, equals - 8), value = command.substr(equals + 1);
+    if (name == "grid_theme") lab_theme = value;
+    else grid_lab_set(name, value);
+    navigator->set_setting(name, value);
+    // The values so far, for the owner to report.
+    std::string all;
+    for (const auto& [setting, shown] : grid_lab_values()) all += ",\"" + setting + "\":" + shown;
+    std::fprintf(stdout, "{\"event\":\"grid_tuning\",\"theme\":\"%s\"%s}\n", lab_theme.c_str(), all.c_str());
+    std::fflush(stdout);
+    return true;
+}
+
+} // namespace
+
+void set_grid_override(const std::string& colour) {
+    std::lock_guard lock(grid_override_mutex);
+    grid_override = colour;
+}
 
 void install(const std::filesystem::path& assets) {
     assets_path = assets;

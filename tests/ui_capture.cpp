@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
     Rml::SetRenderInterface(&renderer);
     Rml::SetSystemInterface(&system);
     if (!Rml::Initialise()) return 1;
-    for (const char* font : {"LatoLatin-Regular.ttf", "LatoLatin-Bold.ttf", "LatoLatin-Italic.ttf", "LatoLatin-BoldItalic.ttf"})
+    for (const char* font : {"LatoLatin-Regular.ttf", "LatoLatin-Bold.ttf", "LatoLatin-Italic.ttf", "LatoLatin-BoldItalic.ttf", "lucide.ttf"})
         Rml::LoadFontFace((assets / "fonts" / font).string());
 
     const std::array<Rml::Vector2i, 4> sizes = {Rml::Vector2i(1440, 1080), Rml::Vector2i(1920, 1080), Rml::Vector2i(2560, 1080),
@@ -322,6 +322,11 @@ int main(int argc, char** argv) {
             frame("pause-start");  // the change into the pause's cycle starts
             advance(now + 2.0);
             frame("pause");
+            for (const auto& [setting, value] : grid_lab_values()) navigator.set_setting(setting, value);
+            navigator.set_setting("grid_theme", "blue");
+            navigator.open("grid_lab");
+            advance(now + 2.0);
+            frame("grid_lab");
             // Closing the menus: the grid flies out, revealing the game.
             navigator.close();
             advance(now + grid_fly_total * 0.4);

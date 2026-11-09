@@ -61,15 +61,15 @@ GridRgb grid_cycle_colour(const std::vector<std::string_view>& cycle, double tim
 // One tile: its patch of the sphere (radians across, right, as lon, and
 // down as lat; the gap to its neighbours already left out), its middle,
 // its width across (pixels, about), its shading (1: lit face on), texture
-// variant, ripple delay and place in the idle wave.
+// variant, ripple delay, place in the wave and when it sets off flying in.
 struct GridTile {
     float lon0 = 0, lon1 = 0, lat0 = 0, lat1 = 0;
     float lon = 0, lat = 0;
     float width = 0, shade = 1;
     int column = 0, row = 0, variant = 0;
     float delay = 0;  // seconds after a colour change that this tile starts to flip
-    float phase = 0;  // the wave's phase here (radians)
-    float fly = 0;    // seconds into a fly-in that this tile sets off (the middle last)
+    float fly = 0;    // when it sets off flying in, 0 (first) to 1 (last, the middle) of the spread
+    int step = 0;     // its place along the wave (from the top left)
 };
 struct GridLayout {
     int columns = 0, rows = 0;
@@ -95,8 +95,9 @@ struct GridPoint {
 std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
                                                           float lift, float turn, float away = 0.0f);
 
-// Flying in and out (seconds): one tile's flight, and the spread between the
-// first and last to set off. Out, the middle leaves first; in, it arrives last.
+// Flying in and out (seconds, the defaults): one tile's flight, and the
+// spread between the first and last to set off. Out, the middle leaves
+// first; in, it arrives last.
 constexpr float grid_fly_seconds = 0.45f;
 constexpr float grid_fly_spread = 0.25f;
 constexpr float grid_fly_total = grid_fly_seconds + grid_fly_spread;
@@ -116,6 +117,27 @@ constexpr float grid_fade_seconds = grid_flip_seconds + grid_ripple_seconds;  //
 constexpr float grid_wave_seconds = 1.5f;
 constexpr float grid_breath_scale = 0.012f;  // either way
 constexpr float grid_wave_depth = 0.05f;     // a tile's width, at most
+
+// The motion's settings, adjustable while the grid runs (the grid test
+// screen, for the owner to tune; the defaults are the values above).
+// Breathing: in over breath_in seconds, held breath_hold, out over
+// breath_out. The wave: every wave_every seconds one starts at the top left;
+// each next tile along it follows wave_step seconds later, rising and falling
+// over wave_rise seconds (waves may overlap). Flying: as above, and how far
+// the tiles fly (1: past the viewer).
+struct GridTuning {
+    float breath_in = grid_wave_seconds / 2, breath_hold = 0.0f, breath_out = grid_wave_seconds / 2;
+    float breath_scale = grid_breath_scale;
+    float wave_every = grid_wave_seconds, wave_step = 0.05f, wave_rise = grid_wave_seconds;
+    float wave_depth = grid_wave_depth;
+    float fly_seconds = grid_fly_seconds, fly_spread = grid_fly_spread, fly_distance = 1.0f;
+};
+GridTuning& grid_tuning();  // the presentation thread's (and tests')
+// The grid test screen's settings (grid_lab.rml): each one's name and
+// current value as its slider shows it (seconds, percent or milliseconds),
+// and setting one from its slider. Returns false for an unknown name.
+std::vector<std::pair<std::string, std::string>> grid_lab_values();
+bool grid_lab_set(const std::string& name, const std::string& value);
 // The whole sphere's scale at `time` seconds (about 1).
 float grid_breath(double time);
 // How far a tile comes forward (pixels) at `time` seconds.
@@ -142,7 +164,7 @@ public:
     // Drawn (in place or flying).
     bool visible() const { return visible_; }
     // How much is in place: 0 gone, 1 every tile in place.
-    float presence() const { return fly_ / grid_fly_total; }
+    float presence() const;
     // How much of the loading cover may show: while the grid flies out into
     // it, the cover waits until the tiles have mostly passed; otherwise all of it.
     float cover_allowance() const;
@@ -169,6 +191,7 @@ private:
     void place(double now);
     void retarget(GridRgb colour, double now);
     void drift(GridRgb colour);
+    float fly_total() const;
 
     std::string path_;
     Rml::ElementDocument* document_ = nullptr;
@@ -183,7 +206,7 @@ private:
     GridRgb far_from_, far_to_;
     std::string far_css_;
     double change_at_ = 0;
-    float fly_ = 0;             // 0 (gone) to grid_fly_total (in place)
+    float fly_ = 0;             // 0 (gone) to the flight's total (in place)
     bool leaving_ = false;      // flying out (or gone)
     bool into_cover_ = false;
     double last_now_ = 0;

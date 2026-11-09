@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 namespace blockplanet::ui {
 namespace {
@@ -31,9 +32,6 @@ constexpr float tile_element = 128.0f;
 constexpr float most_turn = 87.0f;
 // The light, from the upper left and front (CSS axes: y down, z towards the viewer).
 constexpr float light_x = -0.35f, light_y = -0.45f, light_z = 0.82f;
-// The soft wave rolls diagonally, from the top left to the bottom right; one
-// wave would span this many tiles (the grid's diagonal is 14).
-constexpr float wave_tiles = 28.0f;
 
 struct Vec3 {
     float x, y, z;
@@ -155,10 +153,10 @@ GridLayout grid_layout(float width, float height) {
             tile.variant = (column * 7 + row * 3 + (column * row) % 5) % 4;
             // The ripple runs from the top left corner to the bottom right.
             tile.delay = grid_ripple_seconds * float(column + row) / float(layout.columns + layout.rows - 2);
-            tile.phase = 2.0f * pi * float(column + row) / wave_tiles;
+            tile.step = column + row;
             // Flying in, the outermost set off first and the middle last.
             const float dx = float(column) - 3.5f, dy = float(row) - 3.5f;
-            tile.fly = grid_fly_spread * (1.0f - std::sqrt(dx * dx + dy * dy) / std::sqrt(2.0f * 3.5f * 3.5f));
+            tile.fly = 1.0f - std::sqrt(dx * dx + dy * dy) / std::sqrt(2.0f * 3.5f * 3.5f);
             layout.tiles.push_back(tile);
         }
     }
@@ -180,7 +178,8 @@ std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layo
     // Flying out: speeding up towards the viewer (past them at 1) and a
     // little outwards, so the tiles part around the middle as they come.
     const float rush = away * away;
-    const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * 1.3f} * rush + normal * (r * 0.6f * rush);
+    const float distance = grid_tuning().fly_distance;
+    const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * 1.3f * distance} * rush + normal * (r * 0.6f * distance * rush);
     std::array<GridPoint, 4> out{};
     for (int k = 0; k < 4; ++k) {
         // The corner on the sphere, turned about the axis through the tile's
@@ -211,15 +210,77 @@ std::optional<std::array<float, 16>> grid_quad_matrix(const std::array<GridPoint
     return std::array<float, 16>{a / size, d / size, 0, g / size, b / size, e / size, 0, h / size, 0, 0, 1, 0, c, f, 0, 1};
 }
 
+GridTuning& grid_tuning() {
+    static GridTuning tuning;
+    return tuning;
+}
+
+namespace {
+
+// The test screen's settings, with how a slider's value maps onto
+// grid_tuning (the value over `unit`).
+struct LabSetting {
+    const char* name;
+    float GridTuning::*field;
+    float unit;
+};
+constexpr LabSetting lab_settings[] = {
+    {"grid_breath_in", &GridTuning::breath_in, 1.0f},
+    {"grid_breath_hold", &GridTuning::breath_hold, 1.0f},
+    {"grid_breath_out", &GridTuning::breath_out, 1.0f},
+    {"grid_breath_size", &GridTuning::breath_scale, 200.0f},  // percent, peak to peak
+    {"grid_wave_every", &GridTuning::wave_every, 1.0f},
+    {"grid_wave_step", &GridTuning::wave_step, 1000.0f},      // milliseconds
+    {"grid_wave_rise", &GridTuning::wave_rise, 1.0f},
+    {"grid_wave_depth", &GridTuning::wave_depth, 100.0f},     // percent of a tile's width
+    {"grid_fly_seconds", &GridTuning::fly_seconds, 1.0f},
+    {"grid_fly_spread", &GridTuning::fly_spread, 1.0f},
+    {"grid_fly_distance", &GridTuning::fly_distance, 1.0f},
+};
+
+} // namespace
+
+std::vector<std::pair<std::string, std::string>> grid_lab_values() {
+    std::vector<std::pair<std::string, std::string>> values;
+    for (const auto& s : lab_settings) {
+        char text[32];
+        std::snprintf(text, sizeof(text), "%g", double(std::round(grid_tuning().*s.field * s.unit * 1000.0f) / 1000.0f));
+        values.emplace_back(s.name, text);
+    }
+    return values;
+}
+
+bool grid_lab_set(const std::string& name, const std::string& value) {
+    for (const auto& s : lab_settings) {
+        if (name != s.name) continue;
+        grid_tuning().*s.field = float(std::atof(value.c_str())) / s.unit;
+        return true;
+    }
+    return false;
+}
+
 float grid_breath(double time) {
-    const double cycle = std::fmod(std::max(0.0, time) / double(grid_wave_seconds), 1.0);
-    return 1.0f + grid_breath_scale * std::sin(float(cycle) * 2.0f * pi);
+    // In (rising smoothly), held, out (falling smoothly), then again.
+    const auto& t = grid_tuning();
+    const double in = std::max(0.05f, t.breath_in), hold = std::max(0.0f, t.breath_hold), out = std::max(0.05f, t.breath_out);
+    const double at = std::fmod(std::max(0.0, time), in + hold + out);
+    float level;
+    if (at < in) level = 0.5f - 0.5f * std::cos(float(at / in) * pi);
+    else if (at < in + hold) level = 1.0f;
+    else level = 0.5f + 0.5f * std::cos(float((at - in - hold) / out) * pi);
+    return 1.0f + t.breath_scale * (2.0f * level - 1.0f);
 }
 
 float grid_wave_offset(const GridTile& tile, double time) {
-    const double cycle = std::fmod(std::max(0.0, time) / double(grid_wave_seconds), 1.0);
-    const float wave = 0.5f - 0.5f * std::cos(float(cycle) * 2.0f * pi - tile.phase);
-    return grid_wave_depth * tile.width * wave;
+    // Waves set off from the top left every wave_every seconds; this tile
+    // rises and falls (a raised cosine over wave_rise) wave_step seconds
+    // after the one before it along the wave. Overlapping waves add up, to at most one.
+    const auto& t = grid_tuning();
+    const double every = std::max(0.05f, t.wave_every), rise = std::max(0.05f, t.wave_rise);
+    const double local = std::fmod(std::fmod(std::max(0.0, time) - double(tile.step) * t.wave_step, every) + every, every);
+    float sum = 0.0f;
+    for (double since = local; since < rise; since += every) sum += 0.5f - 0.5f * std::cos(float(since / rise) * 2.0f * pi);
+    return t.wave_depth * tile.width * std::min(1.0f, sum);
 }
 
 std::string grid_colour_of(const std::vector<Rml::ElementDocument*>& screens) {
@@ -337,7 +398,8 @@ void MenuGrid::place(double now) {
         // in the wave (lifted outwards), its flip. Worked out here and given
         // to RmlUi as one matrix per tile.
         std::string transform = tile.transform;
-        const float in_place = std::clamp((fly_ - at.fly) / grid_fly_seconds, 0.0f, 1.0f);
+        const auto& tuning = grid_tuning();
+        const float in_place = std::clamp((fly_ - at.fly * tuning.fly_spread) / std::max(0.01f, tuning.fly_seconds), 0.0f, 1.0f);
         const float away = 1.0f - in_place * in_place * (3.0f - 2.0f * in_place);
         const auto corners = grid_tile_corners(layout_, at, breath, grid_wave_offset(at, now), turn, away);
         const bool hidden = !corners || in_place <= 0.0f;
@@ -381,6 +443,9 @@ void MenuGrid::place(double now) {
     }
     changing_ = active || (fade < 1.0f && !same(far_from_, far_to_));
 }
+
+float MenuGrid::fly_total() const { return std::max(0.01f, grid_tuning().fly_seconds) + std::max(0.0f, grid_tuning().fly_spread); }
+float MenuGrid::presence() const { return fly_ / fly_total(); }
 
 float MenuGrid::cover_allowance() const {
     if (!visible_ || !leaving_) return 1.0f;
@@ -451,7 +516,7 @@ void MenuGrid::update(Rml::Context* context, const std::string& asked, double no
     } else {
         retarget(*wanted, now);
     }
-    if (wanted_here) fly_ = std::min(grid_fly_total, fly_ + dt);
+    if (wanted_here) fly_ = std::min(fly_total(), fly_ + dt);
     name_ = name;
     if (context->GetDimensions() != size_ || tiles_.empty()) build(context);
     visible_ = true;
