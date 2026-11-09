@@ -178,6 +178,8 @@ body.pad .subtitle .for-pad { display: inline; }
 
 /* Over the game's own pause background, which already hides the board. */
 body.over-pause { background-color: #00000000; }
+/* Over the menu grid (ui_grid.h), which is the background itself. */
+body.on-grid { background-color: #00000000; }
 
 /* A large heading, for screens shown over play (the pause menu). */
 .header {

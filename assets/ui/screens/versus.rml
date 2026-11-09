@@ -3,7 +3,7 @@
     <title>Versus</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="green">
     <div id="panel">
         <div class="title">Versus</div>
         <div class="subtitle">Who is player 2?</div>

@@ -1,5 +1,7 @@
 #include "ui_renderer.h"
 
+#include "grid_texture.h"
+
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/FileInterface.h>
 
@@ -186,6 +188,13 @@ void Renderer::ReleaseGeometry(Rml::CompiledGeometryHandle handle) {
 }
 
 Rml::TextureHandle Renderer::LoadTexture(Rml::Vector2i& dimensions, const Rml::String& source) {
+    // The menu grid's tiles (grid_texture.h): made in memory, not a file.
+    if (source == "blockplanet-grid-tile") {
+        const auto& atlas = grid_tile_atlas();
+        if (atlas.rgba.empty()) return 0;
+        dimensions = {atlas.width, atlas.height};
+        return create_texture(atlas.rgba.data(), atlas.width, atlas.height);
+    }
     // Read through RmlUi's file interface, decode with stb_image.
     Rml::FileInterface* files = Rml::GetFileInterface();
     Rml::FileHandle file = files->Open(source);

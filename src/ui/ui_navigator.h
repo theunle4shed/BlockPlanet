@@ -128,6 +128,12 @@ public:
     // top (the credits' auto-scroll waits a moment after a manual move).
     std::chrono::steady_clock::time_point manual_scroll_at() const { return manual_scroll_at_; }
     Rml::ElementDocument* top_document() const { return stack_.empty() ? nullptr : stack_.back().document; }
+    // The open screens' documents, first to top.
+    std::vector<Rml::ElementDocument*> documents() const {
+        std::vector<Rml::ElementDocument*> list;
+        for (const auto& screen : stack_) list.push_back(screen.document);
+        return list;
+    }
 private:
     std::chrono::steady_clock::time_point manual_scroll_at_{};
 };

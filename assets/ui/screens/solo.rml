@@ -3,7 +3,7 @@
     <title>Solo</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="green">
     <div id="panel">
         <div class="title">Solo</div>
         <div class="subtitle">Play on your own</div>

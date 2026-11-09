@@ -1,5 +1,7 @@
 #include "ui_system.h"
 
+#include "grid_texture.h"
+#include "ui_grid.h"
 #include "ui_navigator.h"
 #include "ui_renderer.h"
 
@@ -53,6 +55,7 @@ std::unique_ptr<Renderer> renderer;
 std::unique_ptr<System> system_interface;
 Rml::Context* context = nullptr;
 std::unique_ptr<Navigator> navigator;
+std::unique_ptr<MenuGrid> grid;  // the menu grid (ui_grid.h)
 bool started = false;
 bool start_failed = false;
 
@@ -115,6 +118,7 @@ bool start(std::uint32_t width, std::uint32_t height) {
     if (context == nullptr) return false;
     context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
     navigator = std::make_unique<Navigator>(context, assets_path / "screens");
+    grid = std::make_unique<MenuGrid>(asset("grid.rml"));
     std::fprintf(stdout, "{\"event\":\"ui_started\",\"width\":%u,\"height\":%u}\n", width, height);
     std::fflush(stdout);
     return true;
@@ -833,6 +837,14 @@ bool update_hud_document() {
     return true;
 }
 
+// The menu grid behind the open screens, in the colour they ask for.
+void update_grid() {
+    const auto screens = navigator->documents();
+    const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    grid->update(context, grid_colour_of(screens), now);
+    for (auto* document : screens) document->SetClass("on-grid", grid->visible());
+}
+
 void hook_init(plume::RenderInterface* render_interface, plume::RenderDevice* device) {
     renderer = std::make_unique<Renderer>(render_interface, device);
 }
@@ -857,6 +869,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
         return;
     }
     apply_requests();
+    update_grid();
     const bool hud_visible = update_hud_document();
     const bool loading_visible = update_loading_document();
     if (navigator->is_open() || hud_visible || loading_visible) {
@@ -885,6 +898,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
 
 void hook_deinit() {
     hud_document = nullptr;
+    grid.reset();
     navigator.reset();
     if (started) {
         if (context != nullptr) Rml::RemoveContext("main");
@@ -895,6 +909,8 @@ void hook_deinit() {
 }
 
 } // namespace
+
+void set_rom(std::span<const std::uint8_t> rom) { set_grid_rom(rom); }
 
 void install(const std::filesystem::path& assets) {
     assets_path = assets;

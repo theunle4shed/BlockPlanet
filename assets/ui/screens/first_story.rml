@@ -3,7 +3,7 @@
     <title>Story</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="green">
     <div id="panel">
         <div class="title">Story</div>
         <div class="subtitle">New to Tetrisphere?</div>

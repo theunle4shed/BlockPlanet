@@ -3,7 +3,7 @@
     <title>Name</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="blue">
     <div id="panel" class="wide">
         <div class="title">Name</div>
         <div class="subtitle"><span class="for-keys">Type a name. Enter finishes, Esc cancels.</span><span class="for-pad">Choose letters. Start finishes, B cancels.</span></div>

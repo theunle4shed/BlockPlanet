@@ -3,7 +3,7 @@
     <title>Profile</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="blue">
     <div id="panel">
         <div class="title">Profile</div>
         <div class="subtitle">Switching profile restarts the game</div>

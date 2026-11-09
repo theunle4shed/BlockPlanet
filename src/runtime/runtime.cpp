@@ -209,6 +209,10 @@ void set_runtime_rom(std::span<const std::uint8_t> rom) {
     runtime_rom = rom;
 }
 
+std::span<const std::uint8_t> runtime_rom_bytes() {
+    return runtime_rom;
+}
+
 bool initialize_eeprom(const std::filesystem::path& path, std::string& error) {
     if (path.empty()) {
         // A guest: a fresh cartridge save, kept in memory only.

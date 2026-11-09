@@ -3,7 +3,7 @@
     <title>Stages</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body class="compact lists">
+<body data-grid="green" class="compact lists">
     <div id="panel">
         <div class="title" data-text="stages_title">Chapter</div>
         <div class="subtitle" data-text="stages_subtitle">The whole episode, or one stage</div>

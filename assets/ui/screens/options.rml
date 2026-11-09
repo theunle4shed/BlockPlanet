@@ -3,7 +3,7 @@
     <title>Options</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="blue">
     <div id="panel">
         <div class="title">Options</div>
         <div class="subtitle">Settings for this PC and your profile</div>

@@ -3,7 +3,7 @@
     <title>Online</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="green">
     <div id="panel">
         <div class="title">Online</div>
         <div class="subtitle">Play over the internet</div>

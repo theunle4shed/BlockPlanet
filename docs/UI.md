@@ -101,6 +101,19 @@ Requests are refused during play and inside other original pages such as Options
 2. Camera and screen sizes: portrait windows, and the sphere's framing at every shape (docs/REDESIGN.md).
 3. Replacing the original title and mode-select menus with these screens.
 
+## Menu grid
+
+The owner's design (2026-11-09; roadmap: One grid background for the menus). BlockPlanet draws the game's tiled grid as one background of its own (`src/ui/ui_grid.cpp`, `assets/ui/grid.rml`), always behind the menu screens (its document is pushed to the back every frame) and above the game's picture and HUD.
+
+- **Colour per screen:** `data-grid="blue"` (or green, red, purple, gold, grey; `grid_colour` in `ui_grid.cpp`) on a screen's body. The grid shows while the first open screen has one, in the colour of the highest open screen that has one. Screens over the grid get the class `on-grid` (their dimming background is dropped, `menu.rcss`).
+- **Shades:** tile colours sampled from the original (blue `#0d151f`, highlights `#141f2d`, shadows `#080d14`; red `#2b0510`); green is a matching dark teal-green `#0b1d18`. The far background behind the tiles is the tile colour at 45 %.
+- **Shape:** 9 × 7 tiles at 4:3, more columns on wider screens and more rows on taller ones (odd counts). Each tile is an `img` element with a 3D transform under one perspective from the screen's centre: tilted outwards by its place on a sphere, the middle ones a little nearer, shaded by a light from the upper left. Constants at the top of `ui_grid.cpp`.
+- **Changes:** the same colour stays still. A new colour fades the far background and flips each tile half a turn about its upright axis, starting one after another from the top left (`grid_flip_seconds`, `grid_ripple_seconds`); past halfway a tile shows the new colour. A change part way through another starts each tile again from the colour it shows.
+- **Texture:** the game's grey marble from the player's ROM (main archive entry `0x000`, 160 × 120, 8-bit; `grid_texture.cpp` unpacks pass J), read once at run time and kept only in memory. Four square parts of it, each with a bevel, make the tiles' texture, tinted by `image-color`. Without the ROM's texture a procedural marble is used.
+- **Not yet (step 2):** the tiles flying out towards the camera into play and back in afterwards, with the loading cover, and red behind the game over panel.
+
+**Testing without the game:** `cmake -S tests/ui -B build-ui && cmake --build build-ui && ctest --test-dir build-ui` runs the menu tests (RmlUi and FreeType in `.local/deps`). `cmake --build build-ui --target ui_capture`, then `build-ui/ui_capture assets/ui OUT [rom.z64]` writes captures of the main menu, Solo, Story, Options and the pause menu over the grid, and three frames of a colour change, at 4:3, 16:9, 21:9 and portrait, drawn by RmlUi in software (pictures such as controller art are left out). Captures stay out of Git.
+
 ## In-game HUD
 
 BlockPlanet's HUD (design in [HUD_DESIGN.md](HUD_DESIGN.md)) is a separate RmlUi document, `assets/ui/hud.rml` with `hud.rcss`, in the same context as the menus. The game thread fills `blockplanet::ui::HudView` each frame (`update_hud` in `linux_main.cpp`, values from `src/platform/story_hud.cpp`) and calls `ui::set_hud`; the presentation thread rebuilds the HUD's markup only when it changes. The HUD is hidden while a menu is open and outside Story play. It takes no input. A media query (`orientation: portrait`) turns the two columns into rows above and below the game's picture.

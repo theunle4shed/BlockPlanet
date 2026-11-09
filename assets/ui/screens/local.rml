@@ -3,7 +3,7 @@
     <title>Local</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="green">
     <div id="panel">
         <div class="title">Local</div>
         <div class="subtitle">Two players on this PC: a friend or the computer</div>

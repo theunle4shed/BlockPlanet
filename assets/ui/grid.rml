@@ -1,0 +1,18 @@
+<rml>
+<head>
+    <title>Grid</title>
+    <!-- The menu grid (docs/UI.md, Menu grid): behind every menu screen
+         with data-grid. The tiles are placed, tilted and coloured by
+         ui_grid.cpp; this only holds them. -->
+    <style>
+        body { width: 100%; height: 100%; }
+        #grid-far { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-color: #06090e; }
+        #grid-tiles { position: absolute; left: 0; top: 0; width: 100%; height: 100%; perspective-origin: 50% 50%; }
+        .grid-tile { position: absolute; transform-origin: 50% 50%; }
+    </style>
+</head>
+<body>
+    <div id="grid-far"></div>
+    <div id="grid-tiles"></div>
+</body>
+</rml>
