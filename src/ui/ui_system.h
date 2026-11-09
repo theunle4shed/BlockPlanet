@@ -33,6 +33,10 @@ void set_setting(const std::string& name, const std::string& value);
 void set_list(const std::string& name, std::vector<ListItem> items);
 // Text for elements with data-text="NAME". Applied at the next frame.
 void set_text(const std::string& name, const std::string& text);
+// A full-screen loading cover over everything (0: none, 1: opaque), with the
+// mode being started ("Story · Stage 1:1"), while a mode is started through
+// the game's own menus behind it.
+void set_loading(const std::string& text, float opacity);
 // As set_text, with [family:name] tokens drawn as button icons (data-buttons
 // elements): [k:Esc] a key cap, [x:B] an Xbox button, [d:pad] a d-pad.
 void set_button_text(const std::string& name, const std::string& text);

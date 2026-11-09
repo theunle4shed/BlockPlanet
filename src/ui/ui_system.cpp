@@ -719,6 +719,34 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
 }
 
 // Shows, updates or hides the HUD document. Returns whether it is shown.
+std::mutex loading_mutex;
+std::string loading_text;
+float loading_opacity = 0.0f;
+Rml::ElementDocument* loading_document = nullptr;
+
+bool update_loading_document() {
+    std::string text;
+    float opacity;
+    {
+        std::lock_guard lock(loading_mutex);
+        text = loading_text;
+        opacity = loading_opacity;
+    }
+    if (opacity <= 0.0f) {
+        if (loading_document != nullptr) loading_document->Hide();
+        return false;
+    }
+    if (loading_document == nullptr) {
+        loading_document = context->LoadDocument(asset("loading.rml"));
+        if (loading_document == nullptr) return false;
+    }
+    if (auto* e = loading_document->GetElementById("loading-mode")) e->SetInnerRML(escape(text));
+    loading_document->SetProperty("opacity", std::to_string(std::min(1.0f, opacity)));
+    loading_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
+    loading_document->PullToFront();
+    return true;
+}
+
 bool update_hud_document() {
     std::optional<HudView> hud;
     {
@@ -825,7 +853,8 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
     }
     apply_requests();
     const bool hud_visible = update_hud_document();
-    if (navigator->is_open() || hud_visible) {
+    const bool loading_visible = update_loading_document();
+    if (navigator->is_open() || hud_visible || loading_visible) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
             context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
@@ -899,6 +928,12 @@ void set_setting(const std::string& name, const std::string& value) {
 void set_list(const std::string& name, std::vector<ListItem> items) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(ListRequest{name, std::move(items)});
+}
+
+void set_loading(const std::string& text, float opacity) {
+    std::lock_guard lock(loading_mutex);
+    loading_text = text;
+    loading_opacity = opacity;
 }
 
 void set_text(const std::string& name, const std::string& text) {

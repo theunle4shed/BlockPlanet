@@ -112,6 +112,10 @@ bool unlock_all_testing = false;
 // Start-up screens (the owner's choice, 2026-11-08): title, then who is
 // playing (P1), then the main menu; Back goes back through them.
 bool profile_picked = false;  // P1 chosen this session (or given on the command line)
+// The loading cover over a mode's start (set in launch_mode).
+bool loading_active = false;
+std::string loading_title;
+std::chrono::steady_clock::time_point loading_since;
 bool credits_pending = false; // --credits: play them when the title shows
 
 // The active profile's save file (progress and preferences); none for a
@@ -2818,7 +2822,16 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     }
     if (!keep_music) end_track_override();
     const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
-    if (accepted) blockplanet::ui::request_close();
+    if (accepted) {
+        blockplanet::ui::request_close();
+        // The loading cover (the owner's request): over the game's own menus
+        // while they are pressed through, until play has started.
+        static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
+                                      "Training", "Training", "Puzzle Training"};
+        loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
+        loading_since = std::chrono::steady_clock::now();
+        loading_active = true;
+    }
     std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
                  launch_mode_name(mode), accepted ? "started" : "refused");
     std::fflush(stdout);
@@ -3670,6 +3683,39 @@ bool handle_profile_command(const std::string& command) {
             }
             blockplanet::set_game_menu_hidden(!original_menus && at_game_menu &&
                                               (blockplanet::ui::menus_open() || mode_launcher.active()));
+        }
+        // The game's attract demo starts after its menu sits idle; behind
+        // BlockPlanet's menus it counts as play and launches were refused
+        // (the owner's report). While BlockPlanet's menus are open over the
+        // game's menu, its idle counters (frames on the page) are held at 10
+        // seconds, past every page's own entrance timing.
+        if (guest_rdram != nullptr && blockplanet::ui::menus_open() && !mode_launcher.active() &&
+            guest::load16(guest_rdram, 0x800E121C) >= 0) {
+            auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+            for (const std::uint32_t counter : {0x800E1208u, 0x800E120Cu})
+                if (std::int32_t(guest::load32(rd, counter)) > 600) guest::store32(rd, counter, 600);
+        }
+        // The loading cover: fades in over 0.15 s when a mode starts, stays
+        // while the game's menus are pressed through and the stage loads,
+        // and fades out over 0.5 s once play has run for 0.4 s (a pending
+        // Continue or restart keeps it up too). At most 20 seconds.
+        {
+            static float opacity = 0.0f;
+            static std::optional<std::chrono::steady_clock::time_point> playing_since;
+            static auto last = std::chrono::steady_clock::now();
+            const auto now_l = std::chrono::steady_clock::now();
+            const float dt = std::min(0.1f, std::chrono::duration<float>(now_l - last).count());
+            last = now_l;
+            const bool in_play_now = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) == -1;
+            if (loading_active) {
+                if (mode_launcher.active() || continue_mode || !in_play_now) playing_since.reset();
+                else if (!playing_since) playing_since = now_l;
+                if ((playing_since && now_l - *playing_since > std::chrono::milliseconds(400)) ||
+                    now_l - loading_since > std::chrono::seconds(20))
+                    loading_active = false;
+            }
+            opacity = loading_active ? std::min(1.0f, opacity + dt / 0.15f) : std::max(0.0f, opacity - dt / 0.5f);
+            blockplanet::ui::set_loading(loading_title, opacity);
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
         // over (0x800E1202 back to 0 while the end menu fades in), to see
