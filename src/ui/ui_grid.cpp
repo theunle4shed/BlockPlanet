@@ -431,7 +431,9 @@ void MenuGrid::place(double now) {
     // The far background fades in and out with the tiles, unless they fly
     // out into the loading cover. Only on change: setting a property rebuilds
     // its shape, even to the same value.
-    const float present = std::clamp(presence(), 0.0f, 1.0f);
+    // It is whole by half way, so it hides what is behind early on the way
+    // in (the game's own pause fade) and stays until the tiles are mostly gone.
+    const float present = std::clamp(presence() * 2.0f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
     std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);
     far.insert(3, "a");  // rgb( -> rgba(
