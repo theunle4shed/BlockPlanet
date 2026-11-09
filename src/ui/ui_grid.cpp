@@ -488,6 +488,7 @@ void MenuGrid::update(Rml::Context* context, const std::string& asked, double no
         if (!visible_) {
             name_.clear();
             changing_ = false;
+            show_backdrop();
             return;
         }
         if (!leaving_) into_cover_ = into_cover;
@@ -495,8 +496,8 @@ void MenuGrid::update(Rml::Context* context, const std::string& asked, double no
         leaving_ = true;
         fly_ = std::max(0.0f, fly_ - dt);
         if (fly_ <= 0.0f) {
-            if (document_ != nullptr && document_->IsVisible()) document_->Hide();
             visible_ = false;
+            show_backdrop();
             leaving_ = false;
             name_.clear();
             changing_ = false;
@@ -548,6 +549,28 @@ void MenuGrid::update(Rml::Context* context, const std::string& asked, double no
     if (!document_->IsVisible()) document_->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
     // Behind every menu screen.
     document_->PushToBack();
+    if (auto* backdrop = document_->GetElementById("grid-backdrop")) backdrop->SetClass("on", backdrop_);
+}
+
+void MenuGrid::show_backdrop() {
+    // Gone: the document stays only for the backdrop (the tiles are hidden
+    // and the far background clear by now).
+    if (document_ == nullptr) return;
+    if (auto* backdrop = document_->GetElementById("grid-backdrop")) backdrop->SetClass("on", backdrop_);
+    if (backdrop_) {
+        for (auto& tile : tiles_) {
+            if (tile.element != nullptr && !tile.hidden) tile.element->SetProperty("visibility", "hidden");
+            tile.hidden = true;
+        }
+        if (far_ != nullptr && far_css_ != "rgba(0,0,0,0)") {
+            far_css_ = "rgba(0,0,0,0)";
+            far_->SetProperty("background-color", far_css_);
+        }
+        if (!document_->IsVisible()) document_->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
+        document_->PushToBack();
+    } else if (document_->IsVisible()) {
+        document_->Hide();
+    }
 }
 
 } // namespace blockplanet::ui

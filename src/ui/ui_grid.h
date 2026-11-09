@@ -172,6 +172,9 @@ public:
     void update(Rml::Context* context, const std::string& colour, double now, bool into_cover = false);
     // Drawn (in place or flying).
     bool visible() const { return visible_; }
+    // A black backdrop behind the grid, kept even when it has flown out (the
+    // test screen, so a fly-out there does not reveal the game's menus).
+    void set_backdrop(bool on) { backdrop_ = on; }
     // How much is in place: 0 gone, 1 every tile in place.
     float presence() const;
     // How much of the loading cover may show: while the grid flies out into
@@ -222,6 +225,8 @@ private:
     float fly_ = 0;             // 0 (gone) to the flight's total (in place)
     bool leaving_ = false;      // flying out (or gone)
     bool into_cover_ = false;
+    bool backdrop_ = false;
+    void show_backdrop();
     float far_alpha_ = 0;
     double last_now_ = 0;
     bool changing_ = false;

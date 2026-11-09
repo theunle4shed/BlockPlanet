@@ -896,6 +896,7 @@ void update_grid() {
         std::lock_guard lock(loading_mutex);
         cover = loading_opacity > 0.0f;
     }
+    grid->set_backdrop(navigator->current_screen() == "grid_lab");
     grid->update(context, colour, now, cover);
     // Research: BLOCKPLANET_GRID_LOG=1 logs the grid's state every frame
     // while it is drawn (and the frame it goes), to tell its own dark frames

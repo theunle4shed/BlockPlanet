@@ -477,6 +477,17 @@ void grid_tests(const std::string& document) {
         context->Update();
         context->Render();
 
+        // The test screen's backdrop: flown out, the document stays (black
+        // behind), the grid is not visible, and it flies back in.
+        grid.set_backdrop(true);
+        run(grid, "", 1103.0, 1104.0);
+        assert(!grid.visible());
+        run(grid, "blue", 1104.0, 1105.0);
+        assert(grid.visible() && grid.presence() == 1.0f);
+        grid.set_backdrop(false);
+        run(grid, "", 1105.0, 1106.0);
+        assert(!grid.visible());
+
         // A missing document: no grid, and no crash.
         MenuGrid missing("no-such-grid.rml");
         missing.update(context, "blue", 0.0);
