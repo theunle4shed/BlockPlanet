@@ -3741,8 +3741,12 @@ bool handle_profile_command(const std::string& command) {
         }
         // The loading cover: fades in over 0.15 s when a mode starts, stays
         // while the game's menus are pressed through and the stage loads,
-        // and fades out over 0.5 s once play has run for 0.4 s (a pending
-        // Continue or restart keeps it up too). At most 20 seconds.
+        // and fades out over 0.5 s once play has run 0.4 s with the game's
+        // own fade clear (3 s of play at the latest; a pending Continue or
+        // restart keeps it up too). At most 20 seconds. When the menu grid is
+        // up as the mode starts, the grid is the loading screen instead (the
+        // cover's text over it, no dark cover) and flies out once the load is
+        // done (ui_system.h, set_loading).
         {
             static float opacity = 0.0f;
             static std::optional<std::chrono::steady_clock::time_point> playing_since;
@@ -3751,10 +3755,21 @@ bool handle_profile_command(const std::string& command) {
             const float dt = std::min(0.1f, std::chrono::duration<float>(now_l - last).count());
             last = now_l;
             const bool in_play_now = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) == -1;
+            // The game's own fade (0x800E1202: 0 clear, 255 dark) has brought
+            // the stage in: the load is only done once it is clear (the menu
+            // grid, as the loading screen, then reveals the stage itself
+            // rather than a black screen fading in).
+            const bool faded_in = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E1202) == 0;
+            static std::optional<std::chrono::steady_clock::time_point> clear_since;
             if (loading_active) {
                 if (mode_launcher.active() || continue_mode || !in_play_now) playing_since.reset();
                 else if (!playing_since) playing_since = now_l;
-                if ((playing_since && now_l - *playing_since > std::chrono::milliseconds(400)) ||
+                if (!playing_since || !faded_in) clear_since.reset();
+                else if (!clear_since) clear_since = now_l;
+                // Done 0.4 s after the fade is clear in play; 3 s into play in
+                // any case (a mode whose fade reads otherwise); 20 s at most.
+                if ((clear_since && now_l - *clear_since > std::chrono::milliseconds(400)) ||
+                    (playing_since && now_l - *playing_since > std::chrono::seconds(3)) ||
                     now_l - loading_since > std::chrono::seconds(20))
                     loading_active = false;
             }
@@ -3770,7 +3785,7 @@ bool handle_profile_command(const std::string& command) {
                 muted = false;
                 blockplanet::set_audio_levels(current_audio().music, current_audio().effects);
             }
-            blockplanet::ui::set_loading(loading_title, opacity);
+            blockplanet::ui::set_loading(loading_title, opacity, loading_active);
         }
         // The menu grid (docs/UI.md, Menu grid) over the game's own pause
         // animations, in the pause's colours: from the Start press that

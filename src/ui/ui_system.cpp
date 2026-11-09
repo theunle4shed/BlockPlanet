@@ -740,6 +740,8 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
 std::mutex loading_mutex;
 std::string loading_text;
 float loading_opacity = 0.0f;
+bool loading_wanted = false;  // the load still under way (set_loading)
+bool loading_over_grid = false;  // shown over the grid as the loading screen, until it has faded out
 Rml::ElementDocument* loading_document = nullptr;
 
 std::string build_label;  // under loading_mutex
@@ -778,6 +780,7 @@ bool update_loading_document() {
     opacity *= allowed;
     if (opacity <= 0.0f) {
         if (loading_document != nullptr) loading_document->Hide();
+        loading_over_grid = false;
         return false;
     }
     if (loading_document == nullptr) {
@@ -785,6 +788,10 @@ bool update_loading_document() {
         if (loading_document == nullptr) return false;
     }
     if (auto* e = loading_document->GetElementById("loading-mode")) e->SetInnerRML(escape(text));
+    // Over the grid as the loading screen: only the text, no dark cover, until
+    // it has faded out (the grid flies out under it, revealing the game).
+    if (grid && grid->visible() && !grid->leaving()) loading_over_grid = true;
+    loading_document->SetClass("on-grid", loading_over_grid);
     loading_document->SetProperty("opacity", std::to_string(std::min(1.0f, opacity)));
     loading_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
     loading_document->PullToFront();
@@ -893,15 +900,24 @@ void update_grid() {
         std::lock_guard lock(grid_override_mutex);
         colour = grid_override;
     }
-    bool cover = false;
+    bool cover = false, loading = false;
     {
         std::lock_guard lock(loading_mutex);
         cover = loading_opacity > 0.0f;
+        loading = loading_wanted;
     }
+    // The grid as the loading screen (the owner's design, 2026-11-09): while
+    // a launch loads, a grid already up stays, in the colour it had, the
+    // water moving; it flies out to reveal the game once the load is done.
+    static std::string grid_shown_colour;
+    if (colour.empty() && loading && grid->visible() && !grid->leaving()) colour = grid_shown_colour;
+    if (!colour.empty()) grid_shown_colour = colour;
     const bool lab = navigator->current_screen() == "grid_lab";
     grid->set_backdrop(lab);
     grid->set_layers(!lab || lab_show != "background", !lab || lab_show != "tiles");
-    grid->update(context, colour, now, cover);
+    // Flying out while a load is still wanted (the grid was not up as the
+    // loading screen): into the cover; once the load is done: revealing the game.
+    grid->update(context, colour, now, loading);
     // Research: BLOCKPLANET_GRID_LOG=1 logs the grid's state every frame
     // while it is drawn (and the frame it goes), to tell its own dark frames
     // from the game's.
@@ -1092,10 +1108,11 @@ void set_build_label(const std::string& text) {
     build_label = text;
 }
 
-void set_loading(const std::string& text, float opacity) {
+void set_loading(const std::string& text, float opacity, bool wanted) {
     std::lock_guard lock(loading_mutex);
     loading_text = text;
     loading_opacity = opacity;
+    loading_wanted = wanted;
 }
 
 void set_text(const std::string& name, const std::string& text) {
