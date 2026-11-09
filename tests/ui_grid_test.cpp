@@ -168,8 +168,17 @@ void layout_tests() {
     assert(near(wide.radius, big.radius, 0.01f) && near(tall.radius, big.radius, 0.01f) && square.radius < big.radius);
     assert(grid_layout(0, 0).tiles.empty());
 
-    // The idle wave: tiles come forward and back, never behind their place,
-    // and neighbours along the wave are out of step.
+    // Breathing: the whole sphere swells and settles about 1.2 % either way,
+    // once every 1.5 seconds.
+    float low = 2, high = 0;
+    for (double time = 0; time < grid_wave_seconds; time += 0.01) {
+        low = std::min(low, grid_breath(time));
+        high = std::max(high, grid_breath(time));
+    }
+    assert(near(low, 1 - grid_breath_scale, 0.001f) && near(high, 1 + grid_breath_scale, 0.001f));
+    assert(near(grid_breath(0.3), grid_breath(0.3 + grid_wave_seconds), 0.0001f));
+    // The soft wave: tiles come forward and back, never behind their place,
+    // and tiles further along it are out of step.
     const auto& t0 = wide.tiles[0];
     const auto& t1 = wide.tiles[9];
     float most = 0;
@@ -178,7 +187,7 @@ void layout_tests() {
         const float o = grid_wave_offset(t0, time);
         assert(o >= 0 && o <= grid_wave_depth * t0.width + 0.01f);
         most = std::max(most, o);
-        if (std::abs(o - grid_wave_offset(t1, time)) > 1.0f) apart = true;
+        if (std::abs(o - grid_wave_offset(t1, time)) > 0.5f) apart = true;
     }
     assert(most > grid_wave_depth * t0.width * 0.9f && apart);
     assert(near(grid_wave_offset(t0, 1.0), grid_wave_offset(t0, 1.0 + grid_wave_seconds), 0.01f));
@@ -191,9 +200,19 @@ void layout_tests() {
     const auto far = grid_far_colour(blue);
     assert(far.r < blue.r && far.g < blue.g && far.b < blue.b);
     const auto cycle = grid_cycle("pause");
-    assert(cycle.size() == 4 && cycle[0] == "purple");
+    assert(cycle.size() == 4 && cycle[0] == "pause-purple");
     for (auto name : cycle) assert(grid_colour(name));
     assert(grid_cycle("blue").empty());
+    // Smooth: each colour in turn, blended in between, back to the first.
+    const auto purple = *grid_colour("pause-purple"), pblue = *grid_colour("pause-blue");
+    assert(same(grid_cycle_colour(cycle, 0), purple) && same(grid_cycle_colour(cycle, grid_cycle_seconds), pblue));
+    assert(same(grid_cycle_colour(cycle, 4 * grid_cycle_seconds), purple));
+    const auto half = grid_cycle_colour(cycle, grid_cycle_seconds / 2);
+    assert(near(half.r, (purple.r + pblue.r) / 2, 0.002f) && near(half.b, (purple.b + pblue.b) / 2, 0.002f));
+    for (double time = 0; time < 4 * grid_cycle_seconds; time += 0.1) {
+        const auto a = grid_cycle_colour(cycle, time), b = grid_cycle_colour(cycle, time + 0.1);
+        assert(std::abs(a.r - b.r) < 0.003f && std::abs(a.g - b.g) < 0.003f && std::abs(a.b - b.b) < 0.003f);
+    }
 }
 
 // Turns, as seen: the same flip modulo half a turn (edge-on either way looks the same).
@@ -282,17 +301,25 @@ void grid_tests(const std::string& document) {
                 assert(same(grid.tile_colour(i), colours[c]) && grid.tile_turn(i) == 0);
         }
 
-        // The pause's cycle: purple, then cyan after a while, flipping in.
+        // The pause's cycle: purple at first, fading with every tile in step
+        // (no flips), and a flip ripple when it comes from another colour.
         grid.update(context, "", 900.0);
         grid.update(context, "pause", 1000.0);
-        assert(same(grid.tile_colour(20), *grid_colour("purple")) && !grid.changing());
-        grid.update(context, "pause", 1000.0 + grid_cycle_seconds + 0.01);
+        const auto cycle = grid_cycle("pause");
+        assert(same(grid.tile_colour(20), *grid_colour("pause-purple")) && !grid.changing());
+        for (double u = 1000.0; u < 1000.0 + grid_cycle_seconds * 1.5; u += 1.0 / 60.0) {
+            grid.update(context, "pause", u);
+            assert(!grid.changing() && grid.tile_turn(20) == 0);
+            assert(same(grid.tile_colour(0), grid_cycle_colour(cycle, u - 1000.0)) && same(grid.tile_colour(63), grid.tile_colour(0)));
+        }
+        grid.update(context, "blue", 1020.0);  // Options from the pause
+        grid.update(context, "blue", 1022.0);
+        grid.update(context, "pause", 1030.0);  // back: a ripple into the cycle
         assert(grid.changing());
-        grid.update(context, "pause", 1000.0 + grid_cycle_seconds + 2.0);
-        assert(!grid.changing() && same(grid.tile_colour(20), *grid_colour("cyan")));
-        grid.update(context, "pause", 1000.0 + 4 * grid_cycle_seconds + 0.01);  // back to the first
-        grid.update(context, "pause", 1000.0 + 4 * grid_cycle_seconds + 2.0);
-        assert(same(grid.tile_colour(20), *grid_colour("purple")));
+        double u = 1030.0;
+        for (; u < 1032.0; u += 1.0 / 60.0) grid.update(context, "pause", u);
+        assert(!grid.changing());
+        for (std::size_t i = 0; i < grid.tile_count(); ++i) assert(same(grid.tile_colour(i), grid_cycle_colour(cycle, u - 1.0 / 60.0 - 1030.0)));
 
         // Hidden, then shown again: straight in its colour, no flip.
         grid.update(context, "", 1100.0);

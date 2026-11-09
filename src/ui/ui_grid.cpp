@@ -27,9 +27,9 @@ constexpr float cover = 1.06f;
 constexpr float tile_fill = 0.9f;
 // The light, from the upper left and front (CSS axes: y down, z towards the viewer).
 constexpr float light_x = -0.35f, light_y = -0.45f, light_z = 0.82f;
-// The idle wave rolls diagonally, from the top left to the bottom right; one
-// wave spans this many tiles.
-constexpr float wave_tiles = 7.0f;
+// The soft wave rolls diagonally, from the top left to the bottom right; one
+// wave would span this many tiles (the grid's diagonal is 14).
+constexpr float wave_tiles = 28.0f;
 
 struct Vec3 {
     float x, y, z;
@@ -78,14 +78,28 @@ std::optional<GridRgb> grid_colour(std::string_view name) {
     if (name == "cyan") return rgb(0x0a2029);
     if (name == "teal") return rgb(0x0a2420);
     if (name == "peach") return rgb(0x2e1713);
+    if (name == "pause-purple") return rgb(0x271728);  // the pause's, sampled from the original's
+    if (name == "pause-blue") return rgb(0x13192c);
+    if (name == "pause-teal") return rgb(0x142832);
+    if (name == "pause-peach") return rgb(0x2e1b1a);    // not yet sampled: to check
     return std::nullopt;
 }
 
 GridRgb grid_far_colour(GridRgb tile) { return {tile.r * 0.45f, tile.g * 0.45f, tile.b * 0.45f}; }
 
 std::vector<std::string_view> grid_cycle(std::string_view name) {
-    if (name == "pause") return {"purple", "cyan", "teal", "peach"};
+    if (name == "pause") return {"pause-purple", "pause-blue", "pause-teal", "pause-peach"};
     return {};
+}
+
+GridRgb grid_cycle_colour(const std::vector<std::string_view>& cycle, double time) {
+    if (cycle.empty()) return {};
+    const double position = std::max(0.0, time) / grid_cycle_seconds;
+    const auto step = std::size_t(position);
+    const float t = float(position - double(step));
+    const auto from = grid_colour(cycle[step % cycle.size()]).value_or(GridRgb{});
+    const auto to = grid_colour(cycle[(step + 1) % cycle.size()]).value_or(GridRgb{});
+    return mix(from, to, t * t * (3.0f - 2.0f * t));
 }
 
 GridLayout grid_layout(float width, float height) {
@@ -135,11 +149,15 @@ GridLayout grid_layout(float width, float height) {
     return layout;
 }
 
+float grid_breath(double time) {
+    const double cycle = std::fmod(std::max(0.0, time) / double(grid_wave_seconds), 1.0);
+    return 1.0f + grid_breath_scale * std::sin(float(cycle) * 2.0f * pi);
+}
+
 float grid_wave_offset(const GridTile& tile, double time) {
-    const double cycle = std::fmod(time / double(grid_wave_seconds), 1.0);
-    // Mostly resting, rising and sinking smoothly (a raised cosine).
+    const double cycle = std::fmod(std::max(0.0, time) / double(grid_wave_seconds), 1.0);
     const float wave = 0.5f - 0.5f * std::cos(float(cycle) * 2.0f * pi - tile.phase);
-    return grid_wave_depth * tile.width * wave * wave;
+    return grid_wave_depth * tile.width * wave;
 }
 
 std::string grid_colour_of(const std::vector<Rml::ElementDocument*>& screens) {
@@ -194,8 +212,23 @@ void MenuGrid::retarget(GridRgb colour, double now) {
     change_at_ = now;
 }
 
+void MenuGrid::drift(GridRgb colour) {
+    // A cycle's slow fade: every tile showing (or turning to) the colour
+    // follows it without flipping, and so does the far background.
+    const GridRgb old = target_;
+    for (auto& tile : tiles_) {
+        if (same(tile.face, old)) tile.face = colour;
+        if (same(tile.back, old)) tile.back = colour;
+    }
+    const bool settled = same(far_from_, far_to_);
+    far_to_ = grid_far_colour(colour);
+    if (settled) far_from_ = far_to_;
+    target_ = colour;
+}
+
 void MenuGrid::place(double now) {
     bool active = false;
+    const float breath = grid_breath(now);
     for (std::size_t i = 0; i < tiles_.size(); ++i) {
         Tile& tile = tiles_[i];
         const GridTile& at = layout_.tiles[i];
@@ -241,10 +274,13 @@ void MenuGrid::place(double now) {
         // colour, which rebuilds its shape, changes only a few times a flip).
         const float edge = std::round(std::abs(std::cos(turn * pi / 180.0f)) * 6.0f) / 6.0f;
         const float shade = at.shade * (0.35f + 0.65f * edge);
-        char transform[200];
+        // Layers, outermost first: the whole sphere's breath (about the
+        // screen's middle, where every tile's origin is), the tile's place
+        // and facing, its part in the wave, its flip.
+        char transform[240];
         std::snprintf(transform, sizeof(transform),
-                      "translate3d(%.1fpx, %.1fpx, %.1fpx) rotateY(%.2fdeg) rotateX(%.2fdeg) translateZ(%.1fpx) rotateY(%.1fdeg)",
-                      at.x, at.y, at.z, at.yaw, at.pitch, grid_wave_offset(at, now), turn);
+                      "scale3d(%.4f, %.4f, %.4f) translate3d(%.1fpx, %.1fpx, %.1fpx) rotateY(%.2fdeg) rotateX(%.2fdeg) translateZ(%.1fpx) rotateY(%.1fdeg)",
+                      breath, breath, breath, at.x, at.y, at.z, at.yaw, at.pitch, grid_wave_offset(at, now), turn);
         // The texture's middle grey is half white: twice the colour gives the colour.
         std::string colour = css(shown, 2.0f * shade);
         if (tile.element == nullptr) continue;
@@ -268,14 +304,11 @@ void MenuGrid::place(double now) {
 }
 
 void MenuGrid::update(Rml::Context* context, const std::string& name, double now) {
-    // A cycle shows its colours in turn, from the first, while it stays shown.
-    if (name != name_) shown_at_ = now;
-    std::string colour = name;
-    if (const auto cycle = grid_cycle(name); !cycle.empty()) {
-        const auto step = std::size_t(std::max(0.0, now - shown_at_) / grid_cycle_seconds);
-        colour = std::string(cycle[step % cycle.size()]);
-    }
-    const auto wanted = grid_colour(colour);
+    // A cycle fades through its colours, from the first, while it stays shown.
+    const bool renamed = name != name_;
+    if (renamed) shown_at_ = now;
+    const auto cycle = grid_cycle(name);
+    const auto wanted = cycle.empty() ? grid_colour(name) : std::optional<GridRgb>(grid_cycle_colour(cycle, now - shown_at_));
     if (!wanted) {
         if (document_ != nullptr && document_->IsVisible()) document_->Hide();
         visible_ = false;
@@ -304,6 +337,8 @@ void MenuGrid::update(Rml::Context* context, const std::string& name, double now
         far_from_ = far_to_ = grid_far_colour(*wanted);
         change_at_ = now;
         for (auto& tile : tiles_) tile.face = tile.shown = tile.back = *wanted, tile.flipping = false, tile.flip_end = -1e9;
+    } else if (!cycle.empty() && !renamed) {
+        drift(*wanted);
     } else {
         retarget(*wanted, now);
     }

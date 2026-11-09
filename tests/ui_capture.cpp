@@ -313,6 +313,8 @@ int main(int argc, char** argv) {
             now += 2.0;
             frame("options");
             navigator.open("pause");
+            frame("pause-start");  // the change into the pause's cycle starts
+            now += 2.0;
             frame("pause");
         }
         Rml::RemoveContext("capture");

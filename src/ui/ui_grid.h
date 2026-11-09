@@ -5,14 +5,16 @@
 // game's picture and HUD and below the menus. 8 x 8 tiles, each its own
 // piece, placed on part of a sphere (not quite a half) so the grid bulges
 // outward; the sphere stays round and is sized to cover the screen's longer
-// side. A wave rolls across it, each tile gently coming forward and sinking
-// back. Between screens of the same colour nothing else happens; to a new
+// side. Like the original's, it breathes: the whole sphere swells and
+// settles gently, with a soft wave of tiles coming forward and back across
+// it. Between screens of the same colour nothing else happens; to a new
 // colour the far background fades to it and the tiles flip over in a ripple,
-// one after another, showing the new colour on their backs. The wave carries
-// on through flips.
+// one after another, showing the new colour on their backs. The breathing
+// carries on through flips.
 //
 // A screen picks its colour with data-grid on its body ("blue", "green", ...;
-// see grid_colour), or a slow cycle of colours ("pause"; see grid_cycle). The
+// see grid_colour), or a slow cycle of colours that fade smoothly into one
+// another ("pause"; see grid_cycle). The
 // grid is shown while the first screen open has one; its colour is that of
 // the highest open screen that has one (a screen without one, such as a
 // confirmation, keeps the colour under it).
@@ -43,10 +45,13 @@ struct GridRgb {
 // peach.
 std::optional<GridRgb> grid_colour(std::string_view name);
 GridRgb grid_far_colour(GridRgb tile);
-// A named cycle of colours, each shown for grid_cycle_seconds ("pause":
-// purple, cyan, teal, peach). Empty when `name` is not a cycle.
+// A named cycle of colours, fading smoothly from each to the next over
+// grid_cycle_seconds ("pause": purple, blue, teal, peach, after the
+// original pause's sphere grid). Empty when `name` is not a cycle.
 std::vector<std::string_view> grid_cycle(std::string_view name);
-constexpr double grid_cycle_seconds = 8.0;
+constexpr double grid_cycle_seconds = 7.0;
+// A cycle's colour `time` seconds after it was first shown.
+GridRgb grid_cycle_colour(const std::vector<std::string_view>& cycle, double time);
 
 // One tile: its size, its centre's offset from the screen's centre (pixels,
 // CSS axes: x right, y down, z towards the viewer), its turn to face outwards
@@ -73,10 +78,15 @@ GridLayout grid_layout(float width, float height);
 constexpr float grid_flip_seconds = 0.34f;     // one tile's flip
 constexpr float grid_ripple_seconds = 0.42f;   // from the first tile's start to the last's
 constexpr float grid_fade_seconds = grid_flip_seconds + grid_ripple_seconds;  // the far background
-// The idle wave: one cycle's length (seconds) and how far a tile comes forward
-// (a fraction of its width).
-constexpr float grid_wave_seconds = 5.0f;
-constexpr float grid_wave_depth = 0.14f;
+// Breathing, measured from the original (1280 x 720, 30 fps): one breath
+// about every 1.5 seconds, a smooth sine; the sphere's outline swells by
+// about 2.4 % peak to peak. On top, a soft wave of tiles coming forward and
+// back (the owner's impression), out of step across the grid.
+constexpr float grid_wave_seconds = 1.5f;
+constexpr float grid_breath_scale = 0.012f;  // either way
+constexpr float grid_wave_depth = 0.05f;     // a tile's width, at most
+// The whole sphere's scale at `time` seconds (about 1).
+float grid_breath(double time);
 // How far a tile comes forward (pixels) at `time` seconds.
 float grid_wave_offset(const GridTile& tile, double time);
 
@@ -114,6 +124,7 @@ private:
     void build(Rml::Context* context);
     void place(double now);
     void retarget(GridRgb colour, double now);
+    void drift(GridRgb colour);
 
     std::string path_;
     Rml::ElementDocument* document_ = nullptr;
