@@ -15,7 +15,7 @@ namespace {
 constexpr float pi = 3.14159265358979f;
 
 // The sphere: the grid spans this angle either side of its middle (degrees;
-// 90 would be a half sphere), in equal steps of latitude and longitude.
+// 90 would be a half sphere), in equal steps across and down.
 constexpr float half_span_degrees = 62.0f;
 // The viewer's distance, in the screen's longer side.
 constexpr float viewer_distance = 1.6f;
@@ -43,8 +43,13 @@ Vec3 operator-(Vec3 a, Vec3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
 Vec3 operator*(Vec3 a, float k) { return {a.x * k, a.y * k, a.z * k}; }
 float dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 Vec3 cross(Vec3 a, Vec3 b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-// The outward direction at a longitude (right) and latitude (down).
-Vec3 direction(float lon, float lat) { return {std::cos(lat) * std::sin(lon), std::sin(lat), std::cos(lat) * std::cos(lon)}; }
+Vec3 normalised(Vec3 v) { return v * (1.0f / std::sqrt(dot(v, v))); }
+// The outward direction at an angle across (right) and down from the middle.
+// Rows and columns are treated alike: every line of equal angle across is a
+// great circle through the sphere's top and bottom, every line of equal
+// angle down one through its left and right sides, so rows bow as much as
+// columns (a symmetric bulge, like the original's tile sphere seen head on).
+Vec3 direction(float across, float down) { return normalised({std::tan(across), std::tan(down), 1.0f}); }
 
 GridRgb rgb(int hex) { return {float((hex >> 16) & 0xFF) / 255.0f, float((hex >> 8) & 0xFF) / 255.0f, float(hex & 0xFF) / 255.0f}; }
 
@@ -134,15 +139,16 @@ GridLayout grid_layout(float width, float height) {
             GridTile tile;
             tile.column = column;
             tile.row = row;
-            // A patch between lines of latitude and longitude: every tile in a
-            // row shares its top and bottom lines, every tile in a column its sides.
+            // A patch between lines of equal angle: every tile in a row shares
+            // its top and bottom lines, every tile in a column its sides.
             tile.lon0 = -span + float(column) * step + inset;
             tile.lon1 = -span + float(column + 1) * step - inset;
             tile.lat0 = -span + float(row) * step + inset;
             tile.lat1 = -span + float(row + 1) * step - inset;
             tile.lon = (tile.lon0 + tile.lon1) / 2.0f;
             tile.lat = (tile.lat0 + tile.lat1) / 2.0f;
-            tile.width = layout.radius * (tile.lon1 - tile.lon0) * std::cos(tile.lat);
+            tile.width = layout.radius * std::sqrt(dot(direction(tile.lon1, tile.lat) - direction(tile.lon0, tile.lat),
+                                                      direction(tile.lon1, tile.lat) - direction(tile.lon0, tile.lat)));
             const Vec3 d = direction(tile.lon, tile.lat);
             const float facing = d.x * light_x + d.y * light_y + d.z * light_z;
             tile.shade = std::clamp(0.5f + 0.6f * facing, 0.45f, 1.15f);
@@ -162,8 +168,8 @@ std::array<GridPoint, 4> grid_tile_corners(const GridLayout& layout, const GridT
     const Vec3 centre_of_sphere{0.0f, 0.0f, -r};
     const Vec3 normal = direction(tile.lon, tile.lat);
     const Vec3 middle = centre_of_sphere + normal * r;
-    // The upright axis: along the tile's line of longitude, downwards.
-    Vec3 axis{-std::sin(tile.lat) * std::sin(tile.lon), std::cos(tile.lat), -std::sin(tile.lat) * std::cos(tile.lon)};
+    // The upright axis: along the tile's column, downwards.
+    const Vec3 axis = normalised(direction(tile.lon, tile.lat + 0.01f) - direction(tile.lon, tile.lat - 0.01f));
     const float angle = std::clamp(turn, -most_turn, most_turn) * pi / 180.0f;
     const float c = std::cos(angle), s = std::sin(angle);
     const float lons[4] = {tile.lon0, tile.lon1, tile.lon1, tile.lon0};

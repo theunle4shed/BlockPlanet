@@ -3,9 +3,10 @@
 // The menu grid (docs/UI.md, Menu grid; the owner's design, 2026-11-09): the
 // game's tiled grid as one background BlockPlanet draws itself, above the
 // game's picture and HUD and below the menus. 8 x 8 tiles, patches of one
-// sphere (not quite a half) between lines of latitude and longitude, so each
-// row's and column's edges follow one smooth curve across the grid and the
-// gaps between tiles read as the grid's lines. The sphere stays round and is
+// sphere (not quite a half) between lines of equal angle across and down
+// (great circles, rows and columns alike), so each row's and column's edges
+// follow one smooth curve across the grid, bowing as much one way as the
+// other, and the gaps between tiles read as the grid's lines. The sphere stays round and is
 // sized by the screen's longer side, the outermost tiles there cut about in
 // half by the edges. Like the original's, it breathes: the whole sphere swells and
 // settles gently, with a soft wave of tiles coming forward and back across
@@ -57,8 +58,8 @@ constexpr double grid_cycle_seconds = 5.0;
 // A cycle's colour `time` seconds after it was first shown.
 GridRgb grid_cycle_colour(const std::vector<std::string_view>& cycle, double time);
 
-// One tile: its patch of the sphere (radians of longitude, right, and
-// latitude, down; the gap to its neighbours already left out), its middle,
+// One tile: its patch of the sphere (radians across, right, as lon, and
+// down as lat; the gap to its neighbours already left out), its middle,
 // its width across (pixels, about), its shading (1: lit face on), texture
 // variant, ripple delay and place in the idle wave.
 struct GridTile {

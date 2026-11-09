@@ -170,6 +170,19 @@ void layout_tests() {
                 assert(std::abs(across - (edge + next) / 2) <= std::abs(next - edge) / 2 + 0.005f);
             }
         }
+        // Rows bow as much as columns (the owner's note): on a square screen
+        // the grid is the same turned on its side (tile c, r is tile r, c
+        // with across and down swapped).
+        if (w == h) {
+            for (const auto& t : layout.tiles) {
+                const auto c = corners(t), u = corners(at(t.row, t.column));
+                assert(near(c[0].x - layout.centre_x, u[0].y - layout.centre_y, 0.05f));
+                assert(near(c[1].x - layout.centre_x, u[3].y - layout.centre_y, 0.05f));
+            }
+            // And a row away from the middle bows: its ends lower than its middle.
+            const auto end = corners(at(0, 1))[0], mid = corners(at(3, 1))[1];
+            assert(end.y > mid.y + 5);
+        }
         // Breathing scales the picture about the middle; lifting moves a tile
         // outwards (away from the middle); turning narrows it.
         const auto& t = at(6, 2);
