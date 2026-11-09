@@ -69,6 +69,7 @@ struct GridTile {
     int column = 0, row = 0, variant = 0;
     float delay = 0;  // seconds after a colour change that this tile starts to flip
     float phase = 0;  // the wave's phase here (radians)
+    float fly = 0;    // seconds into a fly-in that this tile sets off (the middle last)
 };
 struct GridLayout {
     int columns = 0, rows = 0;
@@ -87,8 +88,18 @@ GridLayout grid_layout(float width, float height);
 struct GridPoint {
     float x = 0, y = 0;
 };
-std::array<GridPoint, 4> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath, float lift,
-                                           float turn);
+//
+// `away` (0 in place, 1 gone) flies the tile out towards and past the viewer
+// (forwards and a little outwards). Nothing when a corner is too near the
+// viewer to draw (the tile has flown past).
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
+                                                          float lift, float turn, float away = 0.0f);
+
+// Flying in and out (seconds): one tile's flight, and the spread between the
+// first and last to set off. Out, the middle leaves first; in, it arrives last.
+constexpr float grid_fly_seconds = 0.45f;
+constexpr float grid_fly_spread = 0.25f;
+constexpr float grid_fly_total = grid_fly_seconds + grid_fly_spread;
 // The CSS matrix3d (16 values, column by column) that draws a `size` x `size`
 // element at (0, 0) onto the quad `corners` in perspective. Nothing when the
 // quad has no area (a tile edge on).
@@ -121,8 +132,20 @@ public:
     // Shows the grid in `colour` (a name for grid_colour or grid_cycle), or
     // hides it (empty or unknown). `now` in seconds. Call once a frame,
     // before Context::Update.
-    void update(Rml::Context* context, const std::string& colour, double now);
+    //
+    // Hidden, it flies in (from past the viewer to its place, the far
+    // background fading in over whatever is behind); shown, it flies out the
+    // same way back, revealing the game, or, `into_cover`, with its far
+    // background kept, for the loading cover to fade in over it. A change of
+    // mind part way carries on from where the tiles are.
+    void update(Rml::Context* context, const std::string& colour, double now, bool into_cover = false);
+    // Drawn (in place or flying).
     bool visible() const { return visible_; }
+    // How much is in place: 0 gone, 1 every tile in place.
+    float presence() const { return fly_ / grid_fly_total; }
+    // How much of the loading cover may show: while the grid flies out into
+    // it, the cover waits until the tiles have mostly passed; otherwise all of it.
+    float cover_allowance() const;
     // For tests: whether a colour change is still under way, the colour a
     // tile shows, and how far it is turned (degrees, 0 face on).
     bool changing() const { return changing_; }
@@ -139,6 +162,7 @@ private:
         double flip_start = 0, flip_end = -1e9;
         GridRgb shown;         // as last placed
         float turn = 0;        // as last placed (degrees)
+        bool hidden = false;   // flown past the viewer (as last set)
         std::string transform, colour;  // last set, to set properties only on change
     };
     void build(Rml::Context* context);
@@ -159,6 +183,10 @@ private:
     GridRgb far_from_, far_to_;
     std::string far_css_;
     double change_at_ = 0;
+    float fly_ = 0;             // 0 (gone) to grid_fly_total (in place)
+    bool leaving_ = false;      // flying out (or gone)
+    bool into_cover_ = false;
+    double last_now_ = 0;
     bool changing_ = false;
     bool visible_ = false;
     bool failed_ = false;  // ui/grid.rml is missing: no grid

@@ -761,6 +761,12 @@ bool update_loading_document() {
         text = loading_text;
         opacity = loading_opacity;
     }
+    // While the menu grid flies out into it, the cover waits for the tiles to
+    // pass; once let through, it never dips (a grid held over it, as after a
+    // restart from the pause, flies out behind it).
+    static float allowed = 0.0f;
+    allowed = opacity <= 0.0f ? 0.0f : std::max(allowed, grid ? grid->cover_allowance() : 1.0f);
+    opacity *= allowed;
     if (opacity <= 0.0f) {
         if (loading_document != nullptr) loading_document->Hide();
         return false;
@@ -782,7 +788,8 @@ bool update_hud_document() {
         std::lock_guard lock(hud_mutex);
         hud = hud_wanted;
     }
-    const bool show = hud.has_value() && !navigator->is_open();
+    // Not under the menu grid (it covers the board while it is up or flying).
+    const bool show = hud.has_value() && !navigator->is_open() && !(grid && grid->visible());
     if (!show) {
         if (hud_document != nullptr) hud_document->Hide();
         std::lock_guard lock(hud_mutex);
@@ -858,10 +865,23 @@ bool update_hud_document() {
 }
 
 // The menu grid behind the open screens, in the colour they ask for.
+// The menu grid behind the open screens, in the colour they ask for. With
+// no screen asking, it flies out (into the loading cover when one is
+// wanted), unless held (set_grid_hold): then it stays in the colour last shown.
+std::atomic<bool> grid_hold{false};
+std::string grid_last_colour;
 void update_grid() {
     const auto screens = navigator->documents();
     const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    grid->update(context, grid_colour_of(screens), now);
+    std::string colour = grid_colour_of(screens);
+    if (!colour.empty()) grid_last_colour = colour;
+    else if (grid_hold.load() && grid->visible() && !navigator->is_open()) colour = grid_last_colour;
+    bool cover = false;
+    {
+        std::lock_guard lock(loading_mutex);
+        cover = loading_opacity > 0.0f;
+    }
+    grid->update(context, colour, now, cover);
     for (auto* document : screens) document->SetClass("on-grid", grid->visible());
 }
 
@@ -893,7 +913,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
     const bool hud_visible = update_hud_document();
     const bool loading_visible = update_loading_document();
     const bool label_visible = update_label_document();
-    if (navigator->is_open() || hud_visible || loading_visible || label_visible) {
+    if (navigator->is_open() || hud_visible || loading_visible || label_visible || grid->visible()) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
             context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
@@ -932,6 +952,8 @@ void hook_deinit() {
 } // namespace
 
 void set_rom(std::span<const std::uint8_t> rom) { set_grid_rom(rom); }
+
+void set_grid_hold(bool hold) { grid_hold.store(hold); }
 
 void install(const std::filesystem::path& assets) {
     assets_path = assets;

@@ -23,6 +23,11 @@ void install(const std::filesystem::path& assets);
 // the menu grid's tile texture (ui_grid.h). Without it the grid uses a plain
 // texture made here. Call before install.
 void set_rom(std::span<const std::uint8_t> rom);
+// Keeps the menu grid up once the menus close, in the colour last shown,
+// while the game's own animation still plays behind it (its pause tiles
+// after Resume, the way back to its menu after Quit). Released, the grid
+// flies out (or, once a screen opens again, changes to that screen's colour).
+void set_grid_hold(bool hold);
 
 // Opens the menus at a screen (ui/screens/<screen>.rml), or closes them.
 // Applied at the next frame.

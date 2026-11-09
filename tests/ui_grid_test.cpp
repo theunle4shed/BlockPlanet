@@ -121,7 +121,7 @@ void layout_tests() {
         assert(layout.columns == 8 && layout.rows == 8 && layout.tiles.size() == 64u);
         const float side = std::max(w, h);
         const auto at = [&](int column, int row) -> const GridTile& { return layout.tiles[std::size_t(row * 8 + column)]; };
-        const auto corners = [&](const GridTile& t) { return grid_tile_corners(layout, t, 1.0f, 0.0f, 0.0f); };
+        const auto corners = [&](const GridTile& t) { return *grid_tile_corners(layout, t, 1.0f, 0.0f, 0.0f); };
         for (const auto& t : layout.tiles) {
             assert(t.lon0 < t.lon && t.lon < t.lon1 && t.lat0 < t.lat && t.lat < t.lat1 && t.width > 0);
             assert(t.shade > 0.4f && t.shade < 1.2f && t.variant >= 0 && t.variant < 4);
@@ -186,13 +186,21 @@ void layout_tests() {
         // Breathing scales the picture about the middle; lifting moves a tile
         // outwards (away from the middle); turning narrows it.
         const auto& t = at(6, 2);
-        const auto base = corners(t), big = grid_tile_corners(layout, t, 1.02f, 0, 0);
+        const auto base = corners(t), big = *grid_tile_corners(layout, t, 1.02f, 0, 0);
         assert(std::abs(big[0].x - layout.centre_x) > std::abs(base[0].x - layout.centre_x));
-        const auto lifted = grid_tile_corners(layout, t, 1.0f, 20.0f, 0);
+        const auto lifted = *grid_tile_corners(layout, t, 1.0f, 20.0f, 0);
         assert(lifted[0].x > base[0].x && lifted[0].y < base[0].y);
-        const auto turned = grid_tile_corners(layout, t, 1.0f, 0, 60.0f);
+        const auto turned = *grid_tile_corners(layout, t, 1.0f, 0, 60.0f);
         assert(turned[1].x - turned[0].x < base[1].x - base[0].x);
-        assert(grid_quad_matrix(grid_tile_corners(layout, t, 1.0f, 0, 90.0f), 128).has_value());  // edge on is held short of it
+        assert(grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, 0, 90.0f), 128).has_value());  // edge on is held short of it
+        // Flying out: towards the viewer (larger, further from the middle),
+        // then past them (nothing to draw).
+        const auto half_away = *grid_tile_corners(layout, t, 1.0f, 0, 0, 0.5f);
+        assert(half_away[1].x - half_away[0].x > base[1].x - base[0].x);
+        assert(std::abs(half_away[0].x - layout.centre_x) > std::abs(base[0].x - layout.centre_x));
+        assert(!grid_tile_corners(layout, t, 1.0f, 0, 0, 1.0f));
+        for (const auto& u : layout.tiles) assert(u.fly >= 0 && u.fly <= grid_fly_spread + 1e-4f);
+        assert(at(3, 3).fly > at(0, 0).fly);  // the middle arrives last (and leaves first)
         return layout;
     };
     const auto square = check(1080, 1080);
@@ -300,6 +308,10 @@ void grid_tests(const std::string& document) {
         assert(grid_colour_of({pause, main}) == "blue");
 
         MenuGrid grid(document);
+        // Frames at 60 a second from `from` to `to`.
+        const auto run = [&](MenuGrid& g, const char* name, double from, double to, bool cover = false) {
+            for (double v = from; v <= to + 1e-9; v += 1.0 / 60.0) g.update(context, name, v, cover);
+        };
         grid.update(context, "", 0.0);
         assert(!grid.visible());
         grid.update(context, "blue", 0.0);
@@ -357,8 +369,9 @@ void grid_tests(const std::string& document) {
 
         // The pause's cycle: purple at first, fading with every tile in step
         // (no flips), and a flip ripple when it comes from another colour.
-        grid.update(context, "", 900.0);
-        grid.update(context, "pause", 1000.0);
+        run(grid, "", 900.0, 901.0);
+        assert(!grid.visible());
+        run(grid, "pause", 1000.0, 1000.0);
         const auto cycle = grid_cycle("pause");
         assert(same(grid.tile_colour(20), *grid_colour("pause-purple")) && !grid.changing());
         for (double u = 1000.0; u < 1000.0 + grid_cycle_seconds * 1.5; u += 1.0 / 60.0) {
@@ -376,10 +389,42 @@ void grid_tests(const std::string& document) {
         for (std::size_t i = 0; i < grid.tile_count(); ++i) assert(same(grid.tile_colour(i), grid_cycle_colour(cycle, u - 1.0 / 60.0 - 1030.0)));
 
         // Hidden, then shown again: straight in its colour, no flip.
-        grid.update(context, "", 1100.0);
+        run(grid, "", 1100.0, 1101.0);
         assert(!grid.visible());
         grid.update(context, "blue", 1101.0);
         assert(grid.visible() && !grid.changing() && same(grid.tile_colour(30), blue));
+
+        // Flying in: from nothing to every tile in place over grid_fly_total;
+        // out again, the same way back, then hidden.
+        assert(grid.presence() == 0.0f);
+        run(grid, "blue", 1101.0, 1101.0 + grid_fly_total / 2);
+        assert(grid.presence() > 0.3f && grid.presence() < 0.7f);
+        run(grid, "blue", 1101.0 + grid_fly_total / 2, 1102.5);
+        assert(grid.presence() == 1.0f && grid.cover_allowance() == 1.0f);
+        run(grid, "", 1102.5, 1102.5 + grid_fly_total / 4);
+        assert(grid.visible() && grid.presence() < 1.0f && grid.presence() > 0.5f);
+        // A change of mind part way: back in from where the tiles are.
+        const float part = grid.presence();
+        grid.update(context, "blue", 1102.5 + grid_fly_total / 4 + 1.0 / 60.0);
+        assert(grid.presence() > part && grid.presence() < part + 0.1f);
+        run(grid, "blue", 1102.6, 1104.0);
+        // Into the loading cover: the cover waits until the tiles have mostly passed.
+        grid.update(context, "", 1104.0 + 1.0 / 60.0, true);
+        assert(grid.cover_allowance() == 0.0f);
+        float allowance = 0;
+        for (double v = 1104.0 + 2.0 / 60.0; grid.visible(); v += 1.0 / 60.0) {
+            grid.update(context, "", v, true);
+            assert(grid.cover_allowance() >= allowance);
+            allowance = grid.cover_allowance();
+            assert(v < 1106.0);
+        }
+        // Held (as ui_system does while the game's own pause tiles animate):
+        // the same colour keeps it up, then a screen's colour changes it.
+        run(grid, "pause", 1110.0, 1112.0);
+        run(grid, "pause", 1112.0, 1113.0);  // held: still asked for
+        run(grid, "blue", 1113.0, 1115.0);
+        assert(grid.visible() && grid.presence() == 1.0f && same(grid.tile_colour(5), blue));
+        run(grid, "blue", 1115.0, 1115.0);
 
         // A wider window: the tiles are laid out again.
         context->SetDimensions(Rml::Vector2i(1920, 1080));

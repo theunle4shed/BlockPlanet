@@ -156,14 +156,17 @@ GridLayout grid_layout(float width, float height) {
             // The ripple runs from the top left corner to the bottom right.
             tile.delay = grid_ripple_seconds * float(column + row) / float(layout.columns + layout.rows - 2);
             tile.phase = 2.0f * pi * float(column + row) / wave_tiles;
+            // Flying in, the outermost set off first and the middle last.
+            const float dx = float(column) - 3.5f, dy = float(row) - 3.5f;
+            tile.fly = grid_fly_spread * (1.0f - std::sqrt(dx * dx + dy * dy) / std::sqrt(2.0f * 3.5f * 3.5f));
             layout.tiles.push_back(tile);
         }
     }
     return layout;
 }
 
-std::array<GridPoint, 4> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath, float lift,
-                                           float turn) {
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
+                                                          float lift, float turn, float away) {
     const float r = layout.radius;
     const Vec3 centre_of_sphere{0.0f, 0.0f, -r};
     const Vec3 normal = direction(tile.lon, tile.lat);
@@ -174,6 +177,10 @@ std::array<GridPoint, 4> grid_tile_corners(const GridLayout& layout, const GridT
     const float c = std::cos(angle), s = std::sin(angle);
     const float lons[4] = {tile.lon0, tile.lon1, tile.lon1, tile.lon0};
     const float lats[4] = {tile.lat0, tile.lat0, tile.lat1, tile.lat1};
+    // Flying out: speeding up towards the viewer (past them at 1) and a
+    // little outwards, so the tiles part around the middle as they come.
+    const float rush = away * away;
+    const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * 1.3f} * rush + normal * (r * 0.6f * rush);
     std::array<GridPoint, 4> out{};
     for (int k = 0; k < 4; ++k) {
         // The corner on the sphere, turned about the axis through the tile's
@@ -181,7 +188,8 @@ std::array<GridPoint, 4> grid_tile_corners(const GridLayout& layout, const GridT
         // about its front (the screen's middle).
         const Vec3 v = centre_of_sphere + direction(lons[k], lats[k]) * r - middle;
         const Vec3 turned = v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1.0f - c));
-        const Vec3 at = (middle + turned + normal * lift) * breath;
+        const Vec3 at = (middle + turned + normal * lift) * breath + flight;
+        if (at.z > layout.perspective * 0.8f) return std::nullopt;  // flown past the viewer
         const float scale = layout.perspective / (layout.perspective - at.z);
         out[std::size_t(k)] = {layout.centre_x + at.x * scale, layout.centre_y + at.y * scale};
     }
@@ -329,7 +337,16 @@ void MenuGrid::place(double now) {
         // in the wave (lifted outwards), its flip. Worked out here and given
         // to RmlUi as one matrix per tile.
         std::string transform = tile.transform;
-        if (const auto m = grid_quad_matrix(grid_tile_corners(layout_, at, breath, grid_wave_offset(at, now), turn), tile_element)) {
+        const float in_place = std::clamp((fly_ - at.fly) / grid_fly_seconds, 0.0f, 1.0f);
+        const float away = 1.0f - in_place * in_place * (3.0f - 2.0f * in_place);
+        const auto corners = grid_tile_corners(layout_, at, breath, grid_wave_offset(at, now), turn, away);
+        const bool hidden = !corners || in_place <= 0.0f;
+        if (tile.element != nullptr && hidden != tile.hidden) {
+            tile.hidden = hidden;
+            tile.element->SetProperty("visibility", hidden ? "hidden" : "visible");
+        }
+        if (corners)
+        if (const auto m = grid_quad_matrix(*corners, tile_element)) {
             char text[400];
             std::snprintf(text, sizeof(text), "matrix3d(%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g)",
                           (*m)[0], (*m)[1], (*m)[2], (*m)[3], (*m)[4], (*m)[5], (*m)[6], (*m)[7], (*m)[8], (*m)[9], (*m)[10],
@@ -349,8 +366,15 @@ void MenuGrid::place(double now) {
         }
     }
     const float fade = std::clamp(float(now - change_at_) / grid_fade_seconds, 0.0f, 1.0f);
-    // Only on change: setting a property rebuilds its shape, even to the same value.
+    // The far background fades in and out with the tiles, unless they fly
+    // out into the loading cover. Only on change: setting a property rebuilds
+    // its shape, even to the same value.
+    const float present = std::clamp(presence(), 0.0f, 1.0f);
+    const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
     std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);
+    far.insert(3, "a");  // rgb( -> rgba(
+    far.back() = ',';
+    far += std::to_string(int(std::lround(far_alpha * 255.0f))) + ")";
     if (far_ != nullptr && far != far_css_) {
         far_css_ = std::move(far);
         far_->SetProperty("background-color", far_css_);
@@ -358,19 +382,48 @@ void MenuGrid::place(double now) {
     changing_ = active || (fade < 1.0f && !same(far_from_, far_to_));
 }
 
-void MenuGrid::update(Rml::Context* context, const std::string& name, double now) {
+float MenuGrid::cover_allowance() const {
+    if (!visible_ || !leaving_) return 1.0f;
+    // The cover rises over the second half of the flight out.
+    const float gone = 1.0f - std::clamp(presence(), 0.0f, 1.0f);
+    const float t = std::clamp((gone - 0.5f) / 0.5f, 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+void MenuGrid::update(Rml::Context* context, const std::string& asked, double now, bool into_cover) {
+    const float dt = visible_ ? float(std::clamp(now - last_now_, 0.0, 0.1)) : 0.0f;
+    last_now_ = now;
+    // Hidden or unknown: fly out in the colour shown, then hide.
+    const bool wanted_here = grid_colour(asked).has_value() || !grid_cycle(asked).empty();
+    if (!wanted_here) {
+        if (!visible_) {
+            name_.clear();
+            changing_ = false;
+            return;
+        }
+        if (!leaving_) into_cover_ = into_cover;
+        into_cover_ = into_cover_ || into_cover;
+        leaving_ = true;
+        fly_ = std::max(0.0f, fly_ - dt);
+        if (fly_ <= 0.0f) {
+            if (document_ != nullptr && document_->IsVisible()) document_->Hide();
+            visible_ = false;
+            leaving_ = false;
+            name_.clear();
+            changing_ = false;
+            return;
+        }
+    } else {
+        leaving_ = false;
+        into_cover_ = false;
+    }
+    const std::string name = wanted_here ? asked : name_;
     // A cycle fades through its colours, from the first, while it stays shown.
     const bool renamed = name != name_;
     if (renamed) shown_at_ = now;
     const auto cycle = grid_cycle(name);
     const auto wanted = cycle.empty() ? grid_colour(name) : std::optional<GridRgb>(grid_cycle_colour(cycle, now - shown_at_));
-    if (!wanted) {
-        if (document_ != nullptr && document_->IsVisible()) document_->Hide();
-        visible_ = false;
-        name_.clear();
-        changing_ = false;
-        return;
-    }
+    if (!wanted) return;
     if (document_ == nullptr) {
         if (failed_) return;
         document_ = context->LoadDocument(path_);
@@ -387,23 +440,25 @@ void MenuGrid::update(Rml::Context* context, const std::string& name, double now
         std::fflush(stdout);
     }
     if (!visible_) {
-        // Shown again (or for the first time): straight in the colour, still.
+        // Shown again (or for the first time): in the colour at once, flying in.
         target_ = *wanted;
         far_from_ = far_to_ = grid_far_colour(*wanted);
         change_at_ = now;
+        fly_ = 0.0f;
         for (auto& tile : tiles_) tile.face = tile.shown = tile.back = *wanted, tile.flipping = false, tile.flip_end = -1e9;
     } else if (!cycle.empty() && !renamed) {
         drift(*wanted);
     } else {
         retarget(*wanted, now);
     }
+    if (wanted_here) fly_ = std::min(grid_fly_total, fly_ + dt);
     name_ = name;
     if (context->GetDimensions() != size_ || tiles_.empty()) build(context);
+    visible_ = true;
     place(now);
     if (!document_->IsVisible()) document_->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
     // Behind every menu screen.
     document_->PushToBack();
-    visible_ = true;
 }
 
 } // namespace blockplanet::ui

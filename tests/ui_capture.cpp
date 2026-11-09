@@ -283,8 +283,12 @@ int main(int argc, char** argv) {
             Navigator navigator(context, assets / "screens");
             MenuGrid grid((assets / "grid.rml").string());
             double now = 0.0;
-            const auto frame = [&](const std::string& name) {
-                grid.update(context, grid_colour_of(navigator.documents()), now);
+            // The grid at 60 frames a second up to `to` (it flies in and out over time).
+            const auto advance = [&](double to, bool cover = false) {
+                for (; now < to; now += 1.0 / 60.0) grid.update(context, grid_colour_of(navigator.documents()), now, cover);
+            };
+            const auto frame = [&](const std::string& name, bool cover = false) {
+                grid.update(context, grid_colour_of(navigator.documents()), now, cover);
                 for (auto* document : navigator.documents()) document->SetClass("on-grid", grid.visible());
                 context->Update();
                 renderer.resize(size.x, size.y);
@@ -293,29 +297,35 @@ int main(int argc, char** argv) {
                 if (!renderer.write_png(out / (name + suffix))) ++failures;
             };
             navigator.open("main");
+            advance(grid_fly_total * 0.5);
+            frame("fly-in");  // half way in, over the game
+            advance(2.0);
             frame("main");
-            now += 2.0;
             navigator.show("solo");
             grid.update(context, grid_colour_of(navigator.documents()), now);  // the change starts
             const double start = now;
             for (const float at : {0.12f, 0.3f, 0.5f}) {
-                now = start + at;
+                advance(start + at);
                 char name[32];
                 std::snprintf(name, sizeof(name), "flip-%03d", int(at * 1000));
                 frame(name);
             }
-            now = start + 2.0;
+            advance(start + 2.0);
             frame("solo");
             navigator.show("story");
-            now += 2.0;
+            advance(now + 2.0);
             frame("story");
             navigator.open("options");
-            now += 2.0;
+            advance(now + 2.0);
             frame("options");
             navigator.open("pause");
             frame("pause-start");  // the change into the pause's cycle starts
-            now += 2.0;
+            advance(now + 2.0);
             frame("pause");
+            // Closing the menus: the grid flies out, revealing the game.
+            navigator.close();
+            advance(now + grid_fly_total * 0.4);
+            frame("fly-out");
         }
         Rml::RemoveContext("capture");
     }
