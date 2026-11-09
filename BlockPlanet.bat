@@ -13,11 +13,20 @@ cls
 for /f "delims=" %%b in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set CURRENT=%%b
 echo  BlockPlanet
 echo  ===========
+echo  Checking for new changes...
+git fetch --prune origin >nul 2>&1
+set BEHIND=0
+for /f %%n in ('git rev-list --count HEAD..origin/%CURRENT% 2^>nul') do set BEHIND=%%n
+cls
+echo  BlockPlanet
+echo  ===========
 if "%CURRENT%"=="%MAIN%" (echo  Build: main) else (echo  Build: %CURRENT%  ^(trying a branch^))
+if "%BEHIND%"=="0" (echo  Up to date: choose 1 to play.) else (echo  %BEHIND% new change^(s^) waiting: choose 3 to get them.)
+if not "%CURRENT%"=="%MAIN%" echo  Finished trying it? Choose 5 to go back to main.
 echo.
 echo   1  Play
 echo   2  Play with everything unlocked
-echo   3  Update and rebuild
+echo   3  Get the latest changes and rebuild
 echo   4  Try a branch (pick from a list)
 echo   5  Back to the main build
 echo   6  Quit
@@ -52,11 +61,12 @@ echo  Looking up the branches...
 git fetch --prune origin >nul 2>&1
 setlocal enabledelayedexpansion
 set N=0
-for /f "delims=" %%r in ('git for-each-ref --sort^=-committerdate --format^=%%^(refname:lstrip^=3^) refs/remotes/origin') do (
-  if not "%%r"=="HEAD" if not "%%r"=="%MAIN%" (
+for /f "tokens=1-3 delims=|" %%a in ('git for-each-ref --sort^=-committerdate "--format=%%(refname:lstrip=3)|%%(committerdate:relative)|%%(contents:subject)" refs/remotes/origin') do (
+  if not "%%a"=="HEAD" if not "%%a"=="%MAIN%" (
     set /a N+=1
-    set "B!N!=%%r"
-    echo   !N!  %%r
+    set "B!N!=%%a"
+    echo   !N!  %%a   ^(updated %%b^)
+    echo        %%c
   )
 )
 echo   0  Back
@@ -85,10 +95,11 @@ goto build
 :build
 powershell -ExecutionPolicy Bypass -File tools\build\setup_windows.ps1 -SkipDependencies
 if errorlevel 1 goto failed
-echo.
-echo Done.
-pause
-goto menu
+rem Straight back to the options, with the newest copy of this menu (the
+rem update may have changed it).
+copy /y "BlockPlanet.bat" "%TEMP%\blockplanet-menu.bat" >nul
+"%TEMP%\blockplanet-menu.bat" --from-temp "%CD%\"
+exit /b
 
 :run
 if not exist ".local\m1\build-windows\Release\tetrisphere-m1.exe" (

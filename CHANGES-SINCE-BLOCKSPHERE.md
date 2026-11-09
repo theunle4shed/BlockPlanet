@@ -239,6 +239,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Windows: `Try a branch.bat` (asks for a branch, such as menu-grid or direct-launch, switches to it and rebuilds) and `Back to main build.bat` (returns to the normal build). Both run from a copy in TEMP, as switching branch can change them.
 - Windows: the five double-click files are replaced by one, `BlockPlanet.bat` (the owner's request): a small menu to play, play with everything unlocked, update and rebuild, try a branch, go back to the main build, showing which build is in use.
 - The build's branch and commit show faintly in the screen's bottom-right corner on every screen (the owner's request, to know which build is running: "main - 7673986", or the branch's name). Set when the game is built (`BLOCKPLANET_BUILD_LABEL`); `BLOCKPLANET_HIDE_BUILD_LABEL=1` hides it.
+- Fixed on Windows (the owner's report): icons set from code (the pause menu, Training's lessons) showed as boxes and the middle dot was missing ("Story  1:1", the guest line, the credits). MSVC read the source's "\u..." text in the old code page; it now compiles as UTF-8 (`/utf-8`).
+- Fixed (the owner's report): at game over the black blocks flew about and vanished instead of covering the sphere. Hiding the original HUD through the GAME OVER scene (earlier today) also stopped the game's queued 3D models, the blocks among them; from 0.6 s into game over they are drawn again, with only the HUD routine's own models still hidden.
 
 ## 2026-11-09: Menu grid, step 1 (the owner's design)
 
