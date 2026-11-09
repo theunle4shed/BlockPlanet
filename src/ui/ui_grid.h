@@ -125,10 +125,18 @@ constexpr float grid_wave_depth = 0.06f;     // a tile's width, either way
 // wave_every / wave_step tiles), wave_depth high; a second, weaker ripple
 // (ripple, 0 to 1 of the first) crosses it at an angle. Flying: as above,
 // and how far the tiles fly.
+//
+// Independence (0 to 1) blends from that shared water to each tile bobbing on
+// its own: its own phase, its own speed (up to speed_variation faster or
+// slower) and its own gentle tilt (the owner: in the original "the tiles seem
+// more independent"). Flying out, a tile travels fly_out sphere radii
+// outwards and fly_toward viewer distances towards the viewer.
 struct GridTuning {
     float wave_every = grid_wave_seconds, wave_step = 0.2f, ripple = 0.35f;
     float wave_depth = grid_wave_depth;
+    float independence = 0.5f, speed_variation = 0.15f;
     float fly_seconds = grid_fly_seconds, fly_spread = grid_fly_spread, fly_distance = 1.0f;
+    float fly_out = 2.2f, fly_toward = 0.35f;
 };
 GridTuning& grid_tuning();  // the presentation thread's (and tests')
 // The grid test screen's settings (grid_lab.rml): each one's name and
@@ -141,6 +149,10 @@ bool grid_lab_set(const std::string& name, const std::string& value);
 // tiles `width` pixels wide. Each corner of a tile follows it, so the tiles
 // rise, sink and tilt with the water.
 float grid_water(float u, float v, double time, float width);
+// A tile's four corner lifts (pixels; top left, top right, bottom right,
+// bottom left) at `time`: the water at its corners blended, by
+// independence, with the tile bobbing and tilting on its own.
+std::array<float, 4> grid_tile_lifts(const GridTile& tile, double time);
 
 // The grid's colour for these open screens (first to top), as the rules
 // above say: empty when the first has no data-grid.

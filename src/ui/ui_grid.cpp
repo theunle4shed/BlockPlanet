@@ -193,7 +193,9 @@ std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layo
     const float distance = grid_tuning().fly_distance;
     const float spread = std::sqrt(normal.x * normal.x + normal.y * normal.y);
     const Vec3 outwards = spread > 1e-4f ? Vec3{normal.x / spread, normal.y / spread, 0.0f} : Vec3{0.0f, -1.0f, 0.0f};
-    const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * 0.75f * distance} * rush + outwards * (r * 1.4f * distance * rush);
+    const auto& tuning = grid_tuning();
+    const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * tuning.fly_toward * distance} * rush +
+                        outwards * (r * tuning.fly_out * distance * rush);
     // As it sets off, the tile also turns to face the viewer, so it flies as
     // a square growing towards them rather than as a thin wedge (a rim tile
     // kept facing outwards is nearly edge on: the owner's "large vector").
@@ -268,6 +270,10 @@ constexpr LabSetting lab_settings[] = {
     {"grid_wave_step", &GridTuning::wave_step, 1000.0f},      // milliseconds
     {"grid_ripple", &GridTuning::ripple, 100.0f},             // percent of the main wave
     {"grid_wave_depth", &GridTuning::wave_depth, 100.0f},     // percent of a tile's width
+    {"grid_independence", &GridTuning::independence, 100.0f},  // percent
+    {"grid_speed_variation", &GridTuning::speed_variation, 100.0f},  // percent either way
+    {"grid_fly_out", &GridTuning::fly_out, 1.0f},             // sphere radii
+    {"grid_fly_toward", &GridTuning::fly_toward, 100.0f},     // percent of the viewer's distance
 };
 
 } // namespace
@@ -303,6 +309,35 @@ float grid_water(float u, float v, double time, float width) {
     const float height = std::sin(float(std::fmod(main, 1.0)) * 2.0f * pi) * (1.0f - 0.5f * t.ripple) +
                          std::sin(float(std::fmod(cross, 1.0)) * 2.0f * pi) * 0.5f * t.ripple;
     return t.wave_depth * width * height;
+}
+
+std::array<float, 4> grid_tile_lifts(const GridTile& tile, double time) {
+    const auto& t = grid_tuning();
+    const float u0 = float(tile.column), v0 = float(tile.row), width = tile.width;
+    const std::array<float, 4> water = {grid_water(u0, v0, time, width), grid_water(u0 + 1, v0, time, width),
+                                        grid_water(u0 + 1, v0 + 1, time, width), grid_water(u0, v0 + 1, time, width)};
+    const float own = std::clamp(t.independence, 0.0f, 1.0f);
+    if (own <= 0.0f) return water;
+    // The tile's own bob: a phase, a speed and a tilt direction of its own,
+    // from a fixed hash of its place (the same every run).
+    const auto hash = [&](std::uint32_t salt) {
+        std::uint32_t h = std::uint32_t(tile.column) * 73856093u ^ std::uint32_t(tile.row) * 19349663u ^ salt * 83492791u;
+        h = (h ^ (h >> 13)) * 1274126177u;
+        return float((h ^ (h >> 16)) & 0xFFFFu) / 65535.0f;
+    };
+    const double every = std::max(0.05f, t.wave_every);
+    const double speed = 1.0 + double(t.speed_variation) * (2.0 * hash(1) - 1.0);
+    const float phase = 2.0f * pi * hash(2), tilt_phase = 2.0f * pi * hash(3), tilt_dir = 2.0f * pi * hash(4);
+    const float bob = std::sin(float(std::fmod(time * speed / every, 1.0)) * 2.0f * pi + phase);
+    const float tilt = 0.5f * std::sin(float(std::fmod(time * speed * 0.83 / every, 1.0)) * 2.0f * pi + tilt_phase);
+    const float sx[4] = {-1, 1, 1, -1}, sy[4] = {-1, -1, 1, 1};
+    std::array<float, 4> lifts{};
+    for (std::size_t k = 0; k < 4; ++k) {
+        const float lean = (sx[k] * std::cos(tilt_dir) + sy[k] * std::sin(tilt_dir)) * 0.7071f;
+        const float alone = t.wave_depth * width * (bob + tilt * lean);
+        lifts[k] = water[k] * (1.0f - own) + alone * own;
+    }
+    return lifts;
 }
 
 std::string grid_colour_of(const std::vector<Rml::ElementDocument*>& screens) {
@@ -423,9 +458,7 @@ void MenuGrid::place(double now) {
         const float in_place = std::clamp((fly_ - at.fly * tuning.fly_spread) / std::max(0.01f, tuning.fly_seconds), 0.0f, 1.0f);
         const float away = 1.0f - in_place * in_place * (3.0f - 2.0f * in_place);
         // Each corner on the water (its place in tiles from the top left).
-        const float u0 = float(at.column), v0 = float(at.row);
-        const std::array<float, 4> lifts = {grid_water(u0, v0, now, at.width), grid_water(u0 + 1, v0, now, at.width),
-                                            grid_water(u0 + 1, v0 + 1, now, at.width), grid_water(u0, v0 + 1, now, at.width)};
+        const std::array<float, 4> lifts = grid_tile_lifts(at, now);
         auto corners = grid_tile_corners(layout_, at, lifts, turn, away);
         auto matrix = corners ? grid_quad_matrix(*corners, tile_element) : std::nullopt;
         if (corners && !matrix) {

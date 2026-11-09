@@ -298,11 +298,31 @@ void layout_tests() {
     assert(near(grid_water(2, 5, 1.0, width), grid_water(2, 5, 1.0 + grid_wave_seconds, width), 0.01f));
     grid_tuning() = GridTuning{};
 
+    // Independence: none, a tile's corners follow the water exactly; all,
+    // tiles on the same diagonal (in step on the water) bob apart, each
+    // keeping to the wave's depth.
+    {
+        const auto& a = wide.tiles[std::size_t(2 * 8 + 3)];  // column 3, row 2
+        const auto& b = wide.tiles[std::size_t(3 * 8 + 2)];  // column 2, row 3: the same diagonal
+        grid_tuning().independence = 0.0f;
+        const auto plain = grid_tile_lifts(a, 3.3);
+        assert(near(plain[0], grid_water(3, 2, 3.3, a.width), 0.001f) && near(plain[2], grid_water(4, 3, 3.3, a.width), 0.001f));
+        grid_tuning().independence = 1.0f;
+        bool differ = false;
+        for (double time = 0; time < 6; time += 0.1) {
+            const auto la = grid_tile_lifts(a, time), lb = grid_tile_lifts(b, time);
+            for (std::size_t k = 0; k < 4; ++k) assert(std::abs(la[k]) <= grid_wave_depth * a.width * 1.5f + 0.01f);
+            if (std::abs(la[0] - lb[0]) > 2.0f) differ = true;
+        }
+        assert(differ);
+        grid_tuning() = GridTuning{};
+    }
+
     // The test screen's settings: each slider's value, in its own units,
     // matching the defaults, and setting one changes the tuning.
     {
         const auto values = grid_lab_values();
-        assert(values.size() == 4);  // the water's settings only
+        assert(values.size() == 8);  // the water's and the flight's settings
         const auto value_of = [&](const char* name) {
             for (const auto& [n, v] : values) if (n == name) return v;
             return std::string("?");
