@@ -136,6 +136,7 @@ Credit extends to all authors and contributors of the following components recor
 - **miniz** — Rich Geldreich, Tenacious Software, RAD Game Tools, Valve Software, and contributors; **o1heap** — Pavel Kirienko; **xxHash** — Yann Collet and contributors; **Zstandard** — Meta Platforms and contributors.
 - **SDL2 / SDL2_net** — Sam Lantinga and contributors; **nlohmann/json** — Niels Lohmann and contributors.
 - **ddspp / hlsl++** — Emilio López and contributors; **Im3d** — John Chapman; **Dear ImGui** — Omar Cornut and contributors; **ImPlot** — Evan Pezent and contributors; **GLFW** — Marcus Geelnard, Camilla Löwy, and contributors.
+- **Lucide** icons (the menus) — Lucide contributors and Cole Bemis (Feather), ISC; see `licenses/lucide-0.460.0-LICENSE.txt`.
 - **Native File Dialog Extended** and its upstream authors/contributors; **plume / re-spirv** — renderbag and contributors; **stb** — Sean Barrett and contributors.
 - **Vulkan Headers / SPIR-V Headers / SPIRV-Cross** — Khronos and contributors; **Vulkan Memory Allocator / D3D12 Memory Allocator** — AMD and contributors; **volk** — Arseny Kapoulkine and contributors; **metal-cpp** — Apple.
 - **Mupen64Plus**, its API authors, and contributors; **GNU awk**, the Free Software Foundation, and contributors; **NASM** authors; and the authors of the additional build scripts and sample code retained in upstream notices.

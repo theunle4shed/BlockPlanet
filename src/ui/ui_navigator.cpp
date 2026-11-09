@@ -150,7 +150,7 @@ void Navigator::fill(Screen& screen) {
                 element->SetAttribute("data-span", entry.span);
                 element->SetClass("span" + std::to_string(entry.span), true);
             }
-            Rml::String text = escaped(entry.label);
+            Rml::String text = (entry.icon.empty() ? Rml::String() : "<span class=\"icon\">" + entry.icon + "</span>") + escaped(entry.label);
             if (!entry.note.empty()) text += "<span class=\"note\">" + escaped(entry.note) + "</span>";
             element->SetInnerRML(text);
             container->AppendChild(std::move(element));

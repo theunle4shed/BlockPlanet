@@ -43,6 +43,9 @@ void set_text(const std::string& name, const std::string& text);
 // mode being started ("Story · Stage 1:1"), while a mode is started through
 // the game's own menus behind it.
 void set_loading(const std::string& text, float opacity);
+// A small label in the screen's bottom-right corner, always shown (the
+// build's branch and commit); empty hides it.
+void set_build_label(const std::string& text);
 // The menus last open (screens first to top, each with its focus), and
 // opening such a path again (back to the menu a game was started from).
 std::vector<std::pair<std::string, std::size_t>> menu_path();

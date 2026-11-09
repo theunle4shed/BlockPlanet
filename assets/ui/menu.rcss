@@ -293,3 +293,8 @@ body.credits .hint { margin-top: 28dp; text-align: center; }
 /* A screen alone on the screen (Who is playing?): centred. */
 body.centred #panel { left: 50%; margin-left: -360dp; top: 26vh; }
 body.centred .hint { display: block; margin-top: 20dp; }
+
+/* Menu icons (the owner's request): Lucide's line icons (ISC, licenses/),
+   in the item's own colour, before its label. */
+.item .icon { font-family: lucide; font-weight: normal; font-style: normal; font-size: 0.9em;
+              display: inline-block; width: 1.5em; vertical-align: middle; }
