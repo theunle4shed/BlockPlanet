@@ -18,7 +18,7 @@ echo.
 echo   1  Play
 echo   2  Play with everything unlocked
 echo   3  Update and rebuild
-echo   4  Try a branch (another session's work)
+echo   4  Try a branch (pick from a list)
 echo   5  Back to the main build
 echo   6  Quit
 echo.
@@ -46,10 +46,29 @@ if errorlevel 1 goto failed
 goto build
 
 :branch
-echo Close the game first. Branches to try: menu-grid, direct-launch, ...
-set BRANCH=
-set /p BRANCH=Branch name: 
-if "%BRANCH%"=="" goto menu
+cls
+echo  Try a branch (another session's work). Close the game first.
+echo  Looking up the branches...
+git fetch --prune origin >nul 2>&1
+setlocal enabledelayedexpansion
+set N=0
+for /f "delims=" %%r in ('git for-each-ref --sort^=-committerdate --format^=%%^(refname:lstrip^=3^) refs/remotes/origin') do (
+  if not "%%r"=="HEAD" if not "%%r"=="%MAIN%" (
+    set /a N+=1
+    set "B!N!=%%r"
+    echo   !N!  %%r
+  )
+)
+echo   0  Back
+echo.
+set PICK=
+set /p PICK=Choose a branch: 
+if "%PICK%"=="" (endlocal & goto menu)
+if "%PICK%"=="0" (endlocal & goto menu)
+set "BRANCH=!B%PICK%!"
+if "!BRANCH!"=="" (endlocal & goto branch)
+endlocal & set "BRANCH=%BRANCH%"
+echo Switching to %BRANCH%...
 git fetch origin %BRANCH%
 if errorlevel 1 goto failed
 git checkout -B %BRANCH% origin/%BRANCH%
