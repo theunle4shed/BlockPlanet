@@ -62,6 +62,7 @@ struct OpenRequest {
     bool on_top = false;  // keep the open screens (Back returns to them)
 };
 struct CloseRequest {};
+struct RestoreRequest { std::vector<std::pair<std::string, std::size_t>> path; };
 struct SettingRequest {
     std::string name;
     std::string value;
@@ -81,11 +82,12 @@ struct AltButtonRequest {
 struct PadRequest {
     bool pad;
 };
-using Request = std::variant<OpenRequest, CloseRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest,
+using Request = std::variant<OpenRequest, CloseRequest, RestoreRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest,
                              AltButtonRequest>;
 std::mutex requests_mutex;
 std::deque<Request> requests;
 std::deque<std::string> commands;
+std::vector<std::pair<std::string, std::size_t>> shown_path;  // the last open menus (under requests_mutex)
 std::string shown_screen;  // under requests_mutex
 std::atomic<bool> open_flag{false};
 
@@ -209,6 +211,8 @@ void apply_requests() {
                 std::fprintf(stderr, "{\"event\":\"ui_screen_missing\",\"screen\":\"%s\"}\n", open->screen.c_str());
         } else if (std::holds_alternative<CloseRequest>(request)) {
             navigator->close();
+        } else if (auto* restore = std::get_if<RestoreRequest>(&request)) {
+            navigator->restore(restore->path);
         } else if (auto* setting = std::get_if<SettingRequest>(&request)) {
             navigator->set_setting(setting->name, setting->value);
             if (setting->name == "text_size") {
@@ -230,10 +234,11 @@ void apply_requests() {
     }
     std::lock_guard lock(requests_mutex);
     while (auto command = navigator->take_command()) commands.push_back(*command);
+    if (navigator->is_open()) shown_path = navigator->path();
     shown_screen = navigator->current_screen();
     // Keep the flag set while requests are still waiting.
     open_flag.store(navigator->is_open() || std::any_of(requests.begin(), requests.end(), [](const Request& r) {
-                        return std::holds_alternative<OpenRequest>(r);
+                        return std::holds_alternative<OpenRequest>(r) || std::holds_alternative<RestoreRequest>(r);
                     }));
 }
 
@@ -839,7 +844,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
         std::lock_guard lock(requests_mutex);
         std::lock_guard hud_lock(hud_mutex);
         if (!hud_wanted && std::none_of(requests.begin(), requests.end(),
-                                        [](const Request& r) { return std::holds_alternative<OpenRequest>(r); }))
+                                        [](const Request& r) { return std::holds_alternative<OpenRequest>(r) || std::holds_alternative<RestoreRequest>(r); }))
             return;
     }
     const std::uint32_t width = framebuffer->getWidth();
@@ -928,6 +933,16 @@ void set_setting(const std::string& name, const std::string& value) {
 void set_list(const std::string& name, std::vector<ListItem> items) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(ListRequest{name, std::move(items)});
+}
+
+std::vector<std::pair<std::string, std::size_t>> menu_path() {
+    std::lock_guard lock(requests_mutex);
+    return shown_path;
+}
+
+void request_restore(const std::vector<std::pair<std::string, std::size_t>>& path) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(RestoreRequest{path});
 }
 
 void set_loading(const std::string& text, float opacity) {

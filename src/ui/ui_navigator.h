@@ -79,6 +79,10 @@ public:
     std::optional<std::string> take_command();
 
     // For tests and logging.
+    // The open screens, first to top, with each one's focused item.
+    std::vector<std::pair<std::string, std::size_t>> path() const;
+    // Opens those screens again, in order, each with its focus.
+    void restore(const std::vector<std::pair<std::string, std::size_t>>& path);
     std::string current_screen() const;
     std::string focused_item() const;  // the focused item's id
 

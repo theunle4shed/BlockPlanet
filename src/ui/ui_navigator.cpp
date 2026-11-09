@@ -442,6 +442,20 @@ std::optional<std::string> Navigator::take_command() {
     return command;
 }
 
+std::vector<std::pair<std::string, std::size_t>> Navigator::path() const {
+    std::vector<std::pair<std::string, std::size_t>> out;
+    for (const auto& screen : stack_) out.emplace_back(screen.name, screen.focus);
+    return out;
+}
+
+void Navigator::restore(const std::vector<std::pair<std::string, std::size_t>>& path) {
+    close();
+    for (const auto& [name, focus] : path) {
+        if (!push(name)) break;
+        set_focus(stack_.back(), focus);
+    }
+}
+
 std::string Navigator::current_screen() const { return stack_.empty() ? std::string{} : stack_.back().name; }
 
 std::string Navigator::focused_item() const {

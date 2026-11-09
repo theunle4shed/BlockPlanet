@@ -114,6 +114,23 @@ bool unlock_all_testing = false;
 bool profile_picked = false;  // P1 chosen this session (or given on the command line)
 // The loading cover over a mode's start (set in launch_mode).
 bool loading_active = false;
+// The menus a game was started from (the owner's choice, 2026-11-09): every
+// way out of it (finished, game over, Quit to menu) goes back there.
+std::vector<std::pair<std::string, std::size_t>> launch_path;
+int launch_stages_chapter = 0;  // the stage list's chapter in that path, to refresh its bests
+// Opens the launch path again (once a second at most: the request takes a
+// frame or two), refreshing the stage list's bests first. The path is kept:
+// the menus may close once more as play ends.
+void restore_launch_path() {
+    static auto last = std::chrono::steady_clock::time_point{};
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last < std::chrono::seconds(1)) return;
+    last = now;
+    for (const auto& [screen, focus] : launch_path)
+        if (screen == "stages" && launch_stages_chapter > 0)
+            blockplanet::ui::send_command("stages:" + std::to_string(launch_stages_chapter) + ":refresh");
+    blockplanet::ui::request_restore(launch_path);
+}
 std::string loading_title;
 std::chrono::steady_clock::time_point loading_since;
 bool credits_pending = false; // --credits: play them when the title shows
@@ -2829,6 +2846,7 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
         static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
                                       "Training", "Training", "Puzzle Training"};
         loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
+        if (const auto path = blockplanet::ui::menu_path(); !path.empty()) launch_path = path;
         loading_since = std::chrono::steady_clock::now();
         loading_active = true;
     }
@@ -3510,7 +3528,8 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::set_text("stages_title", "Chapter " + std::to_string(chapter));
                 blockplanet::ui::set_text("stages_subtitle", "The whole episode, or one stage");
                 blockplanet::ui::set_list("stages", story_stages(chapter, done, best, 10, unlock_all_testing));
-                blockplanet::ui::request_show("stages");
+                launch_stages_chapter = chapter;
+                if (!command->ends_with(":refresh")) blockplanet::ui::request_show("stages");
                 continue;
             }
             if (command->rfind("stage:", 0) == 0) {
@@ -3583,7 +3602,8 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::set_list("pause", pause.items);
                 blockplanet::ui::request_open("pause");
             }
-            if (pause.close_menu) blockplanet::ui::request_close();
+            // Only in play: back at the game's menu (after Quit), the menus shown are the launch path's.
+            if (pause.close_menu && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
             launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons) : training_inject.load());
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
@@ -3630,6 +3650,11 @@ bool handle_profile_command(const std::string& command) {
             read_game_state(guest_rdram).scene >= 0) {
             const int chapter = *return_to_menu_chapter;
             return_to_menu_chapter.reset();
+            if (!launch_path.empty()) {
+                // Back to the menus the game was started from, refreshing the
+                // stage list's bests first.
+                restore_launch_path();
+            } else {
             blockplanet::ui::request_open("main");
             if (chapter > 0) {
                 blockplanet::ui::request_show("solo");
@@ -3639,6 +3664,7 @@ bool handle_profile_command(const std::string& command) {
                                    : menu_variant == PlayVariant::Casual ? "casual" : "story";
                 blockplanet::ui::send_command(list);
                 blockplanet::ui::send_command("stages:" + std::to_string(chapter));
+            }
             }
         }
         // A pending launch (after a Chapter 0, or Restart level) starts once
@@ -3674,7 +3700,10 @@ bool handle_profile_command(const std::string& command) {
                                       guest::load16(guest_rdram, 0x800E122E) < 0;  // not in the credits
             if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !mode_launcher.active() &&
                 !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0) {
-                if (profile_picked || !profile_store) {
+                if (profile_picked && !launch_path.empty()) {
+                    // Back from a game (game over, Exit, an episode's end): the menus it started from.
+                    restore_launch_path();
+                } else if (profile_picked || !profile_store) {
                     blockplanet::ui::request_open("main");
                 } else {
                     blockplanet::ui::set_list("profiles", profile_list(*profile_store, guest_session, true));

@@ -37,6 +37,10 @@ void set_text(const std::string& name, const std::string& text);
 // mode being started ("Story · Stage 1:1"), while a mode is started through
 // the game's own menus behind it.
 void set_loading(const std::string& text, float opacity);
+// The menus last open (screens first to top, each with its focus), and
+// opening such a path again (back to the menu a game was started from).
+std::vector<std::pair<std::string, std::size_t>> menu_path();
+void request_restore(const std::vector<std::pair<std::string, std::size_t>>& path);
 // As set_text, with [family:name] tokens drawn as button icons (data-buttons
 // elements): [k:Esc] a key cap, [x:B] an Xbox button, [d:pad] a d-pad.
 void set_button_text(const std::string& name, const std::string& text);
