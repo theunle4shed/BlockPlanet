@@ -119,7 +119,7 @@ void layout_tests() {
     const auto check = [](float w, float h) {
         const auto layout = grid_layout(w, h);
         assert(layout.columns == 8 && layout.rows == 8 && layout.tiles.size() == 64u);
-        const float side = std::max(w, h);
+        const float side = std::min(w, h);
         const auto at = [&](int column, int row) -> const GridTile& { return layout.tiles[std::size_t(row * 8 + column)]; };
         const auto corners = [&](const GridTile& t) { return *grid_tile_corners(layout, t, 1.0f, 0.0f, 0.0f); };
         for (const auto& t : layout.tiles) {
@@ -132,17 +132,20 @@ void layout_tests() {
             // Corners in order around the tile (top left, top right, bottom right, bottom left).
             assert(c[0].x < c[1].x && c[3].x < c[2].x && c[0].y < c[3].y && c[1].y < c[2].y);
         }
-        // Along the longer side the middle of the outermost tiles is seen at
-        // the screen's edge, so they are cut about in half; round, so the
-        // same along the other side.
-        const auto middle = [&](const GridTile& t) {
-            const auto c = corners(t);
-            return GridPoint{(c[0].x + c[1].x + c[2].x + c[3].x) / 4, (c[0].y + c[1].y + c[2].y + c[3].y) / 4};
-        };
-        const float reach_x = middle(at(7, 3)).x - layout.centre_x, reach_y = middle(at(3, 7)).y - layout.centre_y;
-        assert(std::abs(reach_x - reach_y) < reach_x * 0.02f);  // latitude and longitude differ a little
-        assert(reach_x > side / 2 * 0.95f && reach_x < side / 2 * 1.05f);
-        assert(corners(at(7, 3))[2].x > layout.centre_x + side / 2 + 10);  // its outer edge, by the equator, past the screen
+        // The whole grid fits the shorter side (the owner's note), the same
+        // reach across and down (round); along the longer side the far
+        // background shows beyond it.
+        float reach_x = 0, reach_y = 0;
+        for (const auto& t : layout.tiles) {
+            for (const auto& p : corners(t)) {
+                reach_x = std::max(reach_x, std::abs(p.x - layout.centre_x));
+                reach_y = std::max(reach_y, std::abs(p.y - layout.centre_y));
+            }
+        }
+        assert(std::abs(reach_x - reach_y) < 0.5f);
+        assert(reach_x <= side / 2 && reach_x > side / 2 * 0.9f);
+        if (w > h) assert(reach_x < w / 2 - 10);
+        if (h > w) assert(reach_y < h / 2 - 10);
         // One surface: along a row, each tile's top edge carries on into the
         // next one's across the gap, with no step (the owner's note).
         for (int row = 0; row < 8; ++row) {
@@ -227,10 +230,9 @@ void layout_tests() {
     check(2560, 1080);
     check(1440, 1080);
     const auto tall = check(1080, 1920);
-    // The same sphere for the same longer side: a wide screen crops it top and
-    // bottom, a tall one at the sides; never stretched.
+    // The same sphere for the same shorter side, whatever the longer; never stretched.
     const auto big = check(1920, 1920);
-    assert(near(wide.radius, big.radius, 0.01f) && near(tall.radius, big.radius, 0.01f) && square.radius < big.radius);
+    assert(near(wide.radius, square.radius, 0.01f) && near(tall.radius, square.radius, 0.01f) && square.radius < big.radius);
 
     // The matrix carries the element's square onto the quad, in perspective.
     const std::array<GridPoint, 4> quad = {GridPoint{100, 50}, GridPoint{300, 70}, GridPoint{280, 260}, GridPoint{90, 240}};
@@ -249,29 +251,36 @@ void layout_tests() {
     assert(!grid_quad_matrix({GridPoint{0, 0}, GridPoint{0, 0}, GridPoint{0, 0}, GridPoint{0, 0}}, 128));
     assert(grid_layout(0, 0).tiles.empty());
 
-    // Breathing: the whole sphere swells and settles about 1.2 % either way,
-    // once every 1.5 seconds.
+    // Breathing (off by default; on the test screen): the whole sphere swells
+    // and settles by its size either way, once every 1.5 seconds.
+    grid_tuning().breath_scale = 0.012f;
     float low = 2, high = 0;
     for (double time = 0; time < grid_wave_seconds; time += 0.01) {
         low = std::min(low, grid_breath(time));
         high = std::max(high, grid_breath(time));
     }
-    assert(near(low, 1 - grid_breath_scale, 0.001f) && near(high, 1 + grid_breath_scale, 0.001f));
+    assert(near(low, 1 - 0.012f, 0.001f) && near(high, 1 + 0.012f, 0.001f));
     assert(near(grid_breath(0.3), grid_breath(0.3 + grid_wave_seconds), 0.0001f));
-    // The soft wave: tiles come forward and back, never behind their place,
-    // and tiles further along it are out of step.
-    const auto& t0 = wide.tiles[0];
-    const auto& t1 = wide.tiles[9];
-    float most = 0;
-    bool apart = false;
-    for (double time = 0; time < grid_wave_seconds; time += 0.05) {
-        const float o = grid_wave_offset(t0, time);
-        assert(o >= 0 && o <= grid_wave_depth * t0.width + 0.01f);
-        most = std::max(most, o);
-        if (std::abs(o - grid_wave_offset(t1, time)) > 0.5f) apart = true;
+    grid_tuning() = GridTuning{};
+    // The water: tiles rise and sink (both ways) by up to the wave's depth;
+    // further along the wave they are out of step; a tile's corners differ
+    // (it tilts with the water); with no cross ripple it repeats every wave.
+    const float width = wide.tiles[0].width;
+    float high_water = 0, low_water = 0;
+    bool apart = false, tilts = false;
+    for (double time = 0; time < 3 * grid_wave_seconds; time += 0.02) {
+        const float h0 = grid_water(0, 0, time, width);
+        assert(std::abs(h0) <= grid_wave_depth * width + 0.01f);
+        high_water = std::max(high_water, h0);
+        low_water = std::min(low_water, h0);
+        if (std::abs(h0 - grid_water(3, 3, time, width)) > 1.0f) apart = true;
+        if (std::abs(h0 - grid_water(1, 0, time, width)) > 0.5f) tilts = true;
     }
-    assert(most > grid_wave_depth * t0.width * 0.9f && apart);
-    assert(near(grid_wave_offset(t0, 1.0), grid_wave_offset(t0, 1.0 + grid_wave_seconds), 0.01f));
+    assert(high_water > grid_wave_depth * width * 0.6f && low_water < -grid_wave_depth * width * 0.6f && apart && tilts);
+    grid_tuning().ripple = 0;
+    assert(near(grid_water(2, 5, 1.0, width), grid_water(2, 5, 1.0 + grid_wave_seconds, width), 0.01f));
+    grid_tuning() = GridTuning{};
+    assert(grid_breath(0.4) == 1.0f);  // no breathing by default (the owner's choice)
 
     // The test screen's settings: each slider's value, in its own units,
     // matching the defaults, and setting one changes the tuning.
@@ -282,8 +291,8 @@ void layout_tests() {
             for (const auto& [n, v] : values) if (n == name) return v;
             return std::string("?");
         };
-        assert(value_of("grid_breath_in") == "0.75" && value_of("grid_breath_size") == "2.4" && value_of("grid_wave_step") == "50");
-        assert(value_of("grid_wave_depth") == "5" && value_of("grid_fly_seconds") == "0.45" && value_of("grid_fly_distance") == "1");
+        assert(value_of("grid_breath_in") == "0.75" && value_of("grid_breath_size") == "0" && value_of("grid_wave_step") == "200");
+        assert(value_of("grid_wave_depth") == "6" && value_of("grid_ripple") == "35" && value_of("grid_fly_seconds") == "0.45");
         assert(grid_lab_set("grid_breath_size", "4") && near(grid_tuning().breath_scale, 0.02f, 1e-6f));
         assert(grid_lab_set("grid_wave_step", "100") && near(grid_tuning().wave_step, 0.1f, 1e-6f));
         assert(!grid_lab_set("grid_nothing", "1"));

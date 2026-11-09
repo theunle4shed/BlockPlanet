@@ -18,11 +18,11 @@ constexpr float pi = 3.14159265358979f;
 // The sphere: the grid spans this angle either side of its middle (degrees;
 // 90 would be a half sphere), in equal steps across and down.
 constexpr float half_span_degrees = 62.0f;
-// The viewer's distance, in the screen's longer side.
+// The viewer's distance, in the screen's shorter side.
 constexpr float viewer_distance = 1.6f;
-// Where the middle of the outermost tiles is seen along the longer side
-// (1: at the screen's edge, so they are cut about in half; the owner's note).
-constexpr float outer_reach = 1.0f;
+// Where the grid's outer edge is seen along the shorter side (1: at the
+// screen's edge).
+constexpr float outer_reach = 0.97f;
 // How much of its step of latitude and longitude a tile covers (the rest is the gap).
 constexpr float tile_fill = 0.9f;
 // The element each tile is drawn from (pixels square), before its matrix.
@@ -121,15 +121,17 @@ GridLayout grid_layout(float width, float height) {
     layout.rows = grid_rows;
     layout.centre_x = width / 2.0f;
     layout.centre_y = height / 2.0f;
-    // Round, never stretched: sized by the longer side.
-    const float side = std::max(width, height);
+    // Round, never stretched: the whole grid fits the shorter side (the
+    // owner's note); along the longer one the far background shows beyond
+    // the outermost tiles.
+    const float side = std::min(width, height);
     const float span = half_span_degrees * pi / 180.0f;
     const float step = 2.0f * span / float(grid_columns);
     layout.perspective = viewer_distance * side;
-    // The radius that shows the middle of the outermost tiles at the screen's
-    // edge (seen in perspective from the viewer; the sphere's front at the
+    // The radius that shows the grid's outer edge at the shorter side's
+    // edges (seen in perspective from the viewer; the sphere's front at the
     // screen, its centre behind it).
-    const float outer = span - step / 2.0f, half = side / 2.0f * outer_reach, p = layout.perspective;
+    const float outer = span, half = side / 2.0f * outer_reach, p = layout.perspective;
     layout.radius = half * p / (p * std::sin(outer) - half * (1.0f - std::cos(outer)));
     const float inset = step * (1.0f - tile_fill) / 2.0f;
     for (int row = 0; row < layout.rows; ++row) {
@@ -165,6 +167,11 @@ GridLayout grid_layout(float width, float height) {
 
 std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
                                                           float lift, float turn, float away) {
+    return grid_tile_corners(layout, tile, breath, std::array<float, 4>{lift, lift, lift, lift}, turn, away);
+}
+
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
+                                                          const std::array<float, 4>& lifts, float turn, float away) {
     const float r = layout.radius;
     const Vec3 centre_of_sphere{0.0f, 0.0f, -r};
     const Vec3 normal = direction(tile.lon, tile.lat);
@@ -193,7 +200,7 @@ std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layo
         // about its front (the screen's middle).
         const Vec3 v = centre_of_sphere + direction(lons[k], lats[k]) * r - middle;
         const Vec3 turned = v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1.0f - c));
-        const Vec3 at = (middle + turned + normal * lift) * breath + flight;
+        const Vec3 at = (middle + turned + normal * lifts[std::size_t(k)]) * breath + flight;
         if (at.z > layout.perspective * 0.6f) return std::nullopt;  // near the viewer: dropped
         const float scale = layout.perspective / (layout.perspective - at.z);
         out[std::size_t(k)] = {layout.centre_x + at.x * scale, layout.centre_y + at.y * scale};
@@ -237,7 +244,7 @@ constexpr LabSetting lab_settings[] = {
     {"grid_breath_size", &GridTuning::breath_scale, 200.0f},  // percent, peak to peak
     {"grid_wave_every", &GridTuning::wave_every, 1.0f},
     {"grid_wave_step", &GridTuning::wave_step, 1000.0f},      // milliseconds
-    {"grid_wave_rise", &GridTuning::wave_rise, 1.0f},
+    {"grid_ripple", &GridTuning::ripple, 100.0f},             // percent of the main wave
     {"grid_wave_depth", &GridTuning::wave_depth, 100.0f},     // percent of a tile's width
     {"grid_fly_seconds", &GridTuning::fly_seconds, 1.0f},
     {"grid_fly_spread", &GridTuning::fly_spread, 1.0f},
@@ -277,16 +284,18 @@ float grid_breath(double time) {
     return 1.0f + t.breath_scale * (2.0f * level - 1.0f);
 }
 
-float grid_wave_offset(const GridTile& tile, double time) {
-    // Waves set off from the top left every wave_every seconds; this tile
-    // rises and falls (a raised cosine over wave_rise) wave_step seconds
-    // after the one before it along the wave. Overlapping waves add up, to at most one.
+float grid_water(float u, float v, double time, float width) {
+    // Two travelling waves: the main one from the top left (its phase
+    // wave_step seconds later per tile along the diagonal), and a weaker
+    // ripple crossing it at an angle, a little slower, so the surface never
+    // quite repeats.
     const auto& t = grid_tuning();
-    const double every = std::max(0.05f, t.wave_every), rise = std::max(0.05f, t.wave_rise);
-    const double local = std::fmod(std::fmod(std::max(0.0, time) - double(tile.step) * t.wave_step, every) + every, every);
-    float sum = 0.0f;
-    for (double since = local; since < rise; since += every) sum += 0.5f - 0.5f * std::cos(float(since / rise) * 2.0f * pi);
-    return t.wave_depth * tile.width * std::min(1.0f, sum);
+    const double every = std::max(0.05f, t.wave_every);
+    const double main = time / every - double(u + v) * t.wave_step / every;
+    const double cross = time / (every * 1.37) - double(0.9f * u - 0.5f * v) * t.wave_step / every * 1.2;
+    const float height = std::sin(float(std::fmod(main, 1.0)) * 2.0f * pi) * (1.0f - 0.5f * t.ripple) +
+                         std::sin(float(std::fmod(cross, 1.0)) * 2.0f * pi) * 0.5f * t.ripple;
+    return t.wave_depth * width * height;
 }
 
 std::string grid_colour_of(const std::vector<Rml::ElementDocument*>& screens) {
@@ -406,10 +415,12 @@ void MenuGrid::place(double now) {
         std::string transform = tile.transform;
         const auto& tuning = grid_tuning();
         const float in_place = std::clamp((fly_ - at.fly * tuning.fly_spread) / std::max(0.01f, tuning.fly_seconds), 0.0f, 1.0f);
-        // Flying in, the tiles start nearer than past the viewer, so they show
-        // from the first frames (with the far background, the owner's note).
-        const float away = (leaving_ ? 1.0f : 0.75f) * (1.0f - in_place * in_place * (3.0f - 2.0f * in_place));
-        const auto corners = grid_tile_corners(layout_, at, breath, grid_wave_offset(at, now), turn, away);
+        const float away = 1.0f - in_place * in_place * (3.0f - 2.0f * in_place);
+        // Each corner on the water (its place in tiles from the top left).
+        const float u0 = float(at.column), v0 = float(at.row);
+        const std::array<float, 4> lifts = {grid_water(u0, v0, now, at.width), grid_water(u0 + 1, v0, now, at.width),
+                                            grid_water(u0 + 1, v0 + 1, now, at.width), grid_water(u0, v0 + 1, now, at.width)};
+        const auto corners = grid_tile_corners(layout_, at, breath, lifts, turn, away);
         const bool hidden = !corners || in_place <= 0.0f;
         if (tile.element != nullptr && hidden != tile.hidden) {
             tile.hidden = hidden;
@@ -439,12 +450,11 @@ void MenuGrid::place(double now) {
     // The far background fades in and out with the tiles, unless they fly
     // out into the loading cover. Only on change: setting a property rebuilds
     // its shape, even to the same value.
-    // On the way in it is whole by half way, hiding what is behind early (the
-    // game's own pause fade); on the way out it fades while the tiles are
-    // still leaving, so they reveal the game itself, not an empty background.
-    // (Measured: flying out, the tiles cover about 70 % of the screen at 0.7
-    // of the way in place and almost none by 0.55, so it fades between those.)
-    const float present = leaving_ ? std::clamp((presence() - 0.55f) / 0.3f, 0.0f, 1.0f) : std::clamp(presence() * 2.0f, 0.0f, 1.0f);
+    // In step with the tiles, both ways (the owner's note): measured at
+    // 16:9, the tiles still cover nearly all their usual part of the screen at
+    // 0.7 of the way in place, about half at 0.5 and almost none by 0.4, so
+    // it fades between 0.4 and 0.75.
+    const float present = std::clamp((presence() - 0.4f) / 0.35f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
     far_alpha_ = far_alpha;
     std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);

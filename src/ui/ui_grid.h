@@ -94,6 +94,9 @@ struct GridPoint {
 // viewer to draw (the tile has flown past).
 std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
                                                           float lift, float turn, float away = 0.0f);
+// The same with each corner lifted on its own (the water).
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
+                                                          const std::array<float, 4>& lifts, float turn, float away = 0.0f);
 
 // Flying in and out (seconds, the defaults): one tile's flight, and the
 // spread between the first and last to set off. Out, the middle leaves
@@ -110,25 +113,28 @@ std::optional<std::array<float, 16>> grid_quad_matrix(const std::array<GridPoint
 constexpr float grid_flip_seconds = 0.34f;     // one tile's flip
 constexpr float grid_ripple_seconds = 0.42f;   // from the first tile's start to the last's
 constexpr float grid_fade_seconds = grid_flip_seconds + grid_ripple_seconds;  // the far background
-// Breathing, measured from the original (1280 x 720, 30 fps): one breath
-// about every 1.5 seconds, a smooth sine; the sphere's outline swells by
-// about 2.4 % peak to peak. On top, a soft wave of tiles coming forward and
-// back (the owner's impression), out of step across the grid.
-constexpr float grid_wave_seconds = 1.5f;
-constexpr float grid_breath_scale = 0.012f;  // either way
-constexpr float grid_wave_depth = 0.05f;     // a tile's width, at most
+// The idle motion (the owner's description of the original, 2026-11-09):
+// the tiles bob like floats on gently rippling water, each rising and
+// sinking on its own as the wave's phase travels across the grid from the
+// top left, tilting with the water's slope. No breathing of the whole
+// sphere (measured from the original, but the owner chose the water; it is
+// kept, off, on the test screen).
+constexpr float grid_wave_seconds = 1.5f;    // one rise and fall of a tile
+constexpr float grid_breath_scale = 0.0f;    // either way
+constexpr float grid_wave_depth = 0.06f;     // a tile's width, either way
 
 // The motion's settings, adjustable while the grid runs (the grid test
 // screen, for the owner to tune; the defaults are the values above).
 // Breathing: in over breath_in seconds, held breath_hold, out over
-// breath_out. The wave: every wave_every seconds one starts at the top left;
-// each next tile along it follows wave_step seconds later, rising and falling
-// over wave_rise seconds (waves may overlap). Flying: as above, and how far
-// the tiles fly (1: past the viewer).
+// breath_out. Water: a tile rises and sinks once every wave_every seconds,
+// each next tile from the top left wave_step seconds later (so a wave spans
+// wave_every / wave_step tiles), wave_depth high; a second, weaker ripple
+// (ripple, 0 to 1 of the first) crosses it at an angle. Flying: as above,
+// and how far the tiles fly.
 struct GridTuning {
     float breath_in = grid_wave_seconds / 2, breath_hold = 0.0f, breath_out = grid_wave_seconds / 2;
     float breath_scale = grid_breath_scale;
-    float wave_every = grid_wave_seconds, wave_step = 0.05f, wave_rise = grid_wave_seconds;
+    float wave_every = grid_wave_seconds, wave_step = 0.2f, ripple = 0.35f;
     float wave_depth = grid_wave_depth;
     float fly_seconds = grid_fly_seconds, fly_spread = grid_fly_spread, fly_distance = 1.0f;
 };
@@ -140,8 +146,11 @@ std::vector<std::pair<std::string, std::string>> grid_lab_values();
 bool grid_lab_set(const std::string& name, const std::string& value);
 // The whole sphere's scale at `time` seconds (about 1).
 float grid_breath(double time);
-// How far a tile comes forward (pixels) at `time` seconds.
-float grid_wave_offset(const GridTile& tile, double time);
+// The water's height (pixels, outwards; negative: sunk) at a point of the
+// grid (u across, v down, in tiles from the top left) at `time` seconds, for
+// tiles `width` pixels wide. Each corner of a tile follows it, so the tiles
+// rise, sink and tilt with the water.
+float grid_water(float u, float v, double time, float width);
 
 // The grid's colour for these open screens (first to top), as the rules
 // above say: empty when the first has no data-grid.
