@@ -7,8 +7,9 @@
     <style>
         body { width: 100%; height: 100%; }
         #grid-far { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-color: #06090e; }
-        #grid-tiles { position: absolute; left: 0; top: 0; width: 100%; height: 100%; perspective-origin: 50% 50%; }
-        .grid-tile { position: absolute; transform-origin: 50% 50%; }
+        #grid-tiles { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+        /* Each tile's matrix (ui_grid.cpp) carries it from the top left onto its patch of the sphere. */
+        .grid-tile { position: absolute; left: 0; top: 0; transform-origin: 0px 0px 0px; }
     </style>
 </head>
 <body>

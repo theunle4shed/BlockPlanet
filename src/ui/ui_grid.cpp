@@ -15,16 +15,20 @@ namespace {
 constexpr float pi = 3.14159265358979f;
 
 // The sphere: the grid spans this angle either side of its middle (degrees;
-// 90 would be a half sphere). The tiles sit on it as on a cube's face pushed
-// out to the sphere, equal angles apart along the rows and columns, so the
-// corners pinch less than lines of latitude and longitude would.
+// 90 would be a half sphere), in equal steps of latitude and longitude.
 constexpr float half_span_degrees = 62.0f;
 // The viewer's distance, in the screen's longer side.
 constexpr float viewer_distance = 1.6f;
-// How far past the screen's edge the middle row and column reach (1: just to it).
-constexpr float cover = 1.06f;
-// How much of the space between neighbours a tile covers (the rest is the gap).
+// Where the middle of the outermost tiles is seen along the longer side
+// (1: at the screen's edge, so they are cut about in half; the owner's note).
+constexpr float outer_reach = 1.0f;
+// How much of its step of latitude and longitude a tile covers (the rest is the gap).
 constexpr float tile_fill = 0.9f;
+// The element each tile is drawn from (pixels square), before its matrix.
+constexpr float tile_element = 128.0f;
+// Turned closer to edge on than this, a tile is drawn at this angle (its
+// matrix would have no area).
+constexpr float most_turn = 87.0f;
 // The light, from the upper left and front (CSS axes: y down, z towards the viewer).
 constexpr float light_x = -0.35f, light_y = -0.45f, light_z = 0.82f;
 // The soft wave rolls diagonally, from the top left to the bottom right; one
@@ -34,11 +38,13 @@ constexpr float wave_tiles = 28.0f;
 struct Vec3 {
     float x, y, z;
 };
-Vec3 direction(float a, float b) {  // a: across (right), b: down; radians
-    const float x = std::tan(a), y = std::tan(b), length = std::sqrt(x * x + y * y + 1.0f);
-    return {x / length, y / length, 1.0f / length};
-}
-float distance(Vec3 p, Vec3 q) { return std::sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y) + (p.z - q.z) * (p.z - q.z)); }
+Vec3 operator+(Vec3 a, Vec3 b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
+Vec3 operator-(Vec3 a, Vec3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
+Vec3 operator*(Vec3 a, float k) { return {a.x * k, a.y * k, a.z * k}; }
+float dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+Vec3 cross(Vec3 a, Vec3 b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
+// The outward direction at a longitude (right) and latitude (down).
+Vec3 direction(float lon, float lat) { return {std::cos(lat) * std::sin(lon), std::sin(lat), std::cos(lat) * std::cos(lon)}; }
 
 GridRgb rgb(int hex) { return {float((hex >> 16) & 0xFF) / 255.0f, float((hex >> 8) & 0xFF) / 255.0f, float(hex & 0xFF) / 255.0f}; }
 
@@ -110,36 +116,34 @@ GridLayout grid_layout(float width, float height) {
     if (width <= 0.0f || height <= 0.0f) return layout;
     layout.columns = grid_columns;
     layout.rows = grid_rows;
-    // Round, never stretched: sized by the longer side, so the middle row
-    // (wide screens) or column (tall ones) reaches just past the edges.
+    layout.centre_x = width / 2.0f;
+    layout.centre_y = height / 2.0f;
+    // Round, never stretched: sized by the longer side.
     const float side = std::max(width, height);
     const float span = half_span_degrees * pi / 180.0f;
     const float step = 2.0f * span / float(grid_columns);
     layout.perspective = viewer_distance * side;
-    // The radius that puts the outer edge of the middle row at cover x half
-    // the side, seen in perspective from the viewer (the sphere's front at
-    // the screen, its centre behind it).
-    const float half = side / 2.0f * cover, p = layout.perspective;
-    layout.radius = half * p / (p * std::sin(span) - half * (1.0f - std::cos(span)));
-    const float r = layout.radius;
+    // The radius that shows the middle of the outermost tiles at the screen's
+    // edge (seen in perspective from the viewer; the sphere's front at the
+    // screen, its centre behind it).
+    const float outer = span - step / 2.0f, half = side / 2.0f * outer_reach, p = layout.perspective;
+    layout.radius = half * p / (p * std::sin(outer) - half * (1.0f - std::cos(outer)));
+    const float inset = step * (1.0f - tile_fill) / 2.0f;
     for (int row = 0; row < layout.rows; ++row) {
         for (int column = 0; column < layout.columns; ++column) {
             GridTile tile;
             tile.column = column;
             tile.row = row;
-            const float a = -span + (float(column) + 0.5f) * step, b = -span + (float(row) + 0.5f) * step;
-            const Vec3 d = direction(a, b);
-            tile.x = r * d.x;
-            tile.y = r * d.y;
-            tile.z = r * d.z - r;
-            // Sized to its neighbours, so tiles never overlap near the corners.
-            tile.width = r * distance(direction(a - step / 2, b), direction(a + step / 2, b)) * tile_fill;
-            tile.height = r * distance(direction(a, b - step / 2), direction(a, b + step / 2)) * tile_fill;
-            // Facing outwards: CSS rotateY(yaw) rotateX(pitch) turns the
-            // face's normal (0, 0, 1) to (cos p sin y, -sin p, cos p cos y).
-            const float yaw = std::atan2(d.x, d.z), pitch = -std::asin(d.y);
-            tile.yaw = yaw * 180.0f / pi;
-            tile.pitch = pitch * 180.0f / pi;
+            // A patch between lines of latitude and longitude: every tile in a
+            // row shares its top and bottom lines, every tile in a column its sides.
+            tile.lon0 = -span + float(column) * step + inset;
+            tile.lon1 = -span + float(column + 1) * step - inset;
+            tile.lat0 = -span + float(row) * step + inset;
+            tile.lat1 = -span + float(row + 1) * step - inset;
+            tile.lon = (tile.lon0 + tile.lon1) / 2.0f;
+            tile.lat = (tile.lat0 + tile.lat1) / 2.0f;
+            tile.width = layout.radius * (tile.lon1 - tile.lon0) * std::cos(tile.lat);
+            const Vec3 d = direction(tile.lon, tile.lat);
             const float facing = d.x * light_x + d.y * light_y + d.z * light_z;
             tile.shade = std::clamp(0.5f + 0.6f * facing, 0.45f, 1.15f);
             tile.variant = (column * 7 + row * 3 + (column * row) % 5) % 4;
@@ -150,6 +154,47 @@ GridLayout grid_layout(float width, float height) {
         }
     }
     return layout;
+}
+
+std::array<GridPoint, 4> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath, float lift,
+                                           float turn) {
+    const float r = layout.radius;
+    const Vec3 centre_of_sphere{0.0f, 0.0f, -r};
+    const Vec3 normal = direction(tile.lon, tile.lat);
+    const Vec3 middle = centre_of_sphere + normal * r;
+    // The upright axis: along the tile's line of longitude, downwards.
+    Vec3 axis{-std::sin(tile.lat) * std::sin(tile.lon), std::cos(tile.lat), -std::sin(tile.lat) * std::cos(tile.lon)};
+    const float angle = std::clamp(turn, -most_turn, most_turn) * pi / 180.0f;
+    const float c = std::cos(angle), s = std::sin(angle);
+    const float lons[4] = {tile.lon0, tile.lon1, tile.lon1, tile.lon0};
+    const float lats[4] = {tile.lat0, tile.lat0, tile.lat1, tile.lat1};
+    std::array<GridPoint, 4> out{};
+    for (int k = 0; k < 4; ++k) {
+        // The corner on the sphere, turned about the axis through the tile's
+        // middle (Rodrigues), lifted outwards, then the whole sphere breathes
+        // about its front (the screen's middle).
+        const Vec3 v = centre_of_sphere + direction(lons[k], lats[k]) * r - middle;
+        const Vec3 turned = v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1.0f - c));
+        const Vec3 at = (middle + turned + normal * lift) * breath;
+        const float scale = layout.perspective / (layout.perspective - at.z);
+        out[std::size_t(k)] = {layout.centre_x + at.x * scale, layout.centre_y + at.y * scale};
+    }
+    return out;
+}
+
+std::optional<std::array<float, 16>> grid_quad_matrix(const std::array<GridPoint, 4>& q, float size) {
+    // The unit square onto the quad (Heckbert's square-to-quad mapping):
+    // x = (a u + b v + c) / (g u + h v + 1), y = (d u + e v + f) / (g u + h v + 1).
+    const float dx1 = q[1].x - q[2].x, dx2 = q[3].x - q[2].x, dx3 = q[0].x - q[1].x + q[2].x - q[3].x;
+    const float dy1 = q[1].y - q[2].y, dy2 = q[3].y - q[2].y, dy3 = q[0].y - q[1].y + q[2].y - q[3].y;
+    const float det = dx1 * dy2 - dx2 * dy1;
+    if (std::abs(det) < 1e-3f || size <= 0.0f) return std::nullopt;
+    const float g = (dx3 * dy2 - dx2 * dy3) / det, h = (dx1 * dy3 - dx3 * dy1) / det;
+    const float a = q[1].x - q[0].x + g * q[1].x, b = q[3].x - q[0].x + h * q[3].x, c = q[0].x;
+    const float d = q[1].y - q[0].y + g * q[1].y, e = q[3].y - q[0].y + h * q[3].y, f = q[0].y;
+    if (!std::isfinite(g) || !std::isfinite(h)) return std::nullopt;
+    // u and v are the element's pixels over its size; z is kept as it is.
+    return std::array<float, 16>{a / size, d / size, 0, g / size, b / size, e / size, 0, h / size, 0, 0, 1, 0, c, f, 0, 1};
 }
 
 float grid_breath(double time) {
@@ -187,19 +232,16 @@ void MenuGrid::build(Rml::Context* context) {
                " 0 " + std::to_string(atlas.tile) + " " + std::to_string(atlas.tile) + "\"/>";
     }
     layer_->SetInnerRML(rml);
-    layer_->SetProperty("perspective", px(layout_.perspective));
     tiles_.assign(layout_.tiles.size(), Tile{});
     for (std::size_t i = 0; i < tiles_.size(); ++i) {
         Tile& tile = tiles_[i];
         tile.element = layer_->GetChild(int(i));
         tile.face = tile.shown = target_;
         if (tile.element == nullptr) continue;
-        // Each tile's middle at the screen's middle; its transform moves it out.
-        const auto& place = layout_.tiles[i];
-        tile.element->SetProperty("left", px(float(size_.x) / 2.0f - place.width / 2.0f));
-        tile.element->SetProperty("top", px(float(size_.y) / 2.0f - place.height / 2.0f));
-        tile.element->SetProperty("width", px(place.width));
-        tile.element->SetProperty("height", px(place.height));
+        // Each tile drawn from a square at the top left, which its matrix
+        // carries onto its patch of the sphere, in perspective.
+        tile.element->SetProperty("width", px(tile_element));
+        tile.element->SetProperty("height", px(tile_element));
     }
 }
 
@@ -277,13 +319,17 @@ void MenuGrid::place(double now) {
         // colour, which rebuilds its shape, changes only a few times a flip).
         const float edge = std::round(std::abs(std::cos(turn * pi / 180.0f)) * 6.0f) / 6.0f;
         const float shade = at.shade * (0.35f + 0.65f * edge);
-        // Layers, outermost first: the whole sphere's breath (about the
-        // screen's middle, where every tile's origin is), the tile's place
-        // and facing, its part in the wave, its flip.
-        char transform[240];
-        std::snprintf(transform, sizeof(transform),
-                      "scale3d(%.4f, %.4f, %.4f) translate3d(%.1fpx, %.1fpx, %.1fpx) rotateY(%.2fdeg) rotateX(%.2fdeg) translateZ(%.1fpx) rotateY(%.1fdeg)",
-                      breath, breath, breath, at.x, at.y, at.z, at.yaw, at.pitch, grid_wave_offset(at, now), turn);
+        // Layers: the whole sphere's breath, the tile's place on it, its part
+        // in the wave (lifted outwards), its flip. Worked out here and given
+        // to RmlUi as one matrix per tile.
+        std::string transform = tile.transform;
+        if (const auto m = grid_quad_matrix(grid_tile_corners(layout_, at, breath, grid_wave_offset(at, now), turn), tile_element)) {
+            char text[400];
+            std::snprintf(text, sizeof(text), "matrix3d(%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g,%.7g)",
+                          (*m)[0], (*m)[1], (*m)[2], (*m)[3], (*m)[4], (*m)[5], (*m)[6], (*m)[7], (*m)[8], (*m)[9], (*m)[10],
+                          (*m)[11], (*m)[12], (*m)[13], (*m)[14], (*m)[15]);
+            transform = text;
+        }
         // The texture's middle grey is half white: twice the colour gives the colour.
         std::string colour = css(shown, 2.0f * shade);
         if (tile.element == nullptr) continue;

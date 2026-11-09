@@ -120,41 +120,66 @@ void layout_tests() {
         const auto layout = grid_layout(w, h);
         assert(layout.columns == 8 && layout.rows == 8 && layout.tiles.size() == 64u);
         const float side = std::max(w, h);
-        float reach_x = 0, reach_y = 0;
+        const auto at = [&](int column, int row) -> const GridTile& { return layout.tiles[std::size_t(row * 8 + column)]; };
+        const auto corners = [&](const GridTile& t) { return grid_tile_corners(layout, t, 1.0f, 0.0f, 0.0f); };
         for (const auto& t : layout.tiles) {
-            assert(t.width > 0 && t.height > 0 && t.z <= 0.01f);
+            assert(t.lon0 < t.lon && t.lon < t.lon1 && t.lat0 < t.lat && t.lat < t.lat1 && t.width > 0);
             assert(t.shade > 0.4f && t.shade < 1.2f && t.variant >= 0 && t.variant < 4);
-            assert(std::abs(t.yaw) < 70 && std::abs(t.pitch) < 70);
-            // On the sphere: the same distance from its centre (0, 0, -radius).
-            const float d = std::sqrt(t.x * t.x + t.y * t.y + (t.z + layout.radius) * (t.z + layout.radius));
-            assert(near(d, layout.radius, 0.5f));
-            // Projected outer edge (seen from the viewer at the perspective distance).
-            const float scale = layout.perspective / (layout.perspective - t.z);
-            reach_x = std::max(reach_x, (std::abs(t.x) + t.width / 2 * std::cos(t.yaw * 3.14159f / 180)) * scale);
-            reach_y = std::max(reach_y, (std::abs(t.y) + t.height / 2 * std::cos(t.pitch * 3.14159f / 180)) * scale);
+            // Symmetric: mirrored left to right and top to bottom.
+            const auto c = corners(t), m = corners(at(7 - t.column, t.row)), v = corners(at(t.column, 7 - t.row));
+            assert(near(c[0].x - layout.centre_x, layout.centre_x - m[1].x, 0.05f) && near(c[0].y, m[1].y, 0.05f));
+            assert(near(c[0].y - layout.centre_y, layout.centre_y - v[3].y, 0.05f) && near(c[0].x, v[3].x, 0.05f));
+            // Corners in order around the tile (top left, top right, bottom right, bottom left).
+            assert(c[0].x < c[1].x && c[3].x < c[2].x && c[0].y < c[3].y && c[1].y < c[2].y);
         }
-        // Round: the same reach across and down, about half the longer side
-        // (so it covers the screen along it), whatever the screen's shape.
-        assert(near(reach_x, reach_y, 1.0f));
-        assert(reach_x > side / 2 * 0.95f && reach_x < side / 2 * 1.15f);
-        // Symmetric: the tiles mirror left to right and top to bottom, and face outwards.
-        for (const auto& t : layout.tiles) {
-            const auto& m = layout.tiles[std::size_t(t.row * 8 + (7 - t.column))];
-            assert(near(t.x, -m.x, 0.1f) && near(t.yaw, -m.yaw, 0.01f) && near(t.y, m.y, 0.1f));
-            const auto& v = layout.tiles[std::size_t((7 - t.row) * 8 + t.column)];
-            assert(near(t.y, -v.y, 0.1f) && near(t.pitch, -v.pitch, 0.01f));
-            if (t.column >= 4) assert(t.x > 0 && t.yaw > 0);
-            if (t.row >= 4) assert(t.y > 0 && t.pitch < 0);
+        // Along the longer side the middle of the outermost tiles is seen at
+        // the screen's edge, so they are cut about in half; round, so the
+        // same along the other side.
+        const auto middle = [&](const GridTile& t) {
+            const auto c = corners(t);
+            return GridPoint{(c[0].x + c[1].x + c[2].x + c[3].x) / 4, (c[0].y + c[1].y + c[2].y + c[3].y) / 4};
+        };
+        const float reach_x = middle(at(7, 3)).x - layout.centre_x, reach_y = middle(at(3, 7)).y - layout.centre_y;
+        assert(std::abs(reach_x - reach_y) < reach_x * 0.02f);  // latitude and longitude differ a little
+        assert(reach_x > side / 2 * 0.95f && reach_x < side / 2 * 1.05f);
+        assert(corners(at(7, 3))[2].x > layout.centre_x + side / 2 + 10);  // its outer edge, by the equator, past the screen
+        // One surface: along a row, each tile's top edge carries on into the
+        // next one's across the gap, with no step (the owner's note).
+        for (int row = 0; row < 8; ++row) {
+            for (int column = 0; column < 7; ++column) {
+                const auto l = corners(at(column, row)), r = corners(at(column + 1, row));
+                for (const auto& [i0, i1] : {std::pair{0, 1}, std::pair{3, 2}}) {  // top edges, bottom edges
+                    const float edge = std::atan2(l[i1].y - l[i0].y, l[i1].x - l[i0].x);
+                    const float across = std::atan2(r[i0].y - l[i1].y, r[i0].x - l[i1].x);
+                    const float next = std::atan2(r[i1].y - r[i0].y, r[i1].x - r[i0].x);
+                    // Bending steadily, with no step: the gap's direction lies
+                    // between the two edges' (as along one smooth curve).
+                    assert(std::abs(next - edge) < 0.5f);
+                    assert(std::abs(across - (edge + next) / 2) <= std::abs(next - edge) / 2 + 0.005f);
+                }
+            }
         }
-        // Neighbours never overlap: centres further apart than the tiles' half widths.
-        for (const auto& t : layout.tiles) {
-            if (t.column == 7) continue;
-            const auto& n = layout.tiles[std::size_t(t.row * 8 + t.column + 1)];
-            const float gap = std::sqrt((n.x - t.x) * (n.x - t.x) + (n.y - t.y) * (n.y - t.y) + (n.z - t.z) * (n.z - t.z));
-            assert(gap > (t.width + n.width) / 2);
+        // The same down each column.
+        for (int column = 0; column < 8; ++column) {
+            for (int row = 0; row < 7; ++row) {
+                const auto u = corners(at(column, row)), d = corners(at(column, row + 1));
+                const float edge = std::atan2(u[3].x - u[0].x, u[3].y - u[0].y);
+                const float across = std::atan2(d[0].x - u[3].x, d[0].y - u[3].y);
+                const float next = std::atan2(d[3].x - d[0].x, d[3].y - d[0].y);
+                assert(std::abs(next - edge) < 0.5f);
+                assert(std::abs(across - (edge + next) / 2) <= std::abs(next - edge) / 2 + 0.005f);
+            }
         }
-        // The ripple: top left first, bottom right last.
-        assert(layout.tiles.front().delay == 0 && near(layout.tiles.back().delay, grid_ripple_seconds));
+        // Breathing scales the picture about the middle; lifting moves a tile
+        // outwards (away from the middle); turning narrows it.
+        const auto& t = at(6, 2);
+        const auto base = corners(t), big = grid_tile_corners(layout, t, 1.02f, 0, 0);
+        assert(std::abs(big[0].x - layout.centre_x) > std::abs(base[0].x - layout.centre_x));
+        const auto lifted = grid_tile_corners(layout, t, 1.0f, 20.0f, 0);
+        assert(lifted[0].x > base[0].x && lifted[0].y < base[0].y);
+        const auto turned = grid_tile_corners(layout, t, 1.0f, 0, 60.0f);
+        assert(turned[1].x - turned[0].x < base[1].x - base[0].x);
+        assert(grid_quad_matrix(grid_tile_corners(layout, t, 1.0f, 0, 90.0f), 128).has_value());  // edge on is held short of it
         return layout;
     };
     const auto square = check(1080, 1080);
@@ -166,6 +191,22 @@ void layout_tests() {
     // bottom, a tall one at the sides; never stretched.
     const auto big = check(1920, 1920);
     assert(near(wide.radius, big.radius, 0.01f) && near(tall.radius, big.radius, 0.01f) && square.radius < big.radius);
+
+    // The matrix carries the element's square onto the quad, in perspective.
+    const std::array<GridPoint, 4> quad = {GridPoint{100, 50}, GridPoint{300, 70}, GridPoint{280, 260}, GridPoint{90, 240}};
+    const auto m = grid_quad_matrix(quad, 128);
+    assert(m);
+    const auto project = [&](float x, float y) {
+        const float X = (*m)[0] * x + (*m)[4] * y + (*m)[12], Y = (*m)[1] * x + (*m)[5] * y + (*m)[13];
+        const float W = (*m)[3] * x + (*m)[7] * y + (*m)[15];
+        return GridPoint{X / W, Y / W};
+    };
+    const GridPoint unit[4] = {{0, 0}, {128, 0}, {128, 128}, {0, 128}};
+    for (int k = 0; k < 4; ++k) {
+        const auto p = project(unit[k].x, unit[k].y);
+        assert(near(p.x, quad[std::size_t(k)].x, 0.05f) && near(p.y, quad[std::size_t(k)].y, 0.05f));
+    }
+    assert(!grid_quad_matrix({GridPoint{0, 0}, GridPoint{0, 0}, GridPoint{0, 0}, GridPoint{0, 0}}, 128));
     assert(grid_layout(0, 0).tiles.empty());
 
     // Breathing: the whole sphere swells and settles about 1.2 % either way,
