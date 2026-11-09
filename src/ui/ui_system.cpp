@@ -937,6 +937,28 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
     const bool hud_visible = update_hud_document();
     const bool loading_visible = update_loading_document();
     const bool label_visible = update_label_document();
+    // Research (BLOCKPLANET_GRID_LOG=1): every document drawn, with its
+    // opacity, each frame while the grid is up and for 1.5 s after it goes.
+    {
+        static const bool grid_log = std::getenv("BLOCKPLANET_GRID_LOG") != nullptr;
+        static double grid_gone_at = -1.0;
+        const double t = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (grid->visible()) grid_gone_at = -1.0;
+        else if (grid_gone_at < 0.0) grid_gone_at = t;
+        if (grid_log && (grid->visible() || t - grid_gone_at < 1.5)) {
+            std::string shown;
+            for (int i = 0; i < context->GetNumDocuments(); ++i) {
+                auto* document = context->GetDocument(i);
+                if (document == nullptr || !document->IsVisible()) continue;
+                char entry[160];
+                std::snprintf(entry, sizeof(entry), "%s{\"title\":\"%s\",\"opacity\":%.2f}", shown.empty() ? "" : ",",
+                              document->GetTitle().c_str(), document->GetProperty<float>("opacity"));
+                shown += entry;
+            }
+            std::fprintf(stdout, "{\"event\":\"ui_frame\",\"t\":%.3f,\"menus\":%d,\"hud\":%d,\"loading\":%d,\"label\":%d,\"grid\":%d,\"documents\":[%s]}\n",
+                         t, int(navigator->is_open()), int(hud_visible), int(loading_visible), int(label_visible), int(grid->visible()), shown.c_str());
+        }
+    }
     if (navigator->is_open() || hud_visible || loading_visible || label_visible || grid->visible()) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
