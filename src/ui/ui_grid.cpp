@@ -20,9 +20,9 @@ constexpr float pi = 3.14159265358979f;
 constexpr float half_span_degrees = 62.0f;
 // The viewer's distance, in the screen's shorter side.
 constexpr float viewer_distance = 1.6f;
-// Where the grid's outer edge is seen along the shorter side (1: at the
-// screen's edge).
-constexpr float outer_reach = 0.97f;
+// Where the middle of the outermost tiles is seen along the shorter side
+// (1: at the screen's edge, so they are cut in half).
+constexpr float outer_reach = 1.0f;
 // How much of its step of latitude and longitude a tile covers (the rest is the gap).
 constexpr float tile_fill = 0.9f;
 // The element each tile is drawn from (pixels square), before its matrix.
@@ -121,17 +121,18 @@ GridLayout grid_layout(float width, float height) {
     layout.rows = grid_rows;
     layout.centre_x = width / 2.0f;
     layout.centre_y = height / 2.0f;
-    // Round, never stretched: the whole grid fits the shorter side (the
-    // owner's note); along the longer one the far background shows beyond
-    // the outermost tiles.
+    // Round, never stretched, sized by the shorter side: there the middle of
+    // the outermost tiles is at the screen's edge, so they are cut in half
+    // (the owner's note); along the longer side the far background shows
+    // beyond the outermost tiles.
     const float side = std::min(width, height);
     const float span = half_span_degrees * pi / 180.0f;
     const float step = 2.0f * span / float(grid_columns);
     layout.perspective = viewer_distance * side;
-    // The radius that shows the grid's outer edge at the shorter side's
-    // edges (seen in perspective from the viewer; the sphere's front at the
-    // screen, its centre behind it).
-    const float outer = span, half = side / 2.0f * outer_reach, p = layout.perspective;
+    // The radius that shows the middle of the outermost tiles at the shorter
+    // side's edges (seen in perspective from the viewer; the sphere's front
+    // at the screen, its centre behind it).
+    const float outer = span - step / 2.0f, half = side / 2.0f * outer_reach, p = layout.perspective;
     layout.radius = half * p / (p * std::sin(outer) - half * (1.0f - std::cos(outer)));
     const float inset = step * (1.0f - tile_fill) / 2.0f;
     for (int row = 0; row < layout.rows; ++row) {
@@ -165,12 +166,12 @@ GridLayout grid_layout(float width, float height) {
     return layout;
 }
 
-std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
-                                                          float lift, float turn, float away) {
-    return grid_tile_corners(layout, tile, breath, std::array<float, 4>{lift, lift, lift, lift}, turn, away);
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float lift,
+                                                          float turn, float away) {
+    return grid_tile_corners(layout, tile, std::array<float, 4>{lift, lift, lift, lift}, turn, away);
 }
 
-std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile,
                                                           const std::array<float, 4>& lifts, float turn, float away) {
     const float r = layout.radius;
     const Vec3 centre_of_sphere{0.0f, 0.0f, -r};
@@ -193,14 +194,22 @@ std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layo
     const float spread = std::sqrt(normal.x * normal.x + normal.y * normal.y);
     const Vec3 outwards = spread > 1e-4f ? Vec3{normal.x / spread, normal.y / spread, 0.0f} : Vec3{0.0f, -1.0f, 0.0f};
     const Vec3 flight = Vec3{0.0f, 0.0f, layout.perspective * 0.75f * distance} * rush + outwards * (r * 1.4f * distance * rush);
+    // As it sets off, the tile also turns to face the viewer, so it flies as
+    // a square growing towards them rather than as a thin wedge (a rim tile
+    // kept facing outwards is nearly edge on: the owner's "large vector").
+    const Vec3 across = normalised(direction(tile.lon1, tile.lat) - direction(tile.lon0, tile.lat));
+    const float face = std::clamp(away * 2.5f, 0.0f, 1.0f);
+    const float facing = face * face * (3.0f - 2.0f * face);
     std::array<GridPoint, 4> out{};
     for (int k = 0; k < 4; ++k) {
         // The corner on the sphere, turned about the axis through the tile's
-        // middle (Rodrigues), lifted outwards, then the whole sphere breathes
-        // about its front (the screen's middle).
+        // middle (Rodrigues), lifted outwards (the water), turned towards the
+        // viewer while flying, then carried along the flight.
         const Vec3 v = centre_of_sphere + direction(lons[k], lats[k]) * r - middle;
         const Vec3 turned = v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1.0f - c));
-        const Vec3 at = (middle + turned + normal * lifts[std::size_t(k)]) * breath + flight;
+        const Vec3 lifted = turned + normal * lifts[std::size_t(k)];
+        const Vec3 flat{dot(lifted, across), dot(lifted, axis), 0.0f};
+        const Vec3 at = middle + lifted * (1.0f - facing) + flat * facing + flight;
         if (at.z > layout.perspective * 0.6f) return std::nullopt;  // near the viewer: dropped
         const float scale = layout.perspective / (layout.perspective - at.z);
         out[std::size_t(k)] = {layout.centre_x + at.x * scale, layout.centre_y + at.y * scale};
@@ -224,7 +233,18 @@ std::optional<std::array<float, 16>> grid_quad_matrix(const std::array<GridPoint
     // by the water or turning) gives w crossing zero inside it, and a GPU
     // then stretches the part near zero across the whole screen (seen on the
     // test machine as a dark screen; software drawing hid it).
+    // And the quad must be convex (a tile folded, or seen edge on): with w
+    // positive at the corners of a convex quad the tile stays within them,
+    // so it can never be drawn as a long wedge across the screen (the
+    // owner's "large vector").
     if (std::min({1.0f, 1.0f + g, 1.0f + h, 1.0f + g + h}) < 0.02f) return std::nullopt;
+    float turning = 0.0f;
+    for (std::size_t k = 0; k < 4; ++k) {
+        const GridPoint p0 = q[k], p1 = q[(k + 1) % 4], p2 = q[(k + 2) % 4];
+        const float cross = (p1.x - p0.x) * (p2.y - p1.y) - (p1.y - p0.y) * (p2.x - p1.x);
+        if (k == 0) turning = cross;
+        else if (cross * turning <= 0.0f) return std::nullopt;
+    }
     // u and v are the element's pixels over its size; z is kept as it is.
     return std::array<float, 16>{a / size, d / size, 0, g / size, b / size, e / size, 0, h / size, 0, 0, 1, 0, c, f, 0, 1};
 }
@@ -244,17 +264,10 @@ struct LabSetting {
     float unit;
 };
 constexpr LabSetting lab_settings[] = {
-    {"grid_breath_in", &GridTuning::breath_in, 1.0f},
-    {"grid_breath_hold", &GridTuning::breath_hold, 1.0f},
-    {"grid_breath_out", &GridTuning::breath_out, 1.0f},
-    {"grid_breath_size", &GridTuning::breath_scale, 200.0f},  // percent, peak to peak
     {"grid_wave_every", &GridTuning::wave_every, 1.0f},
     {"grid_wave_step", &GridTuning::wave_step, 1000.0f},      // milliseconds
     {"grid_ripple", &GridTuning::ripple, 100.0f},             // percent of the main wave
     {"grid_wave_depth", &GridTuning::wave_depth, 100.0f},     // percent of a tile's width
-    {"grid_fly_seconds", &GridTuning::fly_seconds, 1.0f},
-    {"grid_fly_spread", &GridTuning::fly_spread, 1.0f},
-    {"grid_fly_distance", &GridTuning::fly_distance, 1.0f},
 };
 
 } // namespace
@@ -276,18 +289,6 @@ bool grid_lab_set(const std::string& name, const std::string& value) {
         return true;
     }
     return false;
-}
-
-float grid_breath(double time) {
-    // In (rising smoothly), held, out (falling smoothly), then again.
-    const auto& t = grid_tuning();
-    const double in = std::max(0.05f, t.breath_in), hold = std::max(0.0f, t.breath_hold), out = std::max(0.05f, t.breath_out);
-    const double at = std::fmod(std::max(0.0, time), in + hold + out);
-    float level;
-    if (at < in) level = 0.5f - 0.5f * std::cos(float(at / in) * pi);
-    else if (at < in + hold) level = 1.0f;
-    else level = 0.5f + 0.5f * std::cos(float((at - in - hold) / out) * pi);
-    return 1.0f + t.breath_scale * (2.0f * level - 1.0f);
 }
 
 float grid_water(float u, float v, double time, float width) {
@@ -369,7 +370,6 @@ void MenuGrid::drift(GridRgb colour) {
 
 void MenuGrid::place(double now) {
     bool active = false;
-    const float breath = grid_breath(now);
     for (std::size_t i = 0; i < tiles_.size(); ++i) {
         Tile& tile = tiles_[i];
         const GridTile& at = layout_.tiles[i];
@@ -415,7 +415,7 @@ void MenuGrid::place(double now) {
         // colour, which rebuilds its shape, changes only a few times a flip).
         const float edge = std::round(std::abs(std::cos(turn * pi / 180.0f)) * 6.0f) / 6.0f;
         const float shade = at.shade * (0.35f + 0.65f * edge);
-        // Layers: the whole sphere's breath, the tile's place on it, its part
+        // Layers: the tile's place on the sphere, its part
         // in the wave (lifted outwards), its flip. Worked out here and given
         // to RmlUi as one matrix per tile.
         std::string transform = tile.transform;
@@ -426,15 +426,15 @@ void MenuGrid::place(double now) {
         const float u0 = float(at.column), v0 = float(at.row);
         const std::array<float, 4> lifts = {grid_water(u0, v0, now, at.width), grid_water(u0 + 1, v0, now, at.width),
                                             grid_water(u0 + 1, v0 + 1, now, at.width), grid_water(u0, v0 + 1, now, at.width)};
-        auto corners = grid_tile_corners(layout_, at, breath, lifts, turn, away);
+        auto corners = grid_tile_corners(layout_, at, lifts, turn, away);
         auto matrix = corners ? grid_quad_matrix(*corners, tile_element) : std::nullopt;
         if (corners && !matrix) {
             // Folded by the water: drawn flat (lifted evenly) instead.
             const float even = (lifts[0] + lifts[1] + lifts[2] + lifts[3]) / 4.0f;
-            corners = grid_tile_corners(layout_, at, breath, even, turn, away);
+            corners = grid_tile_corners(layout_, at, even, turn, away);
             matrix = corners ? grid_quad_matrix(*corners, tile_element) : std::nullopt;
         }
-        const bool hidden = !matrix || in_place <= 0.0f;
+        const bool hidden = !matrix || in_place <= 0.0f || !show_tiles_;
         if (tile.element != nullptr && hidden != tile.hidden) {
             tile.hidden = hidden;
             tile.element->SetProperty("visibility", hidden ? "hidden" : "visible");
@@ -468,11 +468,11 @@ void MenuGrid::place(double now) {
     // it fades between 0.4 and 0.75.
     const float present = std::clamp((presence() - 0.4f) / 0.35f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
-    far_alpha_ = far_alpha;
+    far_alpha_ = show_far_ ? far_alpha : 0.0f;
     std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);
     far.insert(3, "a");  // rgb( -> rgba(
     far.back() = ',';
-    far += std::to_string(int(std::lround(far_alpha * 255.0f))) + ")";
+    far += std::to_string(int(std::lround(far_alpha_ * 255.0f))) + ")";
     if (far_ != nullptr && far != far_css_) {
         far_css_ = std::move(far);
         far_->SetProperty("background-color", far_css_);

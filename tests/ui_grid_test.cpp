@@ -121,7 +121,7 @@ void layout_tests() {
         assert(layout.columns == 8 && layout.rows == 8 && layout.tiles.size() == 64u);
         const float side = std::min(w, h);
         const auto at = [&](int column, int row) -> const GridTile& { return layout.tiles[std::size_t(row * 8 + column)]; };
-        const auto corners = [&](const GridTile& t) { return *grid_tile_corners(layout, t, 1.0f, 0.0f, 0.0f); };
+        const auto corners = [&](const GridTile& t) { return *grid_tile_corners(layout, t, 0.0f, 0.0f); };
         for (const auto& t : layout.tiles) {
             assert(t.lon0 < t.lon && t.lon < t.lon1 && t.lat0 < t.lat && t.lat < t.lat1 && t.width > 0);
             assert(t.shade > 0.4f && t.shade < 1.2f && t.variant >= 0 && t.variant < 4);
@@ -132,20 +132,23 @@ void layout_tests() {
             // Corners in order around the tile (top left, top right, bottom right, bottom left).
             assert(c[0].x < c[1].x && c[3].x < c[2].x && c[0].y < c[3].y && c[1].y < c[2].y);
         }
-        // The whole grid fits the shorter side (the owner's note), the same
-        // reach across and down (round); along the longer side the far
-        // background shows beyond it.
-        float reach_x = 0, reach_y = 0;
-        for (const auto& t : layout.tiles) {
-            for (const auto& p : corners(t)) {
-                reach_x = std::max(reach_x, std::abs(p.x - layout.centre_x));
-                reach_y = std::max(reach_y, std::abs(p.y - layout.centre_y));
-            }
-        }
-        assert(std::abs(reach_x - reach_y) < 0.5f);
-        assert(reach_x <= side / 2 && reach_x > side / 2 * 0.9f);
-        if (w > h) assert(reach_x < w / 2 - 10);
-        if (h > w) assert(reach_y < h / 2 - 10);
+        // Sized by the shorter side (the owner's note): there the middle of
+        // the outermost tiles is at the screen's edge, so they are cut in
+        // half; the same reach across and down (round); along the longer side
+        // the far background shows beyond the grid.
+        const auto middle = [&](const GridTile& t) {
+            const auto c = corners(t);
+            return GridPoint{(c[0].x + c[1].x + c[2].x + c[3].x) / 4, (c[0].y + c[1].y + c[2].y + c[3].y) / 4};
+        };
+        const float mid_x = middle(at(7, 3)).x - layout.centre_x, mid_y = middle(at(3, 7)).y - layout.centre_y;
+        assert(std::abs(mid_x - mid_y) < 0.5f);
+        assert(mid_x > side / 2 * 0.97f && mid_x < side / 2 * 1.03f);
+        float reach = 0;
+        for (const auto& t : layout.tiles)
+            for (const auto& p : corners(t)) reach = std::max(reach, std::abs(p.x - layout.centre_x));
+        assert(reach > side / 2 + 5);  // the outermost tiles run past the shorter side's edges
+        if (w > h) assert(reach < w / 2 - 10);
+        if (h > w) assert(reach < h / 2 - 10);
         // One surface: along a row, each tile's top edge carries on into the
         // next one's across the gap, with no step (the owner's note).
         for (int row = 0; row < 8; ++row) {
@@ -186,22 +189,20 @@ void layout_tests() {
             const auto end = corners(at(0, 1))[0], mid = corners(at(3, 1))[1];
             assert(end.y > mid.y + 5);
         }
-        // Breathing scales the picture about the middle; lifting moves a tile
-        // outwards (away from the middle); turning narrows it.
+        // Lifting moves a tile outwards (away from the middle); turning narrows it.
         const auto& t = at(6, 2);
-        const auto base = corners(t), big = *grid_tile_corners(layout, t, 1.02f, 0, 0);
-        assert(std::abs(big[0].x - layout.centre_x) > std::abs(base[0].x - layout.centre_x));
-        const auto lifted = *grid_tile_corners(layout, t, 1.0f, 20.0f, 0);
+        const auto base = corners(t);
+        const auto lifted = *grid_tile_corners(layout, t, 20.0f, 0);
         assert(lifted[0].x > base[0].x && lifted[0].y < base[0].y);
-        const auto turned = *grid_tile_corners(layout, t, 1.0f, 0, 60.0f);
+        const auto turned = *grid_tile_corners(layout, t, 0, 60.0f);
         assert(turned[1].x - turned[0].x < base[1].x - base[0].x);
-        assert(grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, 0, 90.0f), 128).has_value());  // edge on is held short of it
+        assert(grid_quad_matrix(*grid_tile_corners(layout, t, 0, 90.0f), 128).has_value());  // edge on is held short of it
         // Flying out: towards the viewer (larger, further from the middle),
         // then past them (nothing to draw).
-        const auto half_away = *grid_tile_corners(layout, t, 1.0f, 0, 0, 0.5f);
+        const auto half_away = *grid_tile_corners(layout, t, 0, 0, 0.5f);
         assert(half_away[1].x - half_away[0].x > base[1].x - base[0].x);
         assert(std::abs(half_away[0].x - layout.centre_x) > std::abs(base[0].x - layout.centre_x));
-        assert(!grid_tile_corners(layout, t, 1.0f, 0, 0, 1.0f));
+        assert(!grid_tile_corners(layout, t, 0, 0, 1.0f));
         // Flying, no tile grows to cover much of the screen (straight at the
         // viewer, several together read as a flat dark screen): at most a
         // tenth of it, counting only what is on screen.
@@ -220,7 +221,7 @@ void layout_tests() {
         };
         for (std::size_t i = 0; i < layout.tiles.size(); i += 9)
             for (float away = 0; away < 1.0f; away += 0.1f)
-                if (const auto q = grid_tile_corners(layout, layout.tiles[i], 1.0f, 0, 0, away)) assert(on_screen(*q) < 0.1f);
+                if (const auto q = grid_tile_corners(layout, layout.tiles[i], 0, 0, away)) assert(on_screen(*q) < 0.1f);
         for (const auto& u : layout.tiles) assert(u.fly >= 0 && u.fly <= 1.0001f);
         assert(at(3, 3).fly > at(0, 0).fly);  // the middle arrives last (and leaves first)
         return layout;
@@ -266,29 +267,18 @@ void layout_tests() {
                 const float u = float(t.column), v = float(t.row);
                 const std::array<float, 4> lifts = {grid_water(u, v, time, t.width), grid_water(u + 1, v, time, t.width),
                                                     grid_water(u + 1, v + 1, time, t.width), grid_water(u, v + 1, time, t.width)};
-                const auto water = grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, lifts, 0.0f), 128);
+                const auto water = grid_quad_matrix(*grid_tile_corners(layout, t, lifts, 0.0f), 128);
                 if (water) assert(positive(*water));
-                const auto flat = grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, 0.0f, 0.0f), 128);
+                const auto flat = grid_quad_matrix(*grid_tile_corners(layout, t, 0.0f, 0.0f), 128);
                 assert(flat && positive(*flat));
             }
         }
         for (float turn = 0; turn < 90; turn += 3)
             for (const auto& t : layout.tiles)
-                if (const auto m = grid_quad_matrix(*grid_tile_corners(layout, t, 1.0f, 0.0f, turn), 128)) assert(positive(*m));
+                if (const auto m = grid_quad_matrix(*grid_tile_corners(layout, t, 0.0f, turn), 128)) assert(positive(*m));
     }
     assert(grid_layout(0, 0).tiles.empty());
 
-    // Breathing (off by default; on the test screen): the whole sphere swells
-    // and settles by its size either way, once every 1.5 seconds.
-    grid_tuning().breath_scale = 0.012f;
-    float low = 2, high = 0;
-    for (double time = 0; time < grid_wave_seconds; time += 0.01) {
-        low = std::min(low, grid_breath(time));
-        high = std::max(high, grid_breath(time));
-    }
-    assert(near(low, 1 - 0.012f, 0.001f) && near(high, 1 + 0.012f, 0.001f));
-    assert(near(grid_breath(0.3), grid_breath(0.3 + grid_wave_seconds), 0.0001f));
-    grid_tuning() = GridTuning{};
     // The water: tiles rise and sink (both ways) by up to the wave's depth;
     // further along the wave they are out of step; a tile's corners differ
     // (it tilts with the water); with no cross ripple it repeats every wave.
@@ -307,20 +297,19 @@ void layout_tests() {
     grid_tuning().ripple = 0;
     assert(near(grid_water(2, 5, 1.0, width), grid_water(2, 5, 1.0 + grid_wave_seconds, width), 0.01f));
     grid_tuning() = GridTuning{};
-    assert(grid_breath(0.4) == 1.0f);  // no breathing by default (the owner's choice)
 
     // The test screen's settings: each slider's value, in its own units,
     // matching the defaults, and setting one changes the tuning.
     {
         const auto values = grid_lab_values();
-        assert(values.size() == 11);
+        assert(values.size() == 4);  // the water's settings only
         const auto value_of = [&](const char* name) {
             for (const auto& [n, v] : values) if (n == name) return v;
             return std::string("?");
         };
-        assert(value_of("grid_breath_in") == "0.75" && value_of("grid_breath_size") == "0" && value_of("grid_wave_step") == "200");
-        assert(value_of("grid_wave_depth") == "6" && value_of("grid_ripple") == "35" && value_of("grid_fly_seconds") == "0.45");
-        assert(grid_lab_set("grid_breath_size", "4") && near(grid_tuning().breath_scale, 0.02f, 1e-6f));
+        assert(value_of("grid_wave_every") == "1.5" && value_of("grid_wave_step") == "200");
+        assert(value_of("grid_wave_depth") == "6" && value_of("grid_ripple") == "35");
+        assert(grid_lab_set("grid_ripple", "50") && near(grid_tuning().ripple, 0.5f, 1e-6f));
         assert(grid_lab_set("grid_wave_step", "100") && near(grid_tuning().wave_step, 0.1f, 1e-6f));
         assert(!grid_lab_set("grid_nothing", "1"));
         grid_tuning() = GridTuning{};

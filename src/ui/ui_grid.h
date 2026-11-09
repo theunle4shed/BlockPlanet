@@ -6,14 +6,12 @@
 // sphere (not quite a half) between lines of equal angle across and down
 // (great circles, rows and columns alike), so each row's and column's edges
 // follow one smooth curve across the grid, bowing as much one way as the
-// other, and the gaps between tiles read as the grid's lines. The sphere stays round and is
-// sized by the screen's longer side, the outermost tiles there cut about in
-// half by the edges. Like the original's, it breathes: the whole sphere swells and
-// settles gently, with a soft wave of tiles coming forward and back across
-// it. Between screens of the same colour nothing else happens; to a new
-// colour the far background fades to it and the tiles flip over in a ripple,
-// one after another, showing the new colour on their backs. The breathing
-// carries on through flips.
+// other, and the gaps between tiles read as the grid's lines. The sphere stays
+// round and the whole grid fits the screen's shorter side. The tiles bob like
+// floats on gently rippling water. Between screens of the same colour nothing
+// else happens; to a new colour the far background fades to it and the tiles
+// flip over in a ripple, one after another, showing the new colour on their
+// backs. The water carries on through flips and flights.
 //
 // A screen picks its colour with data-grid on its body ("blue", "green", ...;
 // see grid_colour), or a slow cycle of colours that fade smoothly into one
@@ -82,9 +80,8 @@ constexpr int grid_columns = 8, grid_rows = 8;
 GridLayout grid_layout(float width, float height);
 
 // Where a tile's corners are seen (pixels; top left, top right, bottom right,
-// bottom left): the whole sphere scaled by `breath` about its front, the
-// tile lifted `lift` pixels outwards and turned `turn` degrees about its
-// upright axis (positive: its right edge away).
+// bottom left): the tile lifted `lift` pixels outwards and turned `turn`
+// degrees about its upright axis (positive: its right edge away).
 struct GridPoint {
     float x = 0, y = 0;
 };
@@ -92,10 +89,10 @@ struct GridPoint {
 // `away` (0 in place, 1 gone) flies the tile out towards and past the viewer
 // (forwards and a little outwards). Nothing when a corner is too near the
 // viewer to draw (the tile has flown past).
-std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
-                                                          float lift, float turn, float away = 0.0f);
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float lift,
+                                                          float turn, float away = 0.0f);
 // The same with each corner lifted on its own (the water).
-std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile, float breath,
+std::optional<std::array<GridPoint, 4>> grid_tile_corners(const GridLayout& layout, const GridTile& tile,
                                                           const std::array<float, 4>& lifts, float turn, float away = 0.0f);
 
 // Flying in and out (seconds, the defaults): one tile's flight, and the
@@ -116,24 +113,19 @@ constexpr float grid_fade_seconds = grid_flip_seconds + grid_ripple_seconds;  //
 // The idle motion (the owner's description of the original, 2026-11-09):
 // the tiles bob like floats on gently rippling water, each rising and
 // sinking on its own as the wave's phase travels across the grid from the
-// top left, tilting with the water's slope. No breathing of the whole
-// sphere (measured from the original, but the owner chose the water; it is
-// kept, off, on the test screen).
+// top left, tilting with the water's slope. (The original's whole sphere
+// also seemed to breathe; the owner chose the water alone.)
 constexpr float grid_wave_seconds = 1.5f;    // one rise and fall of a tile
-constexpr float grid_breath_scale = 0.0f;    // either way
 constexpr float grid_wave_depth = 0.06f;     // a tile's width, either way
 
 // The motion's settings, adjustable while the grid runs (the grid test
 // screen, for the owner to tune; the defaults are the values above).
-// Breathing: in over breath_in seconds, held breath_hold, out over
-// breath_out. Water: a tile rises and sinks once every wave_every seconds,
+// Water: a tile rises and sinks once every wave_every seconds,
 // each next tile from the top left wave_step seconds later (so a wave spans
 // wave_every / wave_step tiles), wave_depth high; a second, weaker ripple
 // (ripple, 0 to 1 of the first) crosses it at an angle. Flying: as above,
 // and how far the tiles fly.
 struct GridTuning {
-    float breath_in = grid_wave_seconds / 2, breath_hold = 0.0f, breath_out = grid_wave_seconds / 2;
-    float breath_scale = grid_breath_scale;
     float wave_every = grid_wave_seconds, wave_step = 0.2f, ripple = 0.35f;
     float wave_depth = grid_wave_depth;
     float fly_seconds = grid_fly_seconds, fly_spread = grid_fly_spread, fly_distance = 1.0f;
@@ -144,8 +136,6 @@ GridTuning& grid_tuning();  // the presentation thread's (and tests')
 // and setting one from its slider. Returns false for an unknown name.
 std::vector<std::pair<std::string, std::string>> grid_lab_values();
 bool grid_lab_set(const std::string& name, const std::string& value);
-// The whole sphere's scale at `time` seconds (about 1).
-float grid_breath(double time);
 // The water's height (pixels, outwards; negative: sunk) at a point of the
 // grid (u across, v down, in tiles from the top left) at `time` seconds, for
 // tiles `width` pixels wide. Each corner of a tile follows it, so the tiles
@@ -175,6 +165,9 @@ public:
     // A black backdrop behind the grid, kept even when it has flown out (the
     // test screen, so a fly-out there does not reveal the game's menus).
     void set_backdrop(bool on) { backdrop_ = on; }
+    // Which layers are drawn (the test screen's Show setting): the tiles,
+    // the far background, or both (normally).
+    void set_layers(bool tiles, bool far) { show_tiles_ = tiles, show_far_ = far; }
     // How much is in place: 0 gone, 1 every tile in place.
     float presence() const;
     // How much of the loading cover may show: while the grid flies out into
@@ -226,6 +219,7 @@ private:
     bool leaving_ = false;      // flying out (or gone)
     bool into_cover_ = false;
     bool backdrop_ = false;
+    bool show_tiles_ = true, show_far_ = true;
     void show_backdrop();
     float far_alpha_ = 0;
     double last_now_ = 0;

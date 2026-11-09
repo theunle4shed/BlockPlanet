@@ -124,6 +124,7 @@ bool start(std::uint32_t width, std::uint32_t height) {
     grid = std::make_unique<MenuGrid>(asset("grid.rml"));
     for (const auto& [name, value] : grid_lab_values()) navigator->set_setting(name, value);
     navigator->set_setting("grid_theme", "blue");
+    navigator->set_setting("grid_show", "both");
     std::fprintf(stdout, "{\"event\":\"ui_started\",\"width\":%u,\"height\":%u}\n", width, height);
     std::fflush(stdout);
     return true;
@@ -882,6 +883,7 @@ std::string grid_override;
 // the grid is shown (its Fly in and Fly out buttons).
 std::string lab_theme = "blue";
 bool lab_present = true;
+std::string lab_show = "both";  // both, tiles or background
 void update_grid() {
     const auto screens = navigator->documents();
     const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -896,7 +898,9 @@ void update_grid() {
         std::lock_guard lock(loading_mutex);
         cover = loading_opacity > 0.0f;
     }
-    grid->set_backdrop(navigator->current_screen() == "grid_lab");
+    const bool lab = navigator->current_screen() == "grid_lab";
+    grid->set_backdrop(lab);
+    grid->set_layers(!lab || lab_show != "background", !lab || lab_show != "tiles");
     grid->update(context, colour, now, cover);
     // Research: BLOCKPLANET_GRID_LOG=1 logs the grid's state every frame
     // while it is drawn (and the frame it goes), to tell its own dark frames
@@ -1016,6 +1020,7 @@ bool grid_lab_command(const std::string& command) {
     if (equals == std::string::npos) return true;
     const std::string name = command.substr(8, equals - 8), value = command.substr(equals + 1);
     if (name == "grid_theme") lab_theme = value;
+    else if (name == "grid_show") lab_show = value;
     else grid_lab_set(name, value);
     navigator->set_setting(name, value);
     // The values so far, for the owner to report.
