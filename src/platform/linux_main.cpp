@@ -3715,6 +3715,17 @@ bool handle_profile_command(const std::string& command) {
                     loading_active = false;
             }
             opacity = loading_active ? std::min(1.0f, opacity + dt / 0.15f) : std::max(0.0f, opacity - dt / 0.5f);
+            // The old menus' sound effects (their page transitions) are not
+            // heard under the cover (the owner's report): effects are muted
+            // while it is up, and the player's levels come back with play.
+            static bool muted = false;
+            if (loading_active && !muted) {
+                muted = true;
+                blockplanet::set_audio_levels(current_audio().music, 0);
+            } else if (!loading_active && muted) {
+                muted = false;
+                blockplanet::set_audio_levels(current_audio().music, current_audio().effects);
+            }
             blockplanet::ui::set_loading(loading_title, opacity);
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
