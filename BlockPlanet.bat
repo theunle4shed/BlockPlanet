@@ -95,10 +95,11 @@ goto build
 :build
 powershell -ExecutionPolicy Bypass -File tools\build\setup_windows.ps1 -SkipDependencies
 if errorlevel 1 goto failed
-echo.
-echo Done.
-pause
-goto menu
+rem Straight back to the options, with the newest copy of this menu (the
+rem update may have changed it).
+copy /y "BlockPlanet.bat" "%TEMP%\blockplanet-menu.bat" >nul
+"%TEMP%\blockplanet-menu.bat" --from-temp "%CD%\"
+exit /b
 
 :run
 if not exist ".local\m1\build-windows\Release\tetrisphere-m1.exe" (
