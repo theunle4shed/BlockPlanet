@@ -121,10 +121,6 @@ The owner's design (2026-11-09; roadmap: One grid background for the menus). Blo
 - **Tuning:** the defaults are accepted for now (the owner, 2026-11-09); final tuning is deferred until much later, on the grid test screen. Known differences from the original: the grid is smaller than the original's background, which fills a 4:3 screen's width (ours is sized by the shorter side, the owner's choice), and its light sweeps across the grid as a wave (tile to tile about 0.65 s) where the original's changes per tile almost at once (about 0.06 s); lighting each tile by its tilt was tried and measured further away.
 - **Not yet:** red tiles flying in behind BlockPlanet's game over panel once the GAME OVER animation has shown (waits for the research on holding the game over screen); a different idle motion per section (the owner's idea); the title screen on the new grid. The title's ring, logo and characters are drawn by the game, under BlockPlanet's layer, so the grid would hide them: putting the title on the grid needs the grid drawn before the game's picture (in the renderer) with the game's own grid switched off, or the title's parts rebuilt by BlockPlanet.
 
-## Toasts
-
-A short note over the menus that fades in (0.2 s), holds and fades out by itself (its last 0.5 s; 3.2 s in all), with nothing to dismiss (`blockplanet::ui::show_toast(text)`, `assets/ui/toast.rml`): the menus' note colour (`#E8B818`) on a dark panel with the menus' white outline, low in the middle of the window, in sentence case. Asking again replaces the note and starts it over. Used once each time "Play as guest" is picked on "Who is playing?" or Profiles: "Playing as Guest. Progress isn't saved." (the owner's request, 2026-11-10), over the main menu that opens next.
-
 ## The box art on the grid
 
 The owner's design (2026-11-10): the title's box art (BlockPlanet's held title scene: the 3D letters, the ring, Turbine, Wheels, the Bombs and the core light) stands on BlockPlanet's menu grid, so the grid is already up when the menus open. The game draws the box art, and BlockPlanet's grid is normally drawn over the game's picture, so it is put under it instead:

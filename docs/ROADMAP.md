@@ -88,6 +88,8 @@ Replace the original menus (title, mode select, options, controls, graphics) wit
 
 Direction: a modern, simple, TV-like menu (large focus states, few items per screen, quick transitions), with no option to keep the original menus.
 
+**Idea: toasts (2026-11-10, not built).** A short note over the menus that fades in and out by itself after a few seconds, with nothing to dismiss, in the menus' note colour, for passing information such as "Playing as Guest. Progress isn't saved." A version was built and withdrawn the same day (the owner left guest play as it was); it could return when a screen needs one.
+
 ## Phase 3: audio and visuals
 
 ### Background animations: understand them (research M)

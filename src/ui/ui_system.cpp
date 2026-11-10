@@ -756,44 +756,6 @@ Rml::ElementDocument* loading_document = nullptr;
 std::string build_label;  // under loading_mutex
 Rml::ElementDocument* label_document = nullptr;
 
-// The toast (show_toast): its text, when it was asked for, and its document.
-std::mutex toast_mutex;
-std::string toast_text;
-std::chrono::steady_clock::time_point toast_since{};
-bool toast_new = false;
-Rml::ElementDocument* toast_document = nullptr;
-
-// Fades in over 0.2 s, holds, fades out over its last 0.5 s: 3.2 s in all.
-bool update_toast_document() {
-    std::string text;
-    bool fresh = false;
-    std::chrono::steady_clock::time_point since;
-    {
-        std::lock_guard lock(toast_mutex);
-        text = toast_text;
-        fresh = toast_new;
-        toast_new = false;
-        since = toast_since;
-    }
-    const float t = std::chrono::duration<float>(std::chrono::steady_clock::now() - since).count();
-    const float opacity = text.empty() ? 0.0f : std::clamp(std::min(t / 0.2f, (3.2f - t) / 0.5f), 0.0f, 1.0f);
-    if (opacity <= 0.0f) {
-        if (toast_document != nullptr) toast_document->Hide();
-        return false;
-    }
-    if (toast_document == nullptr) {
-        toast_document = context->LoadDocument(asset("toast.rml"));
-        if (toast_document == nullptr) return false;
-        fresh = true;
-    }
-    if (fresh)
-        if (auto* e = toast_document->GetElementById("text")) e->SetInnerRML(escape(text));
-    toast_document->SetProperty("opacity", std::to_string(opacity));
-    toast_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
-    toast_document->PullToFront();
-    return true;
-}
-
 bool update_label_document() {
     std::string text;
     {
@@ -1015,7 +977,6 @@ bool prepare_frame(plume::RenderCommandList* list, plume::RenderFramebuffer* fra
     const bool hud_visible = update_hud_document();
     const bool loading_visible = update_loading_document();
     const bool label_visible = update_label_document();
-    const bool toast_visible = update_toast_document();
     // Research (BLOCKPLANET_GRID_LOG=1): every document drawn, with its
     // opacity, each frame while the grid is up and for 1.5 s after it goes.
     {
@@ -1038,7 +999,7 @@ bool prepare_frame(plume::RenderCommandList* list, plume::RenderFramebuffer* fra
                          t, int(navigator->is_open()), int(hud_visible), int(loading_visible), int(label_visible), int(grid->visible()), shown.c_str());
         }
     }
-    frame_shown = navigator->is_open() || hud_visible || loading_visible || label_visible || toast_visible || grid->visible();
+    frame_shown = navigator->is_open() || hud_visible || loading_visible || label_visible || grid->visible();
     if (frame_shown) {
         for (auto* each : {context, grid_context}) {
             if (each->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
@@ -1102,7 +1063,6 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
 
 void hook_deinit() {
     hud_document = nullptr;
-    toast_document = nullptr;
     grid.reset();
     navigator.reset();
     if (started) {
@@ -1147,13 +1107,6 @@ bool grid_lab_command(const std::string& command) {
 }
 
 } // namespace
-
-void show_toast(const std::string& text) {
-    std::lock_guard lock(toast_mutex);
-    toast_text = text;
-    toast_since = std::chrono::steady_clock::now();
-    toast_new = true;
-}
 
 void set_grid_override(const std::string& colour) {
     std::lock_guard lock(grid_override_mutex);
