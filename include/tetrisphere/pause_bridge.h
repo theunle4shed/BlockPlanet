@@ -51,8 +51,9 @@ public:
     // Research (BLOCKPLANET_RESUME_SKIP): after Resume, once the game's exit
     // (0x800DFF08 = 5) has faded its picture in (0x800E1202 = 0), end the
     // exit at once, as the game does at its natural end (0x800DFF08 = 0, the
-    // row -1), and stop driving the row, which otherwise wrote it back to 0
-    // and paused the game again. Returns whether it did.
+    // row -1, and its pause request flag 0x8013FAD0 cleared, which otherwise
+    // starts a pause again on the next frame), and stop driving the row,
+    // which otherwise wrote it back to 0 too. Returns whether it did.
     bool finish_resume(std::uint8_t* rdram);
 
 private:

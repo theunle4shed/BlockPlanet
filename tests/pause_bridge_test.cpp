@@ -79,7 +79,9 @@ int main() {
     set(0x800E1202, 120);
     assert(!bridge.finish_resume(m));  // still fading
     set(0x800E1202, 0);
-    assert(bridge.finish_resume(m) && load16(m, 0x800E1228) == -1 && load16(m, 0x800DFF08) == 0);
+    set(0x8013FAD0, 1);  // the game's pause request flag
+    assert(bridge.finish_resume(m) && load16(m, 0x800E1228) == -1 && load16(m, 0x800DFF08) == 0 &&
+           load16(m, 0x8013FAD0) == 0);
     out = step(bridge, false);
     assert(!out.inject && !bridge.hide_original() && load16(m, 0x800E1228) == -1);
     assert(!bridge.finish_resume(m));  // once
