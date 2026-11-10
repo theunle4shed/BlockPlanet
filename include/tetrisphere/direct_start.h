@@ -17,6 +17,7 @@
 // menu's other branch) is refused, and the caller falls back to ModeLauncher.
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 
 namespace tetrisphere {
@@ -51,6 +52,13 @@ bool enabled();
 // without restarting the game: for Back from "Who is playing?". Done by the
 // game's thread at its next frame outside play; ignored during play.
 void request_intro_restart();
+
+// Changes the cartridge save in use without restarting the game (a profile
+// change): once the game has nothing waiting to be written, the save behind
+// it becomes `path` (empty: a guest's, in memory only) and the game reads it
+// in again, as at start-up. The outcome arrives through take_save_switch_result.
+void request_save_switch(const std::filesystem::path& path);
+std::optional<bool> take_save_switch_result();
 
 } // namespace direct_start
 } // namespace tetrisphere

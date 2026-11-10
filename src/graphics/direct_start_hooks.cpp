@@ -35,6 +35,7 @@
 
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
+#include "tetrisphere/runtime.h"
 
 #include <atomic>
 #include <cstdint>
@@ -54,6 +55,9 @@ void func_8003E460(std::uint8_t* rdram, recomp_context* ctx);
 void func_80066E6C(std::uint8_t* rdram, recomp_context* ctx);
 void func_8007ADF8(std::uint8_t* rdram, recomp_context* ctx);
 void func_8007AEE0(std::uint8_t* rdram, recomp_context* ctx);
+void func_80066E40(std::uint8_t* rdram, recomp_context* ctx);
+void func_80066DB8(std::uint8_t* rdram, recomp_context* ctx);
+void func_80066F18(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace tetrisphere {
@@ -158,6 +162,14 @@ constexpr std::uint32_t training_cleared_b = 0x800E4480u;
 
 std::mutex mutex;
 std::atomic<bool> intro_restart{false};
+// A profile change's cartridge save (under `mutex`).
+std::optional<std::filesystem::path> save_switch;
+std::optional<bool> save_switch_result;
+constexpr std::uint32_t save_changed_flags = 0x800F2250u;  // u8 per block: waiting to be written
+constexpr std::uint32_t save_reading = 0x800DF740u;       // u8: set while the save thread reads the save in
+constexpr std::uint32_t save_copy = 0x80102918u;          // the game's copy of the save (512 bytes)
+constexpr std::uint32_t save_checksum = 0x80102B14u;      // u32, as func_80066DB8 computes it
+bool save_switch_reading = false;
 std::optional<DirectStartRequest> waiting;
 std::optional<direct_start::Result> outcome;
 
@@ -441,6 +453,19 @@ void cancel() {
 
 void request_intro_restart() { intro_restart.store(true); }
 
+void request_save_switch(const std::filesystem::path& path) {
+    std::lock_guard lock(mutex);
+    save_switch = path;
+    save_switch_result.reset();
+}
+
+std::optional<bool> take_save_switch_result() {
+    std::lock_guard lock(mutex);
+    auto result = save_switch_result;
+    save_switch_result.reset();
+    return result;
+}
+
 bool enabled() {
     static const bool on = [] {
         const char* value = std::getenv("BLOCKPLANET_LAUNCH");
@@ -478,6 +503,47 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
         std::fflush(stdout);
     }
     std::lock_guard lock(mutex);
+    // A profile change: when no block of the save is waiting to be written
+    // (the save thread only writes while the game's thread waits, so none
+    // can start now), the save behind the game changes and the game reads it
+    // in again (func_80066E40, as the intro does at start-up), which also
+    // refreshes the save thread's copy of what it last wrote.
+    if (save_switch && !save_switch_reading && load16(rdram, main_row) >= 0) {
+        bool waiting_write = false;
+        for (std::uint32_t block = 0; block < 64; ++block)
+            if (load8(rdram, save_changed_flags + block) != 0) waiting_write = true;
+        if (!waiting_write) {
+            std::string error;
+            const bool ok = initialize_eeprom(*save_switch, error);
+            if (ok) {
+                call(func_80066E40, rdram, ctx);
+                save_switch_reading = true;
+            } else {
+                std::fprintf(stdout, "{\"event\":\"save_switch\",\"status\":\"failed\"}\n");
+                std::fprintf(stderr, "Could not load the profile's save: %s\n", error.c_str());
+                std::fflush(stdout);
+                save_switch.reset();
+                save_switch_result = false;
+            }
+        }
+    }
+    // Once read in, the save is checked as at start-up (func_80067434: its
+    // checksum and the "H2O" mark); a new or damaged one is given the game's
+    // defaults (func_80066F18, which also writes it). The start-up check's
+    // steer towards Training for a new player (its menu row and the game's
+    // Training start) is left to BlockPlanet's own Training offers.
+    if (save_switch_reading && load8(rdram, save_reading) == 0) {
+        save_switch_reading = false;
+        const auto checksum = static_cast<std::uint32_t>(call(func_80066DB8, rdram, ctx));
+        const bool valid = checksum == load32(rdram, save_checksum) && load8(rdram, save_copy + 1) == 'H' &&
+                           load8(rdram, save_copy + 2) == '2' && load8(rdram, save_copy + 3) == 'O';
+        if (!valid) call(func_80066F18, rdram, ctx);
+        std::fprintf(stdout, "{\"event\":\"save_switch\",\"guest\":%s,\"status\":\"done\",\"new_save\":%s}\n",
+                     save_switch->empty() ? "true" : "false", valid ? "false" : "true");
+        std::fflush(stdout);
+        save_switch.reset();
+        save_switch_result = true;
+    }
     if (!waiting) return;
     const auto request = *waiting;
     // Only from the original main menu at rest: not in play, not inside a
@@ -490,7 +556,6 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
                        : load16(rdram, player_page_row) >= 0 ? "player_page_open"
                        : load16(rdram, mode_row) >= 0        ? "mode_page_open"
                        : load16(rdram, page_exit) != 0       ? "page_closing"
-                       : load8(rdram, training_jump) != 0    ? "training_jump"
                        : (grid != grid_none && grid != grid_shown) ? "grid_moving"
                                                                    : nullptr;
     static const char* last_busy = nullptr;
@@ -506,6 +571,9 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
         return;
     }
     last_busy = nullptr;
+    // A new save's start-up check asks the game to start Training (the byte
+    // at 0x800DFE8C); the player has chosen a mode in BlockPlanet's menus.
+    store8(rdram, training_jump, 0);
     if (load16(rdram, title_done) == 0) {
         // Still on the game's own title: leave it as the title does.
         call(func_8007ADF8, rdram, ctx, jingle_player);

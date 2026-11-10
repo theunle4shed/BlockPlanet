@@ -2198,6 +2198,10 @@ bool launching() { return mode_launcher.active() || direct_wait.has_value(); }
 // then for it to be shown again.
 bool title_seen = false;
 bool title_restart_pending = false;
+// Profile changes in place (no relaunch, the owner's request 2026-11-10).
+std::filesystem::path trophy_definitions_path;
+std::string profile_to_remove;  // removed once the game has let go of its save
+bool start_chapter_given = false;  // --start-chapter: progress is not recorded
 
 // BlockPlanet's pause menu over the game's pause.
 PauseBridge pause_bridge;
@@ -2515,6 +2519,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // which a profile without controls of its own starts from; a guest uses
     // them for the session.
     pc_controls = controls_of(active_settings);
+    start_chapter_given = run_options.start_chapter.has_value();
     if (!run_options.guest) {
         profile_save = std::make_unique<ProfileSave>(profile_path / "save.json");
         std::string save_error;
@@ -2575,6 +2580,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         const auto definitions = base != nullptr
             ? std::filesystem::u8path(base) / "trophies.json" : std::filesystem::path("trophies.json");
         if (base != nullptr) SDL_free(base);
+        trophy_definitions_path = definitions;
         if (!run_options.guest) initialize_trophies(definitions, profile_path / "trophies.json");
         load_developer_records_at_start(definitions.parent_path() / "developer_records.json");
     }
@@ -2984,6 +2990,79 @@ void shut_down() {
     std::exit(0);  // Windows: the new process is running
 }
 
+// Changes the playing profile without restarting the game (the owner's
+// request, 2026-11-10: no menu item relaunches): everything start-up loads
+// for a profile is loaded again, and the game's cartridge save is changed on
+// its own thread (direct_start::request_save_switch). `remove_id`: a profile
+// to delete once its save is no longer in use (deleting the playing one).
+void switch_profile(std::optional<std::string> name, bool guest, const std::string& remove_id = {}) {
+    auto& profiles = *profile_store;
+    save_profile();
+    save_trophies();
+    std::string error;
+    if (!guest && name && !profiles.use(*name, error)) {
+        show_error(error.c_str());
+        return;
+    }
+    if (!guest && !name) name = profiles.active().name;
+    guest_session = guest;
+    std::filesystem::path profile_path, eeprom_path;
+    if (!guest) {
+        profile_path = profiles.directory(profiles.active());
+        std::error_code ignored;
+        std::filesystem::create_directories(profile_path, ignored);
+        eeprom_path = profile_path / "cartridge.eep";
+        if (!rotate_backup(eeprom_path, profile_path / "backups", 3, error))
+            std::fprintf(stderr, "Could not back up the save: %s\n", error.c_str());
+    }
+    tetrisphere::direct_start::request_save_switch(eeprom_path);
+    profile_to_remove = remove_id;
+    // BlockPlanet's records and preferences for the profile.
+    profile_save.reset();
+    profile_data = ProfileSaveData{};
+    profile_dirty = false;
+    continue_mode.reset();
+    pending_restore.reset();
+    return_to_menu_chapter.reset();
+    single_stage.reset();
+    if (!guest) {
+        profile_save = std::make_unique<ProfileSave>(profile_path / "save.json");
+        if (!profile_save->load(profile_data, error)) {
+            std::fprintf(stderr, "Could not load the profile: %s\n", error.c_str());
+            profile_data = ProfileSaveData{};
+        }
+    }
+    refresh_continue();
+    if (profile_data.preferences.controls) {
+        apply_controls(active_settings, *profile_data.preferences.controls);
+    } else {
+        apply_controls(active_settings, pc_controls);
+        if (!guest) {
+            profile_data.preferences.controls = pc_controls;
+            profile_dirty = true;
+            save_profile();
+        }
+    }
+    set_controller_bindings(active_settings.bindings);
+    set_magic_control(active_settings.magic);
+    profile_recording = !guest && !start_chapter_given;
+    if (profile_data.preferences.audio) {
+        blockplanet::set_audio_levels(profile_data.preferences.audio->music, profile_data.preferences.audio->effects);
+        blockplanet::set_music_random(profile_data.preferences.audio->random_music);
+    } else {
+        blockplanet::set_audio_levels(100, 100);
+        blockplanet::set_music_random(false);
+    }
+    const auto trophies = profile_path / "trophies.json";
+    switch_trophies(trophy_definitions_path, guest ? nullptr : &trophies);
+    profile_picked = true;
+    std::fprintf(stdout, "{\"event\":\"profile_switch\",\"id\":\"%s\",\"guest\":%s}\n",
+                 guest ? "" : profiles.active().id.c_str(), guest ? "true" : "false");
+    std::fflush(stdout);
+    // The main menu opens for the profile (the game's menu check opens it).
+    blockplanet::ui::request_close();
+}
+
 // The profile screens' commands (profile_menu.h). True if `command` was one.
 bool handle_profile_command(const std::string& command) {
     if (!profile_store) return false;
@@ -3062,7 +3141,7 @@ bool handle_profile_command(const std::string& command) {
         if (name_editor.target() == "new") {
             if (name.empty()) name = next_profile_name(store);
             if (store.find(name) != nullptr) show_name("That name is taken");
-            else restart_as(name, false);  // --profile creates it
+            else switch_profile(name, false);  // use() creates it
             return true;
         }
         const auto* profile = profile_by_id(store, name_editor.target());
@@ -3122,15 +3201,26 @@ bool handle_profile_command(const std::string& command) {
         return true;
     }
     if (const auto id = argument("profile_play:")) {
-        if (const auto* profile = profile_by_id(store, *id)) restart_as(profile->name, false);
+        if (const auto* profile = profile_by_id(store, *id)) switch_profile(profile->name, false);
         return true;
     }
-    if (command == "profile_guest") restart_as(std::nullopt, true);
+    if (command == "profile_guest") {
+        switch_profile(std::nullopt, true);
+        return true;
+    }
     if (const auto id = argument("profile_delete_confirmed:")) {
         const auto* profile = profile_by_id(store, *id);
         if (profile == nullptr) return true;
-        // The playing profile's folder is in use until the game stops.
-        if (!guest_session && profile->id == store.active().id) restart_as(std::nullopt, false, *id);
+        // The playing profile: change to another (the next in the list, or
+        // a guest) first; it is removed once its save is no longer in use.
+        if (!guest_session && profile->id == store.active().id) {
+            const Profile* other = nullptr;
+            for (const auto& candidate : store.profiles())
+                if (candidate.id != profile->id) { other = &candidate; break; }
+            if (other != nullptr) switch_profile(other->name, false, *id);
+            else switch_profile(std::nullopt, true, *id);
+            return true;
+        }
         std::string error;
         const std::string name = profile->name;
         if (!store.remove(name, error)) std::fprintf(stderr, "Could not delete the profile: %s\n", error.c_str());
@@ -3647,6 +3737,20 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (const auto mode = launch_mode_for_command(*command)) launch_mode(*mode);
+        }
+        // A profile change's cartridge save has been swapped: a profile
+        // deleted while it was playing can go now.
+        if (const auto switched = tetrisphere::direct_start::take_save_switch_result()) {
+            if (!*switched) show_error("Could not load the profile's save.");
+            if (!profile_to_remove.empty() && profile_store) {
+                std::string error;
+                if (const auto* removed = profile_by_id(*profile_store, profile_to_remove)) {
+                    const std::string name = removed->name;
+                    if (!profile_store->remove(name, error))
+                        std::fprintf(stderr, "Could not delete the profile: %s\n", error.c_str());
+                }
+                profile_to_remove.clear();
+            }
         }
         if (direct_wait && guest_rdram != nullptr) {
             if (const auto result = direct_start::take_result()) {
