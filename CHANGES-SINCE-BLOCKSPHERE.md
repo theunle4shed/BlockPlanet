@@ -295,4 +295,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 ## 2026-11-10: Escape mode, step 1 (research)
 
-- A visual prototype of the Escape mode idea, off by default (`BLOCKPLANET_ESCAPE_VIEW=1`). The game's own board is drawn as seen from inside the sphere. Each brick shows its underside, through the game's own (never used) inner-face routine, so they are the real bricks. There is no core, and holes show where a column is dug to it. Play and the rules are unchanged; the cursor and pieces are still drawn from outside.
+- A visual prototype of the Escape mode idea, off by default (`BLOCKPLANET_ESCAPE_VIEW=1`). The game's own board is drawn as seen from inside the sphere. Each brick shows its underside, through the game's own (never used) inner-face routine, so they are the real bricks. There is no core, and holes show where a column is dug to it. Play and the rules are unchanged; the cursor and pieces are still drawn from outside. Checked on the real game; step 2's rules research and an estimate are in `docs/research/blockplanet-escape-mode.md`.
