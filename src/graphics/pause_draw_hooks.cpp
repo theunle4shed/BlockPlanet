@@ -19,6 +19,8 @@
 //                                     made outside the game's HUD routine
 //   BLOCKPLANET_HUD_SKIP_LOG=1        log each distinct 2D draw skipped in the game's HUD routine
 //   BLOCKPLANET_HUD_SKIP_MODEL=addr   skip model draws (0x8002D93C) whose matrix (a2) is addr
+//   BLOCKPLANET_BG_DL_LOG=N           log the play background's display-list commands on its
+//                                     Nth and (N+30)th draws (default 120), with data hashes
 // The HUD: while BlockPlanet's HUD is shown (set_original_hud_hidden), the 2D
 // draws made inside the game's HUD routine func_80075CD8 are skipped, and so is
 // the held magic's model (func_800C78A0).
@@ -29,6 +31,7 @@
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/recomp_support.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -135,7 +138,100 @@ void set_original_hud_keep_models(bool keep) { hud_keep_models.store(keep); }
 void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
 }
 
+namespace {
+// Research: BLOCKPLANET_BG_DL_LOG=N logs the F3D commands the play background
+// (the built scene at 0x801033BC, drawn through 0x8002D93C from the main
+// loop) writes on its Nth draw and its (N+30)th (default N = 120), following
+// G_DL calls, with hashes of the vertices, matrices, palettes and texels they
+// point at, so two frames can be compared: mesh motion shows as matrices or
+// vertices changing, scrolling as tile sizes, colour cycling as palette
+// hashes, tints as prim or env colours (docs/research/blockplanet-play-backgrounds.md).
+std::uint32_t resolve(std::uint32_t address) {
+    // K0 or physical addresses only; other segments are logged unresolved.
+    const std::uint32_t top = address >> 24;
+    return top == 0x80u || top == 0x00u ? (address & 0x00FFFFFFu) | 0x80000000u : 0u;
+}
+
+std::uint64_t hash_words(const std::uint8_t* rdram, std::uint32_t address, std::uint32_t bytes) {
+    std::uint64_t h = 1469598103934665603ull;
+    for (std::uint32_t i = 0; i + 4 <= bytes && i < 0x10000u; i += 4) {
+        h ^= guest32(rdram, address + i);
+        h *= 1099511628211ull;
+    }
+    return h;
+}
+
+void log_background_dl(const std::uint8_t* rdram, std::uint32_t from, std::uint32_t to, int draw) {
+    std::fprintf(stdout, "{\"event\":\"bg_dl\",\"draw\":%d,\"from\":\"0x%08X\",\"commands\":%u}\n", draw, from, (to - from) / 8u);
+    std::uint32_t image = 0, image_size = 0;
+    int lines = 0;
+    const auto walk = [&](auto&& self, std::uint32_t start, std::uint32_t end, int depth) -> void {
+        for (std::uint32_t a = start; a < end && lines < 6000; a += 8u) {
+            const std::uint32_t w0 = guest32(rdram, a), w1 = guest32(rdram, a + 4u);
+            const std::uint32_t op = w0 >> 24;
+            ++lines;
+            std::fprintf(stdout, "BGDL %d %d %08X %08X", draw, depth, w0, w1);
+            const std::uint32_t at = resolve(w1);
+            if (op == 0x04u && at) {  // G_VTX: length in the low 16 bits
+                std::fprintf(stdout, " vtx n=%u hash=%016llX", ((w0 >> 20) & 0xFu) + 1u,
+                             (unsigned long long)hash_words(rdram, at, w0 & 0xFFFFu));
+            } else if (op == 0x01u && at) {  // G_MTX
+                std::fprintf(stdout, " mtx p=%02X hash=%016llX", (w0 >> 16) & 0xFFu,
+                             (unsigned long long)hash_words(rdram, at, 64));
+            } else if (op == 0xFDu) {  // G_SETTIMG
+                image = at;
+                image_size = (w0 >> 19) & 3u;
+                std::fprintf(stdout, " settimg fmt=%u siz=%u w=%u", (w0 >> 21) & 7u, image_size, (w0 & 0xFFFu) + 1u);
+            } else if (op == 0xF0u && image) {  // G_LOADTLUT
+                const std::uint32_t count = ((w1 >> 14) & 0x3FFu) + 1u;
+                std::fprintf(stdout, " tlut n=%u hash=%016llX", count, (unsigned long long)hash_words(rdram, image, count * 2u));
+            } else if (op == 0xF3u && image) {  // G_LOADBLOCK
+                const std::uint32_t texels = ((w1 >> 12) & 0xFFFu) + 1u;
+                const std::uint32_t bytes = image_size == 0 ? texels / 2u : texels << (image_size - 1u);
+                std::fprintf(stdout, " block texels=%u hash=%016llX", texels, (unsigned long long)hash_words(rdram, image, bytes));
+            } else if (op == 0xF2u || op == 0xF4u) {  // G_SETTILESIZE, G_LOADTILE
+                std::fprintf(stdout, " tilesize uls=%u ult=%u lrs=%u lrt=%u", (w0 >> 12) & 0xFFFu, w0 & 0xFFFu,
+                             (w1 >> 12) & 0xFFFu, w1 & 0xFFFu);
+            }
+            std::fprintf(stdout, "\n");
+            if (op == 0x06u && at && depth < 4) {  // G_DL
+                self(self, at, at + 8u * 2000u, depth + 1);
+                if (((w0 >> 16) & 0xFFu) == 1u) return;  // branch, no return
+            }
+            if (op == 0xB8u && depth > 0) return;  // G_ENDDL
+        }
+    };
+    walk(walk, from, to, 0);
+    std::fflush(stdout);
+}
+} // namespace
+
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    static const int bg_dl_draw = [] {
+        const char* v = std::getenv("BLOCKPLANET_BG_DL_LOG");
+        return v == nullptr ? 0 : std::max(1, std::atoi(v) > 0 ? std::atoi(v) : 120);
+    }();
+    static bool bg_dl_inside = false;
+    if (bg_dl_draw > 0 && !bg_dl_inside && helper == 0x8002D93Cu && guest16(rdram, 0x800E121Cu) == -1 &&
+        static_cast<std::uint32_t>(ctx->r4) == guest32(rdram, 0x801033BCu) && guest32(rdram, 0x801033BCu) != 0) {
+        static int draws = 0;
+        ++draws;
+        if (draws == bg_dl_draw || draws == bg_dl_draw + 30) {
+            // Draw it here, between two reads of the game's next free
+            // display-list command, then skip the original call.
+            const std::uint32_t from = guest32(rdram, 0x800F22B4u);
+            const recomp_context saved = *ctx;
+            ctx->r29 = static_cast<gpr>(static_cast<std::int32_t>(saved.r29) - 0x80);
+            bg_dl_inside = true;
+            func_8002D93C(rdram, ctx);
+            bg_dl_inside = false;
+            const auto result = ctx->r2;
+            *ctx = saved;
+            ctx->r2 = result;
+            log_background_dl(rdram, from, guest32(rdram, 0x800F22B4u), draws);
+            return true;
+        }
+    }
     // Story hides its score (decided 2026-11-08): the game's score bubbles
     // that rise over breaking bricks (its "1x" to "20x" pictures, 25 to 27
     // by 17) are not drawn there.
