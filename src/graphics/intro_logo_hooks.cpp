@@ -51,6 +51,20 @@ int hold_frame() {
     return frame;
 }
 
+// Where the logo starts (the owner's request, 2026-11-10): frame 540 (60 a
+// second), with the N already centred and spinning; its walk-in (frames 64 to
+// about 190) and most of its spin are skipped. The whole logo then shows for
+// 1.75 s, until the wordmark fades and the camera pulls back (640 to 665),
+// and the intro's scenes take over at 690: 2.5 s in all, against about 10.5.
+// BLOCKPLANET_INTRO_LOGO_START=frame changes it (0: the full length).
+int start_frame() {
+    static const int frame = [] {
+        const char* v = std::getenv("BLOCKPLANET_INTRO_LOGO_START");
+        return v ? std::atoi(v) : 540;
+    }();
+    return frame;
+}
+
 bool enabled() {
     static const bool on = [] {
         const char* v = std::getenv("BLOCKPLANET_INTRO_LOGO");
@@ -99,8 +113,13 @@ extern "C" void blockplanet_logo_scene_stepped(std::uint8_t* rdram, recomp_conte
         }
         std::memcpy(host(rdram, scene), saved.data(), saved.size());
         prepared_scene = scene;
-        std::fprintf(stdout, "{\"event\":\"intro_logo_held\",\"scene\":\"0x%08X\",\"from_frame\":%d,\"hold_frame\":%d,\"end_frame\":%d}\n",
-                     scene, frame, hold_frame(), static_cast<int>(load32(rdram, load32(rdram, scene + 0x1Cu) + 0xCu)));
+        // Shorter: carry the live scene on to the start frame.
+        while (static_cast<int>(load32(rdram, frame_address)) < start_frame()) {
+            step(rdram, ctx, scene);
+            store32(rdram, frame_address, load32(rdram, frame_address) + 1u);
+        }
+        std::fprintf(stdout, "{\"event\":\"intro_logo_held\",\"scene\":\"0x%08X\",\"from_frame\":%d,\"start_frame\":%d,\"hold_frame\":%d,\"end_frame\":%d}\n",
+                     scene, frame, start_frame(), hold_frame(), static_cast<int>(load32(rdram, load32(rdram, scene + 0x1Cu) + 0xCu)));
         std::fflush(stdout);
     }
     if (frame >= hold_frame() || held.size() != held_list().size() * state_size) return;
