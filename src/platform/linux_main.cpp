@@ -3254,6 +3254,8 @@ bool handle_profile_command(const std::string& command) {
     }
     if (command == "profile_guest") {
         switch_profile(std::nullopt, true);
+        // Once per pick, over the main menu that opens next (the owner's request).
+        blockplanet::ui::show_toast("Playing as Guest. Progress isn't saved.");
         return true;
     }
     if (const auto id = argument("profile_delete_confirmed:")) {

@@ -30,6 +30,10 @@ void set_rom(std::span<const std::uint8_t> rom);
 // (or, once a screen opens, takes that screen's colour).
 void set_grid_override(const std::string& colour);
 
+// A short note over the menus that fades in and, after about 3 seconds, out
+// by itself, with nothing to dismiss (for example after "Play as guest").
+void show_toast(const std::string& text);
+
 // Opens the menus at a screen (ui/screens/<screen>.rml), or closes them.
 // Applied at the next frame.
 void request_open(const std::string& screen);
