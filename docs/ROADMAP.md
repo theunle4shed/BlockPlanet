@@ -121,6 +121,10 @@ The owner's idea: when the player is close to losing, the background behaves dif
 
 See [the feasibility notes](research/blockplanet-play-backgrounds.md#pinch-mode-the-owners-idea-2026-11-10). Nothing is built until the owner decides.
 
+### Counter-motion backgrounds (idea, research first, 2026-11-10)
+
+The owner's idea: the background turns against the sphere's spin, or with it. Today it does not react at all: measured in Story 1:1, it changes no more while the sphere spins than when idle. The background would follow the sphere's rotation (the board's view position plus the sub-cell rotation used by `func_800ADD6C`, addresses still to name), applied as a rotation of the background's matrices at its draw (`0x80071BA0`), extra animation speed, or a shift of the background layer. See [the notes](research/blockplanet-play-backgrounds.md#counter-motion-the-owners-second-idea-2026-11-10). Nothing is built until the owner decides.
+
 ### Your own music: MP3, OGG and FLAC (M)
 
 Play music files from the player's device instead of, or alongside, the game's soundtrack: silence the game's music channels, keep sound effects, and mix the decoded file into the output. Public-domain decoders such as `dr_mp3`, `dr_flac` and `stb_vorbis` fit the GPL license. Needs: a music folder setting, playlist and shuffle options, and the jukebox menu. Works well with the visualizer, which reacts to whatever is playing.

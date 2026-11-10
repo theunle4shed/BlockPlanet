@@ -94,4 +94,29 @@ The background reacts when the player is close to losing. Research and notes onl
 
 All of these are presentation only. None changes the game's rules or timers (`AGENTS.md`: the original's simulation speed, timers and audio pitch stay as they are).
 
+## Counter-motion: the owner's second idea (2026-11-10)
+
+**Does the background react to play now?** No, at least in Story 1:1. Measured by the parent session on the real game, recorded at 30 fps: 3 s idle, then 3 s holding left so the sphere spins, then 3 s idle. The figure is the mean absolute change per frame, measured on the bands above and below the sphere for the background, and on a patch at the centre for the sphere:
+
+| Phase | Background | Sphere |
+| --- | --- | --- |
+| Idle | 2.40 | 0.11 |
+| Spinning | 0.98 | 4.52 |
+| Idle again | 1.34 | 0.75 |
+
+The background changes no more while the sphere spins than when idle. It follows only its own keyframes, and the matrices passed at `0x80071BA0` are presumably a fixed camera.
+
+**The idea:** "cool counter motion backgrounds". The background turns against the sphere's rotation, or with it, so spinning the sphere feels like moving through a space. Research and notes only until the owner decides.
+
+- **Input: the sphere's rotation.** The game rotates the sphere by moving the board under a fixed view. The mesh is rebuilt by `func_800ADD6C` from the sub-cell rotation while the sphere turns (`docs/research/blockplanet-game-state.md`, how the patch is built). So the rotation is the board's view position (whole cells, 32 around) plus that sub-cell part. Their exact addresses in the player context are still to name. A watch while holding left and then up would find them. The angular speed is the per-frame change.
+- **Applying it:**
+  - **Turn the background:** multiply the matrices passed at `0x80071BA0` (a2 and a3, `ctx + 0x17C0` and `ctx + 0x1800`) by a rotation that follows the sphere's yaw and pitch, scaled (for example −0.3 for counter-motion, +0.3 for drag) and eased. This needs a hook on that call, like the speed hook. It needs the matrices' layout confirmed (`BLOCKPLANET_BG_DL_LOG` logs them). Small to medium.
+  - **Speed up its own animation while spinning:** add the angular speed to the frame advance. Small.
+  - **Offset the background layer:** shift or rotate the copied background layer (the forty tiles, above). This is a 2D parallax rather than a 3D turn. It's cheap, but its edges must stay covered. Medium.
+  - **BlockPlanet's own background:** with our own drawing, counter-motion is simply part of its design. Medium to large, as above.
+- **Care points:**
+  - The rotation should ease and wrap smoothly (the board wraps at 32 cells).
+  - It must stay comfortable to watch, so it needs an option to turn it off or down.
+  - Presentation only: the game's rotation and timing are untouched.
+
 A note on ownership: backgrounds BlockPlanet draws itself (the last row) would be entirely BlockPlanet's own art and code, so they could be committed. Changes to the original ones must keep using the player's ROM at run time.
