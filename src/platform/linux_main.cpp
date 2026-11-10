@@ -68,6 +68,7 @@
 #include <mutex>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <fstream>
 #include <map>
 #include <set>
@@ -3816,11 +3817,14 @@ bool handle_profile_command(const std::string& command) {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME");
                 return text == nullptr || std::string(text) != "fade";
             }();
-            // Research: BLOCKPLANET_RESUME_SKIP=1 ends the game's own pause
-            // exit as soon as its picture has faded in (PauseBridge::
-            // finish_resume), so the row clears about 1.3 s sooner; the grid
-            // then leaves 150 ms after.
-            static const bool resume_skip = std::getenv("BLOCKPLANET_RESUME_SKIP") != nullptr;
+            // After Resume, end the game's own pause exit as soon as its
+            // picture has faded in (PauseBridge::finish_resume), so the row
+            // clears about 1.3 s sooner; the grid then leaves 150 ms after.
+            // BLOCKPLANET_RESUME_SKIP=0 lets the exit run its full length.
+            static const bool resume_skip = [] {
+                const char* text = std::getenv("BLOCKPLANET_RESUME_SKIP");
+                return text == nullptr || std::string_view(text) != "0";
+            }();
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
                 return text != nullptr ? std::max(0, std::atoi(text)) : resume_skip ? 150 : (after_row ? 450 : 200);

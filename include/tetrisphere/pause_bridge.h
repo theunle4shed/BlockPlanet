@@ -48,7 +48,7 @@ public:
     bool showing() const { return showing_; }
     // Whether the original pause's line, text and instructor should be hidden.
     bool hide_original() const { return showing_ || choice_.has_value(); }
-    // Research (BLOCKPLANET_RESUME_SKIP): after Resume, once the game's exit
+    // After Resume (unless BLOCKPLANET_RESUME_SKIP=0), once the game's exit
     // (0x800DFF08 = 5) has faded its picture in (0x800E1202 = 0), end the
     // exit at once, as the game does at its natural end (0x800DFF08 = 0, the
     // row -1, and its pause request flag 0x8013FAD0 cleared, which otherwise
