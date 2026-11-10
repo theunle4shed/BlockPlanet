@@ -342,3 +342,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `tools/audio/dcm_render.py`, which renders the DCM1 songs with the game's own samples (from the player's ROM) to WAV files under `.local/`, and documented the sample bank format.
 - (2026-11-10) The title's letters fly in again at the start of the box art (the owner's request): they form as in the original, in time with the title's song, whose hit for their explosion had been playing over letters already in place, and are then held; the ring, the robots and the light come in after them, as in the original. The same for the hand-over from the intro, a skip, the replay after B and the return after a demo. `BLOCKPLANET_BOX_ART_INSTANT=1` starts the box art with the letters already formed.
 - Menus: the panels and the dimming behind them are black instead of dark blue (the owner's choice), to sit better on the menu grid's and the game's different coloured backgrounds.
+
+## 2026-11-10: Game over screen
+
+- The game over menu now matches BlockPlanet's menus (the owner's request). After the 3D GAME OVER animation, red tiles fly in as the game's end menu fades in. BlockPlanet's panel, on the side as the pause's, then shows "Game over" with the stage, and the game's own choices in sentence case with icons: Try again, Training (when offered) and Exit. Versus' end shows Continue and Exit. Choices drive the game's own menu, as the pause does. Exit returns to the menus the game was started from. The game's Wheels and menu text are no longer drawn behind it.

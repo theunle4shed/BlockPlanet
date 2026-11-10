@@ -428,6 +428,8 @@ Read from the generated code while moving Score Attack onto Story's stages:
 
 Watched (`BLOCKPLANET_WATCH`): hearts (`+0x2D7E`) go to -1 and the 3D GAME OVER scene plays, still in play (main row `0x800E121C` = -1), for about 7 seconds; then the end menu's row (`0x800E1228`) becomes 0, a fade starts (`0x800DFF08` = 4, `0x800E11FA` = 255) with its level `0x800E1202` rising 0 to 255 over about 0.8 s, then `0x800DFF08` = 1 and the end menu screen (Wheels; Try Again, Exit, Training) shows. Holding `0x800E1202` at 0 from BlockPlanet's main loop (`BLOCKPLANET_HOLD_GAMEOVER=1`, research) did not stop the fade: the sequence that leaves GAME OVER is driven elsewhere. Holding the GAME OVER scene for BlockPlanet's own end panel (the owner's wish) needs that routine found first.
 
+**The end menu's rows (checked in play, 2026-11-10):** TRY AGAIN 0, EXIT 1, TRAINING 2, which is the order they are drawn, top to bottom. Setting the row and pressing A chooses, as in the pause. BlockPlanet's game over panel (`EndMenuBridge`) uses this. In Story 1:1, Try again plays 1:1 again, Training starts Wheels' Basics lesson, and Exit goes to the game's menu. Versus' end (CONTINUE, EXIT) is not yet checked.
+
 ## Starting modes directly (2026-11-09)
 
 How the original menus start a mode, read from the generated code and confirmed with memory watches (Story from BlockPlanet's main menu, Linux test setup with software Vulkan) and full memory dumps compared at the same moment of play. Used by the direct start (`src/graphics/direct_start_hooks.cpp`).
@@ -513,6 +515,7 @@ Logged from boot to the title (every call to the 2D helpers, before any of Block
 | 4 | The title's painted picture (logo with ™, ring, characters, rockets) | 270 × 205, format 0, image at `*0x800E1614` | (24, 21), from about 2 s into the title | already hidden; BlockPlanet holds the 3D scene instead |
 
 After the title, the game's own main menu (behind BlockPlanet's) draws its frame (285 × 175), a logo strip (244 × 40, reusing the address `0x8019CC10`), five row bars (110 × 7) and its text; BlockPlanet's menus already hide them. The copyright lines under BlockPlanet's title are BlockPlanet's own text, not a picture.
+
 ### DCM1 song format (2026-11-10)
 
 Songs come from the song table at ROM `0xCD7C0` (big-endian u16 count, then count + 1 big-endian u32 offsets from the table's start), loaded by `func_8008012C(destination, index)`. `func_8007F720(track, player)` loads the song to `0x80000400` and hands it to `func_80079E68(player, song, buffer, 2)`, which parses it. A DCM1 song is not a pattern module: it is a recording of a tracker player's output, one entry per player tick and voice, replayed by `func_8007B124`, the player's libultra `ALPlayer` handler (set up in `func_80079D3C`). Multi-byte fields in the header and instrument table are little-endian except where noted. `tools/audio/dcm_to_midi.py` converts songs to MIDI from the player's ROM.

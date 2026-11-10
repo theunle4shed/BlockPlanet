@@ -412,6 +412,15 @@ int main(int argc, char** argv) {
             navigator.open("sky_lab");
             advance(now + 2.0);
             frame("sky_lab");
+            // The end screen over a game over (items as EndMenuBridge gives them).
+            navigator.set_text("end_title", "Game over");
+            navigator.set_text("end_where", "Story \u00B7 2:3");
+            navigator.set_list("end", {{"try_again", "Try again", "", "command:end_choose:0", true, 1, true, "", "", "\uE14C"},
+                                       {"training", "Training", "", "command:end_choose:2", true, 1, false, "", "", "\uE082"},
+                                       {"exit", "Exit", "", "command:end_choose:1", true, 1, false, "", "", "\uE112"}});
+            navigator.open("gameover");
+            advance(now + 2.0);
+            frame("gameover");
             // Closing the menus: the grid flies out, revealing the game.
             navigator.close();
             {

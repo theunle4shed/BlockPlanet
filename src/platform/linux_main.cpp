@@ -139,6 +139,10 @@ std::string loading_title;
 // Quit to menu was chosen from the pause: the menu grid stays up until the
 // menus open again (docs/UI.md, Menu grid).
 std::optional<std::chrono::steady_clock::time_point> grid_quit_at;
+// The game's end menus under BlockPlanet's panel (EndMenuBridge): while they
+// (or their fade) are up the grid shows in red, and after Exit too.
+bool end_menu_active = false;
+bool grid_quit_red = false;
 std::chrono::steady_clock::time_point loading_since;
 bool credits_pending = false; // --credits: play them when the title shows
 
@@ -2217,6 +2221,7 @@ bool start_chapter_given = false;  // --start-chapter: progress is not recorded
 
 // BlockPlanet's pause menu over the game's pause.
 PauseBridge pause_bridge;
+EndMenuBridge end_menu;
 
 // Settings changed in BlockPlanet's menus, applied like the PC settings menu.
 std::deque<PCSettingsRequest> menu_settings_requests;
@@ -3624,6 +3629,15 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::request_show("howto");
                 continue;
             }
+            if (command->rfind("end_choose:", 0) == 0) {
+                // The end screen: the game's row for that item. Exit goes back
+                // to the menus the game was started from, as Quit to menu does.
+                const int row = std::atoi(command->c_str() + 11);
+                if (row == end_menu.exit_row())
+                    end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = true;
+                end_menu.choose(row, std::chrono::steady_clock::now());
+                continue;
+            }
             if (*command == "pause_resume" || *command == "pause_skip" || *command == "pause_quit") {
                 if (*command == "pause_quit") end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now();
                 pause_bridge.choose(*command == "pause_resume" ? PauseBridge::Choice::Resume
@@ -3874,8 +3888,8 @@ bool handle_profile_command(const std::string& command) {
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
                                                    start_pressed_recently());
-            if (pause.open_menu) {
-                // Where the player is, for the pause screen's subtitle.
+            // Where the player is, for the pause and end screens' subtitles.
+            const auto where_now = [&] {
                 const auto state = read_game_state(guest_rdram);
                 std::string where;
                 switch (state.mode) {
@@ -3888,14 +3902,34 @@ bool handle_profile_command(const std::string& command) {
                 case 9: where = "Lines"; break;
                 default: break;
                 }
-                blockplanet::ui::set_text("pause_where", where);
+                return where;
+            };
+            if (pause.open_menu) {
+                blockplanet::ui::set_text("pause_where", where_now());
                 blockplanet::ui::set_list("pause", pause.items);
                 blockplanet::ui::request_open("pause");
             }
+            // The game's end menus (game over, Versus' end) under BlockPlanet's
+            // panel (the owner's request, 2026-11-10): its items as the game
+            // draws them (its menu text, kept rather than drawn).
+            std::vector<EndMenuBridge::Label> end_labels;
+            for (const auto& t : blockplanet::recent_game_text())
+                if (t.font == 0) end_labels.push_back({t.text, t.y});
+            const auto end = end_menu.update(const_cast<std::uint8_t*>(guest_rdram), end_labels, blockplanet::ui::menus_open(),
+                                             std::chrono::steady_clock::now(), pause_bridge.hide_original());
+            end_menu_active = end.active;
+            if (end.open_menu) {
+                blockplanet::ui::set_text("end_title", end.title);
+                blockplanet::ui::set_text("end_where", where_now());
+                blockplanet::ui::set_list("end", end.items);
+                blockplanet::ui::request_open("gameover");
+            }
             // Only in play: back at the game's menu (after Quit), the menus shown are the launch path's.
-            if (pause.close_menu && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
-            launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons) : training_inject.load());
-            blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
+            if ((pause.close_menu || end.close_menu) && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
+            launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons)
+                                   : end.inject ? (0x10000u | end.buttons)
+                                                : training_inject.load());
+            blockplanet::set_pause_menu_shown(pause_bridge.hide_original() || end_menu.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
             update_hud();
             {
@@ -4175,10 +4209,13 @@ bool handle_profile_command(const std::string& command) {
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             const auto screen = blockplanet::ui::current_screen();
-            if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm") ||
+            if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm" &&
+                                  screen != "gameover") ||
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
-                grid_quit_at.reset();
-            const bool over_pause = start_at || paused || unpaused_at || grid_quit_at;
+                grid_quit_at.reset(), grid_quit_red = false;
+            const bool over_pause = start_at || paused || unpaused_at || (grid_quit_at && !grid_quit_red);
+            // The end menus (and Exit from them): red, as the game over screen.
+            const bool over_end = end_menu_active || (grid_quit_at && grid_quit_red);
             // The box art shows over BlockPlanet's grid (tetrisphere/box_art.h),
             // which stays up as the title hands over to the menus (half a
             // second, until they open), on the way back to it from them, and
@@ -4190,7 +4227,10 @@ bool handle_profile_command(const std::string& command) {
             const bool box_art_returning = box_art_returning_since && now_g - *box_art_returning_since < std::chrono::seconds(3);
             const bool to_demo = tetrisphere::box_art::phase().load() == tetrisphere::box_art::Phase::ToDemo;
             const bool box_art_grid = box_art || box_art_handover || box_art_returning || to_demo;
-            blockplanet::ui::set_grid_override(over_pause && !launching() ? "pause" : (box_art_grid ? "blue" : ""));
+            blockplanet::ui::set_grid_override(over_pause && !launching()            ? "pause"
+                                               : over_end && !mode_launcher.active() ? "red"
+                                               : box_art_grid                        ? "blue"
+                                                                                     : "");
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
         // over (0x800E1202 back to 0 while the end menu fades in), to see
