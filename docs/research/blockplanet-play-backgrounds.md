@@ -95,7 +95,7 @@ The background reacts when the player is close to losing. Research and notes onl
 | Last heart | Player context `0x80110220` + `0x2D7E` (-1 at game over) | Known and already read by BlockPlanet; Story and other modes with hearts |
 | Drop timer or shot time limit nearly out | Candidates `+0x3254` and `+0x3250` (direct-launch catalogue) | To confirm in play, and to scale to each mode's speed |
 | Board close to its limit | Not found yet | The board's height or fill against the game's limit; needs research |
-| The game's own danger signal | Unknown | Check whether the original already changes the music, plays a warning or flashes the HUD near game over. If it does, its flag is the trigger, and the reaction should match it |
+| The game's own danger signal | **None seen** (2026-11-10) | Story 1:1 with the hearts set to 1 by a poke (`0x80112F9E` = 1). For about 10 s the background, the other visuals and the game's own drawing were unchanged, and no new events were logged. Two limits: audio could not be heard, so a music change is not ruled out (asked of the owner); and the poke skips the game's own heart-loss path, so a real loss may still differ. As far as seen, pinch mode would be wholly BlockPlanet's addition, triggered by the hearts value |
 
 **Reactions.** Each follows from the feasibility table:
 - **Speed:** a faster background (for example 1.5 to 2 times), or a stutter or pulse, by scaling the frame passed at `0x80071BA0`. Small effort. It must ease in and out, not jump.
