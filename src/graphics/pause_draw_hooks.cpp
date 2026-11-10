@@ -209,6 +209,12 @@ void log_background_dl(const std::uint8_t* rdram, std::uint32_t from, std::uint3
 } // namespace
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    // The N64 logo's held wordmark and short start (intro_logo_hooks.cpp), also
+    // before each of its draws: the hook after the scene's step is not reached
+    // on its first draws (no frame elapsed), which showed the N alone.
+    if (helper == 0x8002D93Cu && guest16(rdram, 0x800E1648u) == 0 && std::uint32_t(ctx->r4) == guest32(rdram, 0x800E166Cu)) {
+        blockplanet_logo_scene_before(rdram, ctx, static_cast<std::uint32_t>(ctx->r4));
+    }
     // The box art on BlockPlanet's grid (src/graphics/box_art_hooks.cpp).
     if (helper == 0x8002D93Cu && blockplanet_box_art_scene(rdram, ctx)) return true;
     // Portrait windows: the intro zooms to cover (tetrisphere/intro_cover.h).

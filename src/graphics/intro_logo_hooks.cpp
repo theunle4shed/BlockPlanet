@@ -86,9 +86,25 @@ void step(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene) {
 
 } // namespace
 
+namespace {
+void logo_scene(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene, bool hold);
+}
+
 extern "C" void blockplanet_logo_scene_stepped(std::uint8_t* rdram, recomp_context* ctx) {
+    logo_scene(rdram, ctx, static_cast<std::uint32_t>(ctx->r16), true);
+}
+
+// Before each of the logo's draws (the draw filter): the set-up and the short
+// start only. The hook after the step is not reached on the scene's first
+// draws, which showed the N alone; the held state is written only after the
+// step (written before it, the step adds its own increments to it).
+extern "C" void blockplanet_logo_scene_before(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene) {
+    logo_scene(rdram, ctx, scene, false);
+}
+
+namespace {
+void logo_scene(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene, bool hold) {
     if (!enabled()) return;
-    const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r16);
     if (scene == 0 || scene != load32(rdram, logo_scene_pointer) || load16(rdram, 0x800E1648u) != 0) return;
     const std::uint32_t frame_address = scene + 0x24u;
     const int frame = static_cast<int>(load32(rdram, frame_address));
@@ -122,10 +138,11 @@ extern "C" void blockplanet_logo_scene_stepped(std::uint8_t* rdram, recomp_conte
                      scene, frame, start_frame(), hold_frame(), static_cast<int>(load32(rdram, load32(rdram, scene + 0x1Cu) + 0xCu)));
         std::fflush(stdout);
     }
-    if (frame >= hold_frame() || held.size() != held_list().size() * state_size) return;
+    if (!hold || frame >= hold_frame() || held.size() != held_list().size() * state_size) return;
     for (std::size_t i = 0; i < held_list().size(); ++i)
         std::memcpy(host(rdram, objects + std::uint32_t(held_list()[i]) * object_size + state_offset), held.data() + i * state_size, state_size);
 }
+} // namespace
 
 // Straight on (the owner's request, 2026-11-10): the settled wordmark is
 // pitched 11 degrees to the camera and the "64" turned about 14 degrees, so
