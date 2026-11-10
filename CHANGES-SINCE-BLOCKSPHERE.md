@@ -271,3 +271,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-10: Fixes
 
 - Fixed: after Restart level (or Restart chapter) from the pause, Quit to menu left the pause menu on screen over the game's menu instead of going back to the menus the game was started from. The restart, which starts the mode again while the pause menu is still open, recorded the pause screen as the place to return to; a launch from the pause now keeps the earlier one.
+- Fixed: the HUD's Next pieces showed the wrong colours for three brick types: magenta bricks as red, pale lavender as purple, red as orange (from matching each stage's logged brick types to the board on the real game, 2026-11-10: 32 yellow, 33 blue, 34 green, 35 magenta, 36 pale lavender, 37 red).

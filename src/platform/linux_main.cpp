@@ -220,9 +220,9 @@ std::string hud_material_colour(int material) {
     case 32: return "#e8c020";  // yellow
     case 33: return "#3050d8";  // blue
     case 34: return "#30b048";  // green
-    case 35: return "#d83838";
-    case 36: return "#a048d8";
-    case 37: return "#f08020";
+    case 35: return "#c838c0";  // magenta
+    case 36: return "#9880e0";  // pale lavender
+    case 37: return "#d83838";  // red
     default: return "#a0a0a0";
     }
 }
