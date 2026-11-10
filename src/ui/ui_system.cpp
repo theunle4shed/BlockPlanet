@@ -1029,6 +1029,16 @@ bool prepare_frame(plume::RenderCommandList* list, plume::RenderFramebuffer* fra
 // The under layer (called by RT64 before the game's picture while
 // tetrisphere::under_layer::wanted() is set): the grid alone.
 bool hook_under(plume::RenderCommandList* list, plume::RenderFramebuffer* framebuffer) {
+    // The game's picture (the box art) fades in over the grid each time the
+    // layer starts (after half a second without it), over a second, eased.
+    {
+        static double started_at = 0.0, last_at = -10.0;
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (now - last_at > 0.5) started_at = now;
+        last_at = now;
+        const float t = std::clamp(float((now - started_at) / 1.0), 0.0f, 1.0f);
+        tetrisphere::under_layer::picture_fade().store(t * t * (3.0f - 2.0f * t), std::memory_order_relaxed);
+    }
     frame_prepared = prepare_frame(list, framebuffer, true);
     if (!frame_prepared) return false;
     grid_drawn_under = frame_shown && grid->visible();

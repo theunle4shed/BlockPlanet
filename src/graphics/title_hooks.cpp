@@ -10,6 +10,8 @@
 
 #include "tetrisphere/recomp_support.h"
 
+extern "C" void func_8002F55C(std::uint8_t* rdram, recomp_context* ctx);
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -287,8 +289,23 @@ extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ct
     if (scene < 0x80000000u || scene >= 0x80800000u) return;
     const int frame = static_cast<int>(load32(rdram, scene + 0x24));
     const int elapsed = static_cast<int>(load32(rdram, 0x800E1208u) - load32(rdram, 0x800E1210u));
-    if (frame + elapsed < freeze) return;  // not there yet
+    // The box art (tetrisphere/box_art.h) starts held: the letters' forming
+    // is not shown.
+    static const bool box_art = [] { const char* v = std::getenv("BLOCKPLANET_BOX_ART"); return v == nullptr || v[0] != '0'; }();
+    if (!box_art && frame + elapsed < freeze) return;  // not there yet
     const std::uint32_t target = static_cast<std::uint32_t>(std::max(0, freeze - std::max(elapsed, 0)));
+    // Its keyframes are stepped one frame at a time (func_8002F55C), so the
+    // scene is carried there frame by frame rather than set.
+    if (box_art && frame < static_cast<int>(target)) {
+        const recomp_context saved = *ctx;
+        for (int f = frame; f < static_cast<int>(target); ++f) {
+            ctx->r4 = static_cast<gpr>(static_cast<std::int64_t>(static_cast<std::int32_t>(scene)));
+            func_8002F55C(rdram, ctx);
+            const std::uint32_t next = static_cast<std::uint32_t>(f + 1);
+            std::memcpy(rdram + ((scene + 0x24) & 0x00FFFFFFu), &next, 4);
+        }
+        *ctx = saved;
+    }
     std::memcpy(rdram + ((scene + 0x24) & 0x00FFFFFFu), &target, 4);
 }
 

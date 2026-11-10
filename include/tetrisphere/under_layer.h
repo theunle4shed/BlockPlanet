@@ -31,4 +31,19 @@ inline std::atomic<bool>& wanted() {
     return on;
 }
 
+// How much of the game's picture shows over the layer (0 none, 1 all), for
+// the box art's fade-in. Set by BlockPlanet's under layer each frame.
+inline std::atomic<float>& picture_fade() {
+    static std::atomic<float> fade{1.0f};
+    return fade;
+}
+
+// Set by RT64's present while it draws the picture blended (its VI renderer
+// then passes picture_fade to the blended shader, folded into the gamma
+// constant: gamma + 4 x round((1 - fade) x 1000), gamma being 1 or less than 4).
+inline std::atomic<bool>& blending() {
+    static std::atomic<bool> on{false};
+    return on;
+}
+
 } // namespace tetrisphere::under_layer

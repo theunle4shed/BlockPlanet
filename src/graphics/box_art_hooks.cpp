@@ -16,6 +16,7 @@
 #include "tetrisphere/under_layer.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -37,6 +38,17 @@ bool enabled() {
 // The title shows (the intro over, the main menu not yet reached).
 bool on_title(const std::uint8_t* rdram) { return load16(rdram, 0x800E1648u) == 1 && load16(rdram, 0x800E1646u) == 0; }
 
+// The intro scene's frame where it hands over (the last robot, Wheels, leaves
+// on the right about here; the intro's own end is about 1230).
+// BLOCKPLANET_BOX_ART_CUT=frame changes it, 0 keeps the intro to its end.
+int cut_frame() {
+    static const int frame = [] {
+        const char* v = std::getenv("BLOCKPLANET_BOX_ART_CUT");
+        return v ? std::atoi(v) : 1185;
+    }();
+    return frame;
+}
+
 std::uint32_t rgba5551(std::uint32_t rgb) {
     const std::uint32_t r = (rgb >> 16) & 0xFFu, g = (rgb >> 8) & 0xFFu, b = rgb & 0xFFu;
     return (r >> 3) << 11 | (g >> 3) << 6 | (b >> 3) << 1 | 1u;
@@ -47,6 +59,23 @@ std::uint32_t rgba5551(std::uint32_t rgb) {
 // From the draw filter (src/graphics/pause_draw_hooks.cpp), for each scene
 // drawn by func_8002D93C: returns true when the call is replaced.
 extern "C" bool blockplanet_box_art_scene(std::uint8_t* rdram, recomp_context* ctx) {
+    // The intro flows into the box art (the owner's design, 2026-11-10): as
+    // the last robot (Wheels) leaves the intro's scene, the intro ends as it
+    // does at its own end (0x800685BC), and the title starts on the box art.
+    if (enabled() && cut_frame() > 0 && load16(rdram, 0x800E1648u) == 0 && load16(rdram, 0x800E1646u) == 0) {
+        const std::uint32_t intro = load32(rdram, 0x800E1670u);
+        if (intro != 0 && static_cast<std::uint32_t>(ctx->r4) == intro && load32(rdram, 0x800E166Cu) != intro &&
+            static_cast<int>(load32(rdram, intro + 0x24u)) >= cut_frame()) {
+            store32(rdram, 0x800E1208u, 0);
+            store32(rdram, 0x800E120Cu, 0);
+            store16(rdram, 0x800E1648u, 1);
+            store32(rdram, 0x800F22C0u, load32(rdram, 0x801028D0u));
+            std::fprintf(stdout, "{\"event\":\"box_art_from_intro\",\"frame\":%d}\n", static_cast<int>(load32(rdram, intro + 0x24u)));
+            std::fflush(stdout);
+            ctx->r2 = 0;
+            return true;  // this frame's intro scene is not drawn (its memory is the title's from now)
+        }
+    }
     const bool title = enabled() && on_title(rdram);
     tetrisphere::box_art::showing().store(title, std::memory_order_relaxed);
     tetrisphere::under_layer::wanted().store(title, std::memory_order_relaxed);

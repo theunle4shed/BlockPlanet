@@ -37,6 +37,7 @@ SOURCES = {
     "rt64_interpreter.cpp": "cd91e76019205296b0ff9a52d4b477d45959243302c218c3c047d9328e66a7d2",
     "rt64_rdp.cpp": "288e186aa741a0f2ce8ff89a17d22b525fd017da81404ab709f5681c0666194c",
     "rt64_rsp.cpp": "7dfdf40254d44d92c247d9c876bb8ca55995927ad534981bd48868bb44f1f695",
+    "rt64_vi_renderer.cpp": "0159b441fd4872ef30a49d7603f4570d8858084004c20dd6646f51039241fa7b",
 }
 
 VIDEO_INTERFACE_PS_SHA256 = "f4990ef5edfbdece9c89938a0c4951b3a285f99be9e6d92a415433c0e227f961"
@@ -825,6 +826,16 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
             tetrisphere_retire_pause_tiles(fbManager, workload.workloadId);
 
             // Update the GPU profiler''')
+    elif name == "rt64_vi_renderer.cpp":
+        source = replace_once(source, "namespace RT64 {\n",
+                              "#include <algorithm>\n#include <cmath>\n#include \"tetrisphere/under_layer.h\"\n\nnamespace RT64 {\n")
+        source = replace_once(source, "        pushConstants.gamma = p.vi->gamma();\n",
+            "        pushConstants.gamma = p.vi->gamma();\n"
+            "        // BlockPlanet's under layer: the picture's fade, for the blended shader only.\n"
+            "        if (tetrisphere::under_layer::blending().load(std::memory_order_relaxed)) {\n"
+            "            const float fade = std::clamp(tetrisphere::under_layer::picture_fade().load(std::memory_order_relaxed), 0.0f, 1.0f);\n"
+            "            pushConstants.gamma += 4.0f * std::round((1.0f - fade) * 1000.0f);\n"
+            "        }\n")
     elif name == "rt64_present_queue.cpp":
         source = replace_once(source, "namespace RT64 {\n", UNDER_LAYER_INCLUDE + "namespace RT64 {\n" + UNDER_LAYER_HELPER)
         source = replace_once(source,
@@ -852,7 +863,9 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
                         std::swap(library.videoInterfaceLinear.pipeline, tetrisphereCover.linear);
                         std::swap(library.videoInterfaceNearest.pipeline, tetrisphereCover.nearest);
                         std::swap(library.videoInterfacePixel.pipeline, tetrisphereCover.pixel);
+                        tetrisphere::under_layer::blending().store(true, std::memory_order_relaxed);
                         viRenderer->render(renderParams);
+                        tetrisphere::under_layer::blending().store(false, std::memory_order_relaxed);
                         std::swap(library.videoInterfaceLinear.pipeline, tetrisphereCover.linear);
                         std::swap(library.videoInterfaceNearest.pipeline, tetrisphereCover.nearest);
                         std::swap(library.videoInterfacePixel.pipeline, tetrisphereCover.pixel);
@@ -951,7 +964,7 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
         anchor = "                            triangles.screenOffset.y = halfPixelOffset.y + (halfViewportSize.y - (viewportRect.y + viewportRect.height / 2.0f)) / halfViewportSize.y;"
         source = replace_once(source, anchor, anchor + REGULAR_RECT_PROBE)
         source = instrument_renderer(source)
-    elif name == "rt64_framebuffer_manager.cpp":
+    elif name in ("rt64_framebuffer_manager.cpp", "rt64_vi_renderer.cpp"):
         pass
     else:
         raise ValueError(f"unsupported RT64 probe source: {name}")
@@ -970,7 +983,7 @@ def main() -> int:
                                        "rt64_projection_processor.cpp", "rt64_framebuffer_renderer.cpp",
                                        "rt64_framebuffer_manager.cpp", "rt64_workload_queue.cpp",
                                        "rt64_interpreter.cpp", "rt64_rdp.cpp", "rt64_rsp.cpp", "rt64_dynamic_libraries.cpp",
-                                       "rt64_present_queue.cpp")}
+                                       "rt64_present_queue.cpp", "rt64_vi_renderer.cpp")}
     # The under layer's VI shader: RT64's own, writing the game picture's
     # coverage as alpha (its backdrop fill writes 1, everything drawn over it
     # 0) instead of 1, and 0 outside the picture.
@@ -979,13 +992,18 @@ def main() -> int:
     actual = hashlib.sha256(raw).hexdigest()
     if actual != VIDEO_INTERFACE_PS_SHA256:
         raise ValueError(f"RT64 VideoInterfacePS.hlsl SHA256 mismatch: {actual}")
-    cover = replace_once(raw.decode("utf-8"), "    gammaCorrectedColor.a = 1.0f;",
-        "    gammaCorrectedColor.a = (1.0f - sampledColor.a) * max(1.0f - outsideBorder.x - outsideBorder.y, 0.0f);")
+    cover = replace_once(raw.decode("utf-8"), "    float4 gammaCorrectedColor = pow(sampledColor, gConstants.gamma);",
+        "    // The fade comes folded into the gamma (tetrisphere/under_layer.h).\n"
+        "    const float fadeSteps = floor(gConstants.gamma / 4.0f);\n"
+        "    const float fade = 1.0f - fadeSteps / 1000.0f;\n"
+        "    float4 gammaCorrectedColor = pow(sampledColor, gConstants.gamma - fadeSteps * 4.0f);")
+    cover = replace_once(cover, "    gammaCorrectedColor.a = 1.0f;",
+        "    gammaCorrectedColor.a = (1.0f - sampledColor.a) * fade * max(1.0f - outsideBorder.x - outsideBorder.y, 0.0f);")
     destination = args.output / "VideoInterfaceCoverPS.hlsl"
     if not destination.exists() or destination.read_text(encoding="utf-8") != cover:
         destination.write_text(cover, encoding="utf-8")
     for name, expected in names.items():
-        directory = "common" if name == "rt64_dynamic_libraries.cpp" else ("render" if name in ("rt64_projection_processor.cpp", "rt64_framebuffer_renderer.cpp") else "hle")
+        directory = "common" if name == "rt64_dynamic_libraries.cpp" else ("render" if name in ("rt64_projection_processor.cpp", "rt64_framebuffer_renderer.cpp", "rt64_vi_renderer.cpp") else "hle")
         source = args.rt64_root / "src" / directory / name
         patched = patch_source(name, source.read_bytes(), expected, probe=args.probe)
         destination = args.output / name

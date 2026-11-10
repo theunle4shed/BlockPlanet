@@ -965,7 +965,7 @@ if(TETRISPHERE_GAME_ENABLED)
         rt64_projection_processor.cpp rt64_framebuffer_renderer.cpp
         rt64_framebuffer_manager.cpp rt64_workload_queue.cpp
         rt64_interpreter.cpp rt64_rdp.cpp rt64_rsp.cpp rt64_dynamic_libraries.cpp
-        rt64_present_queue.cpp)
+        rt64_present_queue.cpp rt64_vi_renderer.cpp)
     if(TETRISPHERE_RT64_PROBE)
         list(APPEND RT64_COPY_ARGS --probe)
     endif()
@@ -983,7 +983,8 @@ if(TETRISPHERE_GAME_ENABLED)
     set(RT64_COPY_REPLACED_SOURCES "")
     foreach(RT64_COPY_NAME IN LISTS RT64_COPY_NAMES)
         if(RT64_COPY_NAME STREQUAL "rt64_projection_processor.cpp" OR
-           RT64_COPY_NAME STREQUAL "rt64_framebuffer_renderer.cpp")
+           RT64_COPY_NAME STREQUAL "rt64_framebuffer_renderer.cpp" OR
+           RT64_COPY_NAME STREQUAL "rt64_vi_renderer.cpp")
             set(RT64_COPY_DIRECTORY "render")
         elseif(RT64_COPY_NAME STREQUAL "rt64_dynamic_libraries.cpp")
             set(RT64_COPY_DIRECTORY "common")
