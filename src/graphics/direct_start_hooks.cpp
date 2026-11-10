@@ -122,6 +122,7 @@ constexpr std::int16_t mode_rescue = 1;
 constexpr std::int16_t mode_time_trial = 2;
 constexpr std::int16_t mode_puzzle = 4;
 constexpr std::int16_t mode_lines = 9;
+constexpr std::int16_t mode_hide_and_seek = 5;
 constexpr std::int16_t mode_training = 3;
 // Training.
 constexpr std::uint32_t training_type = 0x800E44ACu;  // 1 Basics, 2 Advanced, 3 Puzzle
@@ -161,6 +162,7 @@ const char* mode_name(const DirectStartRequest& request) {
     case DirectMode::Training: return "training";
     case DirectMode::Puzzle: return "puzzle";
     case DirectMode::Lines: return "lines";
+    case DirectMode::HideAndSeek: return "hide_and_seek";
     }
     return "";
 }
@@ -224,6 +226,14 @@ bool start_training(std::uint8_t* rdram, recomp_context* ctx, const DirectStartR
     return true;
 }
 
+// Hide & Seek opens one more page after the hand-over (0x800E1234 = 0,
+// func_8006224C): an animated intro (3D scenes, a random pick of seven, a
+// sound and a fade) that sets nothing play uses, then clears every menu row
+// (0x800E121C to 0x800E1236) for play. A direct start clears them at once.
+void close_all_rows(std::uint8_t* rdram) {
+    for (std::uint32_t row = main_row; row <= 0x800E1236u; row += 2) store16(rdram, row, -1);
+}
+
 // A mode from the Single page's mode list (Rescue, Puzzle; Time Trial and
 // Lines to follow), as the player page and its mode list do it. Returns false
 // when the menus would not have started it the usual way.
@@ -244,8 +254,9 @@ bool start_single(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
     store32(rdram, name_cursor, 0);
 
     // 1. The mode page's confirm, on the mode's row.
-    const std::int16_t row = mode_number == mode_rescue ? 0 : mode_number == mode_puzzle ? 2
-                           : mode_number == mode_time_trial ? 3 : 5;
+    const std::int16_t row = mode_number == mode_rescue ? 0 : mode_number == mode_hide_and_seek ? 1
+                           : mode_number == mode_puzzle ? 2 : mode_number == mode_time_trial ? 3 : 5;
+
     store16(rdram, mode_row_memory, row);
     store16(rdram, flag_a, 1);
     store16(rdram, flag_b, 1);
@@ -289,6 +300,7 @@ bool start_single(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
     store32(rdram, after_new_game, 0);
     store16(rdram, p1_level, static_cast<std::int16_t>(request.level));
     close_menus(rdram);
+    if (mode_number == mode_hide_and_seek) close_all_rows(rdram);  // its intro page's exit
     log("started", request);
     return true;
 }
@@ -386,6 +398,7 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
     case DirectMode::Rescue: started = start_single(rdram, ctx, request, mode_rescue); break;
     case DirectMode::Puzzle: started = start_single(rdram, ctx, request, mode_puzzle); break;
     case DirectMode::Lines: started = start_single(rdram, ctx, request, mode_lines); break;
+    case DirectMode::HideAndSeek: started = start_single(rdram, ctx, request, mode_hide_and_seek); break;
     case DirectMode::Training: started = start_training(rdram, ctx, request); break;
     }
     finish(started ? direct_start::Result::Started : direct_start::Result::Refused);

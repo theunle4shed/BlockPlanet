@@ -21,7 +21,7 @@
 
 namespace tetrisphere {
 
-enum class DirectMode { Rescue, Training, Puzzle, Lines };
+enum class DirectMode { Rescue, Training, Puzzle, Lines, HideAndSeek };
 
 struct DirectStartRequest {
     DirectMode mode = DirectMode::Rescue;

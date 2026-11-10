@@ -279,7 +279,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - (2026-11-10) Direct starts also work while the game still shows its own title behind BlockPlanet's menus, the usual state after start-up (the parent session's test found Training falling back to the menus there): the start first does the title's own exit, including choosing player 1's controller. A start that waits now logs why, and when it gives up.
 - (2026-11-10) Puzzle starts directly too (any puzzle from the list, and Restart level), as the Single page's mode list does it, including the mode row the game keeps in its save; the cartridge save after a Puzzle session is byte for byte the same as through the menus.
 - (2026-11-10) Lines starts directly too, its rules screen kept (it is part of play); its cartridge save matches the menu route byte for byte.
-- The other modes (Hide & Seek, Versus, Time Trial) still start through the original menus, one at a time to follow.
+- (2026-11-10) Hide & Seek starts directly too: the original's extra intro page before play (3D scenes and a fade) is skipped; the game's own introduction in play (the flight round the sphere, the goal word and its card) is kept. Its cartridge save matches the menu route byte for byte.
+- The other modes (Versus, Time Trial) still start through the original menus.
 - Research: how the menus start a mode, and the comparison of the two routes, in [docs/research/blockplanet-game-state.md](docs/research/blockplanet-game-state.md#starting-modes-directly-2026-11-09).
 
 ## 2026-11-10: Fixes
