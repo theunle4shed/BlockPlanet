@@ -487,6 +487,13 @@ func = "func_8002D93C"
 before_vram = 0x8002DEA0
 text = "blockplanet_model_draw_end(rdram, ctx);"
 
+# The N64 logo opens with "NINTENDO64" already in place: after the scene's
+# keyframe step, before its matrices are built (src/graphics/intro_logo_hooks.cpp).
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DD80
+text = "blockplanet_logo_scene_stepped(rdram, ctx);"
+
 # Research (src/graphics/pause_draw_hooks.cpp): each object of a LightWave
 # scene (func_800321D4: scene, ?, geometry, object index) can be logged or
 # filtered, to find the models inside a scene (BLOCKPLANET_OBJECT_*).

@@ -302,3 +302,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-10: The intro on every window shape, step 2: portrait windows
 
 - In portrait (tall) windows the intro, from the N64 logo to the title, now fills the window's height and crops its sides ("zoom to cover", the owner's choice) instead of sitting in a small 4:3 band. The title and everything after it keep the letterbox. Landscape windows are unchanged. RT64 is patched at build time (`tools/build/patch_rt64_probe.py`, new `include/tetrisphere/intro_cover.h`) so that its Expand mode may take the window's narrower shape while the game is in its intro. `BLOCKPLANET_INTRO_COVER=0` keeps the letterbox. Checked at 450 × 800 against the letterbox.
+
+## 2026-11-10: The N64 logo opens with "NINTENDO64" in place
+
+- The N64 logo now opens with the NINTENDO wordmark and its red "64" already in their final place above the N, as the owner asked; the "64" no longer flies round the N, and the wordmark no longer fades in. The N still turns as before, the logo still ends as before (everything leaves together), and the intro's length, music and sounds are unchanged. A hook in the game's scene player (`src/graphics/intro_logo_hooks.cpp`) works this out at the logo's first frame by stepping a copy of the scene ahead, then holds those two objects until the original reaches the same point. `BLOCKPLANET_INTRO_LOGO=1` keeps the original animation.
