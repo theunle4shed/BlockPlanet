@@ -249,6 +249,13 @@ A fast counter-spin around the viewer is the most likely thing in this design to
   - It is drawn at the background's slot (`blockplanet_draw_filter` on the background scene) as one `G_DL` into BlockPlanet's own list at `0x807E0000`–`0x807F8000`, where the title's own use is rebuilt each title frame. About 4,000 commands.
   - It has its own 4:3 perspective, opaque with no depth, and the game's projection is loaded again after.
   - For now the colours are BlockPlanet's own presets; reading the stage's colour set comes next.
+- **One more background, not a replacement** (the owner, 2026-11-10: "This new background concept is just another to the pool it shouldn't replace any"). The setting **Play backgrounds** has three choices:
+  - **Original**, the default: the game's own 25 backgrounds as it picks them. Nothing of the brick sky runs, and the game's draw goes ahead as normal.
+  - **Mixed**: the brick sky joins the pool and takes one stage in four in place of that stage's own background. The rule is fixed and repeatable: a hash of the mode (`0x800E44A8`), the level's background index (`0x8013D264`) and the level counter (`0x800E4498`), which stay the same through a level. So the same stages always get it, and a whole chapter never does. Each decision is logged as `brick_sky_mixed`.
+  - **Brick sky only**, for testing.
+  - `BLOCKPLANET_BRICK_SKY=1` means only; `=mixed` means mixed.
+  - For the owner to decide: whether one in four is right, and whether the setting moves to Options > Graphics once the experiment ends.
+- **The stage's colours are followed as they change:** they are read at every draw, so a new level or chapter, with a new colour set at `0x8013D188`, changes the sky's colours at once.
 - **The Sphere layout** (the default since the owner's note, 2026-11-10: "it's cube shaped.. I was kinda hoping it could be constructed like the outside of our sphere"):
   - The sky is built like the play sphere's outside, seen from inside: 32 cells around at 11.25° (the board's cells), in 14 rows between 78.75° south and north, with the poles capped by a dark disc.
   - A seeded fill lays bricks of one to four cells over the cells, in the game's piece shapes (I, O, T, L, S, three in a line, a corner, two) with their turns, so the bricks have different shapes and sizes. The columns wrap; the rows don't.

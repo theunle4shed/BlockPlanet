@@ -16,7 +16,12 @@
 namespace tetrisphere::brick_sky {
 
 struct Settings {
-    bool on = false;
+    // Play backgrounds (the owner: the brick sky is one more background in
+    // the pool, not a replacement): "original" (the game's 25, as it picks
+    // them; the default), "mixed" (the brick sky takes some stages' place by
+    // a fixed rule, mixed_uses_sky), "only" (the brick sky everywhere, for
+    // testing).
+    std::string backgrounds = "original";
     std::string layout = "sphere";   // sphere (built like the play sphere's outside) or cube
     std::string spin = "gentle";      // still, drift, gentle, normal, wild
     bool against = true;              // turn against the sphere (true) or with it
@@ -28,7 +33,8 @@ struct Settings {
 };
 
 Settings settings();
-// "sky_on", "sky_spin", "sky_direction", "sky_fov", "sky_comfort",
+// "sky_backgrounds" (also "sky_on": on = only, off = original), "sky_layout",
+// "sky_spin", "sky_direction", "sky_fov", "sky_comfort",
 // "sky_colours", "sky_brightness" as the Sky test screen sends them. Returns
 // whether `name` was one of them.
 bool set(const std::string& name, const std::string& value);
@@ -109,6 +115,12 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
 // scene, from the main loop) during play: when the sky is on, adds it to the
 // game's display list and returns true (skip the game's background).
 bool draw(std::uint8_t* rdram);
+
+// Mixed: whether a stage shows the brick sky instead of its own background.
+// Fixed and repeatable for a stage: one stage in four, chosen by a hash of
+// the mode (0x800E44A8), the level's background index (0x8013D264) and the
+// level counter (0x800E4498), which stay the same through a level.
+bool mixed_uses_sky(int mode, int background_index, int level);
 
 // The game picture's shape (width / height, 4:3 or wider when expanded), so
 // the comfort layer reaches the picture's edges, not the 4:3 frame's.

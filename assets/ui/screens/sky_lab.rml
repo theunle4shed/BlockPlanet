@@ -12,8 +12,8 @@
     <div id="panel">
         <div class="title">Sky test</div>
         <div class="subtitle">An experiment, shown in play. Not saved: note the values you like.</div>
-        <div class="item value" id="sky_on" data-setting="sky_on" data-description="Show the brick sky behind the sphere, in place of the game's own background."
-             data-options="off:Off,on:On">Brick sky<span class="value"></span></div>
+        <div class="item value" id="sky_backgrounds" data-setting="sky_backgrounds" data-description="Original: the game's own backgrounds, as it picks them. Mixed: the brick sky joins them, taking one stage in four (always the same stages). Brick sky only: for testing."
+             data-options="original:Original,mixed:Mixed,only:Brick sky only">Play backgrounds<span class="value"></span></div>
         <div class="item value" id="sky_layout" data-setting="sky_layout" data-description="How the bricks are laid out: like the play sphere's outside (bricks of several shapes, 32 around), or six square faces."
              data-options="sphere:Sphere,cube:Cube">Layout<span class="value"></span></div>
         <div class="item value" id="sky_spin" data-setting="sky_spin" data-description="How strongly the sky turns when the sphere turns. Still and Drift do not follow the sphere at all (for comfort)."

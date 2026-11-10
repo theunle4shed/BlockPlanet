@@ -19,9 +19,32 @@ int main() {
     assert(brick_sky::set("sky_spin", "nonsense") && brick_sky::settings().spin == "wild");
     assert(brick_sky::set("sky_fov", "500") && brick_sky::settings().fov_degrees == 130.0f);
     assert(brick_sky::set("sky_brightness", "55") && std::fabs(brick_sky::settings().brightness - 0.55f) < 1e-6f);
-    assert(brick_sky::set("sky_on", "on") && brick_sky::settings().on);
+    assert(brick_sky::settings().backgrounds == "original");  // the game's own by default
+    assert(brick_sky::set("sky_on", "on") && brick_sky::settings().backgrounds == "only");
+    assert(brick_sky::set("sky_backgrounds", "mixed") && brick_sky::settings().backgrounds == "mixed");
+    assert(brick_sky::set("sky_backgrounds", "bogus") && brick_sky::settings().backgrounds == "mixed");
+    {
+        // Mixed: repeatable, and about one stage in four.
+        int sky = 0;
+        for (int level = 0; level < 400; ++level) {
+            const bool use = brick_sky::mixed_uses_sky(1, 8, level);
+            assert(use == brick_sky::mixed_uses_sky(1, 8, level));
+            sky += use;
+        }
+        assert(sky > 60 && sky < 140);
+    }
+    // Original: the game's background is drawn; nothing of the sky runs.
+    {
+        brick_sky::set("sky_backgrounds", "original");
+        std::vector<std::uint8_t> ram(0x800000);
+        store32(ram.data(), 0x801033BCu, 0x80200000u);
+        store32(ram.data(), 0x800F22B4u, 0x80300000u);
+        assert(!brick_sky::draw(ram.data()) && load32(ram.data(), 0x800F22B4u) == 0x80300000u);
+        brick_sky::set("sky_backgrounds", "only");
+        assert(brick_sky::draw(ram.data()) && load32(ram.data(), 0x800F22B4u) == 0x80300008u);
+    }
     assert(!brick_sky::set("grid_theme", "blue"));
-    assert(brick_sky::values().size() == 8);
+    assert(brick_sky::values().size() == 8);  // backgrounds, layout, spin, direction, fov, comfort, colours, brightness
 
     // The angle step wraps at 16 bits.
     assert(brick_sky::angle_step(32760, -32766) == 10);

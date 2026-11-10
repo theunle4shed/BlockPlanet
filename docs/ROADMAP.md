@@ -135,7 +135,7 @@ The sketch:
 - It comes with a strength setting (off, gentle, normal, wild) and a reduced-motion option.
 - Medium effort.
 
-See [the sketch](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10). **Experiment built (2026-11-10, the owner's go), off by default:** Options > Sky test, or `BLOCKPLANET_BRICK_SKY=1`. It has spin strength, direction, field of view, a comfort layer, colours and brightness. To be recorded on the real game.
+See [the sketch](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10). **Experiment built (2026-11-10, the owner's go).** It is one more background in the pool, not a replacement: Options > Sky test > Play backgrounds is Original (the default), Mixed (it takes one stage in four, always the same ones) or Brick sky only. It has spin strength, direction, field of view, a comfort layer, colours and brightness. To be recorded on the real game.
 
 ### Your own music: MP3, OGG and FLAC (M)
 

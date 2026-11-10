@@ -40,12 +40,12 @@ constexpr std::uint32_t vertices_start = commands_end;
 
 bool apply(Settings& s, const std::string& name, const std::string& value);
 
-// BLOCKPLANET_BRICK_SKY=1 turns the sky on; BLOCKPLANET_BRICK_SKY_SET=
+// BLOCKPLANET_BRICK_SKY=1 shows the brick sky everywhere (=mixed: mixed); BLOCKPLANET_BRICK_SKY_SET=
 // "sky_spin=wild,sky_comfort=none" sets others, for recordings.
 Settings from_environment() {
     Settings s;
     const char* on = std::getenv("BLOCKPLANET_BRICK_SKY");
-    s.on = on != nullptr && std::string(on) != "0";
+    if (on != nullptr && std::string(on) != "0") s.backgrounds = std::string(on) == "mixed" ? "mixed" : "only";
     if (const char* list = std::getenv("BLOCKPLANET_BRICK_SKY_SET")) {
         const std::string text(list);
         std::size_t at = 0;
@@ -131,7 +131,10 @@ bool set(const std::string& name, const std::string& value) {
 
 namespace {
 bool apply(Settings& s, const std::string& name, const std::string& value) {
-    if (name == "sky_on") s.on = value == "on";
+    if (name == "sky_on") s.backgrounds = value == "on" ? "only" : "original";
+    else if (name == "sky_backgrounds") {
+        if (value == "original" || value == "mixed" || value == "only") s.backgrounds = value;
+    }
     else if (name == "sky_layout") {
         if (value == "sphere" || value == "cube") s.layout = value;
     }
@@ -152,7 +155,7 @@ bool apply(Settings& s, const std::string& name, const std::string& value) {
 
 std::vector<std::pair<std::string, std::string>> values() {
     const Settings s = settings();
-    return {{"sky_on", s.on ? "on" : "off"},
+    return {{"sky_backgrounds", s.backgrounds},
             {"sky_layout", s.layout},
             {"sky_spin", s.spin},
             {"sky_direction", s.against ? "against" : "with"},
@@ -534,8 +537,30 @@ std::vector<int> stage_brick_types(const std::uint8_t* rdram) {
     return types;
 }
 
+bool mixed_uses_sky(int mode, int background_index, int level) {
+    return hash(std::uint32_t(mode) * 7919u + std::uint32_t(background_index) * 131u + std::uint32_t(level) * 2654435761u) % 4u == 0;
+}
+
 bool draw(std::uint8_t* rdram) {
     Settings s = settings();
+    // The original backgrounds unless the brick sky is chosen: then nothing
+    // of it runs, and the game draws its own.
+    if (s.backgrounds == "original") return false;
+    if (s.backgrounds == "mixed") {
+        const int mode = load16(rdram, 0x800E44A8u), index = load16(rdram, 0x8013D264u), level = load16(rdram, 0x800E4498u);
+        const bool use = mixed_uses_sky(mode, index, level);
+        static int logged_key = -1;
+        const int key = (mode << 20) ^ (index << 12) ^ (level & 0xFFF) ^ (use ? 1 << 30 : 0);
+        if (key != logged_key) {
+            logged_key = key;
+            std::fprintf(stdout, "{\"event\":\"brick_sky_mixed\",\"mode\":%d,\"background\":%d,\"level\":%d,\"sky\":%s}\n", mode, index,
+                         level, use ? "true" : "false");
+            std::fflush(stdout);
+        }
+        if (!use) return false;
+    }
+    // The stage's colours are read at every draw, so a new level or chapter
+    // (a new colour set at 0x8013D188) is followed at once.
     if (s.colours == "stage") {
         s.stage_types = stage_brick_types(rdram);
         static std::vector<int> logged;
@@ -547,7 +572,6 @@ bool draw(std::uint8_t* rdram) {
             std::fflush(stdout);
         }
     }
-    if (!s.on) return false;
     if (load32(rdram, background_scene) == 0) return false;
     std::uint32_t dl = load32(rdram, display_list_pointer);
     if (dl < 0x80000000u || dl >= 0x80400000u) return false;
