@@ -3816,10 +3816,16 @@ bool handle_profile_command(const std::string& command) {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME");
                 return text == nullptr || std::string(text) != "fade";
             }();
+            // Research: BLOCKPLANET_RESUME_SKIP=1 ends the game's own pause
+            // exit as soon as its picture has faded in (PauseBridge::
+            // finish_resume), so the row clears about 1.3 s sooner; the grid
+            // then leaves 150 ms after.
+            static const bool resume_skip = std::getenv("BLOCKPLANET_RESUME_SKIP") != nullptr;
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
-                return text != nullptr ? std::max(0, std::atoi(text)) : (after_row ? 450 : 200);
+                return text != nullptr ? std::max(0, std::atoi(text)) : resume_skip ? 150 : (after_row ? 450 : 200);
             }();
+            if (resume_skip && guest_rdram != nullptr) pause_bridge.finish_resume(const_cast<std::uint8_t*>(guest_rdram));
             static bool was_paused = false;
             static std::optional<std::chrono::steady_clock::time_point> unpaused_at, start_at;
             static std::int64_t start_seen = last_start_ms.load();
