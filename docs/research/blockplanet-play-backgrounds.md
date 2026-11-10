@@ -174,7 +174,19 @@ So the camera sits inside a huge sphere made of bricks, seen from the inside lik
 
 **So the horizontal input is the per-frame change of `+0x2B42`.** It already includes the game's own easing, so a counter-spin that follows it is smooth by itself. The skybox's yaw velocity is −k × Δ(`+0x2B42`) × 2π / 8,192 radians a frame, plus its own drift.
 
-**The vertical axis is not among these.** None of these values follow up and down. It is to be found in a scan of the player context's words and floats while up is held.
+**The vertical axis is the halfword right after each one** (found 2026-11-10, from RAM dumps idle, holding up and after release):
+
+| Offset | What it is | Seen |
+| --- | --- | --- |
+| `+0x2B46` (copy at `+0x2B4E`) | **The vertical angle**, the twin of `+0x2B42` | Idle 128, 128; up held 406, 1,606, 2,941; after release 3,953 |
+| `+0x2B2E` (copy at `+0x2B36`) | The vertical target cell | 0, 0, 2, 8, 13, 15 |
+| `+0x2B1E` (copy at `+0x2B26`) | The vertical cell shown | 0, 0, 1, 5, 11, 15 |
+| `+0x24C6`, `+0x24D6` | The twin of `+0x24C4` | Not needed |
+
+- So the sphere's turn is an (x, y) pair of angles at `+0x2B42` and `+0x2B46`, about 256 per cell, both with the game's easing.
+- The skybox's angular velocity is the per-frame change of both, each taken modulo 65,536.
+- Not yet seen: whether the vertical turn wraps or stops. The run reached 15 cells. A longer hold of up would tell.
+- Other values also change while the sphere turns: floats at `0x8010C874`, `0x8010C8A0` and `0x8010C8CC` (camera or lighting?), and `0x801270F0` onwards, which is the board's mesh table being rebuilt. They are not needed here.
 
 ### A contrasting colour set
 
