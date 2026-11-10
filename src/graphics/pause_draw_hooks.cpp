@@ -502,6 +502,7 @@ extern "C" bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ct
     const auto scene = static_cast<std::uint32_t>(ctx->r4);
     const int object = static_cast<int>(ctx->r7);
     if (blockplanet_title_object(rdram, scene, object, static_cast<std::uint32_t>(ctx->r6))) return true;
+    blockplanet_logo_object_draw(rdram, scene, object);  // the N64 logo's wordmark, straight on
     // While BlockPlanet's menus are open over the game's own menus, its 3D
     // menu scenes (the ring with its character, the MENU sign) are not drawn:
     // only the grid background stays (the owner's choice, 2026-11-08).

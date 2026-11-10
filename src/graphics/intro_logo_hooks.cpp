@@ -17,6 +17,7 @@
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -105,4 +106,83 @@ extern "C" void blockplanet_logo_scene_stepped(std::uint8_t* rdram, recomp_conte
     if (frame >= hold_frame() || held.size() != held_list().size() * state_size) return;
     for (std::size_t i = 0; i < held_list().size(); ++i)
         std::memcpy(host(rdram, objects + std::uint32_t(held_list()[i]) * object_size + state_offset), held.data() + i * state_size, state_size);
+}
+
+// Straight on (the owner's request, 2026-11-10): the settled wordmark is
+// pitched 11 degrees to the camera and the "64" turned about 14 degrees, so
+// the edges of their extruded sides show. When the per-object draw
+// (func_800321D4) reaches either of them, their matrix (drawn after the
+// camera's, scene +0xF8, both chosen by the buffer at scene +0x3D) is turned
+// upright to the camera, the wordmark parallel to the screen and the "64"
+// with its front (local +Z) straight at the eye (see below).
+// Position, size, colour and fade are unchanged (thinning the depth as well
+// was tried and darkens the "64": it bends the lighting normals).
+// BLOCKPLANET_INTRO_LOGO_FACE=0 keeps their own rotation.
+namespace {
+
+struct Matrix { double m[4][4]; };
+struct Vec { double x, y, z; };
+
+Vec cross(const Vec& a, const Vec& b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
+Vec normalised(const Vec& v) {
+    const double l = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    return l > 0 ? Vec{v.x / l, v.y / l, v.z / l} : v;
+}
+
+Matrix read_matrix(const std::uint8_t* rdram, std::uint32_t at) {
+    Matrix r{};
+    for (int k = 0; k < 16; ++k) {
+        const std::int32_t fixed = static_cast<std::int32_t>(
+            (std::uint32_t(std::uint16_t(load16(rdram, at + 2u * k))) << 16) | std::uint16_t(load16(rdram, at + 32u + 2u * k)));
+        r.m[k / 4][k % 4] = fixed / 65536.0;
+    }
+    return r;
+}
+
+void write_matrix(std::uint8_t* rdram, std::uint32_t at, const Matrix& r) {
+    for (int k = 0; k < 16; ++k) {
+        const std::int32_t fixed = static_cast<std::int32_t>(std::llround(r.m[k / 4][k % 4] * 65536.0));
+        store16(rdram, at + 2u * k, static_cast<std::int16_t>(std::uint16_t(std::uint32_t(fixed) >> 16)));
+        store16(rdram, at + 32u + 2u * k, static_cast<std::int16_t>(std::uint16_t(std::uint32_t(fixed) & 0xFFFFu)));
+    }
+}
+
+bool face_enabled() {
+    static const bool on = [] {
+        const char* v = std::getenv("BLOCKPLANET_INTRO_LOGO_FACE");
+        return v == nullptr || v[0] != '0';
+    }();
+    return on;
+}
+
+} // namespace
+
+extern "C" void blockplanet_logo_object_draw(std::uint8_t* rdram, std::uint32_t scene, int object) {
+    if (!enabled() || !face_enabled() || (object != 1 && object != 2)) return;
+    if (scene == 0 || scene != load32(rdram, logo_scene_pointer) || load16(rdram, 0x800E1648u) != 0) return;
+    const std::uint32_t buffer = load8(rdram, scene + 0x3Du) & 1u;
+    const Matrix c = read_matrix(rdram, scene + 0xF8u + buffer * 0x40u);
+    const std::uint32_t at = load32(rdram, scene + 0x14u) + std::uint32_t(object) * object_size + buffer * 0x40u;
+    Matrix m = read_matrix(rdram, at);
+    // Row vectors: drawn = local * m * c. The object's place seen from the
+    // eye (at the origin of the camera's space, looking down -Z):
+    const Vec p{m.m[3][0] * c.m[0][0] + m.m[3][1] * c.m[1][0] + m.m[3][2] * c.m[2][0] + c.m[3][0],
+                m.m[3][0] * c.m[0][1] + m.m[3][1] * c.m[1][1] + m.m[3][2] * c.m[2][1] + c.m[3][1],
+                m.m[3][0] * c.m[0][2] + m.m[3][1] * c.m[1][2] + m.m[3][2] * c.m[2][2] + c.m[3][2]};
+    // Its new axes in the camera's space, upright. The wordmark (wide) lies
+    // parallel to the screen: facing the eye would keystone it (its first N
+    // leans), and its depth is too thin for its sides to show. The "64"
+    // (small, deeper) faces the eye, so perspective shows none of its sides.
+    const Vec z = object == 2 ? Vec{0.0, 0.0, 1.0} : normalised({-p.x, -p.y, -p.z});
+    const Vec x = normalised(cross({0.0, 1.0, 0.0}, z));
+    const Vec y = cross(z, x);
+    const Vec axes[3] = {x, y, z};
+    // Back into the scene's space (the camera's rotation is orthonormal, so
+    // its inverse is its transpose), keeping each axis's length.
+    for (int i = 0; i < 3; ++i) {
+        const double length = std::sqrt(m.m[i][0] * m.m[i][0] + m.m[i][1] * m.m[i][1] + m.m[i][2] * m.m[i][2]);
+        const Vec& a = axes[i];
+        for (int j = 0; j < 3; ++j) m.m[i][j] = length * (a.x * c.m[j][0] + a.y * c.m[j][1] + a.z * c.m[j][2]);
+    }
+    write_matrix(rdram, at, m);
 }
