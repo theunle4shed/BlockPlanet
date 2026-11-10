@@ -289,9 +289,15 @@ extern "C" void blockplanet_title_freeze(std::uint8_t* rdram, recomp_context* ct
     if (scene < 0x80000000u || scene >= 0x80800000u) return;
     const int frame = static_cast<int>(load32(rdram, scene + 0x24));
     const int elapsed = static_cast<int>(load32(rdram, 0x800E1208u) - load32(rdram, 0x800E1210u));
-    // The box art (tetrisphere/box_art.h) starts held: the letters' forming
-    // is not shown.
-    static const bool box_art = [] { const char* v = std::getenv("BLOCKPLANET_BOX_ART"); return v == nullptr || v[0] != '0'; }();
+    // The letters fly in as in the original, in time with the title's song
+    // (308 has the hit for their explosion), and are held once formed (the
+    // owner's request, 2026-11-10). BLOCKPLANET_BOX_ART_INSTANT=1 starts the
+    // box art (tetrisphere/box_art.h) with them already formed instead.
+    static const bool box_art = [] {
+        const char* off = std::getenv("BLOCKPLANET_BOX_ART");
+        const char* instant = std::getenv("BLOCKPLANET_BOX_ART_INSTANT");
+        return (off == nullptr || off[0] != '0') && instant != nullptr && instant[0] == '1';
+    }();
     if (!box_art && frame + elapsed < freeze) return;  // not there yet
     const std::uint32_t target = static_cast<std::uint32_t>(std::max(0, freeze - std::max(elapsed, 0)));
     // Its keyframes are stepped one frame at a time (func_8002F55C), so the
