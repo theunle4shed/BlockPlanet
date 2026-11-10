@@ -2861,7 +2861,11 @@ void begin_launch_presentation(LaunchMode mode) {
     static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
                                   "Training", "Training", "Puzzle Training"};
     loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
-    if (const auto path = blockplanet::ui::menu_path(); !path.empty()) launch_path = path;
+    // A restart from the pause keeps the menus the game was first started
+    // from: the pause screen is not a place to come back to.
+    if (const auto path = blockplanet::ui::menu_path();
+        !path.empty() && std::none_of(path.begin(), path.end(), [](const auto& s) { return s.first == "pause"; }))
+        launch_path = path;
     loading_since = std::chrono::steady_clock::now();
     loading_active = true;
 }

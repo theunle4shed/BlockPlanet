@@ -280,3 +280,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - (2026-11-10) Puzzle starts directly too (any puzzle from the list, and Restart level), as the Single page's mode list does it, including the mode row the game keeps in its save; the cartridge save after a Puzzle session is byte for byte the same as through the menus.
 - The other modes (Lines, Hide & Seek, Versus, Time Trial) still start through the original menus, one at a time to follow.
 - Research: how the menus start a mode, and the comparison of the two routes, in [docs/research/blockplanet-game-state.md](docs/research/blockplanet-game-state.md#starting-modes-directly-2026-11-09).
+
+## 2026-11-10: Fixes
+
+- Fixed: after Restart level (or Restart chapter) from the pause, Quit to menu left the pause menu on screen over the game's menu instead of going back to the menus the game was started from. The restart, which starts the mode again while the pause menu is still open, recorded the pause screen as the place to return to; a launch from the pause now keeps the earlier one.
