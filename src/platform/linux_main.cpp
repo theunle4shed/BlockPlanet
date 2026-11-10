@@ -454,6 +454,7 @@ void update_puzzle_hud() {
 
 bool update_title_overlay();
 extern "C" bool blockplanet_title_recent(std::uint32_t* image);
+extern "C" float blockplanet_title_notice_opacity();
 
 // Training (mode 3, docs/TRAINING_REDESIGN.md): Story's HUD as one row along
 // the bottom, each part shown once Wheels has introduced it, found from the
@@ -1989,6 +1990,7 @@ bool update_title_overlay() {
     blockplanet::ui::HudView view;
     for (const char* line : title_notice_lines) view.title_notice.emplace_back(line);
     view.title_disclaimer = title_disclaimer;
+    view.title_opacity = blockplanet_title_notice_opacity();
     view.title_x = (area_x + area_w * 0.04f) / frame->window_w;
     view.title_w = area_w * 0.92f / frame->window_w;
     view.title_y = (frame->y + frame->h * 0.84f) / frame->window_h;

@@ -840,6 +840,8 @@ bool update_hud_document() {
         hud_shown_rml = rml;
     }
     if (auto* root = hud_document->GetElementById("hud")) root->SetClass("ended", hud->end_menu);
+    if (auto* notice = hud_document->GetElementById("title-notice"))
+        notice->SetProperty("opacity", std::to_string(std::clamp(hud->title_opacity, 0.0f, 1.0f)));
     const auto text_rml = game_text_rml(*hud);
     if (text_rml != game_text_shown_rml) {
         if (auto* layer = hud_document->GetElementById("game-text")) layer->SetInnerRML(text_rml);

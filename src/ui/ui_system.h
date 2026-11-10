@@ -162,6 +162,7 @@ struct HudView {
     std::vector<std::string> title_notice;
     std::string title_disclaimer;
     float title_x = 0, title_y = 0, title_w = 0;
+    float title_opacity = 1;  // the copyright lines fading in with the box art's build-up
     // The game's own text, in BlockPlanet's font (the game's strings, placed
     // as the game placed them; fractions of the window, size in window
     // heights). With nothing else set, only these are shown.

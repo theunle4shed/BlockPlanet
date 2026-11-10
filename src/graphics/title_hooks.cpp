@@ -1210,17 +1210,177 @@ void draw_title_scene(std::uint8_t* rdram, recomp_context* ctx) {
         put32(rdram, display_list_pointer, dl + 8u);
     }
 }
+// The box art's build-up (the owner's notes, 2026-11-10): the ring with the
+// core's light, then the robots, then the Bombs grow into place, one after
+// another, from 308's last big hit (2.27 s into the title's song, where the
+// title would start fading its picture in), each over 26 title frames (60 a
+// second) with a little overshoot, so all of it has settled about 40 frames
+// on (0.67 s), as the letters' red edge light comes up (the letters scene's
+// own lights, which reach their end about 44 frames after the hit). The
+// copyright lines then fade in (blockplanet_title_notice_opacity).
+// BLOCKPLANET_TITLE_BUILD=0: all at once, as before.
+std::atomic<int> build_since{-1};      // title frames since the build-up began
+std::atomic<long long> build_ms{0};    // when the title last drew its picture (steady clock, ms)
+int current_build_since() {           // -1 while the title is not drawn
+    return now_ms() - build_ms.load(std::memory_order_relaxed) > 250 ? -1 : build_since.load(std::memory_order_relaxed);
+}
+
+constexpr int build_length = 26;
+constexpr int notice_from = 44, notice_length = 30;
+// Where each group grows from, in clip space (x right, y up): the ring's
+// centre and the Bombs' middle (RingStyle and bomb_poses, 320 x 240 frame).
+constexpr float ring_centre_x = (161.0f - 160.0f) / 160.0f, ring_centre_y = -(138.0f - 4.0f - 120.0f) / 120.0f;
+constexpr float bombs_centre_x = 57.0f / 160.0f, bombs_centre_y = -18.0f / 120.0f;
+
+bool build_enabled() {
+    static const bool on = [] {
+        const char* v = std::getenv("BLOCKPLANET_TITLE_BUILD");
+        return v == nullptr || v[0] != '0';
+    }();
+    return on;
+}
+
+// Title frames since the build-up began: it begins on the first frame the
+// title draws its picture again (after a pause of half a second or more, or
+// when the title's clock goes back, as on a restart).
+int build_frame(std::uint8_t* rdram) {
+    static std::uint32_t start = 0, last_t = 0;
+    static long long last_ms = 0;
+    const std::uint32_t t = load32(rdram, 0x800E1208u);
+    const long long ms = now_ms();
+    if (ms - last_ms > 500 || t < last_t) start = t;
+    last_t = t, last_ms = ms;
+    const int since = static_cast<int>(t - start);
+    build_since.store(since, std::memory_order_relaxed);
+    build_ms.store(ms, std::memory_order_relaxed);
+    return since;
+}
+
+// The size of a group at this point of the build-up: 0 to 1 with a little
+// overshoot (ease-out back), starting `delay` frames in.
+float build_step(int since, int delay) {
+    if (!build_enabled()) return 1.0f;
+    const float u = std::clamp(static_cast<float>(since - delay) / build_length, 0.0f, 1.0f);
+    const float c1 = 1.2f, c3 = c1 + 1.0f, v = u - 1.0f;
+    return 1.0f + c3 * v * v * v + c1 * v * v;
+}
+
+// Copies of projections, scaled for the build-up (BlockPlanet's memory):
+// each group has its own eight, in two sets used on alternate frames, so a
+// frame still being drawn keeps its own.
+struct BuildMatrices {
+    std::uint8_t* rdram;
+    std::uint32_t set = 0;
+};
+BuildMatrices build_matrices(std::uint8_t* rdram) {
+    static std::uint32_t parity = 0;
+    parity ^= 1u;
+    return BuildMatrices{rdram, 0x807ED000u + parity * 0x600u};
+}
+
+// Scales what was drawn from `from` on (to the list's end now) by `size`
+// about a point on screen: each projection it loads (G_MTX, projection) is
+// replaced by a scaled copy, except the game's own projection put back at the
+// end; nothing is drawn while the size is still 0.
+void build_in(std::uint8_t* rdram, const BuildMatrices& matrices, int group, std::uint32_t from, float size, float cx, float cy) {
+    const std::uint32_t to = load32(rdram, display_list_pointer);
+    if (size >= 0.9999f && size <= 1.0001f) return;
+    if (size <= 0.001f) {
+        put32(rdram, display_list_pointer, from);  // not drawn yet
+        return;
+    }
+    std::uint32_t game_projection = 0;
+    for (std::uint32_t at = from - 8u, n = 0; n < 4096 && at >= 0x80000000u; at -= 8u, ++n) {
+        const std::uint32_t w0 = load32(rdram, at);
+        if ((w0 >> 24) == 0x01u && (w0 >> 16 & 0x01u) != 0) {
+            game_projection = load32(rdram, at + 4u);
+            break;
+        }
+    }
+    std::uint32_t used = 0;
+    for (std::uint32_t a = from; a + 8u <= to && a < from + 8u * 16384u; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a);
+        if ((w0 >> 24) == 0xEDu) {
+            // A scissor (the robots' cut to the ring's area) shrinks with
+            // them; the full-frame one put back afterwards stays.
+            const std::uint32_t w1 = load32(rdram, a + 4u);
+            if ((w0 & 0x00FFFFFFu) == 0 && w1 == ((4u * 320u) << 12 | (4u * 240u))) continue;
+            const float sx = 4.0f * (160.0f + cx * 160.0f), sy = 4.0f * (120.0f - cy * 120.0f);
+            const auto fx = [&](std::uint32_t v) { return std::uint32_t(std::clamp(sx + (float(v) - sx) * size, 0.0f, 4095.0f)); };
+            const auto fy = [&](std::uint32_t v) { return std::uint32_t(std::clamp(sy + (float(v) - sy) * size, 0.0f, 4095.0f)); };
+            put32(rdram, a, (w0 & 0xFF000000u) | fx((w0 >> 12) & 0xFFFu) << 12 | fy(w0 & 0xFFFu));
+            put32(rdram, a + 4u, (w1 & 0xFF000000u) | fx((w1 >> 12) & 0xFFFu) << 12 | fy(w1 & 0xFFFu));
+            continue;
+        }
+        if ((w0 >> 24) != 0x01u || ((w0 >> 16) & 0x01u) == 0) continue;  // a projection matrix
+        const std::uint32_t m = load32(rdram, a + 4u) | 0x80000000u;
+        if ((m & 0x00FFFFFFu) == (game_projection & 0x00FFFFFFu) || used == 8) continue;
+        float p[4][4], q[4][4];
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j) p[i][j] = matrix_get(rdram, m, i, j);
+        for (int i = 0; i < 4; ++i) {
+            q[i][0] = p[i][0] * size + p[i][3] * (1.0f - size) * cx;
+            q[i][1] = p[i][1] * size + p[i][3] * (1.0f - size) * cy;
+            q[i][2] = p[i][2];
+            q[i][3] = p[i][3];
+        }
+        const std::uint32_t out = matrices.set + 0x200u * std::uint32_t(group) + 0x40u * used++;
+        put_matrix(rdram, out, q);
+        put32(rdram, a + 4u, out);
+    }
+}
 } // namespace
+
+// Whether the box art's build-up has finished (the copyright lines in too):
+// the whole picture is in place.
+extern "C" bool blockplanet_title_in_place() {
+    const int since = current_build_since();
+    if (since < 0) return false;
+    return since >= (build_enabled() ? notice_from + notice_length : 0);
+}
+
+// The copyright lines' opacity in the build-up (0 to 1), for the overlay.
+extern "C" float blockplanet_title_notice_opacity() {
+    if (!build_enabled()) return 1.0f;
+    const int since = current_build_since();
+    if (since < 0) return 0.0f;
+    const float u = std::clamp(static_cast<float>(since - notice_from) / notice_length, 0.0f, 1.0f);
+    return u * u * (3.0f - 2.0f * u);
+}
+
 
 // With the letters held (BLOCKPLANET_TITLE_FREEZE), the title picture is drawn
 // fully opaque (its alpha argument, on the stack at +0x1C).
 extern "C" void blockplanet_title_picture(std::uint8_t* rdram, recomp_context* ctx) {
     if (title_freeze_frame() < 0) return;
+    if (std::getenv("BLOCKPLANET_TITLE_TIMING_LOG") != nullptr) {  // research
+        std::uint32_t alpha_in;
+        std::memcpy(&alpha_in, rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x1C) & 0x00FFFFFFu), 4);
+        const std::uint32_t scene = load32(rdram, letters_pointer);
+        std::fprintf(stdout, "{\"event\":\"title_timing\",\"t\":%u,\"since\":%u,\"letters\":%d,\"alpha\":%u,\"v164a\":%u,\"ms\":%lld}\n",
+                     load32(rdram, 0x800E1208u), load32(rdram, 0x800E1208u) - load32(rdram, 0x800E1210u),
+                     scene >= 0x80000000u && scene < 0x80800000u ? static_cast<int>(load32(rdram, scene + 0x24)) : -1, alpha_in,
+                     static_cast<unsigned>(rdram[(0x800E164Au & 0x00FFFFFFu) ^ 2u] | rdram[((0x800E164Au & 0x00FFFFFFu) + 1) ^ 2u] << 8), now_ms());
+    }
     static const bool ring = std::getenv("BLOCKPLANET_TITLE_RING") == nullptr || std::atoi(std::getenv("BLOCKPLANET_TITLE_RING")) != 0;
-    if (ring) draw_title_ring(rdram);
+    const int since = build_frame(rdram);
+    const BuildMatrices matrices = build_matrices(rdram);
+    {
+        const std::uint32_t from = load32(rdram, display_list_pointer);
+        if (ring) draw_title_ring(rdram);
+        build_in(rdram, matrices, 0, from, build_step(since, 0), ring_centre_x, ring_centre_y);
+    }
     build_title_scene(rdram, ctx);
-    draw_title_scene(rdram, ctx);
-    draw_title_bombs(rdram);
+    {
+        const std::uint32_t from = load32(rdram, display_list_pointer);
+        draw_title_scene(rdram, ctx);
+        build_in(rdram, matrices, 1, from, build_step(since, 7), ring_centre_x, ring_centre_y);
+    }
+    {
+        const std::uint32_t from = load32(rdram, display_list_pointer);
+        draw_title_bombs(rdram);
+        build_in(rdram, matrices, 2, from, build_step(since, 14), bombs_centre_x, bombs_centre_y);
+    }
     const std::uint32_t alpha = 0xFF;
     std::memcpy(rdram + ((static_cast<std::uint32_t>(ctx->r29) + 0x1C) & 0x00FFFFFFu), &alpha, 4);
 }

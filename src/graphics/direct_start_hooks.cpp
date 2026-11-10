@@ -502,6 +502,8 @@ bool enabled() {
 // - the attract timer: the title leaves, the game's main menu (behind
 //   BlockPlanet's grid) has its idle timer run out so it starts its demo, and
 //   the game comes back to its title, and so the box art, when the demo ends.
+extern "C" bool blockplanet_title_in_place();
+
 namespace {
 
 using namespace tetrisphere;
@@ -521,11 +523,14 @@ bool box_art_enabled() {
     return on;
 }
 
-// Seconds on the box art before the demo (BLOCKPLANET_ATTRACT_SECONDS; the title's own 15).
+// Seconds the box art holds before the demo, counted from when the whole
+// picture is in place (its build-up done, the letters' fly-in not counted):
+// BLOCKPLANET_ATTRACT_SECONDS, 6 by default (the owner's choice, 2026-11-10;
+// the game's own title leaves after 15 s from its start).
 double attract_seconds() {
     static const double seconds = [] {
         const char* v = std::getenv("BLOCKPLANET_ATTRACT_SECONDS");
-        return v ? std::atof(v) : 15.0;
+        return v ? std::atof(v) : 6.0;
     }();
     return seconds;
 }
@@ -543,7 +548,7 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace tetrisphere::guest;
     static std::uint16_t held = 0;
     static std::chrono::steady_clock::time_point since{};
-    static bool on_box_art = false;
+    static bool on_box_art = false, in_place = false;
     const std::uint16_t now_held = static_cast<std::uint16_t>(load32(rdram, buttons) >> 16) | static_cast<std::uint16_t>(load32(rdram, buttons));
     const std::uint16_t pressed = static_cast<std::uint16_t>(now_held & ~held);
     held = now_held;
@@ -602,23 +607,33 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
     // On the box art.
     if (!on_box_art) {
         on_box_art = true;
+        in_place = false;
         since = std::chrono::steady_clock::now();
         // Back from the demo: the title from its start (it builds its scenes
         // only from phase 0, and the held letters never let it get there).
         if (phase != box_art::Phase::None) title_restart.store(true);
         box_art::phase().store(box_art::Phase::None);
     }
-    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - since).count();
+    // The hold counts from when the whole picture is in place.
+    if (!in_place && blockplanet_title_in_place()) {
+        in_place = true;
+        since = std::chrono::steady_clock::now();
+        std::fprintf(stdout, "{\"event\":\"box_art_in_place\"}\n");
+        std::fflush(stdout);
+    }
+    const double seconds = in_place ? std::chrono::duration<double>(std::chrono::steady_clock::now() - since).count() : 0.0;
     if ((pressed & button_b) != 0) {
         intro_restart.store(true);
         std::fprintf(stdout, "{\"event\":\"box_art_back\"}\n");
         std::fflush(stdout);
         return;
     }
-    if ((pressed & (button_a | button_start)) != 0) {
-        // Leave the title as it does on a press (0x80069500), for its menus,
-        // even with a brand-new save (no Training jump). Done here: the
-        // title reads its buttons after they are polled again this frame.
+    // Leave the title as it does on a press (0x80069500), for its menus,
+    // even with a brand-new save (no Training jump). Done here: the title
+    // reads its buttons after they are polled again this frame. (Its own
+    // 15 s timeout, 0x800E1208 at 901, takes the game's slow way out, which
+    // held the box art for several more seconds.)
+    const auto leave_title = [&] {
         store8(rdram, training_jump, 0);
         call(func_8007ADF8, rdram, ctx, jingle_player);
         call(func_8007AEE0, rdram, ctx, effects_player);
@@ -629,13 +644,15 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
         store16(rdram, title_exits, static_cast<std::int16_t>(load16(rdram, title_exits) + 1));
         store32(rdram, menu_timer_a, 0);
         store32(rdram, menu_timer_b, 0);
+    };
+    if ((pressed & (button_a | button_start)) != 0) {
+        leave_title();
         std::fprintf(stdout, "{\"event\":\"box_art_press\"}\n");
         std::fflush(stdout);
         return;
     }
     if (seconds >= attract_seconds()) {
-        store8(rdram, training_jump, 0);
-        store32(rdram, menu_timer_a, 901);  // the title's own timeout: it leaves for its menus
+        leave_title();
         box_art::phase().store(box_art::Phase::ToDemo);
         std::fprintf(stdout, "{\"event\":\"box_art_attract\"}\n");
         std::fflush(stdout);
