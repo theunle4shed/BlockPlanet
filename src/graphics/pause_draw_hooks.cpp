@@ -259,6 +259,33 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     }();
     if (helper != 0x8002D93Cu && image_skip.count(static_cast<std::uint32_t>(ctx->r5)) != 0) return true;
     if (helper == 0x8003396Cu && blockplanet_title_skip_image(rdram, static_cast<std::uint32_t>(ctx->r5))) return true;
+    // The intro's backdrop (the N64 logo's white picture of Nintendo and H2O
+    // logos, one 320 x 240 bitmap that blurs when enlarged) is not drawn, as
+    // the owner chose (2026-11-10); a white fill takes its place, since the
+    // game clears the frame with it (without it the logo leaves trails).
+    // BLOCKPLANET_INTRO_BACKDROP=1 keeps the original.
+    static const bool intro_backdrop = std::getenv("BLOCKPLANET_INTRO_BACKDROP") != nullptr;
+    if (helper == 0x8003396Cu && !intro_backdrop && guest16(rdram, 0x800E1648u) == 0 && guest16(rdram, 0x800E1646u) == 0) {
+        const std::uint32_t image = static_cast<std::uint32_t>(ctx->r5);
+        if ((image >> 24) == 0x80u && guest16(rdram, image) == 320 && guest16(rdram, image + 2) == 240 &&
+            guest16(rdram, image + 4) == 3 && int(ctx->r6) == 0 && int(ctx->r7) == 0) {
+            const std::uint32_t pointer = static_cast<std::uint32_t>(ctx->r4);  // the game's display list pointer
+            std::uint32_t dl = guest32(rdram, pointer);
+            const auto cmd = [&](std::uint32_t w0, std::uint32_t w1) {
+                std::memcpy(rdram + (dl & 0x00FFFFFFu), &w0, 4);
+                std::memcpy(rdram + ((dl + 4u) & 0x00FFFFFFu), &w1, 4);
+                dl += 8u;
+            };
+            cmd(0xE7000000u, 0);                                   // pipe sync
+            cmd(0xBA001402u, 0x00300000u);                         // fill mode
+            cmd(0xF7000000u, 0xFFFFFFFFu);                         // fill colour: white
+            cmd(0xF6000000u | (319u << 14) | (239u << 2), 0);      // the whole 320 x 240 frame
+            cmd(0xE7000000u, 0);
+            cmd(0xBA001402u, 0x00000000u);                         // one-cycle again
+            std::memcpy(rdram + (pointer & 0x00FFFFFFu), &dl, 4);
+            return true;
+        }
+    }
     // Training's speech bubble and its prompts (in play, mode 3), replaced by
     // BlockPlanet's card panel along with the text. Told apart by size and
     // format, as their addresses depend on what the game has loaded.
