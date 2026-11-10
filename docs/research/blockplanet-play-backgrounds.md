@@ -162,17 +162,19 @@ So the camera sits inside a huge sphere made of bricks, seen from the inside lik
 - The skybox's angular velocity is then −k × the sphere's angular velocity, k being the strength, plus a slow drift of its own so it is never still. The angular velocity is the per-frame change, wrapped at 32 cells.
 - The skybox is smoothed with a critically damped spring, so it starts and stops softly and never snaps. "High spins" means k well above 1, for example 2 to 4 times the sphere's speed, for the owner's trippy look.
 
-Candidates (2026-11-10, five RAM dumps in Story 1:1: two idle, three while holding left 0.6 s apart). These are halfwords of player 1's context (`0x80110220`) that stay fixed while idle and change while the sphere spins:
+**Found (2026-11-10).** Halfwords of player 1's context (`0x80110220`), named from RAM dumps and then a per-frame watch in Story 1:1. The run held left for 3.8 s, released, held right for 2 s, released, then held up and down:
 
-| Offset | Idle, idle, spinning × 3 | Guess |
+| Offset | What it is | Seen |
 | --- | --- | --- |
-| `+0x24C4`, `+0x24D4` | 0, 0, 12, 18, 24 | The cell position around the sphere: about 10 cells a second. The wrap at 32 is not yet seen |
-| `+0x2458` | 0, 0, 5, 6, 1 | A sub-cell phase or a small counter |
-| `+0x2B1A`, `+0x2B22` | 0, 0, 3, 9, 16 | Per-axis speed or acceleration? |
-| `+0x2B2A`, `+0x2B32` | 0, 0, 5, 12, 18 | The same? |
-| `+0x2B42`, `+0x2B4A` | 128, 128, 860, 2537, 4253 | A continuous accumulator, about 2,800 a second: the best input for a smooth counter-spin if it is an angle |
+| `+0x2B42` (copy at `+0x2B4A`) | **The horizontal angle**, continuous, about 256 a cell and 8,192 a full turn | Starts at 128. While left is held it rises every frame (159, 186, 209, 247 …), and after release it eases on for about 26 frames, the game's own momentum. Right makes it fall. It did not wrap at 8,192 (it reached 8,300), so it wraps at 65,536 or not at all; the code should take differences modulo 65,536 |
+| `+0x2B2A` (copy at `+0x2B32`) | The target cell, 0 to 31 | Steps at once, one cell per move |
+| `+0x2B1A` (copy at `+0x2B22`) | The cell shown, following the target | Wraps at 32 (29, 30, 31, 0) |
+| `+0x2458` | The sub-cell phase | 0 to 12 while moving, 0 when settled |
+| `+0x24C4`, `+0x24D4` | Unclear: coarse steps, perhaps the cursor or a camera value | Not needed |
 
-Still to do: a per-frame watch on these while holding left, then right, up and down, then releasing. That would separate the axes, show the direction signs and the wrap, and show whether a value is a position or a speed (a speed falls back to 0 on release).
+**So the horizontal input is the per-frame change of `+0x2B42`.** It already includes the game's own easing, so a counter-spin that follows it is smooth by itself. The skybox's yaw velocity is −k × Δ(`+0x2B42`) × 2π / 8,192 radians a frame, plus its own drift.
+
+**The vertical axis is not among these.** None of these values follow up and down. It is to be found in a scan of the player context's words and floats while up is held.
 
 ### A contrasting colour set
 
