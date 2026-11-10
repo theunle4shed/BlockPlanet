@@ -138,5 +138,66 @@ int main() {
            pause_items(1, 0)[1].action == "command:pause_restart_chapter");
     // Restart is offered only where the same place can be started again.
     assert(can_restart(1, 0) && can_restart(9, 0) && can_restart(3, 3) && !can_restart(3, 2) && !can_restart(7, 0));
+
+    // The end menus: BlockPlanet's panel with the game's items, rows in the
+    // game's order, shown as Try again, Training, Exit.
+    {
+        std::vector<EndMenuBridge::Label> labels{{"TRY AGAIN", 100}, {"EXIT", 120}, {"TRAINING", 140}, {"PUSH", 10}};
+        int exit_row = -2;
+        const auto items = end_menu_items(labels, &exit_row);
+        assert(items.size() == 3 && items[0].label == "Try again" && items[1].label == "Training" && items[2].label == "Exit");
+        assert(items[0].action == "command:end_choose:0" && items[1].action == "command:end_choose:2" &&
+               items[2].action == "command:end_choose:1" && exit_row == 1 && items[0].focus);
+        assert(end_menu_items({{"TRY AGAIN", 1}}).empty());  // no Exit: not the end menu
+        const auto versus = end_menu_items({{"EXIT", 50}, {"CONTINUE", 30}});
+        assert(versus.size() == 2 && versus[0].label == "Continue" && versus[0].action == "command:end_choose:0");
+
+        EndMenuBridge end;
+        set(0x800E121C, -1);
+        set(0x800E44A8, 1);   // Story
+        set(0x80112F9E, 3);   // hearts left
+        set(0x800E1228, 0);   // a row in use with hearts left (a chapter's end): left alone
+        set(0x800DFF08, 1);
+        t += std::chrono::milliseconds(50);
+        auto e = end.update(m, labels, false, t);
+        assert(!e.open_menu && !e.active && !end.hide_original());
+        // Game over: the grid while the menu fades in, the panel once it has.
+        set(0x80112F9E, -1);
+        set(0x800DFF08, 4);
+        t += std::chrono::milliseconds(50);
+        e = end.update(m, labels, false, t);
+        assert(e.active && !e.open_menu);
+        set(0x800DFF08, 1);
+        t += std::chrono::milliseconds(50);
+        e = end.update(m, labels, false, t);
+        assert(e.open_menu && e.title == "Game over" && e.items.size() == 3 && end.hide_original() && end.exit_row() == 1);
+        t += std::chrono::milliseconds(50);
+        assert(!end.update(m, {}, true, t).open_menu);  // open: nothing more (the game's text is hidden now)
+        t += std::chrono::milliseconds(50);
+        assert(!end.update(m, {}, false, t).open_menu);  // not yet open: not asked again at once
+        t += std::chrono::milliseconds(600);
+        assert(end.update(m, {}, false, t).open_menu);  // closed with Back: shown again
+        // Choosing Training (row 2): the row is set and A pressed.
+        end.choose(2, t);
+        bool pressed = false;
+        for (int k = 0; k < 10; ++k) {
+            t += std::chrono::milliseconds(50);
+            e = end.update(m, {}, true, t);
+            assert(e.inject && load16(m, 0x800E1228) == 2);
+            pressed = pressed || e.buttons == 0x8000;
+        }
+        assert(pressed);
+        // The game leaves its menu: done.
+        set(0x800E1228, -1);
+        t += std::chrono::milliseconds(50);
+        e = end.update(m, {}, false, t);
+        assert(!e.inject && !e.active && !end.hide_original());
+        // BlockPlanet's pause in charge: left alone.
+        set(0x800E1228, 0);
+        t += std::chrono::milliseconds(50);
+        assert(!end.update(m, labels, false, t, true).open_menu);
+        set(0x800E1228, -1);
+        set(0x80112F9E, 3);
+    }
     return 0;
 }
