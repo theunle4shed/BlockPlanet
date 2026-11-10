@@ -64,6 +64,28 @@ int main() {
     out = step(bridge, false);
     assert(!out.inject && !bridge.hide_original());
 
+    // Ending the game's exit early after Resume (research): only once the
+    // exit (0x800DFF08 = 5) has faded in (0x800E1202 = 0); then the row is
+    // -1 and the bridge no longer writes it back (which re-paused the game).
+    set(0x800E1228, 0);
+    set(0x800E44A8, 1);
+    out = step(bridge, false);
+    assert(out.open_menu);
+    bridge.choose(PauseBridge::Choice::Resume, t);
+    out = step(bridge, false);
+    assert(out.inject && load16(m, 0x800E1228) == 0);
+    assert(!bridge.finish_resume(m));  // not in the exit yet
+    set(0x800DFF08, 5);
+    set(0x800E1202, 120);
+    assert(!bridge.finish_resume(m));  // still fading
+    set(0x800E1202, 0);
+    set(0x8013FAD0, 1);  // the game's pause request flag
+    assert(bridge.finish_resume(m) && load16(m, 0x800E1228) == -1 && load16(m, 0x800DFF08) == 0 &&
+           load16(m, 0x8013FAD0) == 0);
+    out = step(bridge, false);
+    assert(!out.inject && !bridge.hide_original() && load16(m, 0x800E1228) == -1);
+    assert(!bridge.finish_resume(m));  // once
+
     // F1 during play presses Start until the game pauses.
     bridge.request_pause(t);
     pressed = false;

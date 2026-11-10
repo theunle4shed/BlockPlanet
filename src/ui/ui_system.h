@@ -48,7 +48,11 @@ void set_text(const std::string& name, const std::string& text);
 // A full-screen loading cover over everything (0: none, 1: opaque), with the
 // mode being started ("Story · Stage 1:1"), while a mode is started through
 // the game's own menus behind it.
-void set_loading(const std::string& text, float opacity);
+// `wanted`: the load is still under way (the opacity may be fading out). While
+// it is wanted and the menu grid is up, the grid stays as the loading screen
+// (in the colour it had, the cover's text over it, no dark cover), and flies
+// out to reveal the game once it is no longer wanted.
+void set_loading(const std::string& text, float opacity, bool wanted);
 // A small label in the screen's bottom-right corner, always shown (the
 // build's branch and commit); empty hides it.
 void set_build_label(const std::string& text);

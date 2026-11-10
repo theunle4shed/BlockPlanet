@@ -25,6 +25,7 @@
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/pause_bridge.h"
+#include "tetrisphere/brick_sky.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
 #include "tetrisphere/developer_records.h"
@@ -69,6 +70,7 @@
 #include <mutex>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <fstream>
 #include <map>
 #include <set>
@@ -149,6 +151,12 @@ bool guest_session = false;
 NameEditor name_editor;
 std::string character_profile_id;
 ProfileSaveData profile_data;
+// The Sky test's "Play test stage" (brick sky research): the profile as it
+// was before, put back afterwards, and nothing saved meanwhile, so the run
+// leaves no progress, records or Continue checkpoint.
+std::optional<ProfileSaveData> sky_test_profile;
+bool sky_test_seen_play = false;
+int sky_test_variants[2] = {0, 0};  // play_variant and menu_variant before the run, put back after
 bool profile_recording = false;
 bool profile_dirty = false;
 // A Chapter 0 (a Training lesson) started from a chapter list: when it is
@@ -207,7 +215,7 @@ void apply_controls(Settings& settings, const ControlPreferences& controls) {
 }
 
 void save_profile() {
-    if (!profile_save || !profile_dirty) return;
+    if (!profile_save || !profile_dirty || sky_test_profile) return;
     std::string error;
     if (profile_save->save(profile_data, error)) profile_dirty = false;
     else std::fprintf(stderr, "Could not save the profile: %s\n", error.c_str());
@@ -221,9 +229,9 @@ std::string hud_material_colour(int material) {
     case 32: return "#e8c020";  // yellow
     case 33: return "#3050d8";  // blue
     case 34: return "#30b048";  // green
-    case 35: return "#d83838";
-    case 36: return "#a048d8";
-    case 37: return "#f08020";
+    case 35: return "#c838c0";  // magenta
+    case 36: return "#9880e0";  // pale lavender
+    case 37: return "#d83838";  // red
     default: return "#a0a0a0";
     }
 }
@@ -2823,6 +2831,30 @@ bool handle_text_setting(const std::string& command) {
     return true;
 }
 
+// Options > Sky test: the brick sky experiment's settings (not saved; each
+// change is logged as "brick_sky_settings" so the values can be reported).
+bool handle_sky_setting(const std::string& command) {
+    const auto equals = command.find('=');
+    if (command.rfind("setting:sky_", 0) != 0 || equals == std::string::npos) return false;
+    const auto name = command.substr(8, equals - 8);
+    if (!tetrisphere::brick_sky::set(name, command.substr(equals + 1))) return true;
+    std::string all;
+    for (const auto& [setting, value] : tetrisphere::brick_sky::values()) {
+        blockplanet::ui::set_setting(setting, value);
+        all += std::string(all.empty() ? "" : ",") + "\"" + setting + "\":\"" + value + "\"";
+    }
+    std::fprintf(stdout, "{\"event\":\"brick_sky_settings\",%s}\n", all.c_str());
+    std::fflush(stdout);
+    return true;
+}
+
+void publish_sky_settings() {
+    static bool published = false;
+    if (published) return;
+    published = true;
+    for (const auto& [setting, value] : tetrisphere::brick_sky::values()) blockplanet::ui::set_setting(setting, value);
+}
+
 // "setting:NAME=VALUE" from the menus, as a settings change (field numbers
 // as in the PC settings menu). False if the command is not a known setting.
 bool queue_menu_setting(const std::string& command) {
@@ -3516,6 +3548,7 @@ bool handle_profile_command(const std::string& command) {
             if (handle_audio_setting(*command)) continue;
             if (handle_hud_setting(*command)) continue;
             if (handle_text_setting(*command)) continue;
+            if (handle_sky_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "audio_screen") {
@@ -3701,6 +3734,41 @@ bool handle_profile_command(const std::string& command) {
                 if (!command->ends_with(":refresh")) blockplanet::ui::request_show("stages");
                 continue;
             }
+            if (*command == "sky_test_stage") {
+                // Options > Sky test > Play test stage: Story 1:1 on its own,
+                // as Casual (no game over, no trophies), with the brick sky
+                // on for this run only; the profile is put back afterwards
+                // and nothing is saved meanwhile. Quit (or the stage's end)
+                // returns to the Sky test.
+                if (game_option_applier && !sky_test_profile) {
+                    // Trophy stats from earlier play are written now, so
+                    // nothing from before is saved during the run (the
+                    // periodic save would otherwise write them then).
+                    save_trophies();
+                    sky_test_profile = profile_data;
+                    sky_test_seen_play = false;
+                    sky_test_variants[0] = int(play_variant);
+                    sky_test_variants[1] = int(menu_variant);
+                    tetrisphere::brick_sky::set_test_run(true);
+                    continue_mode.reset();
+                    single_stage = std::pair{1, 1};
+                    menu_variant = play_variant = PlayVariant::Casual;
+                    single_stage_quit_at.reset();
+                    single_stage_result.reset();
+                    chapter_zero_lesson.clear();
+                    game_option_applier->choose_start(1, 1);
+                    launch_mode(LaunchMode::Rescue);
+                    if (!mode_launcher.active()) {  // refused: nothing started
+                        profile_data = *sky_test_profile;
+                        sky_test_profile.reset();
+                        play_variant = PlayVariant(sky_test_variants[0]);
+                        menu_variant = PlayVariant(sky_test_variants[1]);
+                        tetrisphere::brick_sky::set_test_run(false);
+                        single_stage.reset();
+                    }
+                }
+                continue;
+            }
             if (command->rfind("stage:", 0) == 0) {
                 // stage:N:L: one Story stage on its own.
                 const int chapter = std::atoi(command->c_str() + 6);
@@ -3848,6 +3916,36 @@ bool handle_profile_command(const std::string& command) {
         poll_game_events();
         publish_audio_settings();
         publish_hud_settings();
+        publish_sky_settings();
+        if (const auto frame = picture_frame()) tetrisphere::brick_sky::set_picture_aspect(frame->aspect);
+        // The Sky test's test stage ends once play has been left (Quit, or
+        // the stage's end) and the game is back at its menus: the sky goes
+        // off and the profile is put back as it was.
+        // During the run no trophy stats are counted (Casual turns awards
+        // off at launch; held off here throughout, whatever else changes).
+        if (sky_test_profile) trophy_engine().set_awards_enabled(false);
+        if (sky_test_profile && guest_rdram != nullptr && !mode_launcher.active()) {
+            const bool playing = guest::load16(guest_rdram, 0x800E121C) == -1;
+            sky_test_seen_play = sky_test_seen_play || playing;
+            if (sky_test_seen_play && !playing) {
+                tetrisphere::brick_sky::set_test_run(false);
+                profile_data = *sky_test_profile;
+                sky_test_profile.reset();
+                profile_dirty = false;
+                // Back to the variant the menus had (the run was Casual), and
+                // Casual's no-game-over and trophies as they are for that.
+                play_variant = PlayVariant(sky_test_variants[0]);
+                menu_variant = PlayVariant(sky_test_variants[1]);
+                single_stage.reset();
+                if (game_option_applier) {
+                    const bool casual = play_variant == PlayVariant::Casual;
+                    game_option_applier->set_menu_casual(casual);
+                    trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());
+                }
+                std::fprintf(stdout, "{\"event\":\"sky_test_stage_end\"}\n");
+                std::fflush(stdout);
+            }
+        }
         // Back at the game's menu after leaving play from BlockPlanet: open
         // BlockPlanet's menus (the stage list after a single stage).
         if (return_to_menu_chapter && !continue_mode && !launching() && guest_rdram != nullptr &&
@@ -3933,8 +4031,12 @@ bool handle_profile_command(const std::string& command) {
         }
         // The loading cover: fades in over 0.15 s when a mode starts, stays
         // while the game's menus are pressed through and the stage loads,
-        // and fades out over 0.5 s once play has run for 0.4 s (a pending
-        // Continue or restart keeps it up too). At most 20 seconds.
+        // and fades out over 0.5 s once play has run 0.4 s with the game's
+        // own fade clear (3 s of play at the latest; a pending Continue or
+        // restart keeps it up too). At most 20 seconds. When the menu grid is
+        // up as the mode starts, the grid is the loading screen instead (the
+        // cover's text over it, no dark cover) and flies out once the load is
+        // done (ui_system.h, set_loading).
         {
             static float opacity = 0.0f;
             static std::optional<std::chrono::steady_clock::time_point> playing_since;
@@ -3943,10 +4045,30 @@ bool handle_profile_command(const std::string& command) {
             const float dt = std::min(0.1f, std::chrono::duration<float>(now_l - last).count());
             last = now_l;
             const bool in_play_now = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) == -1;
+            // The game's own fade (0x800E1202: 0 clear, 255 dark) has brought
+            // the stage in: the load is only done once it is clear (the menu
+            // grid, as the loading screen, then reveals the stage itself
+            // rather than a black screen fading in).
+            const bool faded_in = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E1202) == 0;
+            static std::optional<std::chrono::steady_clock::time_point> clear_since;
+            // How long after the fade reads clear the load is done: Story's
+            // stage still fades in for about 1 s after 0x800E1202 reads 0
+            // (recorded 2026-11-09), so the grid holds over it
+            // (BLOCKPLANET_GRID_LOAD_MS, default 1200).
+            static const int settle_ms = [] {
+                const char* text = std::getenv("BLOCKPLANET_GRID_LOAD_MS");
+                return text != nullptr ? std::max(0, std::atoi(text)) : 1200;
+            }();
             if (loading_active) {
                 if (launching() || continue_mode || !in_play_now) playing_since.reset();
                 else if (!playing_since) playing_since = now_l;
-                if ((playing_since && now_l - *playing_since > std::chrono::milliseconds(400)) ||
+                if (!playing_since || !faded_in) clear_since.reset();
+                else if (!clear_since) clear_since = now_l;
+                // Done settle_ms after the fade is clear in play; 4 s into
+                // play in any case (a mode whose fade reads otherwise); 20 s
+                // at most.
+                if ((clear_since && now_l - *clear_since > std::chrono::milliseconds(settle_ms)) ||
+                    (playing_since && now_l - *playing_since > std::chrono::seconds(4)) ||
                     now_l - loading_since > std::chrono::seconds(20))
                     loading_active = false;
             }
@@ -3962,29 +4084,41 @@ bool handle_profile_command(const std::string& command) {
                 muted = false;
                 blockplanet::set_audio_levels(current_audio().music, current_audio().effects);
             }
-            blockplanet::ui::set_loading(loading_title, opacity);
+            blockplanet::ui::set_loading(loading_title, opacity, loading_active);
         }
         // The menu grid (docs/UI.md, Menu grid) over the game's own pause
         // animations, in the pause's colours: from the Start press that
         // pauses (before the game's own fade and tiles show), while paused,
         // and after Resume until the pause row 0x800E1228 clears and a moment
-        // more (BLOCKPLANET_GRID_RESUME_MS, default 450: the game draws dark
-        // for about 0.3 s just after the row clears); and after Quit
-        // until BlockPlanet's menus open again. Measured on the test machine
+        // more (BLOCKPLANET_GRID_RESUME_MS, default 450); and after Quit until
+        // BlockPlanet's menus open again. Measured on the test machine
         // (2026-11-09): after Resume the game's screen fade (0x800E1202, 255
-        // while paused) is clear within about 0.4 s, then its own pause tiles
-        // fly out over the game (0x800DFF08 = 5) for about 1.3 s, and the row
-        // clears when they have gone. BLOCKPLANET_GRID_RESUME=fade leaves
-        // once the fade is clear instead (then 200 ms), for comparison.
+        // while paused) is clear within about 0.4 s, then the game flies its
+        // own pause tiles out over the play field for about 1.3 s before the
+        // row clears, so Resume takes about 2 s (the owner finds it slow).
+        // Research: BLOCKPLANET_GRID_RESUME=fade leaves once the fade is clear
+        // and skips the pause background helper after Resume
+        // (set_pause_exit_hidden); that helper is not where the game's pause
+        // tiles are drawn (recorded 2026-11-10: they still fly out after our
+        // grid), so it waits for the row until they are found.
         {
             static const bool after_row = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME");
                 return text == nullptr || std::string(text) != "fade";
             }();
+            // After Resume, end the game's own pause exit as soon as its
+            // picture has faded in (PauseBridge::finish_resume), so the row
+            // clears about 1.3 s sooner; the grid then leaves 150 ms after.
+            // BLOCKPLANET_RESUME_SKIP=0 lets the exit run its full length.
+            static const bool resume_skip = [] {
+                const char* text = std::getenv("BLOCKPLANET_RESUME_SKIP");
+                return text == nullptr || std::string_view(text) != "0";
+            }();
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
-                return text != nullptr ? std::max(0, std::atoi(text)) : (after_row ? 450 : 200);
+                return text != nullptr ? std::max(0, std::atoi(text)) : resume_skip ? 150 : (after_row ? 450 : 200);
             }();
+            if (resume_skip && guest_rdram != nullptr) pause_bridge.finish_resume(const_cast<std::uint8_t*>(guest_rdram));
             static bool was_paused = false;
             static std::optional<std::chrono::steady_clock::time_point> unpaused_at, start_at;
             static std::int64_t start_seen = last_start_ms.load();
@@ -4001,6 +4135,8 @@ bool handle_profile_command(const std::string& command) {
                 static bool menu_seen = false;
                 if (!paused) menu_seen = false;
                 else if (blockplanet::ui::menus_open()) menu_seen = true;
+                // Resumed: the game's own pause tiles are not drawn as they leave.
+                blockplanet::set_pause_exit_hidden(!after_row && paused && menu_seen && !blockplanet::ui::menus_open());
                 if (paused && menu_seen && !after_row && !blockplanet::ui::menus_open() &&
                     guest::load16(guest_rdram, 0x800E1202) == 0)
                     paused = false;

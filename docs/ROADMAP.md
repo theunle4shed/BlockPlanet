@@ -97,11 +97,45 @@ Gameplay frames render an off-screen background layer at RDRAM `0x000400` with t
 - Are the backgrounds procedural, or stored animations?
 - How much of each frame's GPU time do they cost?
 
+**Found so far (2026-11-10, [research](research/blockplanet-play-backgrounds.md)):** each is a stored animation: a LightWave scene with one object, keyframed, played and looped in real time by the game's general model player. There are 25, picked per level by the mode's rule. They are not linked to the music. Only the mesh moves: one small textured mesh (one 32 × 32 texture), turned by its keyframes and shaded by the game's lights, which give the colour shifts. No textures scroll and no palettes cycle (`BLOCKPLANET_BG_DL_LOG`). Still open: the GPU cost.
+
 ### Music-reactive backgrounds, like a Winamp visualizer (M to L, after research)
 
 Analyze the audio the game outputs (BlockPlanet already receives every PCM buffer in `queue_audio`) with an FFT to get bass, mid and treble levels and beat detection. Then either:
 - **Drive the original backgrounds:** write those levels into the background's animation parameters each frame, if the research finds suitable ones. Original look, music-reactive.
 - **Add new backgrounds:** draw host-side shader backgrounds into the background layer. Fully new visuals, the most freedom, and the basis for user-made visualizers later.
+
+### Pinch mode: a background that reacts near game over (idea, research first, 2026-11-10)
+
+The owner's idea: when the player is close to losing, the background behaves differently or reacts.
+- **Triggers to consider:**
+  - the last heart (player context `0x80110220` + `0x2D7E`);
+  - the drop timer or shot time limit nearly run out (candidates `+0x3254` and `+0x3250`, from the direct-launch session's catalogue);
+  - the board close to its limit;
+  - any danger signal the original already gives (a music change, warning sound or HUD flash near game over), still to check.
+- **Reactions to consider:**
+  - a faster or slower background;
+  - a tint or pulse;
+  - a switch to another of the 25 backgrounds;
+  - a BlockPlanet overlay effect.
+
+See [the feasibility notes](research/blockplanet-play-backgrounds.md#pinch-mode-the-owners-idea-2026-11-10). Nothing is built until the owner decides.
+
+### Counter-motion backgrounds (idea, research first, 2026-11-10)
+
+The owner's idea: the background turns against the sphere's spin, or with it. Today it does not react at all: measured in Story 1:1, it changes no more while the sphere spins than when idle. The background would follow the sphere's rotation (the board's view position plus the sub-cell rotation used by `func_800ADD6C`, addresses still to name), applied as a rotation of the background's matrices at its draw (`0x80071BA0`), extra animation speed, or a shift of the background layer. See [the notes](research/blockplanet-play-backgrounds.md#counter-motion-the-owners-second-idea-2026-11-10). Nothing is built until the owner decides.
+
+### Brick skybox background (design idea, research first, 2026-11-10)
+
+The owner's design: "inside a sphere (just a skybox) and high spins counter to the play sphere. Bricks would need to be different colours to the current stage." The camera sits inside a huge sphere of bricks that spins fast against the play sphere's rotation, in the colours the stage does not use (darkened), so the board stays readable.
+
+The sketch:
+- BlockPlanet generates the brick sphere and draws it in the game's background slot (`0x80071BA0`), with the game's brick texture read at run time.
+- It is driven by the sphere's rotation, as in counter-motion.
+- It comes with a strength setting (off, gentle, normal, wild) and a reduced-motion option.
+- Medium effort.
+
+See [the sketch](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10). **Experiment built (2026-11-10, the owner's go), and parked there by the owner's choice:** it stays a research experiment behind its switch (Options > Sky test, Play backgrounds defaulting to Original). It is not for the original modes' pool, and it isn't offered to players. It is kept for new game modes (see Custom backgrounds for new modes). No more work on it for now; the play sphere's texture, for one, is not started.
 
 ### Your own music: MP3, OGG and FLAC (M)
 
@@ -170,6 +204,8 @@ First technical notes (not yet researched):
 
 - **Escape:** the camera inside the sphere means the renderer drawing the inner faces and culling differently (BlockPlanet now draws the sphere itself, `docs/research/blockplanet-game-state.md`). Dropping onto the underside reverses the drop direction and gravity, which is game logic spread over many functions (the board limits table in the same document); likely the largest change of the two.
 - **Multiphasic:** the transition fits what is already known: the core can be resized in the mesh builder (the `BLOCKPLANET_SPHERE_CORE_SCALE` experiment), BlockPlanet draws the sphere, and an indestructible block type exists (type 47, Puzzle's border). The "core picture" stage would need art for the next stage drawn on the core, and a way to load the next level without leaving play (the game builds a level between levels today). Earning lives needs a rule (for example a score or combo threshold) and a HUD element.
+
+**Custom backgrounds for new modes** (the owner, 2026-11-10: "Don't incorporate the brick sky yet.. I'm thinking we can use some custom ones for new game modes"). BlockPlanet's own play backgrounds, such as the brick sky (below and in [the research](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10)), belong to new game modes: the modes above, any later ones such as the Phear-inspired mode, and the rulesets per stage, where the background is one of a stage's variables. They don't belong in the original modes' pool, which keeps the game's own 25.
 
 ### Custom characters you can save (M to L, plus art)
 

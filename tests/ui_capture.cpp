@@ -401,6 +401,17 @@ int main(int argc, char** argv) {
             navigator.open("grid_lab");
             advance(now + 2.0);
             frame("grid_lab");
+            navigator.set_setting("sky_backgrounds", "mixed");
+            navigator.set_setting("sky_layout", "sphere");
+            navigator.set_setting("sky_spin", "gentle");
+            navigator.set_setting("sky_direction", "against");
+            navigator.set_setting("sky_fov", "70");
+            navigator.set_setting("sky_comfort", "frame");
+            navigator.set_setting("sky_colours", "stage");
+            navigator.set_setting("sky_brightness", "55");
+            navigator.open("sky_lab");
+            advance(now + 2.0);
+            frame("sky_lab");
             // Closing the menus: the grid flies out, revealing the game.
             navigator.close();
             {

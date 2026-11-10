@@ -66,6 +66,21 @@ void PauseBridge::choose(Choice choice, Clock::time_point now) {
     since_ = now;
 }
 
+bool PauseBridge::finish_resume(std::uint8_t* rdram) {
+    if (!choice_ || *choice_ != Choice::Resume) return false;
+    if (load16(rdram, scene) != -1 || load16(rdram, pause_row) < 0) return false;
+    if (load16(rdram, 0x800DFF08u) != 5 || load16(rdram, 0x800E1202u) != 0) return false;
+    // The game's pause request flag: while it is set and the row is -1, its
+    // main loop (func_80070118) starts a pause again (found by the parent
+    // session with a write watch, 2026-11-10).
+    store16(rdram, 0x8013FAD0u, 0);
+    store16(rdram, 0x800DFF08u, 0);
+    store16(rdram, pause_row, -1);
+    choice_.reset();
+    showing_ = false;
+    return true;
+}
+
 void PauseBridge::request_pause(Clock::time_point now) {
     pause_requested_ = true;
     since_ = now;
