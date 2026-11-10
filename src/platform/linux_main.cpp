@@ -2475,6 +2475,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // folder: the save stays in memory and no trophies are earned.
     profile_store = std::make_unique<ProfileStore>(user_path);
     guest_session = run_options.guest;
+    tetrisphere::direct_start::set_guest(guest_session);
     unlock_all_testing = run_options.unlock_all || std::getenv("BLOCKPLANET_UNLOCK_ALL") != nullptr;
     auto& profiles = *profile_store;
     std::string profile_error;
@@ -3040,6 +3041,7 @@ void switch_profile(std::optional<std::string> name, bool guest, const std::stri
     }
     if (!guest && !name) name = profiles.active().name;
     guest_session = guest;
+    tetrisphere::direct_start::set_guest(guest);
     std::filesystem::path profile_path, eeprom_path;
     if (!guest) {
         profile_path = profiles.directory(profiles.active());
@@ -3178,6 +3180,12 @@ bool handle_profile_command(const std::string& command) {
     if (command == "name_done") {
         std::string name = name_editor.text();
         while (!name.empty() && name.back() == ' ') name.pop_back();
+        // "Guest" is for guest play; a profile already called that keeps it.
+        const auto* renamed = name_editor.target() == "new" ? nullptr : profile_by_id(store, name_editor.target());
+        if (tetrisphere::reserved_profile_name(name) && !(renamed != nullptr && renamed->name == name)) {
+            show_name("That name is for guest play");
+            return true;
+        }
         if (name_editor.target() == "new") {
             if (name.empty()) name = next_profile_name(store);
             if (store.find(name) != nullptr) show_name("That name is taken");

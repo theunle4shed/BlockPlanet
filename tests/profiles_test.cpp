@@ -23,6 +23,13 @@ std::string read(const std::filesystem::path& path) {
 } // namespace
 
 int main(int argc, char** argv) {
+    // "Guest" is kept for guest play, whatever its case and spaces.
+    assert(reserved_profile_name("Guest"));
+    assert(reserved_profile_name("guest"));
+    assert(reserved_profile_name(" GUEST "));
+    assert(!reserved_profile_name("Guests"));
+    assert(!reserved_profile_name("Gues t"));
+    assert(!reserved_profile_name("Player 1"));
     assert(argc == 2);
     const auto root = std::filesystem::path(argv[1]) /
                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());

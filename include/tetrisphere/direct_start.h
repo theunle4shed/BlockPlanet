@@ -57,6 +57,9 @@ void request_intro_restart();
 // from its start, without the intro. Done at the game's next frame in its menus.
 void request_title_restart();
 
+// Guest play: player 1's name in the game is "Guest" (no name is asked for).
+void set_guest(bool guest);
+
 // Changes the cartridge save in use without restarting the game (a profile
 // change): once the game has nothing waiting to be written, the save behind
 // it becomes `path` (empty: a guest's, in memory only) and the game reads it

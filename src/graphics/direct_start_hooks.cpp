@@ -165,6 +165,7 @@ constexpr std::uint32_t training_cleared_b = 0x800E4480u;
 std::mutex mutex;
 std::atomic<bool> intro_restart{false};
 std::atomic<bool> title_restart{false};
+std::atomic<bool> guest_play{false};
 // A profile change's cartridge save (under `mutex`).
 std::optional<std::filesystem::path> save_switch;
 std::optional<bool> save_switch_result;
@@ -340,10 +341,15 @@ void versus_players_page(std::uint8_t* rdram, recomp_context* ctx) {
 bool start_single(std::uint8_t* rdram, recomp_context* ctx, const DirectStartRequest& request, std::int16_t mode_number) {
     // 0. The player page's opening: the player's name.
     call(func_800656C8, rdram, ctx);
-    if (load8(rdram, name_copy) == 0) {
+    // A guest is always "Guest" (the owner's rule, 2026-11-10), in the
+    // game's capitals; otherwise the save's name, or the menus' default.
+    if (guest_play.load() || load8(rdram, name_copy) == 0) {
+        const char guest_name[] = "GUEST";
         const char default_name[] = "PLAYER 1";
-        for (std::uint32_t i = 0; i < sizeof default_name; ++i)
-            store8(rdram, name_copy + i, static_cast<std::uint8_t>(default_name[i]));
+        const char* chosen = guest_play.load() ? guest_name : default_name;
+        const std::uint32_t length = static_cast<std::uint32_t>(std::strlen(chosen));
+        for (std::uint32_t i = 0; i < 9; ++i)
+            store8(rdram, name_copy + i, i < length ? static_cast<std::uint8_t>(chosen[i]) : 0);
     }
     store32(rdram, p1_name, name_copy);
     call(func_80066854, rdram, ctx);
@@ -456,6 +462,7 @@ void cancel() {
 
 void request_intro_restart() { intro_restart.store(true); }
 void request_title_restart() { title_restart.store(true); }
+void set_guest(bool guest) { guest_play.store(guest); }
 
 void request_save_switch(const std::filesystem::path& path) {
     std::lock_guard lock(mutex);
