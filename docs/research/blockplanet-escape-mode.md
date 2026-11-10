@@ -35,6 +35,12 @@ Two steps, each reported before going further. Step 1 is a visual prototype; ste
   3. **A large pale lavender quad** covered the lower screen after the second drop. It is probably the dropped or landing piece, or the landing marker, drawn near the camera in our view's space.
   4. **No depth:** at 150° the patch's far edges overlap at the corners.
 
+**The camera, after the first run** (the owner, 2026-11-10: "the camera would need to be as far back inside the core as it can and facing the brick opposite"):
+- It is pulled back from the centre towards the far side's inner surface, still looking across the sphere at the patch. `BLOCKPLANET_ESCAPE_DISTANCE`: 0 is the centre and 1 the far side; 0.85 by default.
+- A moderate view, 70° by default (`BLOCKPLANET_ESCAPE_FOV`).
+- That frames the patch much as the outside view does, flattening the curvature, with its rim past the screen's edges, as the outside view's is.
+- Only the patch facing the camera is drawn (the game's 15 × 15), so the far side behind the camera is never in the way.
+
 **Drawing the cursor, falling piece and landing marker from inside.** Everything the game places on the sphere reads the mesh table or the cell setup's work area: `func_80097E3C`, `func_80098D8C`, `func_800A0ED8`, `func_800A2374`, `func_800A18F4` and `func_800A1E58`. The last two call the face functions (`docs/research/blockplanet-game-state.md`, sphere proportions). So:
 - **The landing marker and the piece on the sphere:** wrap those routines' calls in the inside camera (`escape_view::begin` and `end`, as the board is wrapped now), and draw their inner faces rather than their outer faces where they draw faces. First, find which routine draws what: a draw log of those six while a piece is held, then dropped.
 - **The falling piece in flight:** a model, drawn through the model helper (`0x8002D93C`) with the game camera's matrices. It needs its matrix replaced by one in the inside camera's space, placed by its own position along its fall (its height above the board, from the player context), as BlockPlanet already does for the held magic (`src/graphics/magic_hooks.cpp`).

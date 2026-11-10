@@ -24,10 +24,13 @@ bool begin(std::uint8_t* rdram);
 // Pops the view and loads the game's projection again.
 void end(std::uint8_t* rdram);
 
-// The camera's matrices, written to `memory`, for a field of view: from the
-// centre of the mesh table's sphere (0x800E44E4) towards its patch's middle.
-// Returns false if the mesh table is not there.
-bool write_camera(std::uint8_t* rdram, float fov_degrees);
+// The camera's matrices, written to `memory`, for a field of view, looking
+// at the patch's middle (the mesh table's sphere, 0x800E44E4) from
+// `distance` of the way from the centre back to the far side's inner surface
+// (0 the centre, 1 the far side; BLOCKPLANET_ESCAPE_DISTANCE, 0.85 by
+// default; BLOCKPLANET_ESCAPE_FOV, 70 degrees). Returns false if the mesh
+// table is not there.
+bool write_camera(std::uint8_t* rdram, float fov_degrees, float distance = 0.0f);
 
 constexpr std::uint32_t memory = 0x805F0000u;  // two matrices (the tail of the extended sphere's first vertex buffer)
 

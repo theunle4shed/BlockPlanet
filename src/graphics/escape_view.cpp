@@ -62,7 +62,7 @@ bool enabled() {
     return on;
 }
 
-bool write_camera(std::uint8_t* rdram, float fov_degrees) {
+bool write_camera(std::uint8_t* rdram, float fov_degrees, float distance) {
     const std::uint32_t mesh = load32(rdram, mesh_pointer);
     if (mesh < 0x80000000u || mesh >= 0x80800000u) return false;
     // From the centre (the mesh's origin) towards the patch's middle, its up
@@ -75,10 +75,19 @@ bool write_camera(std::uint8_t* rdram, float fov_degrees) {
     up = unit({up[0] - forward[0] * along, up[1] - forward[1] * along, up[2] - forward[2] * along});
     const Vec back{-forward[0], -forward[1], -forward[2]};
     const Vec right = unit(cross(up, back));
-    // Row vectors: eye = v * V (x right, y up, the camera looking down -z).
-    const float v[4][4] = {{right[0], up[0], back[0], 0}, {right[1], up[1], back[1], 0}, {right[2], up[2], back[2], 0}, {0, 0, 0, 1}};
+    // The owner's framing (2026-11-10): "as far back inside the core as it
+    // can and facing the brick opposite". The camera is pulled back from
+    // the centre towards the far side's inner surface, by `distance` of the
+    // radius, still looking across at the patch.
+    const float d = std::clamp(distance, 0.0f, 0.98f) * radius;
+    const Vec eye{-forward[0] * d, -forward[1] * d, -forward[2] * d};
+    // Row vectors: eye space = (v - eye) * R (x right, y up, the camera looking down -z).
+    const float v[4][4] = {{right[0], up[0], back[0], 0},
+                           {right[1], up[1], back[1], 0},
+                           {right[2], up[2], back[2], 0},
+                           {-dot(eye, right), -dot(eye, up), -dot(eye, back), 1}};
     const float f = 1.0f / std::tan(std::clamp(fov_degrees, 30.0f, 150.0f) * 3.14159265f / 360.0f), aspect = 4.0f / 3.0f;
-    const float near = radius * 0.05f, far = radius * 8.0f;
+    const float near = radius * 0.02f, far = radius * 8.0f;
     const float p[4][4] = {{f / aspect, 0, 0, 0}, {0, f, 0, 0}, {0, 0, (far + near) / (near - far), -1}, {0, 0, 2.0f * far * near / (near - far), 0}};
     put_matrix(rdram, projection_matrix, p);
     put_matrix(rdram, view_matrix, v);
@@ -90,9 +99,14 @@ bool begin(std::uint8_t* rdram) {
     if (dl < 0x80000000u || dl >= 0x80400000u) return false;
     static const float fov = [] {
         const char* v = std::getenv("BLOCKPLANET_ESCAPE_FOV");
-        return v != nullptr ? float(std::atof(v)) : 100.0f;
+        return v != nullptr ? float(std::atof(v)) : 70.0f;
     }();
-    if (!write_camera(rdram, fov)) return false;
+    // 0 at the centre, 1 at the far side's inner surface.
+    static const float distance = [] {
+        const char* v = std::getenv("BLOCKPLANET_ESCAPE_DISTANCE");
+        return v != nullptr ? float(std::atof(v)) : 0.85f;
+    }();
+    if (!write_camera(rdram, fov, distance)) return false;
     // The projection in use, to load again after (the last projection load
     // in this frame's list, looked for a little way back).
     saved_projection = 0;

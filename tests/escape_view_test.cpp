@@ -72,6 +72,22 @@ int main() {
               a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
     }
     assert(det > 0.99 && det < 1.01);
+    // Pulled back to the far side (the owner's framing): still looking at
+    // the patch's middle, the patch smaller on screen than from the centre.
+    assert(escape_view::write_camera(m, 70.0f, 0.85f));
+    const Mat p2 = read_matrix(m, escape_view::memory), v2 = read_matrix(m, escape_view::memory + 0x40);
+    const auto screen2 = [&](int row, int column) {
+        const std::uint32_t e = mesh + std::uint32_t(row) * 0xC0u + std::uint32_t(column) * 12u;
+        const auto clip = apply(apply({double(load16(m, e)), double(load16(m, e + 2)), double(load16(m, e + 4)), 1.0}, v2), p2);
+        assert(clip[3] > 0);
+        return std::array<double, 2>{clip[0] / clip[3], clip[1] / clip[3]};
+    };
+    const auto mid2 = screen2(7, 7), inner = screen2(3, 3);
+    assert(std::fabs(mid2[0]) < 0.1 && std::fabs(mid2[1]) < 0.1);
+    // Most of the patch in view at 70 degrees (its rim, near 79 degrees round
+    // the sphere, past the edges, as the outside view's rim is).
+    assert(std::fabs(inner[0]) < 1.0 && std::fabs(inner[1]) < 1.0);
+    assert(screen2(0, 7)[1] > mid2[1] && screen2(7, 0)[0] > screen2(7, 15)[0]);
     std::puts("escape_view ok");
     return 0;
 }
