@@ -1,0 +1,33 @@
+<rml>
+<head>
+    <title>Sky test</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- A temporary screen for the brick sky experiment (the owner's design,
+     2026-11-10; docs/research/blockplanet-play-backgrounds.md, Brick skybox).
+     Its settings apply at once and are not saved; each change is written to
+     the log ("brick_sky_settings"). The sky shows in play, behind the sphere:
+     open it from the pause's Options, then Resume to see it. -->
+<body class="compact lab" data-grid="blue">
+    <div id="panel">
+        <div class="title">Sky test</div>
+        <div class="subtitle">An experiment, shown in play. Not saved: note the values you like.</div>
+        <div class="item value" id="sky_on" data-setting="sky_on" data-description="Show the brick sky behind the sphere, in place of the game's own background."
+             data-options="off:Off,on:On">Brick sky<span class="value"></span></div>
+        <div class="item value" id="sky_spin" data-setting="sky_spin" data-description="How strongly the sky turns when the sphere turns. Still and Drift do not follow the sphere at all (for comfort)."
+             data-options="still:Still,drift:Drift,gentle:Gentle,normal:Normal,wild:Wild">Spin<span class="value"></span></div>
+        <div class="item value" id="sky_direction" data-setting="sky_direction" data-description="Turn against the sphere, or with it."
+             data-options="against:Against the sphere,with:With the sphere">Direction<span class="value"></span></div>
+        <div class="item value slider" id="sky_fov" data-setting="sky_fov" data-description="The sky's field of view: wider makes the bricks smaller and the sky look further away."
+             data-options="40:40°,50:50°,60:60°,70:70°,80:80°,90:90°,100:100°,110:110°,120:120°">Field of view<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item value" id="sky_comfort" data-setting="sky_comfort" data-description="Something that stays still for the eye while the sky turns: a dark frame at the edges, a faint line across the middle, or both."
+             data-options="none:None,frame:Frame,horizon:Horizon line,both:Frame and line">Comfort layer<span class="value"></span></div>
+        <div class="item value" id="sky_colours" data-setting="sky_colours" data-description="The bricks' colours (the stage's own colours are not read yet)."
+             data-options="violet:Violet,teal:Teal,amber:Amber,rose:Rose,grey:Grey">Colours<span class="value"></span></div>
+        <div class="item value slider" id="sky_brightness" data-setting="sky_brightness" data-description="How bright the bricks are. Dim keeps the sphere easy to read."
+             data-options="30:30 %,40:40 %,55:55 %,70:70 %,85:85 %,100:100 %">Brightness<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

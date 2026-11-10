@@ -28,6 +28,7 @@
 // their arguments.
 
 #include "tetrisphere/pause_draw.h"
+#include "tetrisphere/brick_sky.h"
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/recomp_support.h"
 
@@ -207,6 +208,14 @@ void log_background_dl(const std::uint8_t* rdram, std::uint32_t from, std::uint3
 } // namespace
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    // The brick sky (an experiment, src/graphics/brick_sky.cpp): when on, it
+    // is drawn in the play background's place and the game's is skipped.
+    if (helper == 0x8002D93Cu && guest16(rdram, 0x800E121Cu) == -1 &&
+        static_cast<std::uint32_t>(ctx->r4) == guest32(rdram, 0x801033BCu) && guest32(rdram, 0x801033BCu) != 0 &&
+        tetrisphere::brick_sky::draw(rdram)) {
+        ctx->r2 = 0;  // "animation finished": no
+        return true;
+    }
     static const int bg_dl_draw = [] {
         const char* v = std::getenv("BLOCKPLANET_BG_DL_LOG");
         return v == nullptr ? 0 : std::max(1, std::atoi(v) > 0 ? std::atoi(v) : 120);

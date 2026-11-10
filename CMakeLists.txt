@@ -310,6 +310,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/graphics/pause_draw_hooks.cpp
+    src/graphics/brick_sky.cpp
     src/graphics/magic_hooks.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
@@ -455,6 +456,7 @@ add_executable(tetrisphere_diag
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/graphics/pause_draw_hooks.cpp
+    src/graphics/brick_sky.cpp
     src/graphics/magic_hooks.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
@@ -589,6 +591,14 @@ else()
     target_compile_options(pause_bridge_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME pause_bridge COMMAND pause_bridge_test)
+add_executable(brick_sky_test tests/brick_sky_test.cpp src/graphics/brick_sky.cpp)
+target_include_directories(brick_sky_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(brick_sky_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(brick_sky_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME brick_sky COMMAND brick_sky_test)
 
 add_executable(story_hud_test tests/story_hud_test.cpp src/platform/story_hud.cpp)
 target_include_directories(story_hud_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
@@ -1120,6 +1130,7 @@ if(TETRISPHERE_GAME_ENABLED)
     src/graphics/sphere_extended.cpp
         src/graphics/sphere_hooks.cpp
         src/graphics/pause_draw_hooks.cpp
+        src/graphics/brick_sky.cpp
         src/graphics/magic_hooks.cpp
         src/graphics/title_hooks.cpp
         src/graphics/audio_hooks.cpp

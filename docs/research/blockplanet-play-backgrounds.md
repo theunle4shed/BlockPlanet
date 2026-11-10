@@ -107,6 +107,12 @@ The background reacts when the player is close to losing. Research and notes onl
 - **Another background:** switch to a "danger" one of the 25 by loading it as `func_8006EE6C` does. A rebuild mid-play is riskier: it uses the pool at `0x800F22C0`. A cross-fade would need both in memory. Medium.
 - **A BlockPlanet overlay:** a vignette, edge glow or pulse drawn by BlockPlanet over the background and under the sphere. It is ours entirely and doesn't depend on the game's assets. Medium.
 
+**Music.** The owner doesn't think the original's music changes near game over, and this matches what was seen. The owner suggests that in pinch mode the music could speed up a touch. Research is needed on whether the tempo can change at run time without changing the pitch. There are two routes:
+- **The game's own sequence player:** the N64 audio library's sequence player has a run-time tempo (`alSeqpSetTempo` in libaudio), so if the game's music is sequenced, its tempo can be raised a little, with the pitch unchanged. It needs the game's player found, and to check that the tempo isn't re-set each beat.
+- **BlockPlanet's audio output** (`queue_audio`): a time-stretch of the mixed output. It is harder to keep clean, and it would also stretch the effects.
+
+The first is the natural one if the music is sequenced (the roadmap's BGM research asks the same). This is presentation only: `AGENTS.md` forbids changing the original's audio pitch or timers, and a tempo change in a pinch is an added effect, so it needs the owner's explicit choice and an option to turn it off.
+
 All of these are presentation only. None changes the game's rules or timers (`AGENTS.md`: the original's simulation speed, timers and audio pitch stay as they are).
 
 ## Counter-motion: the owner's second idea (2026-11-10)
@@ -212,6 +218,27 @@ A fast counter-spin around the viewer is the most likely thing in this design to
   - no sudden starts: the spring above;
   - no flashing above 3 Hz, if pulses are added for pinch mode.
 - **Readability:** keep the skybox dim and low in contrast, keep the play sphere's silhouette clear, and keep the stage's colours out of it.
+
+### The experiment (built 2026-11-10, the owner's go: "just an experiment for now")
+
+- **Code:** `src/graphics/brick_sky.cpp` (`include/tetrisphere/brick_sky.h`), tested in `tests/brick_sky_test.cpp`. It is off unless turned on by `BLOCKPLANET_BRICK_SKY=1` or Options > **Sky test** > Brick sky (open from the pause's Options, then Resume to see it). `BLOCKPLANET_BRICK_SKY_SET="sky_spin=wild,sky_comfort=none"` sets the others for recordings. `BLOCKPLANET_BRICK_SKY_LOG=1` logs the sky's turn twice a second.
+- **The sky:** a cube-sphere of 6 × 8 × 8 = 384 bricks at radius 1,000, laid out at equal angles as the menu grid is, seen from the centre.
+  - Each brick has 8 vertices: dark mortar corners and an inset face, lighter at its top edge.
+  - It is drawn at the background's slot (`blockplanet_draw_filter` on the background scene) as one `G_DL` into BlockPlanet's own list at `0x807E0000`–`0x807F8000`, where the title's own use is rebuilt each title frame. About 4,000 commands.
+  - It has its own 4:3 perspective, opaque with no depth, and the game's projection is loaded again after.
+  - For now the colours are BlockPlanet's own presets; reading the stage's colour set comes next.
+- **The test screen** (not saved; each change is logged as `brick_sky_settings`):
+  - **Spin:** Still, Drift, Gentle 0.5, Normal 1.5, Wild 3 × the sphere's turn.
+  - **Direction:** against or with the sphere.
+  - **Field of view:** 40–120°, default 70°; wider looks further away.
+  - **Comfort layer:** none, a dark still frame at the edges, a faint still horizon line, or both.
+  - **Colours** and **Brightness**.
+- **Comfort rules in the code:**
+  - the sky's turn eases towards its target (a quarter of a second) and never snaps;
+  - it is capped at half a turn a second;
+  - it drifts slowly unless set to Still;
+  - nothing flashes.
+- **Not yet checked on the real game:** that the background layer takes the sky as expected, the direction signs on each axis, the frame rate, and the look at each aspect ratio. To be recorded holding left, right, up and down.
 
 ### Effort and risk
 

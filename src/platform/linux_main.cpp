@@ -25,6 +25,7 @@
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/pause_bridge.h"
+#include "tetrisphere/brick_sky.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
 #include "tetrisphere/developer_records.h"
@@ -2804,6 +2805,30 @@ bool handle_text_setting(const std::string& command) {
     return true;
 }
 
+// Options > Sky test: the brick sky experiment's settings (not saved; each
+// change is logged as "brick_sky_settings" so the values can be reported).
+bool handle_sky_setting(const std::string& command) {
+    const auto equals = command.find('=');
+    if (command.rfind("setting:sky_", 0) != 0 || equals == std::string::npos) return false;
+    const auto name = command.substr(8, equals - 8);
+    if (!tetrisphere::brick_sky::set(name, command.substr(equals + 1))) return true;
+    std::string all;
+    for (const auto& [setting, value] : tetrisphere::brick_sky::values()) {
+        blockplanet::ui::set_setting(setting, value);
+        all += std::string(all.empty() ? "" : ",") + "\"" + setting + "\":\"" + value + "\"";
+    }
+    std::fprintf(stdout, "{\"event\":\"brick_sky_settings\",%s}\n", all.c_str());
+    std::fflush(stdout);
+    return true;
+}
+
+void publish_sky_settings() {
+    static bool published = false;
+    if (published) return;
+    published = true;
+    for (const auto& [setting, value] : tetrisphere::brick_sky::values()) blockplanet::ui::set_setting(setting, value);
+}
+
 // "setting:NAME=VALUE" from the menus, as a settings change (field numbers
 // as in the PC settings menu). False if the command is not a known setting.
 bool queue_menu_setting(const std::string& command) {
@@ -3363,6 +3388,7 @@ bool handle_profile_command(const std::string& command) {
             if (handle_audio_setting(*command)) continue;
             if (handle_hud_setting(*command)) continue;
             if (handle_text_setting(*command)) continue;
+            if (handle_sky_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "audio_screen") {
@@ -3660,6 +3686,7 @@ bool handle_profile_command(const std::string& command) {
         poll_game_events();
         publish_audio_settings();
         publish_hud_settings();
+        publish_sky_settings();
         // Back at the game's menu after leaving play from BlockPlanet: open
         // BlockPlanet's menus (the stage list after a single stage).
         if (return_to_menu_chapter && !continue_mode && !mode_launcher.active() && guest_rdram != nullptr &&
