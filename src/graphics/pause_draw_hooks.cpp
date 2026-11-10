@@ -82,6 +82,7 @@ const Settings& settings() {
 }
 
 std::atomic<bool> menu_shown{false};
+std::atomic<bool> exit_hidden{false};  // after Resume: the pause background skipped too
 std::atomic<bool> hud_hidden{false};
 std::atomic<bool> hud_keep_models{false};
 // While BlockPlanet's menus are open over the game's own menus: their 2D
@@ -128,6 +129,7 @@ std::optional<CardBox> recent_card_box() {
     return box;
 }
 void set_pause_menu_shown(bool shown) { menu_shown.store(shown); }
+void set_pause_exit_hidden(bool hidden) { exit_hidden.store(hidden); }
 void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 void set_original_hud_keep_models(bool keep) { hud_keep_models.store(keep); }
 void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
@@ -444,6 +446,7 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     }
     static const bool keep_all = std::getenv("BLOCKPLANET_PAUSE_KEEP_ALL") != nullptr;  // research
     if (shown && !keep_all && helper != 0x800353F4u) return true;  // keep only the background
+    if (shown && !keep_all && exit_hidden.load(std::memory_order_relaxed)) return true;  // after Resume: that too
     return s.skip.count(a1) != 0;
 }
 

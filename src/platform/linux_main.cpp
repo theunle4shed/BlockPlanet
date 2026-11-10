@@ -3799,19 +3799,20 @@ bool handle_profile_command(const std::string& command) {
         // The menu grid (docs/UI.md, Menu grid) over the game's own pause
         // animations, in the pause's colours: from the Start press that
         // pauses (before the game's own fade and tiles show), while paused,
-        // and after Resume until the pause row 0x800E1228 clears and a moment
-        // more (BLOCKPLANET_GRID_RESUME_MS, default 450: the game draws dark
-        // for about 0.3 s just after the row clears); and after Quit
-        // until BlockPlanet's menus open again. Measured on the test machine
-        // (2026-11-09): after Resume the game's screen fade (0x800E1202, 255
-        // while paused) is clear within about 0.4 s, then its own pause tiles
-        // fly out over the game (0x800DFF08 = 5) for about 1.3 s, and the row
-        // clears when they have gone. BLOCKPLANET_GRID_RESUME=fade leaves
-        // once the fade is clear instead (then 200 ms), for comparison.
+        // and after Resume until the game's screen fade (0x800E1202, 255 while
+        // paused) is clear and a moment more (BLOCKPLANET_GRID_RESUME_MS,
+        // default 200); and after Quit until BlockPlanet's menus open again.
+        // Measured on the test machine (2026-11-09): after Resume the fade is
+        // clear within about 0.4 s, then the game flies its own pause tiles
+        // out over the play field for about 1.3 s before the pause row
+        // 0x800E1228 clears. Those tiles are not drawn (set_pause_exit_hidden,
+        // the owner found waiting for them slow), so the grid leaves as soon
+        // as the fade is clear. BLOCKPLANET_GRID_RESUME=row waits for the row
+        // instead, with the game's tiles drawn (then 450 ms), for comparison.
         {
             static const bool after_row = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME");
-                return text == nullptr || std::string(text) != "fade";
+                return text != nullptr && std::string(text) == "row";
             }();
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
@@ -3833,6 +3834,8 @@ bool handle_profile_command(const std::string& command) {
                 static bool menu_seen = false;
                 if (!paused) menu_seen = false;
                 else if (blockplanet::ui::menus_open()) menu_seen = true;
+                // Resumed: the game's own pause tiles are not drawn as they leave.
+                blockplanet::set_pause_exit_hidden(!after_row && paused && menu_seen && !blockplanet::ui::menus_open());
                 if (paused && menu_seen && !after_row && !blockplanet::ui::menus_open() &&
                     guest::load16(guest_rdram, 0x800E1202) == 0)
                     paused = false;
