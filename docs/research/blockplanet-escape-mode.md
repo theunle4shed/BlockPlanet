@@ -8,6 +8,13 @@ The owner's idea (`docs/ROADMAP.md`, New game modes):
 
 Two steps, each reported before going further. Step 1 is a visual prototype; step 2 is the rules, as notes only.
 
+**The goal (the owner, 2026-11-10):** "goal is for us to escape. Gravity still makes bricks fall towards the core.. it's just we are throwing bricks up from the underside. So 3×3 or 5×5 or 7×7 square to escape, based on level."
+- **Win:** open a square hole right through the shell, through every layer to the outside: 3 × 3, 5 × 5 or 7 × 7, set per level. It is the inside-out version of the original's win, a core-sized opening.
+- **Pieces** are thrown upwards from the core's side onto the shell's underside, and land just under the first block.
+- **Gravity** stays inwards: unsupported blocks fall towards the core, and blocks that reach the core line dissolve.
+- **A miss** (nothing above within reach) dissolves and costs a heart.
+- **Matching and combos** work as normal.
+
 ## Step 1: the view from inside (prototype, built and checked 2026-11-10)
 
 `BLOCKPLANET_ESCAPE_VIEW=1`, off by default; `BLOCKPLANET_ESCAPE_FOV` sets the view's width (100° by default). The rules don't change.
@@ -68,6 +75,8 @@ These three would come from write watches on the real game, as the pause flag wa
 2. **Where a drop loses a heart:** a write watch on `+0x2D7E` during a drop that loses one. It names the "miss" test: what makes a drop a miss today (no matching shape touched, or the piece not fitting, to confirm).
 3. **Gravity:** writes to the block values during a gravity combo. That names the routine that moves unsupported blocks down.
 
+**Research aid:** `BLOCKPLANET_BOARD_LOG=1` logs, during play, each board cell that changes each frame: layer, x, y, and the value before and after (`board` events). It also logs the cursor and hearts when they change (`board_player`). Paired with a debugger's write watch for the writing function, it shows a drop's cells and layer, the heart a miss costs, and a gravity combo's moves, frame by frame.
+
 ### What Escape would change
 
 In board terms:
@@ -87,7 +96,7 @@ What each part takes:
 | Gravity | Unchanged (inwards), plus "dissolve at the core line": blocks reaching layer 1 with nothing under them are removed (and perhaps cost a life; the owner's call) | Small to medium | Medium: gravity runs inside combos, so removals must not break combo counting |
 | Matching and combos | Unchanged, in board terms: shapes still match by type, and only the direction pieces arrive from changes | None | Low |
 | Inside view | Step 1 plus the cursor, pieces and marker (above). The underside drawn is the lowest block per column, not layer 1, once boards are shells | Medium | Medium |
-| Game over and goals | Escape's goal is to be decided (escape through the shell? clear it?). The core-opening goal doesn't fit | Small (once decided) | Low |
+| The goal: an S × S hole through the shell | **Very likely the game's own core-opening check, unchanged.** That check (`func_800AB4C8` after a clear, when the goal type `0x800E44A4` is 3) tries every S × S square at even corners, wrapping, with S the level's opening size (player context `+0x23E4`: twice the level record's byte 12, so even sizes from 2 to 10 today; Escape's 3, 5 and 7 would be new, odd values). It counts uncovered rows with `func_800AA3A4` on the exposed-core map (`0x800E44C8`, a bit per column set while the core under it is uncovered, that is with no block above it in any layer). In a shell board a column is uncovered exactly when a hole runs through every layer, so the same check is the escape. To confirm: whether odd sizes work with the even-corner search (a 3 × 3 hole may need odd corners too), and that the map is rebuilt from all layers rather than from the lowest one | Small | Low to medium |
 
 **Estimate:**
 - **Built on the game's engine:** large overall, about as large as the roadmap expected. The view is the easy part, and is mostly shown now. The landing reversal and the shell boards are the core of it. Medium to high risk, because landing, gravity and matching share the board helpers' assumptions (towards the core is down).

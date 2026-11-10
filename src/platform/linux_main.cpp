@@ -1100,6 +1100,44 @@ void poll_watches() {
     }
 }
 
+// Research aid (docs/research/blockplanet-escape-mode.md): with
+// BLOCKPLANET_BOARD_LOG=1, during play, each board cell that changes (layer,
+// x, y, the block value before and after), each frame, and the cursor
+// (+0x2B2A, +0x2B2E) and hearts (+0x2D7E) when they change; at most 200
+// cells a pass. For finding the landing, the miss and gravity: a drop's
+// cells, its layer, and the heart lost, frame by frame.
+void poll_board_log() {
+    static const bool on = std::getenv("BLOCKPLANET_BOARD_LOG") != nullptr;
+    if (!on || guest_rdram == nullptr || guest::load16(guest_rdram, 0x800E121C) != -1) return;
+    const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0);
+    if (values < 0x80000000u || values >= 0x80800000u) return;
+    static std::vector<std::int16_t> last;
+    static const auto started = std::chrono::steady_clock::now();
+    const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+    constexpr int cells = 9 * 1024;
+    const bool first = last.size() != std::size_t(cells);
+    if (first) last.assign(std::size_t(cells), 0);
+    int logged = 0;
+    for (int i = 0; i < cells; ++i) {
+        const std::int16_t v = guest::load16(guest_rdram, values + 2u * std::uint32_t(i));
+        if (!first && v != last[std::size_t(i)] && logged < 200) {
+            ++logged;
+            std::fprintf(stdout, "{\"event\":\"board\",\"ms\":%lld,\"layer\":%d,\"x\":%d,\"y\":%d,\"from\":%d,\"to\":%d}\n", ms,
+                         i / 1024, i % 32, (i % 1024) / 32, last[std::size_t(i)], v);
+        }
+        last[std::size_t(i)] = v;
+    }
+    constexpr std::uint32_t p1 = 0x80110220u;
+    static int cursor_x = -1, cursor_y = -1, hearts = -99;
+    const int cx = guest::load16(guest_rdram, p1 + 0x2B2A), cy = guest::load16(guest_rdram, p1 + 0x2B2E);
+    const int h = guest::load16(guest_rdram, p1 + 0x2D7E);
+    if (cx != cursor_x || cy != cursor_y || h != hearts) {
+        cursor_x = cx, cursor_y = cy, hearts = h;
+        std::fprintf(stdout, "{\"event\":\"board_player\",\"ms\":%lld,\"cursor_x\":%d,\"cursor_y\":%d,\"hearts\":%d}\n", ms, cx, cy, h);
+    }
+    if (logged || first) std::fflush(stdout);
+}
+
 // Experiment (docs/research/blockplanet-game-state.md, puzzle border): with
 // BLOCKPLANET_TEST_TYPE47=1, the first time Rescue is in play the blocks in
 // every other 4-column stripe become type 47 (value 423), Puzzle's border.
@@ -1159,6 +1197,7 @@ void poll_pokes() {
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
     poll_watches();
+    poll_board_log();
     poll_pokes();
     poll_type47_experiment();
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
