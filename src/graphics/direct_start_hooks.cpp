@@ -550,6 +550,10 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
         std::fprintf(stdout, "{\"event\":\"box_art_demo\"}\n");
         std::fflush(stdout);
     }
+    if (intro && box_art::handover_pending().exchange(false)) {
+        end_intro_now(rdram);  // the hand-over asked for in the intro's last frame (box_art_hooks.cpp)
+        return;
+    }
     if (intro) {
         on_box_art = false;
         if ((pressed & (button_a | button_start)) != 0 && load8(rdram, save_read) != 0) {

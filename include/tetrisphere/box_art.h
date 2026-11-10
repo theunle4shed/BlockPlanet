@@ -36,4 +36,12 @@ inline std::atomic<Phase>& phase() {
     return value;
 }
 
+// Set when the intro's scene reaches the hand-over frame (box_art_hooks.cpp,
+// inside the intro's own frame); the hand-over itself is done at the start of
+// the game's next frame, before the intro runs (direct_start_hooks.cpp).
+inline std::atomic<bool>& handover_pending() {
+    static std::atomic<bool> pending{false};
+    return pending;
+}
+
 } // namespace tetrisphere::box_art

@@ -69,20 +69,22 @@ extern "C" void blockplanet_box_art_update(const std::uint8_t* rdram) {
 // drawn by func_8002D93C: returns true when the call is replaced.
 extern "C" bool blockplanet_box_art_scene(std::uint8_t* rdram, recomp_context* ctx) {
     // The intro flows into the box art (the owner's design, 2026-11-10): as
-    // the last robot (Wheels) leaves the intro's scene, the intro ends as it
-    // does at its own end (0x800685BC), and the title starts on the box art.
+    // the last robot (Wheels) leaves the intro's scene, the intro is ended (at
+    // the next frame's start, as it does at its own end, 0x800685BC) and the
+    // title starts on the box art.
     if (enabled() && cut_frame() > 0 && load16(rdram, 0x800E1648u) == 0 && load16(rdram, 0x800E1646u) == 0) {
         const std::uint32_t intro = load32(rdram, 0x800E1670u);
         if (intro != 0 && static_cast<std::uint32_t>(ctx->r4) == intro && load32(rdram, 0x800E166Cu) != intro &&
             static_cast<int>(load32(rdram, intro + 0x24u)) >= cut_frame()) {
-            store32(rdram, 0x800E1208u, 0);
-            store32(rdram, 0x800E120Cu, 0);
-            store16(rdram, 0x800E1648u, 1);
-            store32(rdram, 0x800F22C0u, load32(rdram, 0x801028D0u));
-            std::fprintf(stdout, "{\"event\":\"box_art_from_intro\",\"frame\":%d}\n", static_cast<int>(load32(rdram, intro + 0x24u)));
-            std::fflush(stdout);
+            // The hand-over is done at the start of the next frame, before
+            // the intro runs (direct_start_hooks.cpp): changing the intro's
+            // state here, inside its own frame, is not safe.
+            if (!tetrisphere::box_art::handover_pending().exchange(true)) {
+                std::fprintf(stdout, "{\"event\":\"box_art_from_intro\",\"frame\":%d}\n", static_cast<int>(load32(rdram, intro + 0x24u)));
+                std::fflush(stdout);
+            }
             ctx->r2 = 0;
-            return true;  // this frame's intro scene is not drawn (its memory is the title's from now)
+            return true;  // not drawn: the next frame is the title's
         }
     }
     const bool title = enabled() && on_title(rdram);
