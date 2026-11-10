@@ -2,7 +2,7 @@
 
 The owner's question: the animated "Winamp style" backgrounds behind the sphere during play (the swirling purple and blue tunnel in Story 1:1, the red and orange one in Versus and Lines, and so on). How are they made? Do they follow scripts? Can we make our own, or change the existing ones?
 
-Status: **mostly answered (2026-11-10)**, from the generated code and a RAM dump of Story 1:1, read by the parent session. One point is still open: whether the visible swirl is motion of the mesh or of its textures (below). Nothing taken from the game (textures, tables, code, asset ids) goes in Git: this page gives addresses and descriptions only.
+Status: **answered (2026-11-10)**, from the generated code and a RAM dump of Story 1:1, read by the parent session. The display list of Story 1:1's background was then logged and compared across frames. Nothing taken from the game (textures, tables, code, asset ids) goes in Git: this page gives addresses and descriptions only.
 
 ## Summary
 
@@ -47,11 +47,26 @@ So the frame it plays comes from a counter plus a per-frame step, and the animat
 
 ## Still open
 
-- **Mesh motion or texture motion?** The swirl and colour shifts seen in play may be keyframed object motion (the tunnel turning and scaling) or the object's own material or texture data. To tell them apart: take two RT64 inspector frames about 1 s apart in Story 1:1. Compare the first draws, before the sphere: vertex positions, tile offsets (`uls`/`ult`), and whether a TLUT is loaded and changes between the frames. Research switch for it: `BLOCKPLANET_BG_DL_LOG=N` (`src/graphics/pause_draw_hooks.cpp`). It draws the background itself on its Nth and (N+30)th draws (default 120), between two reads of the game's next free display-list command (`0x800F22B4`), and logs the F3D commands written (`BGDL` lines, following `G_DL`). It adds hashes of the vertices (`G_VTX`), matrices (`G_MTX`), palettes (`G_LOADTLUT`) and texels (`G_LOADBLOCK`) they point at, and the tile sizes. Diffing the two frames answers it.
+- ~~Mesh motion or texture motion?~~ **Mesh motion only** (2026-11-10, `BLOCKPLANET_BG_DL_LOG=120`, Story 1:1, draws 120 and 150, read by the parent session).
+  - Both draws are 260 F3D commands. The only lines that differ are two `G_MTX` modelview matrices: a load (`p=02`) and a multiply (`p=00`). The projection (`p=03`) is identical.
+  - Everything else is byte for byte the same:
+    - 13 `G_VTX` loads (12 of 16 vertices and one of 9);
+    - one RGBA16 texture, a 32 × 32 mipmap chain (six tile levels, 32 down to 1), with no palette;
+    - the colour combiner, prim and env colours, and the geometry mode.
+  - So nothing scrolls or colour-cycles. The tunnel is one small textured mesh that the keyframes turn, move and scale.
+  - **The colour shifts seen in play** (red to purple) come from lighting: the geometry mode has `G_LIGHTING` on, with the lights set by `G_MOVEWORD` and `G_MOVEMEM`. As the mesh turns, the lights shade it differently.
+  - No colour-image switch appears in these commands. The switch to the off-screen layer at `0x000400` is made in the code around the call, not inside it.
 - ~~Is it music-driven?~~ **No** (2026-11-10). The step `0x80160C64` is set by the frame loop `func_800CC6E0` (at `0x800CCF28`–`0x800CCF90`), just before each call to `func_80070118`, from `0x800E4484`, the count of video retraces since the last game frame (reset each loop, 1 at start; capped at 5 in Puzzle, mode 4). So the background plays its keyframes at a fixed speed in real time, with no link to the music. A music-driven background would be BlockPlanet's own addition: for example, the frame passed at `0x80071BA0` scaled by the audio level or tempo.
 - The texture sizes and formats in the 25 objects; Hide & Seek's extra handling.
 
 ## Feasibility (2026-11-10)
+
+What the display-list log means for each option:
+- **Tints** can come from three places: the light colours (the background's `G_MOVEMEM` light blocks, which also keep its shading alive), the prim colour, or the whole off-screen layer.
+- **Speed** comes from the frame advance.
+- **Counter-motion** comes from an extra rotation multiplied into the modelview (`p=02`), the one thing that moves.
+- **Texture replacement** is one 32 × 32 RGBA16 texture per background, an easy target for RT64 texture replacement.
+
 
 | Option | What it takes | Effort | Risk |
 | --- | --- | --- | --- |

@@ -97,7 +97,7 @@ Gameplay frames render an off-screen background layer at RDRAM `0x000400` with t
 - Are the backgrounds procedural, or stored animations?
 - How much of each frame's GPU time do they cost?
 
-**Found so far (2026-11-10, [research](research/blockplanet-play-backgrounds.md)):** each is a stored animation: a LightWave scene with one object, keyframed, played and looped in real time by the game's general model player. There are 25, picked per level by the mode's rule. They are not linked to the music. Still open: whether the swirl is the mesh moving or its textures (`BLOCKPLANET_BG_DL_LOG`), and the GPU cost.
+**Found so far (2026-11-10, [research](research/blockplanet-play-backgrounds.md)):** each is a stored animation: a LightWave scene with one object, keyframed, played and looped in real time by the game's general model player. There are 25, picked per level by the mode's rule. They are not linked to the music. Only the mesh moves: one small textured mesh (one 32 × 32 texture), turned by its keyframes and shaded by the game's lights, which give the colour shifts. No textures scroll and no palettes cycle (`BLOCKPLANET_BG_DL_LOG`). Still open: the GPU cost.
 
 ### Music-reactive backgrounds, like a Winamp visualizer (M to L, after research)
 
