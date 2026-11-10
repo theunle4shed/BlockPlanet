@@ -285,7 +285,10 @@ std::optional<Result> take_result() {
 
 void cancel() {
     std::lock_guard lock(mutex);
-    if (waiting) finish(Result::Refused);
+    if (waiting) {
+        log("refused", *waiting, "timed_out");
+        finish(Result::Refused);
+    }
 }
 
 bool enabled() {
@@ -310,10 +313,27 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
     // game starts Training itself. Otherwise wait (BlockPlanet gives up after
     // two seconds and uses the menus).
     const auto grid = static_cast<std::uint16_t>(load16(rdram, grid_state));
-    if (load16(rdram, main_row) < 0 || load16(rdram, submenu_row) >= 0 || load16(rdram, player_page_row) >= 0 ||
-        load16(rdram, mode_row) >= 0 || load16(rdram, page_exit) != 0 || load8(rdram, training_jump) != 0 ||
-        (grid != grid_none && grid != grid_shown))
+    const char* busy = load16(rdram, main_row) < 0           ? "in_play"
+                       : load16(rdram, submenu_row) >= 0     ? "submenu_open"
+                       : load16(rdram, player_page_row) >= 0 ? "player_page_open"
+                       : load16(rdram, mode_row) >= 0        ? "mode_page_open"
+                       : load16(rdram, page_exit) != 0       ? "page_closing"
+                       : load8(rdram, training_jump) != 0    ? "training_jump"
+                       : (grid != grid_none && grid != grid_shown) ? "grid_moving"
+                                                                   : nullptr;
+    static const char* last_busy = nullptr;
+    if (busy != nullptr) {
+        if (busy != last_busy) {  // once per reason, for diagnosis
+            std::fprintf(stdout,
+                         "{\"event\":\"direct_start\",\"status\":\"waiting\",\"reason\":\"%s\",\"main_row\":%d,"
+                         "\"submenu_row\":%d,\"page_exit\":%d,\"grid\":%d}\n",
+                         busy, load16(rdram, main_row), load16(rdram, submenu_row), load16(rdram, page_exit), grid);
+            std::fflush(stdout);
+        }
+        last_busy = busy;
         return;
+    }
+    last_busy = nullptr;
     bool started = false;
     switch (request.mode) {
     case DirectMode::Rescue: started = start_rescue(rdram, ctx, request); break;
