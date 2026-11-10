@@ -2878,14 +2878,21 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     }
     if (direct_wait) return;  // a direct start is already on its way
     if (!keep_music) end_track_override();
-    // Story starts directly, without the original menus, from the game's main
+    // Story and Training start directly, without the original menus, from the game's main
     // menu (docs/research/blockplanet-game-state.md, "Starting modes
     // directly"); BLOCKPLANET_LAUNCH=menus keeps the menu route.
-    if (mode == LaunchMode::Rescue && direct_start::enabled() && game_option_applier && !launching() &&
+    const bool training = mode == LaunchMode::TrainingBasics || mode == LaunchMode::TrainingAdvanced ||
+                          mode == LaunchMode::TrainingPuzzle;
+    if ((mode == LaunchMode::Rescue || training) && direct_start::enabled() && game_option_applier && !launching() &&
         guest::load16(guest_rdram, 0x800E121C) >= 0) {
         DirectStartRequest request;
-        request.chapter = game_option_applier->rescue_start_chapter() - 1;
-        request.level = game_option_applier->rescue_start_level() - 1;
+        if (training) {
+            request.mode = DirectMode::Training;
+            request.training_type = mode == LaunchMode::TrainingBasics ? 1 : mode == LaunchMode::TrainingAdvanced ? 2 : 3;
+        } else {
+            request.chapter = game_option_applier->rescue_start_chapter() - 1;
+            request.level = game_option_applier->rescue_start_level() - 1;
+        }
         if (direct_start::request(request)) {
             direct_wait = DirectWait{mode, std::chrono::steady_clock::now()};
             begin_launch_presentation(mode);
@@ -3869,7 +3876,7 @@ bool handle_profile_command(const std::string& command) {
                 const auto start_ms = last_start_ms.load();
                 if (start_ms != start_seen) {
                     start_seen = start_ms;
-                    if (playing && !paused && !game_over && !blockplanet::ui::menus_open() && !mode_launcher.active()) start_at = now_g;
+                    if (playing && !paused && !game_over && !blockplanet::ui::menus_open() && !launching()) start_at = now_g;
                 }
             }
             if (paused || (start_at && now_g - *start_at > std::chrono::milliseconds(1200))) start_at.reset();  // paused, or it did not
@@ -3881,7 +3888,7 @@ bool handle_profile_command(const std::string& command) {
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
                 grid_quit_at.reset();
             const bool over_pause = start_at || paused || unpaused_at || grid_quit_at;
-            blockplanet::ui::set_grid_override(over_pause && !mode_launcher.active() ? "pause" : "");
+            blockplanet::ui::set_grid_override(over_pause && !launching() ? "pause" : "");
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
         // over (0x800E1202 back to 0 while the end menu fades in), to see

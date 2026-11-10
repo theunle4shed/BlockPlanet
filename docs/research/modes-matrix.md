@@ -69,7 +69,7 @@ El aporte identificado de Baseman en [GameFAQs](https://gamefaqs.gamespot.com/n6
 
 The catalogue for the roadmap entry "One game, many rulesets": every gameplay variable, where the game keeps it, its value in each mode, and whether it changes per stage. Descriptions and addresses only (NTPE rev0); values that come from the game's level records are described, never copied (AGENTS.md). Filled in as the direct-launch work finds what each mode sets before play ([blockplanet-game-state.md](blockplanet-game-state.md#starting-modes-directly-2026-11-09)). Sources: L = [level data](blockplanet-level-data.md), G = [game state](blockplanet-game-state.md), D = the mode page's confirm handler (`func_8004127C` at `0x800462D0`) read on 2026-11-09.
 
-Modes by their number at `0x800E44A8` (s16): 1 Rescue (Story), 2 Time Trial (BlockPlanet's Score Attack), 3 Training, 4 Puzzle, 5 Hide & Seek, 6 VS CPU, 9 Lines; 10 and 12 appear in the code (12 returns to a menu; 10 is treated like Training in the top-level loop) and are not identified yet.
+Modes by their number at `0x800E44A8` (s16): 1 Rescue (Story), 2 Time Trial (BlockPlanet's Score Attack), 3 Training, 4 Puzzle, 5 Hide & Seek, 6 VS CPU, 7 (set by another original page, not yet identified), 9 Lines, 10 the attract demo (started after the main menu sits idle; the demo also runs as mode 3 with `0x80113323` = 1), 12 (returns to a menu; not identified).
 
 **Coverage so far:** of the owner's 16 named variables, 6 have an address and per-mode values (layers, objective in part, single stage or episode, lives, playfield size, opponent settings in part), 4 are partly known (block types, core to uncover, hidden pictures, default music), and 6 are still to find (background effect, drop timer speed, shot time limit, score and speed goals, friend inside, opponent intelligence per stage). Rescue (Story) is the best covered; Lines, Puzzle and Hide & Seek the least.
 
@@ -109,7 +109,7 @@ All modes: `0x800DFD4C`, `0x8015D980`, `0x800DFD50`, `0x800DFD54` set to 1, the 
 | Puzzle (4) | None. |
 | Time Trial (2) | None at the confirm; skips the saved-progress check. |
 | VS CPU (6) | `0x800E44A4` = 1, `0x8015D980` = 2, player 1 context `+0x23D6` = 1, player 2 context `+0x23D6` = 0, `0x800E08A8` = 1, `0x800E08AC` = 0, `0x800E08B0` = 0, `0x800E088C` = 0; level counters cleared again at the hand-over. Practice and VS player menus also offer pieces, layers, core area and rounds (above). |
-| Training (3) | Started by the game's own direct start (`0x800DFE8C`): training type `0x800E44AC` (1 Basics, 2 Advanced, 3 Puzzle), `0x800DFDFC` = 1, character 4 and a default name. |
+| Training (3) | From the Training page: training type `0x800E44AC` (1 Basics, 2 Advanced, 3 Puzzle), player 1's port from the first connected controller, `0x80113323` = 0 (1 marks the attract demo), the name at `0x800ECC4C`, character 4, and bit 0 of the save's first byte set and written. The game's own jump (`0x800DFE8C`, from a game over) sets `0x800DFDFC` = 1 and another name instead. |
 
 ### What only one mode has
 

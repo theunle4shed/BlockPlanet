@@ -43,6 +43,8 @@ void func_80066854(std::uint8_t* rdram, recomp_context* ctx);
 void func_80065660(std::uint8_t* rdram, recomp_context* ctx);
 void func_80066CE8(std::uint8_t* rdram, recomp_context* ctx);
 void func_800CC6E0(std::uint8_t* rdram, recomp_context* ctx);
+void func_8003E460(std::uint8_t* rdram, recomp_context* ctx);
+void func_80066E6C(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace tetrisphere {
@@ -65,6 +67,11 @@ constexpr std::uint32_t training_jump = 0x800DFE8Cu;  // u8: the game's own Trai
 constexpr std::uint32_t grid_state = 0x800DFF08u;
 constexpr std::uint32_t grid_state_seen = 0x800DFF10u;  // the animator's last state
 constexpr std::uint16_t grid_none = 0, grid_shown = 1;
+// The menus' screen fade (255 dark, 0 clear) and the values the grid's
+// fly-in and fly-out leave beside it: all 0 once the menus hand over to play.
+constexpr std::uint32_t screen_fade = 0x800E1202u;
+constexpr std::uint32_t fade_saved = 0x800E1206u;
+constexpr std::uint32_t fade_flag = 0x800E11FAu;
 constexpr std::uint32_t saved_page_flag = 0x800E12DCu;  // s16: with progress, Rescue opens another page
 
 // What the mode page sets (meanings not yet known for the flags).
@@ -93,6 +100,15 @@ constexpr std::uint32_t new_game_flag = 0x801125C6u;
 constexpr std::uint32_t after_new_game = 0x80112D18u;
 
 constexpr std::int16_t mode_rescue = 1;
+constexpr std::int16_t mode_training = 3;
+// Training.
+constexpr std::uint32_t training_type = 0x800E44ACu;  // 1 Basics, 2 Advanced, 3 Puzzle
+constexpr std::uint32_t port_index = 0x800E0B10u;     // which entry of 0x800E07CC is player 1's port
+constexpr std::uint32_t training_name = 0x800ECC4Cu;  // the name the Training hand-over gives player 1
+constexpr std::uint8_t default_character = 4;
+constexpr std::uint32_t save_flags = 0x80102918u;  // the save's first byte (RAM copy); bit 0 set by every Training start
+constexpr std::uint32_t training_cleared_a = 0x800E076Cu;
+constexpr std::uint32_t training_cleared_b = 0x800E4480u;
 
 std::mutex mutex;
 std::optional<DirectStartRequest> waiting;
@@ -113,12 +129,71 @@ void finish(direct_start::Result result) {
     outcome = result;
 }
 
+const char* mode_name(const DirectStartRequest& request) {
+    switch (request.mode) {
+    case DirectMode::Rescue: return "rescue";
+    case DirectMode::Training: return "training";
+    }
+    return "";
+}
+
 void log(const char* status, const DirectStartRequest& request, const char* reason = nullptr) {
-    std::fprintf(stdout, "{\"event\":\"direct_start\",\"mode\":\"rescue\",\"chapter\":%d,\"level\":%d,\"status\":\"%s\"",
-                 request.chapter + 1, request.level + 1, status);
+    std::fprintf(stdout, "{\"event\":\"direct_start\",\"mode\":\"%s\",\"chapter\":%d,\"level\":%d,\"training\":%d,\"status\":\"%s\"",
+                 mode_name(request), request.chapter + 1, request.level + 1, request.training_type, status);
     if (reason != nullptr) std::fprintf(stdout, ",\"reason\":\"%s\"", reason);
     std::fprintf(stdout, "}\n");
     std::fflush(stdout);
+}
+
+// The menus' grid gone and their fade clear, as after the grid's fly-out.
+void clear_menu_presentation(std::uint8_t* rdram) {
+    store16(rdram, grid_state, grid_none);
+    store16(rdram, grid_state_seen, grid_none);
+    store16(rdram, screen_fade, 0);
+    store16(rdram, fade_saved, 0);
+    store16(rdram, fade_flag, 0);
+}
+
+// The menus' last step: no menu shown, which is play.
+void close_menus(std::uint8_t* rdram) {
+    store16(rdram, main_row, -1);
+    store16(rdram, submenu_row, -1);
+    store16(rdram, player_page_row, -1);
+    store16(rdram, mode_row, -1);
+    store32(rdram, menu_timer_a, 0);
+    store32(rdram, menu_timer_b, 0);
+}
+
+// Training (Basics, Advanced, Puzzle), as the Training page's confirm
+// (func_8004C7E8 at 0x8004F9B8, its sound left out) and the main menu's
+// hand-over do it: for Training (not the attract demo) it sets bit 0 of the
+// save's first byte and writes the save (0x8004D034), then hands over
+// (0x8004D1D8).
+bool start_training(std::uint8_t* rdram, recomp_context* ctx, const DirectStartRequest& request) {
+    store16(rdram, flag_b, 1);
+    store32(rdram, port_index, 0);
+    call(func_8003E460, rdram, ctx);  // player 1's port: the first controller connected
+    store16(rdram, mode, mode_training);
+    store8(rdram, p1_extra, 0);
+    store16(rdram, training_type, static_cast<std::int16_t>(request.training_type));
+    store16(rdram, level_count, 0);
+    store16(rdram, next_level, 0);
+    store16(rdram, chapter, 0);
+
+    clear_menu_presentation(rdram);
+    store16(rdram, training_cleared_a, 0);
+    store8(rdram, save_flags, load8(rdram, save_flags) | 1u);
+    call(func_80066E6C, rdram, ctx);  // writes the save
+    store32(rdram, training_cleared_b, 0);
+    store8(rdram, p1_port, load8(rdram, port_source + load32(rdram, port_index)));
+    store32(rdram, p1_name, training_name);
+    store8(rdram, p1_character, default_character);
+    store16(rdram, new_game_flag, 1);
+    call(func_800CC6E0, rdram, ctx);
+    store32(rdram, after_new_game, 0);
+    close_menus(rdram);
+    log("started", request);
+    return true;
 }
 
 // Story (Rescue). Returns false (nothing written) when the menus would not
@@ -170,8 +245,7 @@ bool start_rescue(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
         log("note", request, "saved_progress_page_skipped");
 
     // 2. The player page's hand-over, with the grid gone as after its fly-out.
-    store16(rdram, grid_state, grid_none);
-    store16(rdram, grid_state_seen, grid_none);
+    clear_menu_presentation(rdram);
     for (std::uint32_t i = 0; i < 9; ++i) store8(rdram, name_copy + i, load8(rdram, name + i));
     call(func_80065660, rdram, ctx);
     store16(rdram, chapter, static_cast<std::int16_t>(request.chapter));
@@ -180,12 +254,7 @@ bool start_rescue(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
     call(func_800CC6E0, rdram, ctx);
     store32(rdram, after_new_game, 0);
     store16(rdram, p1_level, static_cast<std::int16_t>(request.level));
-    store16(rdram, main_row, -1);
-    store16(rdram, submenu_row, -1);
-    store16(rdram, player_page_row, -1);
-    store16(rdram, mode_row, -1);
-    store32(rdram, menu_timer_a, 0);
-    store32(rdram, menu_timer_b, 0);
+    close_menus(rdram);
     log("started", request);
     return true;
 }
@@ -248,6 +317,7 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
     bool started = false;
     switch (request.mode) {
     case DirectMode::Rescue: started = start_rescue(rdram, ctx, request); break;
+    case DirectMode::Training: started = start_training(rdram, ctx, request); break;
     }
     finish(started ? direct_start::Result::Started : direct_start::Result::Refused);
 }

@@ -21,12 +21,13 @@
 
 namespace tetrisphere {
 
-enum class DirectMode { Rescue };
+enum class DirectMode { Rescue, Training };
 
 struct DirectStartRequest {
     DirectMode mode = DirectMode::Rescue;
     int chapter = 0;  // 0-based (the game's 0x800E44A0)
     int level = 0;    // 0-based level within the chapter
+    int training_type = 0;  // Training: 1 Basics, 2 Advanced, 3 Puzzle
 };
 
 namespace direct_start {
