@@ -205,13 +205,17 @@ So the camera sits inside a huge sphere made of bricks, seen from the inside lik
 | Story 1:1 | 0x21, 0x20 | blue, yellow |
 | Story 2:1 | 0x21, 0x23 | blue, magenta |
 | Story 4:1 | 0x21, 0x23 | blue, magenta |
-| Story 6:1 | 0x20, 0x24, 0x25 | yellow, red, pale lavender |
+| Story 3:1 | 0x22, 0x23 | green, magenta |
+| Story 5:1 | 0x22, 0x23, 0x24 | green, magenta, pale lavender |
+| Story 6:1 | 0x20, 0x24, 0x25 | yellow, pale lavender, red |
+| Story 7:1 | 0x21, 0x22, 0x24 | blue, green, pale lavender |
+| Story 8:1 | 0x21, 0x20, 0x23 | blue, yellow, magenta |
 | Lines 1:1 | 0x21, 0x20 | blue, yellow |
 | Puzzle 12 | 0x21, 0x20, 0x22 | yellow, green (and blue) |
 
-So **0x20 yellow, 0x21 blue, 0x22 green, 0x23 magenta**. 0x24 and 0x25 are red and pale lavender, which is which still to split by a stage with only one of them.
+So **0x20 yellow, 0x21 blue, 0x22 green, 0x23 magenta, 0x24 pale lavender, 0x25 red** (settled by 5:1 and 7:1, which have lavender without red).
 
-**In the experiment:** the Colours setting "Not the stage's" reads the stage's types (`stage_brick_types`) and uses the colours of the other types, darkened by the brightness setting. It falls back to a fixed set if a stage used all six. The type-to-colour table (`type_colour`) follows the mapping above, with 0x24 and 0x25 guessed as red and lavender. Each change of the stage's types is logged as `brick_sky_stage_types`. **This is the default.**
+**In the experiment:** the Colours setting "Not the stage's" reads the stage's types (`stage_brick_types`) and uses the colours of the other types, darkened by the brightness setting. It falls back to a fixed set if a stage used all six. The type-to-colour table (`type_colour`) follows the mapping above. Each change of the stage's types is logged as `brick_sky_stage_types`. **This is the default.**
 
 
 - The stage's brick colours are known at level set-up. Byte 14 of the level record, the colour set, picks entries of the six-entry colour table at `0x800E4508` into `0x8013D188` onwards. The number of colours is at `0x8013D186` (`docs/research/blockplanet-level-data.md`).

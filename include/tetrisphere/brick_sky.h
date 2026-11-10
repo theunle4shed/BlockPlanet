@@ -82,8 +82,8 @@ Mesh mesh(const Settings& s);
 std::vector<int> sphere_bricks();
 
 // The six brick colours by type (0x20 .. 0x25), as the sky shows them.
-// Seen in play: 0x20 yellow, 0x21 blue, 0x22 green, 0x23 magenta; 0x24 and
-// 0x25 red and pale lavender (Story 6:1 has both; which is which to confirm).
+// Seen in play: 0x20 yellow, 0x21 blue, 0x22 green, 0x23 magenta, 0x24 pale
+// lavender, 0x25 red.
 std::array<float, 3> type_colour(int type);
 // For "stage": the colours of the brick types the stage does not use.
 std::vector<std::array<float, 3>> stage_contrast(const std::vector<int>& used);
