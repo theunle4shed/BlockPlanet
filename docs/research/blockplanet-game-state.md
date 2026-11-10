@@ -479,3 +479,16 @@ Recorded at about 21:9 (1280 × 548, software rendering, 45 s from the N64 logo 
 ### The intro on other screen shapes, step 2: the tiled backdrop (2026-11-10)
 
 A draw log of the intro (`BLOCKPLANET_DRAW_LOG=1`) shows one 2D picture from the N64 logo to the intro scenes: image `0x8019CC10` (320 × 240, format 3), drawn by the image helper `0x8003396C` at (0, 0) every frame while `0x800E1648` is 0; everything else is 3D (`0x8002D93C`). Skipping it (`BLOCKPLANET_IMAGE_SKIP=8019CC10`) leaves black with trails behind the moving logo, because that picture is the frame's clear, and a white floor under the logo's shadow. So BlockPlanet (`pause_draw_hooks.cpp`) writes a fill of the whole 320 × 240 frame in white (fill cycle, fill colour, fill rectangle, then one-cycle again) into the game's display list in its place, matched by size, format and position during the intro. RT64 widens the fill with the frame, so wider windows are white to their edges (checked at 16:9, 21:9 and 4:3); the shadow then sits on white as before, and the fade into the scenes, drawn after it, is unchanged.
+
+### Every 2D picture from the N64 logo to the title (2026-11-10)
+
+Logged from boot to the title (every call to the 2D helpers, before any of BlockPlanet's skips; 16:9, guest profile, 60 s). Positions and sizes are in the game's 320 × 240 frame; everything not listed (the N64 logo, the flying blocks, the sphere, the robots, the title's letters, ring, characters, rockets and the grid sphere behind them) is 3D, drawn by `0x8002D93C`.
+
+| # | Picture | Size, format | Where, when | Now |
+|---|---|---|---|---|
+| 1 | The N64 logo's backdrop of Nintendo and H2O logos | 320 × 240, format 3, image `0x8019CC10` | (0, 0), every frame from boot to the end of the logo (`0x800E1648` = 0) | replaced by a white fill (above) |
+| 2 | A registered mark (®), grey on white | 10 × 10, format 0 (16-bit colour), image `0x801AFE60` | (214, 58), every frame of the logo | drawn but never visible in captures (no grey pixels there in any frame); left alone |
+| 3 | The title's soft shadow | 280 × 188, format 2, image at `*0x800E1638` | (24, 21), during the title (`0x800E1648` = 1, `0x800E1646` = 0) | already hidden (`title_hooks.cpp`) |
+| 4 | The title's painted picture (logo with ™, ring, characters, rockets) | 270 × 205, format 0, image at `*0x800E1614` | (24, 21), from about 2 s into the title | already hidden; BlockPlanet holds the 3D scene instead |
+
+After the title, the game's own main menu (behind BlockPlanet's) draws its frame (285 × 175), a logo strip (244 × 40, reusing the address `0x8019CC10`), five row bars (110 × 7) and its text; BlockPlanet's menus already hide them. The copyright lines under BlockPlanet's title are BlockPlanet's own text, not a picture.
