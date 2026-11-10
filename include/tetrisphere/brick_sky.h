@@ -126,4 +126,9 @@ bool mixed_uses_sky(int mode, int background_index, int level);
 // the comfort layer reaches the picture's edges, not the 4:3 frame's.
 void set_picture_aspect(float aspect);
 
+// The Sky test's "Play test stage": while on, the brick sky is shown
+// whatever Play backgrounds says (the setting itself is unchanged).
+void set_test_run(bool on);
+bool test_run();
+
 } // namespace tetrisphere::brick_sky

@@ -63,6 +63,7 @@ Settings from_environment() {
 std::mutex mutex;
 Settings current = from_environment();
 std::atomic<float> picture_aspect{4.0f / 3.0f};
+std::atomic<bool> testing{false};
 
 using Colour = std::array<float, 3>;
 std::vector<Colour> palette(const std::string& name, const std::vector<int>& stage_types) {
@@ -500,6 +501,9 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
     return commands_start;
 }
 
+void set_test_run(bool on) { testing = on; }
+bool test_run() { return testing; }
+
 void set_picture_aspect(float aspect) {
     if (aspect > 0.5f && aspect < 10.0f) picture_aspect = aspect;
 }
@@ -543,6 +547,7 @@ bool mixed_uses_sky(int mode, int background_index, int level) {
 
 bool draw(std::uint8_t* rdram) {
     Settings s = settings();
+    if (testing) s.backgrounds = "only";
     // The original backgrounds unless the brick sky is chosen: then nothing
     // of it runs, and the game draws its own.
     if (s.backgrounds == "original") return false;

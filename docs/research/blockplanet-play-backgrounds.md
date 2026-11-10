@@ -245,6 +245,12 @@ A fast counter-spin around the viewer is the most likely thing in this design to
 
 **Status (the owner, 2026-11-10): parked.** "Don't incorporate the brick sky yet.. I'm thinking we can use some custom ones for new game modes." It stays a research experiment behind its switch. Play backgrounds stays Original by default, Mixed is not offered to players, and the setting does not move to Options > Graphics. No further work is planned for now (the play sphere's texture is not started). Custom backgrounds such as this one belong to new game modes (`docs/ROADMAP.md`).
 
+**Play test stage** (the owner: "If there's a way to have a test stage which has it set up that might be good", 2026-11-10). It is on the Sky test screen:
+- It starts Story 1:1 as a single Casual stage (no game over, no trophies), with the brick sky on for that run only, whatever Play backgrounds says, using the screen's other settings.
+- The profile is copied first, nothing is saved during the run, and the copy is put back once play is left. So the run leaves no progress, records or Continue checkpoint. Any settings changed during the run are also undone.
+- Quit from the pause, or the stage's end, returns to the Sky test, and the sky is off again. The end is logged as `sky_test_stage_end`.
+- It is started from the menus. Started from the pause's Options, it returns to the menus the game was first started from, as a restart does.
+
 - **Code:** `src/graphics/brick_sky.cpp` (`include/tetrisphere/brick_sky.h`), tested in `tests/brick_sky_test.cpp`. It is off unless turned on by `BLOCKPLANET_BRICK_SKY=1` or Options > **Sky test** > Brick sky (open from the pause's Options, then Resume to see it). `BLOCKPLANET_BRICK_SKY_SET="sky_spin=wild,sky_comfort=none"` sets the others for recordings. `BLOCKPLANET_BRICK_SKY_LOG=1` logs the sky's turn twice a second.
 - **The sky:** a cube-sphere of 6 × 8 × 8 = 384 bricks at radius 1,000, laid out at equal angles as the menu grid is, seen from the centre.
   - Each brick has 8 vertices: dark mortar corners and an inset face, lighter at its top edge.

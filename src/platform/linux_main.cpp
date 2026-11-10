@@ -150,6 +150,11 @@ bool guest_session = false;
 NameEditor name_editor;
 std::string character_profile_id;
 ProfileSaveData profile_data;
+// The Sky test's "Play test stage" (brick sky research): the profile as it
+// was before, put back afterwards, and nothing saved meanwhile, so the run
+// leaves no progress, records or Continue checkpoint.
+std::optional<ProfileSaveData> sky_test_profile;
+bool sky_test_seen_play = false;
 bool profile_recording = false;
 bool profile_dirty = false;
 // A Chapter 0 (a Training lesson) started from a chapter list: when it is
@@ -208,7 +213,7 @@ void apply_controls(Settings& settings, const ControlPreferences& controls) {
 }
 
 void save_profile() {
-    if (!profile_save || !profile_dirty) return;
+    if (!profile_save || !profile_dirty || sky_test_profile) return;
     std::string error;
     if (profile_save->save(profile_data, error)) profile_dirty = false;
     else std::fprintf(stderr, "Could not save the profile: %s\n", error.c_str());
@@ -3578,6 +3583,33 @@ bool handle_profile_command(const std::string& command) {
                 if (!command->ends_with(":refresh")) blockplanet::ui::request_show("stages");
                 continue;
             }
+            if (*command == "sky_test_stage") {
+                // Options > Sky test > Play test stage: Story 1:1 on its own,
+                // as Casual (no game over, no trophies), with the brick sky
+                // on for this run only; the profile is put back afterwards
+                // and nothing is saved meanwhile. Quit (or the stage's end)
+                // returns to the Sky test.
+                if (game_option_applier && !sky_test_profile) {
+                    sky_test_profile = profile_data;
+                    sky_test_seen_play = false;
+                    tetrisphere::brick_sky::set_test_run(true);
+                    continue_mode.reset();
+                    single_stage = std::pair{1, 1};
+                    menu_variant = play_variant = PlayVariant::Casual;
+                    single_stage_quit_at.reset();
+                    single_stage_result.reset();
+                    chapter_zero_lesson.clear();
+                    game_option_applier->choose_start(1, 1);
+                    launch_mode(LaunchMode::Rescue);
+                    if (!mode_launcher.active()) {  // refused: nothing started
+                        profile_data = *sky_test_profile;
+                        sky_test_profile.reset();
+                        tetrisphere::brick_sky::set_test_run(false);
+                        single_stage.reset();
+                    }
+                }
+                continue;
+            }
             if (command->rfind("stage:", 0) == 0) {
                 // stage:N:L: one Story stage on its own.
                 const int chapter = std::atoi(command->c_str() + 6);
@@ -3692,6 +3724,21 @@ bool handle_profile_command(const std::string& command) {
         publish_hud_settings();
         publish_sky_settings();
         if (const auto frame = picture_frame()) tetrisphere::brick_sky::set_picture_aspect(frame->aspect);
+        // The Sky test's test stage ends once play has been left (Quit, or
+        // the stage's end) and the game is back at its menus: the sky goes
+        // off and the profile is put back as it was.
+        if (sky_test_profile && guest_rdram != nullptr && !mode_launcher.active()) {
+            const bool playing = guest::load16(guest_rdram, 0x800E121C) == -1;
+            sky_test_seen_play = sky_test_seen_play || playing;
+            if (sky_test_seen_play && !playing) {
+                tetrisphere::brick_sky::set_test_run(false);
+                profile_data = *sky_test_profile;
+                sky_test_profile.reset();
+                profile_dirty = false;
+                std::fprintf(stdout, "{\"event\":\"sky_test_stage_end\"}\n");
+                std::fflush(stdout);
+            }
+        }
         // Back at the game's menu after leaving play from BlockPlanet: open
         // BlockPlanet's menus (the stage list after a single stage).
         if (return_to_menu_chapter && !continue_mode && !mode_launcher.active() && guest_rdram != nullptr &&

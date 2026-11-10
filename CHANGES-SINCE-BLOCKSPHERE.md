@@ -279,6 +279,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - From the owner's first look: the brick sky is now built like the play sphere's outside by default (Layout: Sphere), with 32 cells around in 14 rows, bricks of one to four cells in the game's piece shapes with bevelled edges, and capped poles. The six-faced version stays as Layout: Cube. The comfort frame reaches the picture's edges at any width. "Not the stage's" colours, now the default, use the colours of the brick types the stage does not use (yellow, blue, green, magenta, red and lavender, seen in play). `BLOCKPLANET_HIDE_SPHERE=1` hides the play sphere, for stills of the sky alone.
 - The brick sky is one more background in the pool, not a replacement (the owner's note). Play backgrounds: Original (the game's own, the default; nothing of the sky runs), Mixed (it takes one stage in four, always the same ones) or Brick sky only.
 - The brick sky is parked as a research experiment (the owner's choice): kept for new game modes, not added to the original modes.
+- Sky test > Play test stage: Story 1:1 with the brick sky on for that run only, as Casual. Nothing is saved and no trophies are given (the profile is put back afterwards). Quit returns to the Sky test.
 
 ## 2026-11-10: Fixes
 

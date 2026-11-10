@@ -28,6 +28,7 @@
              data-options="stage:Not the stage's,violet:Violet,teal:Teal,amber:Amber,rose:Rose,grey:Grey">Colours<span class="value"></span></div>
         <div class="item value slider" id="sky_brightness" data-setting="sky_brightness" data-description="How bright the bricks are. Dim keeps the sphere easy to read."
              data-options="30:30 %,40:40 %,55:55 %,70:70 %,85:85 %,100:100 %">Brightness<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
+        <div class="item" id="sky_test_stage" data-action="command:sky_test_stage" data-description="Play Story 1:1 with the brick sky on and these settings. A test run: nothing is saved and no trophies are given. Quit from the pause to come back here.">Play test stage</div>
         <div class="item" id="back" data-action="back">Back</div>
         <div id="description" class="description"></div>
     </div>
