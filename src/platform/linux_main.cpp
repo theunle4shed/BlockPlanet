@@ -36,6 +36,7 @@
 #include "tetrisphere/mode_launcher.h"
 #include "tetrisphere/direct_start.h"
 #include "ui_system.h"
+#include "tetrisphere/box_art.h"
 #include "tetrisphere/profile_save.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/wav_capture.h"
@@ -4156,7 +4157,9 @@ bool handle_profile_command(const std::string& command) {
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
                 grid_quit_at.reset();
             const bool over_pause = start_at || paused || unpaused_at || grid_quit_at;
-            blockplanet::ui::set_grid_override(over_pause && !launching() ? "pause" : "");
+            // The box art shows over BlockPlanet's grid (tetrisphere/box_art.h).
+            const bool box_art = tetrisphere::box_art::showing().load(std::memory_order_relaxed);
+            blockplanet::ui::set_grid_override(over_pause && !launching() ? "pause" : (box_art ? "blue" : ""));
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
         // over (0x800E1202 back to 0 while the end menu fades in), to see

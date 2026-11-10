@@ -39,6 +39,8 @@ SOURCES = {
     "rt64_rsp.cpp": "7dfdf40254d44d92c247d9c876bb8ca55995927ad534981bd48868bb44f1f695",
 }
 
+VIDEO_INTERFACE_PS_SHA256 = "f4990ef5edfbdece9c89938a0c4951b3a285f99be9e6d92a415433c0e227f961"
+
 VS_WIDE_HELPER = '''    // Tetrisphere VS uses two clipped 320x240 viewports, each centered on a player.
     // Both the projection and raster path must recognize the same exact signature.
     // Rect coordinates are quarter pixels; projection type 1 is Perspective and origin 2048 is None.
@@ -476,6 +478,67 @@ REGULAR_RECT_PROBE = '''
 '''
 
 
+UNDER_LAYER_INCLUDE = """#include "tetrisphere/under_layer.h"
+#include "VideoInterfaceCoverPSRegular.hlsl.spirv.h"
+#include "VideoInterfaceCoverPSPixel.hlsl.spirv.h"
+#include "shaders/FullScreenVS.hlsl.spirv.h"
+#ifdef _WIN32
+#include "VideoInterfaceCoverPSRegular.hlsl.dxil.h"
+#include "VideoInterfaceCoverPSPixel.hlsl.dxil.h"
+#include "shaders/FullScreenVS.hlsl.dxil.h"
+#endif
+
+"""
+
+UNDER_LAYER_HELPER = """    // BlockPlanet's under layer (tetrisphere/under_layer.h): the VI pipelines
+    // with the game's picture blended by its coverage, built on first use from
+    // the same layouts as RT64's own (VideoInterfaceCoverPS, a patched copy of
+    // VideoInterfacePS that writes the coverage as alpha).
+    struct TetrisphereCoverPipelines {
+        std::unique_ptr<RenderPipeline> linear, nearest, pixel;
+        bool failed = false;
+    };
+
+    static bool tetrisphere_cover_pipelines(TetrisphereCoverPipelines &cover, RenderDevice *device, const ShaderLibrary *library,
+                                            UserConfiguration::GraphicsAPI api) {
+        if (cover.linear != nullptr) return true;
+        if (cover.failed || device == nullptr || library == nullptr) return false;
+        std::unique_ptr<RenderShader> vertex, regular, pixel;
+        if (api == UserConfiguration::GraphicsAPI::Vulkan) {
+            vertex = device->createShader(FullScreenVSBlobSPIRV, sizeof(FullScreenVSBlobSPIRV), "VSMain", RenderShaderFormat::SPIRV);
+            regular = device->createShader(VideoInterfaceCoverPSRegularBlobSPIRV, sizeof(VideoInterfaceCoverPSRegularBlobSPIRV), "PSMain", RenderShaderFormat::SPIRV);
+            pixel = device->createShader(VideoInterfaceCoverPSPixelBlobSPIRV, sizeof(VideoInterfaceCoverPSPixelBlobSPIRV), "PSMain", RenderShaderFormat::SPIRV);
+        }
+#ifdef _WIN32
+        else if (api == UserConfiguration::GraphicsAPI::D3D12) {
+            vertex = device->createShader(FullScreenVSBlobDXIL, sizeof(FullScreenVSBlobDXIL), "VSMain", RenderShaderFormat::DXIL);
+            regular = device->createShader(VideoInterfaceCoverPSRegularBlobDXIL, sizeof(VideoInterfaceCoverPSRegularBlobDXIL), "PSMain", RenderShaderFormat::DXIL);
+            pixel = device->createShader(VideoInterfaceCoverPSPixelBlobDXIL, sizeof(VideoInterfaceCoverPSPixelBlobDXIL), "PSMain", RenderShaderFormat::DXIL);
+        }
+#endif
+        if (vertex == nullptr || regular == nullptr || pixel == nullptr) {
+            cover.failed = true;
+            return false;
+        }
+        RenderGraphicsPipelineDesc desc;
+        desc.vertexShader = vertex.get();
+        desc.renderTargetFormat[0] = RenderFormat::B8G8R8A8_UNORM;
+        desc.renderTargetBlend[0] = RenderBlendDesc::AlphaBlend();
+        desc.renderTargetCount = 1;
+        desc.pixelShader = regular.get();
+        desc.pipelineLayout = library->videoInterfaceNearest.pipelineLayout.get();
+        cover.nearest = device->createGraphicsPipeline(desc);
+        desc.pipelineLayout = library->videoInterfaceLinear.pipelineLayout.get();
+        cover.linear = device->createGraphicsPipeline(desc);
+        desc.pixelShader = pixel.get();
+        desc.pipelineLayout = library->videoInterfacePixel.pipelineLayout.get();
+        cover.pixel = device->createGraphicsPipeline(desc);
+        return cover.linear != nullptr;
+    }
+
+"""
+
+
 def replace_once(source: str, anchor: str, replacement: str) -> str:
     count = source.count(anchor)
     if count != 1:
@@ -762,6 +825,42 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
             tetrisphere_retire_pause_tiles(fbManager, workload.workloadId);
 
             // Update the GPU profiler''')
+    elif name == "rt64_present_queue.cpp":
+        source = replace_once(source, "namespace RT64 {\n", UNDER_LAYER_INCLUDE + "namespace RT64 {\n" + UNDER_LAYER_HELPER)
+        source = replace_once(source,
+            "                if (renderParams.texture != nullptr) {\n"
+            "                    commandList->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(renderParams.texture, RenderTextureLayout::SHADER_READ));\n"
+            "                    viRenderer->render(renderParams);\n"
+            "                }",
+            """                // BlockPlanet's under layer: drawn first, then the picture over it.
+                // Kept for the program's life: destroyed at exit, after the
+                // device, Vulkan reports an invalid device.
+                static TetrisphereCoverPipelines &tetrisphereCover = *new TetrisphereCoverPipelines();
+                bool tetrisphereUnder = false;
+                if (tetrisphere::under_layer::wanted().load(std::memory_order_relaxed) && (renderParams.texture != nullptr) &&
+                    tetrisphere_cover_pipelines(tetrisphereCover, ext.device, ext.shaderLibrary, ext.createdGraphicsAPI)) {
+                    const auto draw = tetrisphere::under_layer::draw_function().load();
+                    tetrisphereUnder = (draw != nullptr) && draw(commandList, swapChainFramebuffer);
+                    commandList->setFramebuffer(swapChainFramebuffers[swapChainIndex].get());
+                }
+
+                if (renderParams.texture != nullptr) {
+                    commandList->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(renderParams.texture, RenderTextureLayout::SHADER_READ));
+                    if (tetrisphereUnder) {
+                        // RT64's VI pipelines swapped for the blended ones for this draw.
+                        auto &library = const_cast<ShaderLibrary &>(*ext.shaderLibrary);
+                        std::swap(library.videoInterfaceLinear.pipeline, tetrisphereCover.linear);
+                        std::swap(library.videoInterfaceNearest.pipeline, tetrisphereCover.nearest);
+                        std::swap(library.videoInterfacePixel.pipeline, tetrisphereCover.pixel);
+                        viRenderer->render(renderParams);
+                        std::swap(library.videoInterfaceLinear.pipeline, tetrisphereCover.linear);
+                        std::swap(library.videoInterfaceNearest.pipeline, tetrisphereCover.nearest);
+                        std::swap(library.videoInterfacePixel.pipeline, tetrisphereCover.pixel);
+                    }
+                    else {
+                        viRenderer->render(renderParams);
+                    }
+                }""")
     elif not probe:
         raise ValueError(f"normal RT64 copy does not need {name}")
     if not probe:
@@ -870,7 +969,21 @@ def main() -> int:
                                       ("rt64_application.cpp", "rt64_state.cpp",
                                        "rt64_projection_processor.cpp", "rt64_framebuffer_renderer.cpp",
                                        "rt64_framebuffer_manager.cpp", "rt64_workload_queue.cpp",
-                                       "rt64_interpreter.cpp", "rt64_rdp.cpp", "rt64_rsp.cpp", "rt64_dynamic_libraries.cpp")}
+                                       "rt64_interpreter.cpp", "rt64_rdp.cpp", "rt64_rsp.cpp", "rt64_dynamic_libraries.cpp",
+                                       "rt64_present_queue.cpp")}
+    # The under layer's VI shader: RT64's own, writing the game picture's
+    # coverage as alpha (its backdrop fill writes 1, everything drawn over it
+    # 0) instead of 1, and 0 outside the picture.
+    shader = args.rt64_root / "src" / "shaders" / "VideoInterfacePS.hlsl"
+    raw = shader.read_bytes().replace(b"\r\n", b"\n")
+    actual = hashlib.sha256(raw).hexdigest()
+    if actual != VIDEO_INTERFACE_PS_SHA256:
+        raise ValueError(f"RT64 VideoInterfacePS.hlsl SHA256 mismatch: {actual}")
+    cover = replace_once(raw.decode("utf-8"), "    gammaCorrectedColor.a = 1.0f;",
+        "    gammaCorrectedColor.a = (1.0f - sampledColor.a) * max(1.0f - outsideBorder.x - outsideBorder.y, 0.0f);")
+    destination = args.output / "VideoInterfaceCoverPS.hlsl"
+    if not destination.exists() or destination.read_text(encoding="utf-8") != cover:
+        destination.write_text(cover, encoding="utf-8")
     for name, expected in names.items():
         directory = "common" if name == "rt64_dynamic_libraries.cpp" else ("render" if name in ("rt64_projection_processor.cpp", "rt64_framebuffer_renderer.cpp") else "hle")
         source = args.rt64_root / "src" / directory / name

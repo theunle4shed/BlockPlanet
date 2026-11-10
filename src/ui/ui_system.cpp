@@ -1,5 +1,7 @@
 #include "ui_system.h"
 
+#include "tetrisphere/under_layer.h"
+
 #include "grid_texture.h"
 #include "ui_grid.h"
 #include "ui_navigator.h"
@@ -57,6 +59,10 @@ std::filesystem::path assets_path;
 std::unique_ptr<Renderer> renderer;
 std::unique_ptr<System> system_interface;
 Rml::Context* context = nullptr;
+// The menu grid has a context of its own, drawn before the menus' (behind
+// them) or, while the game's picture is laid over it, before the game's
+// picture (tetrisphere/under_layer.h).
+Rml::Context* grid_context = nullptr;
 std::unique_ptr<Navigator> navigator;
 std::unique_ptr<MenuGrid> grid;  // the menu grid (ui_grid.h)
 bool started = false;
@@ -120,6 +126,9 @@ bool start(std::uint32_t width, std::uint32_t height) {
     context = Rml::CreateContext("main", Rml::Vector2i(int(width), int(height)));
     if (context == nullptr) return false;
     context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
+    grid_context = Rml::CreateContext("grid", Rml::Vector2i(int(width), int(height)));
+    if (grid_context == nullptr) return false;
+    grid_context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
     navigator = std::make_unique<Navigator>(context, assets_path / "screens");
     grid = std::make_unique<MenuGrid>(asset("grid.rml"));
     for (const auto& [name, value] : grid_lab_values()) navigator->set_setting(name, value);
@@ -804,8 +813,10 @@ bool update_hud_document() {
         std::lock_guard lock(hud_mutex);
         hud = hud_wanted;
     }
-    // Not under the menu grid (it covers the board while it is up or flying).
-    const bool show = hud.has_value() && !navigator->is_open() && !(grid && grid->visible());
+    // Not under the menu grid (it covers the board while it is up or flying),
+    // except the title's notice while the box art shows over the grid.
+    const bool box_art = hud.has_value() && !hud->title_notice.empty() && tetrisphere::under_layer::wanted().load();
+    const bool show = hud.has_value() && !navigator->is_open() && (box_art || !(grid && grid->visible()));
     if (!show) {
         if (hud_document != nullptr) hud_document->Hide();
         std::lock_guard lock(hud_mutex);
@@ -917,7 +928,7 @@ void update_grid() {
     grid->set_layers(!lab || lab_show != "background", !lab || lab_show != "tiles");
     // Flying out while a load is still wanted (the grid was not up as the
     // loading screen): into the cover; once the load is done: revealing the game.
-    grid->update(context, colour, now, loading);
+    grid->update(grid_context, colour, now, loading);
     // Research: BLOCKPLANET_GRID_LOG=1 logs the grid's state every frame
     // while it is drawn (and the frame it goes), to tell its own dark frames
     // from the game's.
@@ -934,15 +945,23 @@ void hook_init(plume::RenderInterface* render_interface, plume::RenderDevice* de
     renderer = std::make_unique<Renderer>(render_interface, device);
 }
 
-void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebuffer) {
-    if (!renderer || start_failed) return;
+// Once a frame, before either hook draws: requests, the grid, the HUD and the
+// other layers, and RmlUi's update. Returns whether anything is to be drawn.
+bool frame_prepared = false;   // this frame's preparation done (by the under hook)
+bool grid_drawn_under = false; // the grid drawn under the game's picture this frame
+bool frame_shown = false;
+
+bool prepare_frame(plume::RenderCommandList* list, plume::RenderFramebuffer* framebuffer, bool under) {
+    if (!renderer || start_failed) return false;
     if (!started) {
-        // Start RmlUi only once a menu is wanted.
+        // Start RmlUi only once a menu (or the grid under the game) is wanted.
         std::lock_guard lock(requests_mutex);
         std::lock_guard hud_lock(hud_mutex);
-        if (!hud_wanted && std::none_of(requests.begin(), requests.end(),
-                                        [](const Request& r) { return std::holds_alternative<OpenRequest>(r) || std::holds_alternative<RestoreRequest>(r); }))
-            return;
+        std::lock_guard grid_lock(grid_override_mutex);
+        if (!under && !hud_wanted && grid_override.empty() &&
+            std::none_of(requests.begin(), requests.end(),
+                         [](const Request& r) { return std::holds_alternative<OpenRequest>(r) || std::holds_alternative<RestoreRequest>(r); }))
+            return false;
     }
     const std::uint32_t width = framebuffer->getWidth();
     const std::uint32_t height = framebuffer->getHeight();
@@ -951,7 +970,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
         start_failed = true;
         open_flag.store(false);
         renderer->end_frame();
-        return;
+        return false;
     }
     apply_requests();
     update_grid();
@@ -980,11 +999,15 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
                          t, int(navigator->is_open()), int(hud_visible), int(loading_visible), int(label_visible), int(grid->visible()), shown.c_str());
         }
     }
-    if (navigator->is_open() || hud_visible || loading_visible || label_visible || grid->visible()) {
-        if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
-            context->SetDimensions(Rml::Vector2i(int(width), int(height)));
-            context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
+    frame_shown = navigator->is_open() || hud_visible || loading_visible || label_visible || grid->visible();
+    if (frame_shown) {
+        for (auto* each : {context, grid_context}) {
+            if (each->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
+                each->SetDimensions(Rml::Vector2i(int(width), int(height)));
+                each->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
+            }
         }
+        grid_context->Update();
         context->Update();
         apply_card_scroll(float(height));
         // The credits scroll by themselves, about a fifteenth of the window a
@@ -999,6 +1022,30 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
                     scroll->SetScrollTop(scroll->GetScrollTop() + scroll->GetClientHeight() / 15.0f * dt);
             }
         }
+    }
+    return true;
+}
+
+// The under layer (called by RT64 before the game's picture while
+// tetrisphere::under_layer::wanted() is set): the grid alone.
+bool hook_under(plume::RenderCommandList* list, plume::RenderFramebuffer* framebuffer) {
+    frame_prepared = prepare_frame(list, framebuffer, true);
+    if (!frame_prepared) return false;
+    grid_drawn_under = frame_shown && grid->visible();
+    if (grid_drawn_under) grid_context->Render();
+    renderer->end_frame();
+    return grid_drawn_under;
+}
+
+void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebuffer) {
+    const bool prepared = frame_prepared;
+    const bool under = grid_drawn_under;
+    frame_prepared = false;
+    grid_drawn_under = false;
+    if (prepared) renderer->begin_frame(list, framebuffer);
+    else if (!prepare_frame(list, framebuffer, false)) return;
+    if (frame_shown) {
+        if (!under) grid_context->Render();  // behind the menus
         context->Render();
     }
     renderer->end_frame();
@@ -1010,7 +1057,9 @@ void hook_deinit() {
     navigator.reset();
     if (started) {
         if (context != nullptr) Rml::RemoveContext("main");
+        if (grid_context != nullptr) Rml::RemoveContext("grid");
         context = nullptr;
+        grid_context = nullptr;
         Rml::Shutdown();
     }
     renderer.reset();
@@ -1057,6 +1106,7 @@ void set_grid_override(const std::string& colour) {
 void install(const std::filesystem::path& assets) {
     assets_path = assets;
     RT64::SetRenderHooks(hook_init, hook_draw, hook_deinit);
+    tetrisphere::under_layer::draw_function().store(hook_under);
     const char* test = std::getenv("BLOCKPLANET_UI_TEST");
     if (test != nullptr && std::string(test) == "1") request_open("main");
 }

@@ -209,6 +209,8 @@ void log_background_dl(const std::uint8_t* rdram, std::uint32_t from, std::uint3
 } // namespace
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    // The box art on BlockPlanet's grid (src/graphics/box_art_hooks.cpp).
+    if (helper == 0x8002D93Cu && blockplanet_box_art_scene(rdram, ctx)) return true;
     // Portrait windows: the intro zooms to cover (tetrisphere/intro_cover.h).
     // BLOCKPLANET_INTRO_COVER=0 keeps the letterbox.
     static const bool intro_cover = [] {

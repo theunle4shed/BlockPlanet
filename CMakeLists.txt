@@ -316,6 +316,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/audio_hooks.cpp
     src/graphics/direct_start_hooks.cpp
     src/graphics/intro_logo_hooks.cpp
+    src/graphics/box_art_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
     assets/trophies/developer_records.json
@@ -325,6 +326,8 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/menu_medal_trace.h
     include/tetrisphere/full_frame_target_height.h
     include/tetrisphere/intro_cover.h
+    include/tetrisphere/under_layer.h
+    include/tetrisphere/box_art.h
     include/tetrisphere/pause_capture_scene.h
     include/tetrisphere/prompt_atlas.h
     include/tetrisphere/training_prompts.h
@@ -465,6 +468,7 @@ add_executable(tetrisphere_diag
     src/graphics/audio_hooks.cpp
     src/graphics/direct_start_hooks.cpp
     src/graphics/intro_logo_hooks.cpp
+    src/graphics/box_art_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
     src/platform/pc_settings_menu.cpp
@@ -960,10 +964,10 @@ if(TETRISPHERE_GAME_ENABLED)
     set(RT64_COPY_NAMES rt64_application.cpp rt64_state.cpp
         rt64_projection_processor.cpp rt64_framebuffer_renderer.cpp
         rt64_framebuffer_manager.cpp rt64_workload_queue.cpp
-        rt64_interpreter.cpp rt64_rdp.cpp rt64_rsp.cpp rt64_dynamic_libraries.cpp)
+        rt64_interpreter.cpp rt64_rdp.cpp rt64_rsp.cpp rt64_dynamic_libraries.cpp
+        rt64_present_queue.cpp)
     if(TETRISPHERE_RT64_PROBE)
         list(APPEND RT64_COPY_ARGS --probe)
-        list(APPEND RT64_COPY_NAMES rt64_present_queue.cpp)
     endif()
     execute_process(
         COMMAND "${Python3_EXECUTABLE}"
@@ -1141,6 +1145,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/audio_hooks.cpp
         src/graphics/direct_start_hooks.cpp
         src/graphics/intro_logo_hooks.cpp
+        src/graphics/box_art_hooks.cpp
             src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp
         src/runtime/unsupported.cpp
@@ -1191,6 +1196,43 @@ if(TETRISPHERE_GAME_ENABLED)
                           ${TETRISPHERE_SDL_LIBRARIES})
     # BlockPlanet's menu layer (docs/UI.md).
     include(cmake/BlockPlanetUI.cmake)
+    # The under layer's VI shader (tetrisphere/under_layer.h): a patched copy
+    # of RT64's, written by patch_rt64_probe.py, compiled like RT64's own
+    # (regular and pixel-antialiased) into the RT64 library.
+    function(blockplanet_cover_shader NAME)
+        set(SOURCE "${RT64_COPY_OUTPUT}/VideoInterfaceCoverPS.hlsl")
+        set(OUT "${BLOCKPLANET_UI_SHADER_DIR}/${NAME}.hlsl")
+        add_custom_command(OUTPUT "${OUT}.spv"
+            COMMAND ${BLOCKPLANET_DXC} -spirv -fspv-target-env=vulkan1.0 -fvk-use-dx-layout
+                    "-I${RT64_ROOT}/src" -E PSMain -T ps_6_3 ${ARGN} "${SOURCE}" /Fo "${OUT}.spv"
+            DEPENDS "${SOURCE}")
+        add_custom_command(OUTPUT "${OUT}.spirv.c" "${OUT}.spirv.h"
+            COMMAND file_to_c "${OUT}.spv" ${NAME}BlobSPIRV "${OUT}.spirv.c" "${OUT}.spirv.h"
+            DEPENDS "${OUT}.spv" file_to_c)
+        set(BLOCKPLANET_COVER_OUTPUTS ${BLOCKPLANET_COVER_OUTPUTS} "${OUT}.spirv.c" "${OUT}.spirv.h" PARENT_SCOPE)
+        if(WIN32)
+            add_custom_command(OUTPUT "${OUT}.dxil"
+                COMMAND ${BLOCKPLANET_DXC} -Wno-ignored-attributes "-I${RT64_ROOT}/src" -E PSMain -T ps_6_3 ${ARGN}
+                        "${SOURCE}" /Fo "${OUT}.dxil"
+                DEPENDS "${SOURCE}")
+            add_custom_command(OUTPUT "${OUT}.dxil.c" "${OUT}.dxil.h"
+                COMMAND file_to_c "${OUT}.dxil" ${NAME}BlobDXIL "${OUT}.dxil.c" "${OUT}.dxil.h"
+                DEPENDS "${OUT}.dxil" file_to_c)
+            set(BLOCKPLANET_COVER_OUTPUTS ${BLOCKPLANET_COVER_OUTPUTS} "${OUT}.spirv.c" "${OUT}.spirv.h"
+                "${OUT}.dxil.c" "${OUT}.dxil.h" PARENT_SCOPE)
+        endif()
+    endfunction()
+    set(BLOCKPLANET_COVER_OUTPUTS "")
+    blockplanet_cover_shader(VideoInterfaceCoverPSRegular)
+    blockplanet_cover_shader(VideoInterfaceCoverPSPixel -D PIXEL_ANTIALIASING)
+    # The commands are in this directory and RT64 in its own: a target here
+    # makes them, and RT64 compiles their C arrays once made.
+    add_custom_target(blockplanet_cover_shaders DEPENDS ${BLOCKPLANET_COVER_OUTPUTS})
+    add_dependencies(rt64 blockplanet_cover_shaders)
+    list(FILTER BLOCKPLANET_COVER_OUTPUTS INCLUDE REGEX "\\.c$")
+    set_source_files_properties(${BLOCKPLANET_COVER_OUTPUTS} TARGET_DIRECTORY rt64 PROPERTIES GENERATED TRUE)
+    target_sources(rt64 PRIVATE ${BLOCKPLANET_COVER_OUTPUTS})
+    target_include_directories(rt64 PRIVATE "${BLOCKPLANET_UI_SHADER_DIR}")
     blockplanet_add_ui(tetrisphere-m1)
     add_executable(audio_output_test tests/audio_output_test.cpp
         src/platform/audio_output.cpp)
