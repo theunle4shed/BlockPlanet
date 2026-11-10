@@ -334,3 +334,5 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-10: Guest play
 
 - A guest is always called Guest: the game is given "GUEST" as player 1's name when a mode starts. "Guest" can no longer be chosen for a new or renamed profile ("That name is for guest play"); a profile already called that keeps its name. A guest's save, records and settings already live in memory only, so each launch starts a fresh guest. Test: `tests/profiles_test.cpp`.
+- Added `tools/audio/dcm_to_midi.py`, a research tool that converts the game's DCM1 songs from the player's own ROM into MIDI files (one track per voice) under `.local/`, and documented the song format in `docs/research/blockplanet-game-state.md`.
+- Added `tools/audio/dcm_render.py`, which renders the DCM1 songs with the game's own samples (from the player's ROM) to WAV files under `.local/`, and documented the sample bank format.
