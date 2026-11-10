@@ -160,6 +160,7 @@ const char* mode_name(const DirectStartRequest& request) {
     case DirectMode::Rescue: return "rescue";
     case DirectMode::Training: return "training";
     case DirectMode::Puzzle: return "puzzle";
+    case DirectMode::Lines: return "lines";
     }
     return "";
 }
@@ -384,6 +385,7 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
     switch (request.mode) {
     case DirectMode::Rescue: started = start_single(rdram, ctx, request, mode_rescue); break;
     case DirectMode::Puzzle: started = start_single(rdram, ctx, request, mode_puzzle); break;
+    case DirectMode::Lines: started = start_single(rdram, ctx, request, mode_lines); break;
     case DirectMode::Training: started = start_training(rdram, ctx, request); break;
     }
     finish(started ? direct_start::Result::Started : direct_start::Result::Refused);

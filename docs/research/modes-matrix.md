@@ -105,7 +105,7 @@ All modes: `0x800DFD4C`, `0x8015D980`, `0x800DFD50`, `0x800DFD54` set to 1, the 
 | --- | --- |
 | Rescue (1) | None. With saved progress the game opens another page first (`0x800E1232`). |
 | Hide & Seek (5) | None at the confirm; its own page follows the hand-over (`0x800E1234`). |
-| Lines (9) | `0x800DFD4C` = 2 (meaning unknown). |
+| Lines (9) | `0x800DFD4C` = 2 (meaning unknown). Opens on its rules pages, which are part of play (HUD up). Song 1 at the start. |
 | Puzzle (4) | None at the confirm. The puzzle number is the level (`0x800E449C` before the set-up, context `+0x23BA`); the chapter stays 0. Every mode's row is also saved (`0x80102B07`, from the mode page's row memory `0x800E0756`). |
 | Time Trial (2) | None at the confirm; skips the saved-progress check. |
 | VS CPU (6) | `0x800E44A4` = 1, `0x8015D980` = 2, player 1 context `+0x23D6` = 1, player 2 context `+0x23D6` = 0, `0x800E08A8` = 1, `0x800E08AC` = 0, `0x800E08B0` = 0, `0x800E088C` = 0; level counters cleared again at the hand-over. Practice and VS player menus also offer pieces, layers, core area and rounds (above). |
@@ -119,4 +119,4 @@ All modes: `0x800DFD4C`, `0x8015D980`, `0x800DFD50`, `0x800DFD54` set to 1, the 
 - **Puzzle:** the puzzle number in the HUD's level badge and a purple border on the board (G).
 - **Hide & Seek:** goal pictures and goal text per stage; its own chapter counter.
 - **VS CPU:** two players' contexts, rounds, and the second player's settings above.
-- **Lines:** to describe (its rules screen is the game's own).
+- **Lines:** a rules screen in play before the first piece ("Lines Rules": line up three bricks across or down to remove them; clear enough of the core for the friend inside to escape).

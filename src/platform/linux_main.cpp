@@ -2882,12 +2882,13 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     }
     if (direct_wait) return;  // a direct start is already on its way
     if (!keep_music) end_track_override();
-    // Story, Training and Puzzle start directly, without the original menus, from the game's main
+    // Story, Training, Puzzle and Lines start directly, without the original menus, from the game's main
     // menu (docs/research/blockplanet-game-state.md, "Starting modes
     // directly"); BLOCKPLANET_LAUNCH=menus keeps the menu route.
     const bool training = mode == LaunchMode::TrainingBasics || mode == LaunchMode::TrainingAdvanced ||
                           mode == LaunchMode::TrainingPuzzle;
-    if ((mode == LaunchMode::Rescue || mode == LaunchMode::Puzzle || training) && direct_start::enabled() && game_option_applier && !launching() &&
+    if ((mode == LaunchMode::Rescue || mode == LaunchMode::Puzzle || mode == LaunchMode::Lines || training) &&
+        direct_start::enabled() && game_option_applier && !launching() &&
         guest::load16(guest_rdram, 0x800E121C) >= 0) {
         DirectStartRequest request;
         if (training) {
@@ -2895,9 +2896,11 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
             request.training_type = mode == LaunchMode::TrainingBasics ? 1 : mode == LaunchMode::TrainingAdvanced ? 2 : 3;
         } else {
             if (mode == LaunchMode::Puzzle) request.mode = DirectMode::Puzzle;
+            if (mode == LaunchMode::Lines) request.mode = DirectMode::Lines;
             request.chapter = game_option_applier->rescue_start_chapter() - 1;
             request.level = game_option_applier->rescue_start_level() - 1;
-            if (mode == LaunchMode::Puzzle) request.chapter = 0;  // the menus clear it; the puzzle is the level
+            if (mode != LaunchMode::Rescue) request.chapter = 0;  // the menus clear it (Puzzle: the puzzle is the level)
+            if (mode == LaunchMode::Lines) request.level = 0;
         }
         if (direct_start::request(request)) {
             direct_wait = DirectWait{mode, std::chrono::steady_clock::now()};
