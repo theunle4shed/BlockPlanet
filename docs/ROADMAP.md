@@ -97,11 +97,29 @@ Gameplay frames render an off-screen background layer at RDRAM `0x000400` with t
 - Are the backgrounds procedural, or stored animations?
 - How much of each frame's GPU time do they cost?
 
+**Found so far (2026-11-10, [research](research/blockplanet-play-backgrounds.md)):** each is a stored animation: a LightWave scene with one object, keyframed, played and looped in real time by the game's general model player. There are 25, picked per level by the mode's rule. They are not linked to the music. Still open: whether the swirl is the mesh moving or its textures (`BLOCKPLANET_BG_DL_LOG`), and the GPU cost.
+
 ### Music-reactive backgrounds, like a Winamp visualizer (M to L, after research)
 
 Analyze the audio the game outputs (BlockPlanet already receives every PCM buffer in `queue_audio`) with an FFT to get bass, mid and treble levels and beat detection. Then either:
 - **Drive the original backgrounds:** write those levels into the background's animation parameters each frame, if the research finds suitable ones. Original look, music-reactive.
 - **Add new backgrounds:** draw host-side shader backgrounds into the background layer. Fully new visuals, the most freedom, and the basis for user-made visualizers later.
+
+### Pinch mode: a background that reacts near game over (idea, research first, 2026-11-10)
+
+The owner's idea: when the player is close to losing, the background behaves differently or reacts.
+- **Triggers to consider:**
+  - the last heart (player context `0x80110220` + `0x2D7E`);
+  - the drop timer or shot time limit nearly run out (candidates `+0x3254` and `+0x3250`, from the direct-launch session's catalogue);
+  - the board close to its limit;
+  - any danger signal the original already gives (a music change, warning sound or HUD flash near game over), still to check.
+- **Reactions to consider:**
+  - a faster or slower background;
+  - a tint or pulse;
+  - a switch to another of the 25 backgrounds;
+  - a BlockPlanet overlay effect.
+
+See [the feasibility notes](research/blockplanet-play-backgrounds.md#pinch-mode-the-owners-idea-2026-11-10). Nothing is built until the owner decides.
 
 ### Your own music: MP3, OGG and FLAC (M)
 
