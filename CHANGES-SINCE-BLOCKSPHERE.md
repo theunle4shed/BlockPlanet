@@ -285,3 +285,6 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - Fixed: after Restart level (or Restart chapter) from the pause, Quit to menu left the pause menu on screen over the game's menu instead of going back to the menus the game was started from. The restart, which starts the mode again while the pause menu is still open, recorded the pause screen as the place to return to; a launch from the pause now keeps the earlier one.
 - Fixed: the HUD's Next pieces showed the wrong colours for three brick types: magenta bricks as red, pale lavender as purple, red as orange (from matching each stage's logged brick types to the board on the real game, 2026-11-10: 32 yellow, 33 blue, 34 green, 35 magenta, 36 pale lavender, 37 red).
+- Added `tools/audio/dcm_to_midi.py`, a research tool that converts the game's DCM1 songs from the player's own ROM into MIDI files (one track per voice) under `.local/`, and documented the song format in `docs/research/blockplanet-game-state.md`.
+- Added `tools/audio/dcm_render.py`, which renders the DCM1 songs with the game's own samples (from the player's ROM) to WAV files under `.local/`, and documented the sample bank format.
+- Menus: the panels and the dimming behind them are black instead of dark blue (the owner's choice), to sit better on the menu grid's and the game's different coloured backgrounds.
