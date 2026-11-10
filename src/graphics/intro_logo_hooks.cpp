@@ -205,3 +205,22 @@ extern "C" void blockplanet_logo_object_draw(std::uint8_t* rdram, std::uint32_t 
     }
     write_matrix(rdram, at, m);
 }
+
+// Research: BLOCKPLANET_MUSIC_LOG=1 logs each track the game starts
+// (func_8007F720: a0 track, a1 player) with the time, the intro's and title's
+// state and the logo's and intro scenes' frames.
+extern "C" void blockplanet_music_log(std::uint8_t* rdram, recomp_context* ctx) {
+    static const bool on = std::getenv("BLOCKPLANET_MUSIC_LOG") != nullptr;
+    if (!on) return;
+    const auto frame_of = [&](std::uint32_t pointer) {
+        const std::uint32_t scene = load32(rdram, pointer);
+        return (scene >> 24) == 0x80u ? static_cast<int>(load32(rdram, scene + 0x24u)) : -1;
+    };
+    std::fprintf(stdout,
+                 "{\"event\":\"music_start\",\"track\":%u,\"player\":\"0x%08X\",\"intro_done\":%d,\"title_done\":%d,"
+                 "\"logo_frame\":%d,\"intro_frame\":%d,\"timer\":%d}\n",
+                 static_cast<unsigned>(ctx->r4), static_cast<std::uint32_t>(ctx->r5), load16(rdram, 0x800E1648u),
+                 load16(rdram, 0x800E1646u), frame_of(logo_scene_pointer), frame_of(intro_scene_pointer),
+                 static_cast<int>(load32(rdram, 0x800E1208u)));
+    std::fflush(stdout);
+}

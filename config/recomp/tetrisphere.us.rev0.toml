@@ -487,6 +487,13 @@ func = "func_8002D93C"
 before_vram = 0x8002DEA0
 text = "blockplanet_model_draw_end(rdram, ctx);"
 
+# Research (src/graphics/intro_logo_hooks.cpp): each track the game starts
+# (func_8007F720: a0 track, a1 player), with the logo's and intro's frames
+# (BLOCKPLANET_MUSIC_LOG=1).
+[[patches.hook]]
+func = "func_8007F720"
+text = "blockplanet_music_log(rdram, ctx);"
+
 # The N64 logo opens with "NINTENDO64" already in place: after the scene's
 # keyframe step, before its matrices are built (src/graphics/intro_logo_hooks.cpp).
 [[patches.hook]]
