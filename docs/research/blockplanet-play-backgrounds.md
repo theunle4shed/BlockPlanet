@@ -255,6 +255,11 @@ A fast counter-spin around the viewer is the most likely thing in this design to
   - **Brick sky only**, for testing.
   - `BLOCKPLANET_BRICK_SKY=1` means only; `=mixed` means mixed.
   - For the owner to decide: whether one in four is right, and whether the setting moves to Options > Graphics once the experiment ends.
+- **Checked on the real game** (2026-11-10, the parent session):
+  - **Original** draws the game's own backgrounds, with no brick-sky lines at all in the log.
+  - **Mixed** at the first level of Story chapters 1 to 8 matched its log every time: the brick sky in 1:1 and the game's own background in 2:1 to 8:1. That is one in eight over that small sample.
+  - **Sphere** with the stage's colours, in Story 1:1 and 6:1: the sky has none of the board's colours.
+  - **Frame rate:** about 33–36 fps, the same as Cube.
 - **The stage's colours are followed as they change:** they are read at every draw, so a new level or chapter, with a new colour set at `0x8013D188`, changes the sky's colours at once.
 - **The Sphere layout** (the default since the owner's note, 2026-11-10: "it's cube shaped.. I was kinda hoping it could be constructed like the outside of our sphere"):
   - The sky is built like the play sphere's outside, seen from inside: 32 cells around at 11.25° (the board's cells), in 14 rows between 78.75° south and north, with the poles capped by a dark disc.
