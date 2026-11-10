@@ -155,6 +155,7 @@ ProfileSaveData profile_data;
 // leaves no progress, records or Continue checkpoint.
 std::optional<ProfileSaveData> sky_test_profile;
 bool sky_test_seen_play = false;
+int sky_test_variants[2] = {0, 0};  // play_variant and menu_variant before the run, put back after
 bool profile_recording = false;
 bool profile_dirty = false;
 // A Chapter 0 (a Training lesson) started from a chapter list: when it is
@@ -3590,8 +3591,14 @@ bool handle_profile_command(const std::string& command) {
                 // and nothing is saved meanwhile. Quit (or the stage's end)
                 // returns to the Sky test.
                 if (game_option_applier && !sky_test_profile) {
+                    // Trophy stats from earlier play are written now, so
+                    // nothing from before is saved during the run (the
+                    // periodic save would otherwise write them then).
+                    save_trophies();
                     sky_test_profile = profile_data;
                     sky_test_seen_play = false;
+                    sky_test_variants[0] = int(play_variant);
+                    sky_test_variants[1] = int(menu_variant);
                     tetrisphere::brick_sky::set_test_run(true);
                     continue_mode.reset();
                     single_stage = std::pair{1, 1};
@@ -3604,6 +3611,8 @@ bool handle_profile_command(const std::string& command) {
                     if (!mode_launcher.active()) {  // refused: nothing started
                         profile_data = *sky_test_profile;
                         sky_test_profile.reset();
+                        play_variant = PlayVariant(sky_test_variants[0]);
+                        menu_variant = PlayVariant(sky_test_variants[1]);
                         tetrisphere::brick_sky::set_test_run(false);
                         single_stage.reset();
                     }
@@ -3727,6 +3736,9 @@ bool handle_profile_command(const std::string& command) {
         // The Sky test's test stage ends once play has been left (Quit, or
         // the stage's end) and the game is back at its menus: the sky goes
         // off and the profile is put back as it was.
+        // During the run no trophy stats are counted (Casual turns awards
+        // off at launch; held off here throughout, whatever else changes).
+        if (sky_test_profile) trophy_engine().set_awards_enabled(false);
         if (sky_test_profile && guest_rdram != nullptr && !mode_launcher.active()) {
             const bool playing = guest::load16(guest_rdram, 0x800E121C) == -1;
             sky_test_seen_play = sky_test_seen_play || playing;
@@ -3735,6 +3747,16 @@ bool handle_profile_command(const std::string& command) {
                 profile_data = *sky_test_profile;
                 sky_test_profile.reset();
                 profile_dirty = false;
+                // Back to the variant the menus had (the run was Casual), and
+                // Casual's no-game-over and trophies as they are for that.
+                play_variant = PlayVariant(sky_test_variants[0]);
+                menu_variant = PlayVariant(sky_test_variants[1]);
+                single_stage.reset();
+                if (game_option_applier) {
+                    const bool casual = play_variant == PlayVariant::Casual;
+                    game_option_applier->set_menu_casual(casual);
+                    trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());
+                }
                 std::fprintf(stdout, "{\"event\":\"sky_test_stage_end\"}\n");
                 std::fflush(stdout);
             }

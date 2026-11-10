@@ -249,6 +249,9 @@ A fast counter-spin around the viewer is the most likely thing in this design to
 - It starts Story 1:1 as a single Casual stage (no game over, no trophies), with the brick sky on for that run only, whatever Play backgrounds says, using the screen's other settings.
 - The profile is copied first, nothing is saved during the run, and the copy is put back once play is left. So the run leaves no progress, records or Continue checkpoint. Any settings changed during the run are also undone.
 - Quit from the pause, or the stage's end, returns to the Sky test, and the sky is off again. The end is logged as `sky_test_stage_end`.
+- Fixed after the first check on the real game:
+  - Casual stayed chosen afterwards, so a normal Story 1:1 then showed "Casual" in the HUD. The menus' variant, and Casual's no-game-over and trophy states, are now put back when the run ends.
+  - Trophy stats were written during the run. They came from earlier play, which the periodic save wrote then. That earlier play is now saved as the run starts, and trophy counting is held off for the whole run.
 - It is started from the menus. Started from the pause's Options, it returns to the menus the game was first started from, as a restart does.
 
 - **Code:** `src/graphics/brick_sky.cpp` (`include/tetrisphere/brick_sky.h`), tested in `tests/brick_sky_test.cpp`. It is off unless turned on by `BLOCKPLANET_BRICK_SKY=1` or Options > **Sky test** > Brick sky (open from the pause's Options, then Resume to see it). `BLOCKPLANET_BRICK_SKY_SET="sky_spin=wild,sky_comfort=none"` sets the others for recordings. `BLOCKPLANET_BRICK_SKY_LOG=1` logs the sky's turn twice a second.
