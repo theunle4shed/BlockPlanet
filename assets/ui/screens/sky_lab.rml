@@ -14,6 +14,8 @@
         <div class="subtitle">An experiment, shown in play. Not saved: note the values you like.</div>
         <div class="item value" id="sky_on" data-setting="sky_on" data-description="Show the brick sky behind the sphere, in place of the game's own background."
              data-options="off:Off,on:On">Brick sky<span class="value"></span></div>
+        <div class="item value" id="sky_layout" data-setting="sky_layout" data-description="How the bricks are laid out: like the play sphere's outside (bricks of several shapes, 32 around), or six square faces."
+             data-options="sphere:Sphere,cube:Cube">Layout<span class="value"></span></div>
         <div class="item value" id="sky_spin" data-setting="sky_spin" data-description="How strongly the sky turns when the sphere turns. Still and Drift do not follow the sphere at all (for comfort)."
              data-options="still:Still,drift:Drift,gentle:Gentle,normal:Normal,wild:Wild">Spin<span class="value"></span></div>
         <div class="item value" id="sky_direction" data-setting="sky_direction" data-description="Turn against the sphere, or with it."

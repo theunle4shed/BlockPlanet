@@ -702,6 +702,10 @@ bool replaying_original = false;
 
 extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
     if (replaying_original) return false;
+    // Research: BLOCKPLANET_HIDE_SPHERE=1 draws no sphere at all (its
+    // quarters are skipped), for stills of the background alone.
+    static const bool hide = std::getenv("BLOCKPLANET_HIDE_SPHERE") != nullptr;
+    if (hide) return true;
     if (quadrant == 0) stats_sphere_begin(rdram);
     const Mode m = mode_for("quadrants");
     if (m == Mode::Original) return false;

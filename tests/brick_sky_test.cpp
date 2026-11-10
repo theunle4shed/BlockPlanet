@@ -4,6 +4,7 @@
 #include "tetrisphere/brick_sky.h"
 #include "tetrisphere/guest_memory.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -20,7 +21,7 @@ int main() {
     assert(brick_sky::set("sky_brightness", "55") && std::fabs(brick_sky::settings().brightness - 0.55f) < 1e-6f);
     assert(brick_sky::set("sky_on", "on") && brick_sky::settings().on);
     assert(!brick_sky::set("grid_theme", "blue"));
-    assert(brick_sky::values().size() == 7);
+    assert(brick_sky::values().size() == 8);
 
     // The angle step wraps at 16 bits.
     assert(brick_sky::angle_step(32760, -32766) == 10);
@@ -62,15 +63,48 @@ int main() {
     // The yaw stays wrapped.
     assert(m.yaw >= -3.1416f && m.yaw <= 3.1416f);
 
-    // The bricks lie on the sphere, eight vertices each.
-    const auto bricks = brick_sky::bricks(s);
-    assert(bricks.size() == std::size_t(6 * 8 * 8 * brick_sky::vertices_per_brick));
-    for (const auto& v : bricks) {
-        const double r = std::sqrt(double(v.x) * v.x + double(v.y) * v.y + double(v.z) * v.z);
-        assert(std::fabs(r - 1000.0) < 2.0);
+    // Both layouts lie on the sphere, eight vertices a cell.
+    for (const char* layout : {"cube", "sphere"}) {
+        s.layout = layout;
+        const auto sky = brick_sky::mesh(s);
+        assert(sky.vertices.size() == sky.cells() * brick_sky::vertices_per_cell);
+        for (const auto& v : sky.vertices) {
+            const double r = std::sqrt(double(v.x) * v.x + double(v.y) * v.y + double(v.z) * v.z);
+            assert(std::fabs(r - 1000.0) < 2.0);
+        }
+        // A brick's outer corners (mortar) are darker than its face.
+        const auto& v = sky.vertices;
+        assert(v[0].r + v[0].g + v[0].b < v[4].r + v[4].g + v[4].b);
     }
-    // A brick's outer corners (mortar) are darker than its face.
-    assert(bricks[0].r + bricks[0].g + bricks[0].b < bricks[4].r + bricks[4].g + bricks[4].b);
+    assert(brick_sky::cube_mesh(s).cells() == 6 * 8 * 8);
+    // The sphere: 32 x 14 cells, as the board's 11.25 degrees, and 32 cap cells at each pole.
+    const auto sphere = brick_sky::sphere_mesh(s);
+    assert(sphere.cells() == std::size_t(32 * 14 + 64));
+    {
+        // Its bricks are one to four cells, connected, and each cell's
+        // bevels are exactly its sides against another brick.
+        const auto brick = brick_sky::sphere_bricks();
+        const int bricks = *std::max_element(brick.begin(), brick.end()) + 1;
+        std::vector<int> size(std::size_t(bricks), 0);
+        for (const int b : brick) ++size[std::size_t(b)];
+        int multi = 0;
+        for (const int n : size) {
+            assert(n >= 1 && n <= 4);
+            multi += n > 1;
+        }
+        assert(multi > bricks / 2);  // mostly larger bricks, as on the board
+        const auto id = [&](int r, int c) { return r < 0 || r >= 14 ? -1 : brick[std::size_t(r * 32 + (c + 32) % 32)]; };
+        for (int r = 0; r < 14; ++r)
+            for (int c = 0; c < 32; ++c) {
+                const int me = id(r, c);
+                const std::uint8_t expect = std::uint8_t((id(r - 1, c) != me) | (id(r, c + 1) != me) << 1 | (id(r + 1, c) != me) << 2 |
+                                                         (id(r, c - 1) != me) << 3);
+                assert(sphere.bevels[std::size_t(r * 32 + c)] == expect);
+            }
+        // The middle row is on the equator's edge: latitude 0 at row 7's bottom.
+        assert(std::abs(sphere.vertices[std::size_t((7 * 32) * 8)].y) <= 1);
+    }
+    s.layout = "cube";
 
     // The display list fits, ends with G_ENDDL, and loads the game's
     // projection again at its end.
@@ -97,12 +131,16 @@ int main() {
         if (op == 0x01u && (w0 >> 16 & 1u)) last_projection = w1;
     }
     assert(ended && last_projection == 0x80123450u);
-    assert(vertex_loads == 6 * 8 * 8 / 2 + 2);  // two bricks a load, then the frame and the horizon
+    assert(vertex_loads == 6 * 8 * 8 / 2 + 2);  // two cells a load, then the frame and the horizon
     // At 21:9 the comfort frame reaches the picture's edges, past the 4:3 frame's.
     brick_sky::build(rdram.data(), s, m, 0, 0, 21.0f / 9.0f);
-    const std::uint32_t comfort = brick_sky::memory + 0x9000u + 16u * std::uint32_t(bricks.size());
+    const std::uint32_t comfort = brick_sky::memory + 0xB000u + 16u * std::uint32_t(brick_sky::cube_mesh(s).vertices.size());
     assert(load16(rdram.data(), comfort) == -280 && load16(rdram.data(), comfort + 16) == 280);
-    assert(triangles == 6 * 8 * 8 * brick_sky::triangles_per_brick + 8 + 2);
+    assert(triangles == int(brick_sky::cube_mesh(s).triangles()) + 8 + 2);
+    // The sphere layout fits too.
+    s.layout = "sphere";
+    assert(brick_sky::build(rdram.data(), s, m, 0, 0) != 0);
+    s.layout = "cube";
     // Stage contrast: the types the stage does not use, read from its records.
     {
         std::vector<std::uint8_t> ram(0x800000);
@@ -119,7 +157,7 @@ int main() {
         brick_sky::Settings st;
         st.colours = "stage";
         st.stage_types = used;
-        assert(!brick_sky::bricks(st).empty());
+        assert(brick_sky::mesh(st).cells() > 0);
         assert(brick_sky::set("sky_colours", "stage") && brick_sky::settings().colours == "stage");
     }
     std::puts("brick_sky ok");

@@ -234,6 +234,14 @@ A fast counter-spin around the viewer is the most likely thing in this design to
   - It is drawn at the background's slot (`blockplanet_draw_filter` on the background scene) as one `G_DL` into BlockPlanet's own list at `0x807E0000`–`0x807F8000`, where the title's own use is rebuilt each title frame. About 4,000 commands.
   - It has its own 4:3 perspective, opaque with no depth, and the game's projection is loaded again after.
   - For now the colours are BlockPlanet's own presets; reading the stage's colour set comes next.
+- **The Sphere layout** (the default since the owner's note, 2026-11-10: "it's cube shaped.. I was kinda hoping it could be constructed like the outside of our sphere"):
+  - The sky is built like the play sphere's outside, seen from inside: 32 cells around at 11.25° (the board's cells), in 14 rows between 78.75° south and north, with the poles capped by a dark disc.
+  - A seeded fill lays bricks of one to four cells over the cells, in the game's piece shapes (I, O, T, L, S, three in a line, a corner, two) with their turns, so the bricks have different shapes and sizes. The columns wrap; the rows don't.
+  - Each brick is one colour, with a bevel only along its own edges, and lighter towards its top.
+  - That is 512 cells of 8 vertices, with BlockPlanet's memory for the sky extended to `0x807FF000`.
+  - **The Cube layout** (6 × 8 × 8 square bricks) stays as an option.
+  - Still to do: the play sphere's own brick texture (the bricks are vertex-coloured for now), and the game's real brick shapes, which the type records may hold as 0/1 grids.
+  - `BLOCKPLANET_HIDE_SPHERE=1` hides the play sphere for stills of the sky alone.
 - **The test screen** (not saved; each change is logged as `brick_sky_settings`):
   - **Spin:** Still, Drift, Gentle 0.5, Normal 1.5, Wild 3 × the sphere's turn.
   - **Direction:** against or with the sphere.

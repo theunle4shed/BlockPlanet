@@ -402,6 +402,7 @@ int main(int argc, char** argv) {
             advance(now + 2.0);
             frame("grid_lab");
             navigator.set_setting("sky_on", "on");
+            navigator.set_setting("sky_layout", "sphere");
             navigator.set_setting("sky_spin", "gentle");
             navigator.set_setting("sky_direction", "against");
             navigator.set_setting("sky_fov", "70");

@@ -35,7 +35,7 @@ constexpr std::uint32_t sphere_angle_y = player_context + 0x2B46u;  // up and do
 
 constexpr std::uint32_t projection_matrix = memory, sky_matrix = memory + 0x40u;
 constexpr std::uint32_t flat_matrix = memory + 0x80u, identity_matrix = memory + 0xC0u;
-constexpr std::uint32_t commands_start = memory + 0x100u, commands_end = memory + 0x9000u;
+constexpr std::uint32_t commands_start = memory + 0x100u, commands_end = memory + 0xB000u;
 constexpr std::uint32_t vertices_start = commands_end;
 
 bool apply(Settings& s, const std::string& name, const std::string& value);
@@ -132,6 +132,9 @@ bool set(const std::string& name, const std::string& value) {
 namespace {
 bool apply(Settings& s, const std::string& name, const std::string& value) {
     if (name == "sky_on") s.on = value == "on";
+    else if (name == "sky_layout") {
+        if (value == "sphere" || value == "cube") s.layout = value;
+    }
     else if (name == "sky_spin") {
         if (value == "still" || value == "drift" || value == "gentle" || value == "normal" || value == "wild") s.spin = value;
     } else if (name == "sky_direction") s.against = value != "with";
@@ -150,6 +153,7 @@ bool apply(Settings& s, const std::string& name, const std::string& value) {
 std::vector<std::pair<std::string, std::string>> values() {
     const Settings s = settings();
     return {{"sky_on", s.on ? "on" : "off"},
+            {"sky_layout", s.layout},
             {"sky_spin", s.spin},
             {"sky_direction", s.against ? "against" : "with"},
             {"sky_fov", std::to_string(int(std::lround(s.fov_degrees)))},
@@ -188,7 +192,49 @@ void Motion::step(std::int16_t sphere_x, std::int16_t sphere_y, float seconds, c
     pitch = wrap(pitch + pitch_speed * dt);
 }
 
-std::vector<Vertex> bricks(const Settings& s, int per_face, float radius) {
+std::size_t Mesh::triangles() const {
+    std::size_t n = 0;
+    for (const auto bits : bevels) n += 2 + 2 * std::size_t(((bits >> 0) & 1) + ((bits >> 1) & 1) + ((bits >> 2) & 1) + ((bits >> 3) & 1));
+    return n;
+}
+
+namespace {
+constexpr float inset = 0.12f;  // the bevel's width, in a cell
+
+// Adds one cell: its outer corners (mortar), then its face's corners, inset
+// on its bevelled sides. `at(u, v)` places a point given in cell units;
+// `light(v)` is the face's light at a height in the cell (0 bottom, 1 top).
+template <typename At, typename Light>
+void add_cell(Mesh& mesh, const At& at, const Light& light, const Colour& base, float shade, std::uint8_t bevels) {
+    static const std::array<std::array<float, 2>, 4> corners{{{0, 0}, {1, 0}, {1, 1}, {0, 1}}};
+    for (int ring = 0; ring < 2; ++ring)
+        for (int c = 0; c < 4; ++c) {
+            const float cu = corners[std::size_t(c)][0], cv = corners[std::size_t(c)][1];
+            float u = cu, v = cv;
+            if (ring == 1) {
+                if (cu == 0 && (bevels & 8)) u = inset;
+                if (cu == 1 && (bevels & 2)) u = 1 - inset;
+                if (cv == 0 && (bevels & 1)) v = inset;
+                if (cv == 1 && (bevels & 4)) v = 1 - inset;
+            }
+            const auto p = at(u, v);
+            // The outer corners are mortar where a side is a brick's edge;
+            // inside a brick they carry the face's light.
+            const float l = ring == 0 && bevels != 0 ? 0.28f : light(v);
+            mesh.vertices.push_back({static_cast<std::int16_t>(std::lround(p[0])), static_cast<std::int16_t>(std::lround(p[1])),
+                                     static_cast<std::int16_t>(std::lround(p[2])), channel(base[0] * shade * l),
+                                     channel(base[1] * shade * l), channel(base[2] * shade * l), 0xFF});
+        }
+    mesh.bevels.push_back(bevels);
+}
+
+std::uint32_t next_random(std::uint32_t& state) {
+    state = state * 1664525u + 1013904223u;
+    return hash(state);
+}
+} // namespace
+
+Mesh cube_mesh(const Settings& s, int per_face, float radius) {
     struct Face { std::array<float, 3> n, u, v; };
     static const std::array<Face, 6> faces{{
         {{1, 0, 0}, {0, 0, -1}, {0, 1, 0}}, {{-1, 0, 0}, {0, 0, 1}, {0, 1, 0}},
@@ -196,40 +242,146 @@ std::vector<Vertex> bricks(const Settings& s, int per_face, float radius) {
         {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}}, {{0, 0, -1}, {-1, 0, 0}, {0, 1, 0}},
     }};
     const auto colours = palette(s.colours, s.stage_types);
-    const float step = (pi / 2.0f) / float(per_face), inset = 0.12f;
-    std::vector<Vertex> out;
-    out.reserve(std::size_t(6 * per_face * per_face * vertices_per_brick));
+    const float step = (pi / 2.0f) / float(per_face);
+    Mesh out;
     for (int f = 0; f < 6; ++f) {
         const Face& face = faces[std::size_t(f)];
-        const auto point = [&](float i, float j) {
-            // Equal angles across the face (as the menu grid's layout).
-            const float ta = std::tan(-pi / 4.0f + i * step), tb = std::tan(-pi / 4.0f + j * step);
-            std::array<float, 3> d{};
-            for (int c = 0; c < 3; ++c) d[std::size_t(c)] = face.n[std::size_t(c)] + ta * face.u[std::size_t(c)] + tb * face.v[std::size_t(c)];
-            const float l = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-            return std::array<float, 3>{d[0] / l * radius, d[1] / l * radius, d[2] / l * radius};
-        };
         for (int i = 0; i < per_face; ++i)
             for (int j = 0; j < per_face; ++j) {
+                const auto at = [&](float u, float v) {
+                    // Equal angles across the face (as the menu grid's layout).
+                    const float ta = std::tan(-pi / 4.0f + (float(i) + u) * step), tb = std::tan(-pi / 4.0f + (float(j) + v) * step);
+                    std::array<float, 3> d{};
+                    for (int c = 0; c < 3; ++c) d[std::size_t(c)] = face.n[std::size_t(c)] + ta * face.u[std::size_t(c)] + tb * face.v[std::size_t(c)];
+                    const float l = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+                    return std::array<float, 3>{d[0] / l * radius, d[1] / l * radius, d[2] / l * radius};
+                };
                 const Colour& base = colours[hash(std::uint32_t(f * 4099 + i * 131 + j)) % colours.size()];
                 const float shade = s.brightness * (0.85f + 0.3f * float(hash(std::uint32_t(f * 7919 + i * 31 + j * 17)) % 100) / 100.0f);
-                const std::array<std::array<float, 2>, 4> corners{{{0, 0}, {1, 0}, {1, 1}, {0, 1}}};
-                for (int ring = 0; ring < 2; ++ring)  // outer corners (mortar), then the brick's face
-                    for (int c = 0; c < 4; ++c) {
-                        const float ci = corners[std::size_t(c)][0], cj = corners[std::size_t(c)][1];
-                        const float pi_ = float(i) + (ring == 0 ? ci : inset + ci * (1.0f - 2.0f * inset));
-                        const float pj = float(j) + (ring == 0 ? cj : inset + cj * (1.0f - 2.0f * inset));
-                        const auto p = point(pi_, pj);
-                        // Mortar dark; the face lighter along its top edge, darker along its bottom.
-                        const float light = ring == 0 ? 0.28f : (cj > 0.5f ? 1.12f : 0.82f);
-                        out.push_back({static_cast<std::int16_t>(std::lround(p[0])), static_cast<std::int16_t>(std::lround(p[1])),
-                                       static_cast<std::int16_t>(std::lround(p[2])), channel(base[0] * shade * light),
-                                       channel(base[1] * shade * light), channel(base[2] * shade * light), 0xFF});
-                    }
+                add_cell(out, at, [](float v) { return v > 0.5f ? 1.12f : 0.82f; }, base, shade, 0xF);
             }
     }
     return out;
 }
+
+std::vector<int> sphere_bricks() {
+    // The game's pieces are one to four cells; these shapes (each with its
+    // turns) fill the grid at random, as a board's layers look. Columns
+    // wrap; rows do not.
+    using Shape = std::vector<std::array<int, 2>>;
+    static const std::vector<Shape> shapes = [] {
+        const std::vector<Shape> base{
+            {{0, 0}, {1, 0}, {2, 0}, {3, 0}},  // I
+            {{0, 0}, {1, 0}, {0, 1}, {1, 1}},  // O
+            {{0, 0}, {1, 0}, {2, 0}, {1, 1}},  // T
+            {{0, 0}, {1, 0}, {2, 0}, {2, 1}},  // L
+            {{0, 0}, {1, 0}, {1, 1}, {2, 1}},  // S
+            {{0, 0}, {1, 0}, {2, 0}},          // three in a line
+            {{0, 0}, {1, 0}, {1, 1}},          // a corner
+            {{0, 0}, {1, 0}},                  // two
+        };
+        std::vector<Shape> all;
+        for (const auto& shape : base)
+            for (int turn = 0; turn < 4; ++turn) {
+                Shape t;
+                for (const auto& [x, y] : shape) {
+                    int a = x, b = y;
+                    for (int k = 0; k < turn; ++k) {
+                        const int c = a;
+                        a = -b;
+                        b = c;
+                    }
+                    t.push_back({a, b});
+                }
+                // Anchored at its first cell in reading order (the fill's next free cell).
+                std::sort(t.begin(), t.end(), [](const auto& p, const auto& q) { return p[1] != q[1] ? p[1] < q[1] : p[0] < q[0]; });
+                const auto origin = t.front();
+                for (auto& p : t) p = {p[0] - origin[0], p[1] - origin[1]};
+                if (std::find(all.begin(), all.end(), t) == all.end()) all.push_back(t);
+            }
+        return all;
+    }();
+    const auto cell = [](int row, int col) { return std::size_t(row * sphere_columns + ((col % sphere_columns) + sphere_columns) % sphere_columns); };
+    std::vector<int> brick(std::size_t(sphere_columns * sphere_rows), -1);
+    std::uint32_t random = 0x5EEDu;
+    int next = 0;
+    for (int row = 0; row < sphere_rows; ++row)
+        for (int col = 0; col < sphere_columns; ++col) {
+            if (brick[cell(row, col)] >= 0) continue;
+            bool placed = false;
+            for (int attempt = 0; attempt < 8 && !placed; ++attempt) {
+                const auto& shape = shapes[next_random(random) % shapes.size()];
+                bool fits = true;
+                for (const auto& [dx, dy] : shape) {
+                    const int r = row + dy;
+                    if (r < 0 || r >= sphere_rows || brick[cell(r, col + dx)] >= 0) {
+                        fits = false;
+                        break;
+                    }
+                }
+                if (!fits) continue;
+                for (const auto& [dx, dy] : shape) brick[cell(row + dy, col + dx)] = next;
+                placed = true;
+            }
+            if (!placed) brick[cell(row, col)] = next;
+            ++next;
+        }
+    return brick;
+}
+
+Mesh sphere_mesh(const Settings& s, float radius) {
+    const auto colours = palette(s.colours, s.stage_types);
+    const float step = 2.0f * pi / float(sphere_columns);   // 11.25 degrees, as the board's cells
+    const float south = -float(sphere_rows) / 2.0f * step;  // -78.75 degrees
+    // A point at a column and row in cell units; rows below 0 and above the
+    // last are the poles.
+    const auto point = [&](float col, float row) {
+        const float lon = col * step;
+        const float lat = row < 0.0f ? -pi / 2 : row > float(sphere_rows) ? pi / 2 : south + row * step;
+        return std::array<float, 3>{radius * std::cos(lat) * std::sin(lon), radius * std::sin(lat), radius * std::cos(lat) * std::cos(lon)};
+    };
+    static const std::vector<int> brick = sphere_bricks();
+    const auto id = [&](int row, int col) {
+        if (row < 0 || row >= sphere_rows) return -1;
+        return brick[std::size_t(row * sphere_columns + ((col % sphere_columns) + sphere_columns) % sphere_columns)];
+    };
+    // Each brick's rows, so its light runs across the whole brick (lighter towards its top).
+    std::vector<std::array<int, 2>> rows(std::size_t(*std::max_element(brick.begin(), brick.end()) + 1), {sphere_rows, -1});
+    for (int r = 0; r < sphere_rows; ++r)
+        for (int c = 0; c < sphere_columns; ++c) {
+            auto& span = rows[std::size_t(id(r, c))];
+            span = {std::min(span[0], r), std::max(span[1], r)};
+        }
+    Mesh out;
+    for (int row = 0; row < sphere_rows; ++row)
+        for (int col = 0; col < sphere_columns; ++col) {
+            const int me = id(row, col);
+            const std::uint8_t bevels = std::uint8_t((id(row - 1, col) != me ? 1 : 0) | (id(row, col + 1) != me ? 2 : 0) |
+                                                     (id(row + 1, col) != me ? 4 : 0) | (id(row, col - 1) != me ? 8 : 0));
+            const Colour& base = colours[hash(std::uint32_t(me) * 2654435761u) % colours.size()];
+            const float shade = s.brightness * (0.85f + 0.3f * float(hash(std::uint32_t(me) + 977u) % 100) / 100.0f);
+            const auto span = rows[std::size_t(me)];
+            const float height = float(span[1] - span[0] + 1);
+            add_cell(out, [&](float u, float v) { return point(float(col) + u, float(row) + v); },
+                     [&](float v) { return 0.82f + 0.30f * (float(row - span[0]) + v) / height; }, base, shade, bevels);
+        }
+    // The poles: a dark disc each, 32 thin cells from the last row to the pole.
+    const Colour cap = colours.front();
+    for (int pole = 0; pole < 2; ++pole)
+        for (int col = 0; col < sphere_columns; ++col) {
+            const float ring = pole == 0 ? 0.0f : float(sphere_rows);
+            const float tip = pole == 0 ? -1.0f : float(sphere_rows) + 1.0f;
+            add_cell(out,
+                     [&](float u, float v) {
+                         const float r = pole == 0 ? (v < 0.5f ? tip : ring) : (v < 0.5f ? ring : tip);
+                         return point(float(col) + u, r);
+                     },
+                     [](float) { return 0.45f; }, cap, s.brightness, 0);
+        }
+    return out;
+}
+
+Mesh mesh(const Settings& s) { return s.layout == "cube" ? cube_mesh(s) : sphere_mesh(s); }
 
 std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std::uint32_t projection, int /*frame*/,
                     float picture_aspect) {
@@ -251,7 +403,7 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
     put_matrix(rdram, flat_matrix, flat);
     put_matrix(rdram, identity_matrix, id);
 
-    const auto sky = bricks(s);
+    const Mesh sky = mesh(s);
     std::vector<Vertex> comfort;
     const bool frame = s.comfort == "frame" || s.comfort == "both", horizon = s.comfort == "horizon" || s.comfort == "both";
     // The flat projection is the 4:3 frame's units (x 160 at its edge); an
@@ -270,10 +422,10 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
         for (const auto [x, y, a] : std::array<std::array<int, 3>, 4>{{{-half_w, 2, 60}, {half_w, 2, 60}, {half_w, -2, 60}, {-half_w, -2, 60}}})
             comfort.push_back({std::int16_t(x), std::int16_t(y), 0, 210, 220, 240, std::uint8_t(a)});
     }
-    const std::uint32_t vertex_bytes = std::uint32_t((sky.size() + comfort.size()) * 16u);
+    const std::uint32_t vertex_bytes = std::uint32_t((sky.vertices.size() + comfort.size()) * 16u);
     if (vertices_start + vertex_bytes > memory_end) return 0;
-    for (std::size_t k = 0; k < sky.size(); ++k) put_vertex(rdram, vertices_start + 16u * std::uint32_t(k), sky[k]);
-    const std::uint32_t comfort_start = vertices_start + 16u * std::uint32_t(sky.size());
+    for (std::size_t k = 0; k < sky.vertices.size(); ++k) put_vertex(rdram, vertices_start + 16u * std::uint32_t(k), sky.vertices[k]);
+    const std::uint32_t comfort_start = vertices_start + 16u * std::uint32_t(sky.vertices.size());
     for (std::size_t k = 0; k < comfort.size(); ++k) put_vertex(rdram, comfort_start + 16u * std::uint32_t(k), comfort[k]);
 
     std::uint32_t dl = commands_start;
@@ -298,15 +450,17 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
     cmd(0x01060040u, sky_matrix);         // modelview: load, push
     // Two bricks a vertex load: 16 vertices, 20 triangles. From the centre
     // of a sphere every direction meets it once, so no depth is needed.
-    const std::uint32_t brick_count = std::uint32_t(sky.size()) / vertices_per_brick;
-    for (std::uint32_t b = 0; b < brick_count; b += 2) {
-        const std::uint32_t n = std::min<std::uint32_t>(2, brick_count - b);
+    const std::uint32_t cell_count = std::uint32_t(sky.cells());
+    for (std::uint32_t b = 0; b < cell_count; b += 2) {
+        const std::uint32_t n = std::min<std::uint32_t>(2, cell_count - b);
         cmd(0x04000000u | ((n * 8u - 1u) << 20) | (n * 8u * 16u), vertices_start + b * 8u * 16u);
         for (std::uint32_t k = 0; k < n; ++k) {
             const std::uint32_t o = k * 8u, in = o + 4u;
+            const std::uint8_t bevels = sky.bevels[b + k];
             tri(in + 0, in + 1, in + 2);
             tri(in + 0, in + 2, in + 3);
             for (std::uint32_t c = 0; c < 4; ++c) {
+                if (!(bevels & (1u << c))) continue;
                 const std::uint32_t c1 = (c + 1) % 4;
                 tri(o + c, o + c1, in + c1);
                 tri(o + c, in + c1, in + c);

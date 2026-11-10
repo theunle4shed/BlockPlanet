@@ -17,6 +17,7 @@ namespace tetrisphere::brick_sky {
 
 struct Settings {
     bool on = false;
+    std::string layout = "sphere";   // sphere (built like the play sphere's outside) or cube
     std::string spin = "gentle";      // still, drift, gentle, normal, wild
     bool against = true;              // turn against the sphere (true) or with it
     float fov_degrees = 70.0f;        // the sky's field of view: wider looks further away
@@ -54,10 +55,31 @@ constexpr float max_speed = 3.14159265f;  // radians a second: half a turn
 inline int angle_step(std::int16_t from, std::int16_t to) { return std::int16_t(std::uint16_t(to) - std::uint16_t(from)); }
 
 struct Vertex { std::int16_t x, y, z; std::uint8_t r, g, b, a; };
-// The sky's bricks: six faces of `per_face` x `per_face`, each brick 8
-// vertices (its outer corners, dark like mortar, then its face's corners),
-// on a sphere of `radius`, seen from the inside.
-std::vector<Vertex> bricks(const Settings& s, int per_face = 8, float radius = 1000.0f);
+// The sky as cells of 8 vertices each: the cell's outer corners (dark, like
+// mortar), then its face's corners, inset on the sides that are a brick's
+// edge. `bevels` has a bit per cell side (0 bottom, 1 right, 2 top, 3 left)
+// that is a brick's edge, drawn as a bevel from the mortar to the face.
+struct Mesh {
+    std::vector<Vertex> vertices;
+    std::vector<std::uint8_t> bevels;
+    std::size_t cells() const { return bevels.size(); }
+    std::size_t triangles() const;
+};
+constexpr int vertices_per_cell = 8;
+// Cube: six faces of `per_face` x `per_face` square bricks, at equal angles.
+Mesh cube_mesh(const Settings& s, int per_face = 8, float radius = 1000.0f);
+// Sphere: built like the play sphere's outside, seen from inside. 32 cells
+// around (11.25 degrees, as the board) by 14 rows between 78.75 degrees
+// south and north, filled with bricks of several shapes (one to four cells,
+// as the game's pieces), each brick one colour with bevelled edges; the
+// poles capped with a dark disc of 32 cells each.
+Mesh sphere_mesh(const Settings& s, float radius = 1000.0f);
+constexpr int sphere_columns = 32, sphere_rows = 14;
+// The layout the settings choose.
+Mesh mesh(const Settings& s);
+// Which brick each cell of the sphere layout belongs to (row-major,
+// 32 x 14), from the same seeded fill.
+std::vector<int> sphere_bricks();
 
 // The six brick colours by type (0x20 .. 0x25), as the sky shows them.
 // PROVISIONAL: the game's six colours are blue, yellow, red, green, purple
@@ -70,13 +92,12 @@ std::vector<std::array<float, 3>> stage_contrast(const std::vector<int>& used);
 // and the brick-type records it points at (0x8013D188 on; each record's
 // second halfword is its type).
 std::vector<int> stage_brick_types(const std::uint8_t* rdram);
-constexpr int vertices_per_brick = 8;
-constexpr int triangles_per_brick = 10;
 
 // Guest memory BlockPlanet uses for the sky during play (above 4 MB, past
-// the title's own use, which is rebuilt each title frame).
+// the title's own use, which is rebuilt each title frame; the tail of the
+// extended sphere's second vertex buffer, reached only above ~120k vertices).
 constexpr std::uint32_t memory = 0x807E0000u;
-constexpr std::uint32_t memory_end = 0x807F8000u;
+constexpr std::uint32_t memory_end = 0x807FF000u;
 
 // Writes the sky's display list (its own projection and turn, the bricks,
 // then the comfort layer) into BlockPlanet's memory and returns its
