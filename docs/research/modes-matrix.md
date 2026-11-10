@@ -84,7 +84,7 @@ Each stage has a level record (L): 20 bytes, with flags, the playfield layers, b
 | Playfield layers | Level record byte 3 (L), copied to the level structure (`0x8013D170` + 0xC, `0x8013D17C`); the board has 9 layers of 32 × 32 cells (G, "Layers, core size and stacking") | Rescue: rises with the chapter (chapter 1 one layer above the core, chapter 10 up to six). Score Attack: 3 in the sphere records seen. Others: to read from their records | Yes (record) |
 | Block types | Block values in the board tables (`0x800E44D0`, 2 bytes per cell); colour count in the level record (L) | Rescue: colours rise with the chapter; special blocks (value 7, probably buried bonuses) from 1:2 on; the core is value 10 (L). Crystal pieces and power pieces exist (Training Advanced, manual). Per-mode use to catalogue | Yes (record) |
 | Objective | Mode code, plus the record's flags (`0x10`/`0x20` add goal text) and group byte (L) | Rescue: uncover an S × S square of the core (context `+0x23E4`). Time Trial: score in a clock. Puzzle: clear with limited moves. Hide & Seek: per-stage goals (MULTI, DRILL, core, SHIFT, CONNECT, TOWER, …). VS CPU: win the rounds. Lines: to describe | Yes (record) |
-| Single stage or episode | Mode; levels per chapter from `func_80089D04` (returns 5 for Rescue, 3 for Hide & Seek and VS CPU); chapter `0x800E44A0`, level context `+0x23BA` | Rescue: episodes of 10 levels (chapter-end menu after the tenth). Hide & Seek: its own chapter counter, not yet found. Puzzle: one puzzle after another (number in `+0x23BA`). Time Trial: spheres one after another until the clock ends | Per mode |
+| Single stage or episode | The level structure's `0x8013D260` (set from the level record by `func_80088914`, and by the VS CPU loader for its last opponent): when set, the level's end goes to the chapter-end sequence (`func_80070118` at `0x800714A4` → `func_8005907C`: the chapter-end menu and message scene) instead of the next level. Levels per chapter from `func_80089D04` (returns 5 for Rescue, 3 for Hide & Seek and VS CPU; meaning to confirm); chapter `0x800E44A0`, level context `+0x23BA` | Rescue: episodes of 10 levels (chapter-end menu after the tenth). Hide & Seek: its own chapter counter, not yet found. Puzzle: one puzzle after another (number in `+0x23BA`). Time Trial: spheres one after another until the clock ends | Per mode |
 | Background effect | The level structure's `0x8013D264` (set beside the song by the level set-up `func_800906E8`), read by `func_8006EE6C`: an index into two tables of asset ids (`0x800E2262`, `0x800E2296`) loaded for the backdrop; the current one is kept at `0x800E23BC`; 0 keeps the previous backdrop | Chosen by the same per-mode rule as the music (below) | Yes, by the mode's rule |
 | Default music | The level set-up `func_800906E8` (from `0x80090AC4`) picks the song into the level structure's `0x8013D266` by a per-mode rule (jump table `0x800F0F98`), then plays it if non-zero (otherwise the previous song goes on); the song playing is the music player `0x80107290` + `0x157C`. On a level's first set-up the player's Music setting overrides it (`0x800E0B20`: 1 Random, 2 Choose the track at `0x800E0B24`) | Rescue, Lines and the demo: by chapter (tables `0x800E94D8` song, `0x800E94C4` backdrop). Time Trial: fixed (`0x800E94A0`, `0x800E94A4`). Training: fixed (`0x800E9498`, `0x800E949C`). Puzzle: by group of ten puzzles (`0x800E9484`, `0x800E9470`, index = level counter ÷ 10). Hide & Seek: by the record's group byte (`0x8013D248`; `0x800E9540`, `0x800E9528`). VS CPU: by round (`0x800E9558` + 2 × level counter). Mode 7: fixed (`0x800E94A8`). Mode 12: fixed (`0x800E94BC`, `0x800E94C0`). Heard at the first level: Story 1, Training 11, Puzzle 3, Lines 1, Hide & Seek 1, VS 4 | Yes, by the mode's rule |
 | Hidden pictures | Hide & Seek's goal pictures (G, "Hide & Seek goals and their pictures") | Hide & Seek only | Yes |
@@ -96,6 +96,21 @@ Each stage has a level record (L): 20 bytes, with flags, the playfield layers, b
 | Friend inside | The rescued robot (Rescue's chapter-end scene); not yet located in memory | Rescue | Per chapter |
 | Playfield size and shape | Fixed: 9 layers × 32 × 32 cells round a sphere (G) | All modes | No (engine limit) |
 | Opponent intelligence | Not found yet. The computer is player 2: its robot is the level number (player 2's context `+0x3102`) and its name comes from the table at `0x800E08B4` by level; its skill is still to find, probably per level | VS CPU | Owner wants per stage |
+
+### Which level records each mode plays (2026-11-10)
+
+The loaders pass the level record number to `func_8002A870` (which reads the record; `func_80088914` copies it into the level structure at `0x8013D170`). In the loaders' numbering (the level-data tool numbers the same records 4 higher):
+
+| Mode | Record | So |
+| --- | --- | --- |
+| Rescue (and the demo, mode 8) | level + 10 × chapter | records 0–149: 15 chapters of 10 |
+| Lines | 100 + level + 10 × chapter | **the records of Rescue's chapters 11–15** |
+| VS CPU | 150 + level | 7 opponents (records 150–156); the 7th (record 156) also sets the episode-end flag `0x8013D260` |
+| Time Trial | 157 + level | records 157 on (the "probably Score Attack" group of the level-data notes) |
+| Hide & Seek | 192 + level + 30 × chapter (`0xC0`, `0xDE`, `0xFC` … per chapter) | 5 chapters of 30 (records 192–341) |
+| Puzzle, Training | no level record: their boards come from their own data | |
+
+So a stage's layers, colours, core opening, goal text and episode end are already per stage in the original; the per-mode rules (music, backdrop, drop timer) are in the code.
 
 ### Each mode's level loader
 
