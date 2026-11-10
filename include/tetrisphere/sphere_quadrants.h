@@ -23,6 +23,12 @@ enum class Quadrant { RowsUpColumnsUp, RowsDownColumnsUp, RowsUpColumnsDown, Row
 // functions in the same order.
 void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant);
 
+// The Escape view (research, include/tetrisphere/escape_view.h): every cell
+// of the game's patch drawn by the inner face of its first block above the
+// core, through the game's own cell setup, per-block setup and inner-face
+// routine. The camera is set around it.
+void draw_inside(std::uint8_t* rdram, recomp_context* ctx);
+
 class ExtendedSphere;
 // The same for the extended patch: cells from -ring to 14 + ring, set up from
 // `sphere` instead of the game's tables (see sphere_extended.h).

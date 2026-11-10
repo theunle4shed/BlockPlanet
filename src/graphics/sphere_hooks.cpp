@@ -711,7 +711,13 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
     // (src/graphics/escape_view.cpp) in place of the sphere.
     if (tetrisphere::escape_view::enabled()) {
         static bool drawn = false;
-        if (quadrant == 0) drawn = tetrisphere::escape_view::draw(rdram);
+        if (quadrant == 0) {
+            drawn = tetrisphere::escape_view::begin(rdram);
+            if (drawn) {
+                draw_inside(rdram, ctx);
+                tetrisphere::escape_view::end(rdram);
+            }
+        }
         if (drawn) return true;
     }
     if (quadrant == 0) stats_sphere_begin(rdram);
