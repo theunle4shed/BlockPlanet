@@ -3799,20 +3799,22 @@ bool handle_profile_command(const std::string& command) {
         // The menu grid (docs/UI.md, Menu grid) over the game's own pause
         // animations, in the pause's colours: from the Start press that
         // pauses (before the game's own fade and tiles show), while paused,
-        // and after Resume until the game's screen fade (0x800E1202, 255 while
-        // paused) is clear and a moment more (BLOCKPLANET_GRID_RESUME_MS,
-        // default 200); and after Quit until BlockPlanet's menus open again.
-        // Measured on the test machine (2026-11-09): after Resume the fade is
-        // clear within about 0.4 s, then the game flies its own pause tiles
-        // out over the play field for about 1.3 s before the pause row
-        // 0x800E1228 clears. Those tiles are not drawn (set_pause_exit_hidden,
-        // the owner found waiting for them slow), so the grid leaves as soon
-        // as the fade is clear. BLOCKPLANET_GRID_RESUME=row waits for the row
-        // instead, with the game's tiles drawn (then 450 ms), for comparison.
+        // and after Resume until the pause row 0x800E1228 clears and a moment
+        // more (BLOCKPLANET_GRID_RESUME_MS, default 450); and after Quit until
+        // BlockPlanet's menus open again. Measured on the test machine
+        // (2026-11-09): after Resume the game's screen fade (0x800E1202, 255
+        // while paused) is clear within about 0.4 s, then the game flies its
+        // own pause tiles out over the play field for about 1.3 s before the
+        // row clears, so Resume takes about 2 s (the owner finds it slow).
+        // Research: BLOCKPLANET_GRID_RESUME=fade leaves once the fade is clear
+        // and skips the pause background helper after Resume
+        // (set_pause_exit_hidden); that helper is not where the game's pause
+        // tiles are drawn (recorded 2026-11-10: they still fly out after our
+        // grid), so it waits for the row until they are found.
         {
             static const bool after_row = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME");
-                return text != nullptr && std::string(text) == "row";
+                return text == nullptr || std::string(text) != "fade";
             }();
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
