@@ -111,7 +111,9 @@ The background reacts when the player is close to losing. Research and notes onl
 - **The game's own sequence player:** the N64 audio library's sequence player has a run-time tempo (`alSeqpSetTempo` in libaudio), so if the game's music is sequenced, its tempo can be raised a little, with the pitch unchanged. It needs the game's player found, and to check that the tempo isn't re-set each beat.
 - **BlockPlanet's audio output** (`queue_audio`): a time-stretch of the mixed output. It is harder to keep clean, and it would also stretch the effects.
 
-The first is the natural one if the music is sequenced (the roadmap's BGM research asks the same). This is presentation only: `AGENTS.md` forbids changing the original's audio pitch or timers, and a tempo change in a pinch is an added effect, so it needs the owner's explicit choice and an option to turn it off.
+The first is the natural one if the music is sequenced (the roadmap's BGM research asks the same).
+
+**On game over** (the owner, 2026-11-10): the original fades the music out and plays its game-over sound, the sound of the black bricks encasing the sphere. So pinch mode's faster music must hand over cleanly to that fade, not fight it: it stops changing the tempo as soon as the game-over sequence starts (hearts at -1, `docs/research/blockplanet-game-state.md`, game over), and leaves the fade and the sound to the game. This is presentation only: `AGENTS.md` forbids changing the original's audio pitch or timers, and a tempo change in a pinch is an added effect, so it needs the owner's explicit choice and an option to turn it off.
 
 All of these are presentation only. None changes the game's rules or timers (`AGENTS.md`: the original's simulation speed, timers and audio pitch stay as they are).
 
@@ -191,7 +193,7 @@ So the camera sits inside a huge sphere made of bricks, seen from the inside lik
 
 - So the sphere's turn is an (x, y) pair of angles at `+0x2B42` and `+0x2B46`, about 256 per cell, both with the game's easing.
 - The skybox's angular velocity is the per-frame change of both, each taken modulo 65,536.
-- Not yet seen: whether the vertical turn wraps or stops. The run reached 15 cells. A longer hold of up would tell.
+- **The vertical turn wraps, as the horizontal does** (2026-11-10, up held 6 s): `+0x2B46` climbed smoothly from 128 to 13,169 (about 1.6 turns) with no stop; the target cell counted on to 51 and the cell shown wrapped at 32. There are no poles: both angles are treated the same way.
 - Other values also change while the sphere turns: floats at `0x8010C874`, `0x8010C8A0` and `0x8010C8CC` (camera or lighting?), and `0x801270F0` onwards, which is the board's mesh table being rebuilt. They are not needed here.
 
 ### A contrasting colour set
