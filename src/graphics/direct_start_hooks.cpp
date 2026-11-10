@@ -509,6 +509,7 @@ using namespace tetrisphere;
 constexpr std::uint32_t buttons = 0x800DFD98u;          // the title's buttons word
 constexpr std::uint32_t menu_idle_since = 0x800E1214u;  // u32: the menu timer at the last input
 constexpr std::uint32_t demo_running = 0x800E11F8u;     // u16: another attract path (not the demos)
+constexpr std::uint32_t demo_count = 0x800E14A0u;      // s16: the main menu's demos started
 constexpr std::uint32_t save_read = 0x800DF770u;        // u8: the save has been read (the title waits for it)
 constexpr std::uint16_t button_a = 0x8000u, button_b = 0x4000u, button_start = 0x1000u;
 
@@ -577,8 +578,25 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
         // the menu starts its demo itself (func at 0x8004FB3C: mode 10, or 3
         // every sixth time, then its grid flies out), as after sitting idle.
         if (phase == box_art::Phase::ToDemo && load16(rdram, title_done) == 1 && load16(rdram, main_row) >= 0 &&
-            load16(rdram, submenu_row) < 0)
+            load16(rdram, submenu_row) < 0) {
             store32(rdram, menu_idle_since, load32(rdram, menu_timer_a) - 32000u);
+            // Every sixth demo (0x800E14A0 a multiple of 6) would be the
+            // Training one (mode 3), which leaves for the game's main menu
+            // half a second after it starts instead of playing; the next
+            // count is used instead, so the demo is always the game's own (BLOCKPLANET_TRAINING_DEMO=1 keeps it).
+            const std::int16_t count = load16(rdram, demo_count);
+            static const bool training_demo = std::getenv("BLOCKPLANET_TRAINING_DEMO") != nullptr;
+            if (count % 6 == 0 && !training_demo) store16(rdram, demo_count, static_cast<std::int16_t>(count + 1));
+        }
+        // After a demo the game's main menu (rather than its title): back to
+        // the box art at once, before the game's own grid can fly in.
+        if (phase == box_art::Phase::Demo && load16(rdram, title_done) == 1 && load16(rdram, main_row) >= 0 &&
+            !title_restart.load()) {
+            title_restart.store(true);
+            box_art::phase().store(box_art::Phase::None);  // the restart is under way (once)
+            std::fprintf(stdout, "{\"event\":\"box_art_demo_to_menu\"}\n");
+            std::fflush(stdout);
+        }
         return;
     }
     // On the box art.
