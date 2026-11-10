@@ -655,8 +655,13 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
     elif name == "rt64_workload_queue.cpp":
         source = replace_once(source, "#include \"rt64_workload_queue.h\"\n",
                               "#include \"rt64_workload_queue.h\"\n"
-                              "#include \"tetrisphere/full_frame_target_height.h\"\n\n"
+                              "#include \"tetrisphere/full_frame_target_height.h\"\n"
+                              "#include \"tetrisphere/intro_cover.h\"\n\n"
                               + PAUSE_SNAPSHOT_INCLUDE)
+        source = replace_once(source,
+            "                workloadConfig.aspectRatioTarget = std::max(derivedRatioTarget, workloadConfig.aspectRatioSource);",
+            "                workloadConfig.aspectRatioTarget = tetrisphere::expand_aspect_target(derivedRatioTarget, workloadConfig.aspectRatioSource,\n"
+            "                    tetrisphere::intro_cover_active().load(std::memory_order_relaxed));")
         source = replace_once(source, "namespace RT64 {\n", "namespace RT64 {\n" + PAUSE_SNAPSHOT_HELPER)
         source = replace_once(source,
             "                    nativeColorHeight = fbPair.drawColorRect.bottom(true);",

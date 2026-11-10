@@ -322,6 +322,7 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/f3d_flat_shade.h
     include/tetrisphere/menu_medal_trace.h
     include/tetrisphere/full_frame_target_height.h
+    include/tetrisphere/intro_cover.h
     include/tetrisphere/pause_capture_scene.h
     include/tetrisphere/prompt_atlas.h
     include/tetrisphere/training_prompts.h

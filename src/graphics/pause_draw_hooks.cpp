@@ -28,6 +28,7 @@
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/recomp_support.h"
+#include "tetrisphere/intro_cover.h"
 
 #include <atomic>
 #include <chrono>
@@ -134,6 +135,15 @@ void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
 }
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    // Portrait windows: the intro zooms to cover (tetrisphere/intro_cover.h).
+    // BLOCKPLANET_INTRO_COVER=0 keeps the letterbox.
+    static const bool intro_cover = [] {
+        const char* v = std::getenv("BLOCKPLANET_INTRO_COVER");
+        return v == nullptr || std::string(v) != "0";
+    }();
+    if (intro_cover)
+        tetrisphere::intro_cover_active().store(guest16(rdram, 0x800E1648u) == 0 && guest16(rdram, 0x800E1646u) == 0,
+                                                std::memory_order_relaxed);
     // Story hides its score (decided 2026-11-08): the game's score bubbles
     // that rise over breaking bricks (its "1x" to "20x" pictures, 25 to 27
     // by 17) are not drawn there.

@@ -298,3 +298,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-10: The intro on every window shape, step 1: no tiled backdrop
 
 - The intro's tiled backdrop behind the N64 logo (one small 320 × 240 picture of Nintendo and H2O logos, which blurs when enlarged) is no longer drawn, as the owner chose; a plain white fill of the whole frame takes its place, so the logo still stands on white, and wider windows are white to their edges. The game used that picture to clear each frame, so without the fill the logo left trails. The fade from white into the intro scenes is unchanged. `BLOCKPLANET_INTRO_BACKDROP=1` keeps the original for comparison. Checked at 16:9, 21:9 and 4:3.
+
+## 2026-11-10: The intro on every window shape, step 2: portrait windows
+
+- In portrait (tall) windows the intro, from the N64 logo to the title, now fills the window's height and crops its sides ("zoom to cover", the owner's choice) instead of sitting in a small 4:3 band. The title and everything after it keep the letterbox. Landscape windows are unchanged. RT64 is patched at build time (`tools/build/patch_rt64_probe.py`, new `include/tetrisphere/intro_cover.h`) so that its Expand mode may take the window's narrower shape while the game is in its intro. `BLOCKPLANET_INTRO_COVER=0` keeps the letterbox. Checked at 450 × 800 against the letterbox.
