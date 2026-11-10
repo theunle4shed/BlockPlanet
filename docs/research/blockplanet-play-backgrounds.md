@@ -162,6 +162,18 @@ So the camera sits inside a huge sphere made of bricks, seen from the inside lik
 - The skybox's angular velocity is then −k × the sphere's angular velocity, k being the strength, plus a slow drift of its own so it is never still. The angular velocity is the per-frame change, wrapped at 32 cells.
 - The skybox is smoothed with a critically damped spring, so it starts and stops softly and never snaps. "High spins" means k well above 1, for example 2 to 4 times the sphere's speed, for the owner's trippy look.
 
+Candidates (2026-11-10, five RAM dumps in Story 1:1: two idle, three while holding left 0.6 s apart). These are halfwords of player 1's context (`0x80110220`) that stay fixed while idle and change while the sphere spins:
+
+| Offset | Idle, idle, spinning × 3 | Guess |
+| --- | --- | --- |
+| `+0x24C4`, `+0x24D4` | 0, 0, 12, 18, 24 | The cell position around the sphere: about 10 cells a second. The wrap at 32 is not yet seen |
+| `+0x2458` | 0, 0, 5, 6, 1 | A sub-cell phase or a small counter |
+| `+0x2B1A`, `+0x2B22` | 0, 0, 3, 9, 16 | Per-axis speed or acceleration? |
+| `+0x2B2A`, `+0x2B32` | 0, 0, 5, 12, 18 | The same? |
+| `+0x2B42`, `+0x2B4A` | 128, 128, 860, 2537, 4253 | A continuous accumulator, about 2,800 a second: the best input for a smooth counter-spin if it is an angle |
+
+Still to do: a per-frame watch on these while holding left, then right, up and down, then releasing. That would separate the axes, show the direction signs and the wrap, and show whether a value is a position or a speed (a speed falls back to 0 on release).
+
 ### A contrasting colour set
 
 - The stage's brick colours are known at level set-up. Byte 14 of the level record, the colour set, picks entries of the six-entry colour table at `0x800E4508` into `0x8013D188` onwards. The number of colours is at `0x8013D186` (`docs/research/blockplanet-level-data.md`).
