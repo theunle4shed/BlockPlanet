@@ -294,6 +294,20 @@ body.credits .hint { margin-top: 28dp; text-align: center; }
 body.centred #panel { left: 50%; margin-left: -360dp; top: 26vh; }
 body.centred .hint { display: block; margin-top: 20dp; }
 
+/* Who is playing? and the main menu share one panel (the owner's request,
+   2026-11-10): the same place, size and heading, so going from one to the
+   other changes the panel's contents instead of bringing in a new panel. */
+@keyframes swap {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+}
+body.shared.entering #panel, body.shared.returning #panel { animation: 0.12s cubic-out swap; }
+body.shared .hint { display: block; margin-top: 20dp; }
+/* Taller than wide: the shared panel fits the window's width. */
+@media (orientation: portrait) {
+    body.shared #panel { left: 4vw; width: 92vw; }
+}
+
 /* Menu icons (the owner's request): Lucide's line icons (ISC, licenses/),
    in the item's own colour, before its label. */
 .item .icon { font-family: lucide; font-weight: normal; font-style: normal; font-size: 0.9em;
