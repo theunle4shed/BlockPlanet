@@ -47,5 +47,10 @@ void cancel();
 // BLOCKPLANET_LAUNCH=menus forces the original menus (ModeLauncher).
 bool enabled();
 
+// Plays the game's intro again from its start (then its title), as at boot,
+// without restarting the game: for Back from "Who is playing?". Done by the
+// game's thread at its next frame outside play; ignored during play.
+void request_intro_restart();
+
 } // namespace direct_start
 } // namespace tetrisphere

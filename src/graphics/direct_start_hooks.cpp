@@ -73,6 +73,10 @@ constexpr std::uint32_t training_jump = 0x800DFE8Cu;  // u8: the game's own Trai
 constexpr std::uint32_t title_done = 0x800E1646u;      // u16: 0 while the intro and title run
 constexpr std::uint32_t title_exits = 0x800E16B8u;     // s16: counted by the title at each exit
 constexpr std::uint32_t title_left = 0x800E16B4u;      // s16: set when the title hands over
+constexpr std::uint32_t intro_done = 0x800E1648u;      // u16: 0 while the intro (func_80067798) plays
+constexpr std::uint32_t title_phase = 0x800E1650u;     // u32: the title's phase
+constexpr std::uint32_t arena_top = 0x800F22C0u;       // the scene memory's next free address
+constexpr std::uint32_t intro_arena_mark = 0x801028D0u;  // where the intro started it (and the title rewinds to)
 constexpr std::uint32_t jingle_player = 0x80109DC0u;
 constexpr std::uint32_t effects_player = 0x8010B358u;
 constexpr std::uint32_t menu_scene_copy = 0x800F22C0u;  // set from 0x801028D0 at the title's exit
@@ -153,6 +157,7 @@ constexpr std::uint32_t training_cleared_a = 0x800E076Cu;
 constexpr std::uint32_t training_cleared_b = 0x800E4480u;
 
 std::mutex mutex;
+std::atomic<bool> intro_restart{false};
 std::optional<DirectStartRequest> waiting;
 std::optional<direct_start::Result> outcome;
 
@@ -434,6 +439,8 @@ void cancel() {
     }
 }
 
+void request_intro_restart() { intro_restart.store(true); }
+
 bool enabled() {
     static const bool on = [] {
         const char* value = std::getenv("BLOCKPLANET_LAUNCH");
@@ -448,6 +455,28 @@ bool enabled() {
 extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace tetrisphere;
     using namespace tetrisphere::guest;
+    // Back to the intro (Back from "Who is playing?"): as at boot, the intro's
+    // scene memory rewound to where it started it, the intro, title and their
+    // counters from the start, no menu open and no grid; then the loop goes
+    // on into the intro this same frame.
+    if (intro_restart.load() && load16(rdram, main_row) >= 0) {
+        intro_restart.store(false);
+        store32(rdram, arena_top, load32(rdram, intro_arena_mark));
+        store16(rdram, intro_done, 0);
+        store16(rdram, title_done, 0);
+        store32(rdram, title_phase, 0);
+        store16(rdram, title_exits, 0);
+        store16(rdram, title_left, 0);
+        store32(rdram, menu_timer_a, 0);
+        store32(rdram, menu_timer_b, 0);
+        store32(rdram, 0x800E1210u, 0);
+        for (std::uint32_t row = main_row; row <= 0x800E1236u; row += 2) store16(rdram, row, -1);
+        store16(rdram, main_row, 0);
+        store16(rdram, page_exit, 0);
+        clear_menu_presentation(rdram);
+        std::fprintf(stdout, "{\"event\":\"intro_restart\"}\n");
+        std::fflush(stdout);
+    }
     std::lock_guard lock(mutex);
     if (!waiting) return;
     const auto request = *waiting;

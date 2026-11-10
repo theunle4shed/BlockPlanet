@@ -287,3 +287,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-10: Fixes
 
 - Fixed: after Restart level (or Restart chapter) from the pause, Quit to menu left the pause menu on screen over the game's menu instead of going back to the menus the game was started from. The restart, which starts the mode again while the pause menu is still open, recorded the pause screen as the place to return to; a launch from the pause now keeps the earlier one.
+
+## 2026-11-10: Title flow, step 1: Back from "Who is playing?" plays the intro again
+
+- Back from "Who is playing?" no longer restarts the game: the game's intro (the N64 logo and the intro scenes) and title play again in place, then "Who is playing?" opens again after the title, as at start-up (the owner's request: intro, profile select, menu; no menu item relaunches the game). Done on the game's thread like the direct starts (`direct_start::request_intro_restart`), with the intro's scene memory rewound to where it started it, so nothing is lost however often it is done.

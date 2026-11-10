@@ -2193,6 +2193,11 @@ struct DirectWait {
 };
 std::optional<DirectWait> direct_wait;
 bool launching() { return mode_launcher.active() || direct_wait.has_value(); }
+// Back from "Who is playing?" plays the game's intro again (no relaunch); the
+// menus then wait for the title as at boot: first for the old title to go,
+// then for it to be shown again.
+bool title_seen = false;
+bool title_restart_pending = false;
 
 // BlockPlanet's pause menu over the game's pause.
 PauseBridge pause_bridge;
@@ -2999,9 +3004,17 @@ bool handle_profile_command(const std::string& command) {
         blockplanet::ui::request_close();  // the picker opens in its place
         return true;
     }
-    // The original menu has no way back to the title, so the game restarts
-    // (the intro plays again; Start skips it) as the same profile.
-    if (command == "back_to_title") restart_as(std::nullopt, guest_session);
+    // Back to the intro, as at boot, without restarting the game (the owner's
+    // request, 2026-11-10): the game's thread plays the intro again, and
+    // "Who is playing?" opens again after the title.
+    if (command == "back_to_title") {
+        profile_picked = false;
+        title_seen = false;
+        title_restart_pending = true;
+        blockplanet::ui::request_close();
+        tetrisphere::direct_start::request_intro_restart();
+        return true;
+    }
     if (command == "profiles") {
         blockplanet::ui::set_list("profiles", profile_list(store, guest_session, !profile_picked));
         blockplanet::ui::request_show("profiles");
@@ -3775,9 +3788,12 @@ bool handle_profile_command(const std::string& command) {
             static const bool original_menus = std::getenv("BLOCKPLANET_ORIGINAL_MENUS") != nullptr;
             // Only once the title has been shown: before it (the logo
             // animation) the menu row already reads as a menu.
-            static bool title_seen = false;
             const bool title_now = blockplanet_title_recent(nullptr);
-            title_seen = title_seen || title_now;
+            if (title_restart_pending) {
+                if (!title_now) title_restart_pending = false;  // the old title has gone
+            } else {
+                title_seen = title_seen || title_now;
+            }
             if (credits_pending && title_now && guest_rdram != nullptr) {
                 credits_pending = false;
                 guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x800E122E, 0);
