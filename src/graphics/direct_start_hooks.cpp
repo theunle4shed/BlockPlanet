@@ -60,6 +60,7 @@ void func_8007AEE0(std::uint8_t* rdram, recomp_context* ctx);
 void func_80066E40(std::uint8_t* rdram, recomp_context* ctx);
 void func_80066DB8(std::uint8_t* rdram, recomp_context* ctx);
 void func_80066F18(std::uint8_t* rdram, recomp_context* ctx);
+void func_80067434(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace tetrisphere {
@@ -511,6 +512,7 @@ using namespace tetrisphere;
 constexpr std::uint32_t buttons = 0x800DFD98u;          // the title's buttons word
 constexpr std::uint32_t menu_idle_since = 0x800E1214u;  // u32: the menu timer at the last input
 constexpr std::uint32_t demo_running = 0x800E11F8u;     // u16: another attract path (not the demos)
+constexpr std::uint32_t save_check_done = 0x800E160Cu;  // u32: the intro has run the start-up save check
 constexpr std::uint32_t demo_count = 0x800E14A0u;      // s16: the main menu's demos started
 constexpr std::uint32_t save_read = 0x800DF770u;        // u8: the save has been read (the title waits for it)
 constexpr std::uint16_t button_a = 0x8000u, button_b = 0x4000u, button_start = 0x1000u;
@@ -535,8 +537,21 @@ double attract_seconds() {
     return seconds;
 }
 
-void end_intro_now(std::uint8_t* rdram) {
+// The intro's end, done early (the box art's hand-over and the Start skip).
+// Near its end the intro runs the game's start-up save check once
+// (func_80067434, at 0x8006839C and 0x800684F0, flagged at 0x800E160C): a
+// new or damaged save is given the game's defaults there, its high-score
+// tables among them. Ending the intro before it ran left those tables all
+// zeros, so a score of 0 made a new high score and game over went to the
+// SCORES name entry instead of the end menu. It is run here as the intro
+// would.
+void end_intro_now(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace tetrisphere::guest;
+    if (load32(rdram, save_check_done) == 0) {
+        store32(rdram, save_check_done, 1);
+        store32(rdram, 0x800E1658u, load32(rdram, menu_timer_a));
+        call(func_80067434, rdram, ctx);
+    }
     store32(rdram, menu_timer_a, 0);
     store32(rdram, menu_timer_b, 0);
     store16(rdram, intro_done, 1);
@@ -564,13 +579,13 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
         std::fflush(stdout);
     }
     if (intro && box_art::handover_pending().exchange(false)) {
-        end_intro_now(rdram);  // the hand-over asked for in the intro's last frame (box_art_hooks.cpp)
+        end_intro_now(rdram, ctx);  // the hand-over asked for in the intro's last frame (box_art_hooks.cpp)
         return;
     }
     if (intro) {
         on_box_art = false;
         if ((pressed & (button_a | button_start)) != 0 && load8(rdram, save_read) != 0) {
-            end_intro_now(rdram);
+            end_intro_now(rdram, ctx);
             std::fprintf(stdout, "{\"event\":\"box_art_skip\"}\n");
             std::fflush(stdout);
         }
