@@ -123,6 +123,25 @@ constexpr std::int16_t mode_time_trial = 2;
 constexpr std::int16_t mode_puzzle = 4;
 constexpr std::int16_t mode_lines = 9;
 constexpr std::int16_t mode_hide_and_seek = 5;
+constexpr std::int16_t mode_vs_cpu = 6;
+// Versus against the computer: after its confirm the mode list opens the
+// players page (0x800E122A = 0, func_80050BFC), which sets up both players
+// and starts the game itself.
+constexpr std::uint32_t players_page = 0x800E122Au;
+constexpr std::uint32_t pause_row = 0x800E1228u;
+constexpr std::uint32_t extra_row = 0x800E1226u;
+constexpr std::uint32_t kept_next_level = 0x800E123Eu;  // the next level, kept across the new game
+constexpr std::uint32_t two_humans = 0x800E088Cu;
+constexpr std::uint32_t player_index_1 = 0x800E0B10u;
+constexpr std::uint32_t player_index_2 = 0x800E0B14u;
+constexpr std::uint32_t player_index_next = 0x800E0B18u;
+constexpr std::uint32_t players_count = 0x800E0B0Cu;
+constexpr std::uint32_t p2_port = 0x80116588u;       // player 2's context + 0x3100
+constexpr std::uint32_t p2_character = 0x8011658Au;  // + 0x3102: the computer's robot, from the level
+constexpr std::uint32_t p2_extra = 0x8011658Bu;      // + 0x3103: 1 for the computer
+constexpr std::uint32_t p2_name = 0x80116590u;       // + 0x3108
+constexpr std::uint32_t opponent_names = 0x800E08B4u;  // u32 per level: the computer's name
+constexpr std::uint32_t music_player_jingle_a = 0x80108828u;
 constexpr std::int16_t mode_training = 3;
 // Training.
 constexpr std::uint32_t training_type = 0x800E44ACu;  // 1 Basics, 2 Advanced, 3 Puzzle
@@ -163,6 +182,7 @@ const char* mode_name(const DirectStartRequest& request) {
     case DirectMode::Puzzle: return "puzzle";
     case DirectMode::Lines: return "lines";
     case DirectMode::HideAndSeek: return "hide_and_seek";
+    case DirectMode::Versus: return "versus";
     }
     return "";
 }
@@ -234,6 +254,66 @@ void close_all_rows(std::uint8_t* rdram) {
     for (std::uint32_t row = main_row; row <= 0x800E1236u; row += 2) store16(rdram, row, -1);
 }
 
+// Versus: the mode list opens the players page (0x80046604: 0x800E122A = 0,
+// the name copied to 0x800E0784, the timers cleared); the page's opening for
+// Versus with one human (func_80050BFC from 0x80050D1C; its scenes and grid
+// left out), its A press (0x80052D38, the sound left out) and its hand-over
+// (0x80051B60).
+void versus_players_page(std::uint8_t* rdram, recomp_context* ctx) {
+    for (std::uint32_t i = 0; i < 9; ++i) store8(rdram, name_copy + i, load8(rdram, name + i));
+    store32(rdram, menu_timer_a, 0);
+    store32(rdram, menu_timer_b, 0);
+    // Opening.
+    store8(rdram, 0x80102688u, 0);
+    store8(rdram, 0x80102690u, 0);
+    store32(rdram, 0x800E1018u, 0);
+    store32(rdram, player_index_1, 0);
+    store32(rdram, player_index_2, 1);
+    store32(rdram, players_count, 2);
+    store16(rdram, level_count, 0);
+    store16(rdram, next_level, 0);
+    store32(rdram, player_index_next, 1);
+    store32(rdram, 0x801026A8u, 0xFFFFFFFFu);
+    store32(rdram, 0x801026ACu, 1);
+    const std::uint32_t index = load32(rdram, player_index_1);
+    store8(rdram, p1_port, load8(rdram, port_source + index));
+    store8(rdram, p2_port, 0xFF);  // the computer
+    store8(rdram, p1_character, load8(rdram, character_source + index));
+    store8(rdram, p2_character, static_cast<std::uint8_t>(load16(rdram, next_level)));
+    store8(rdram, p1_extra, load8(rdram, extra_source + index));
+    store8(rdram, p2_extra, 1);
+    store32(rdram, p1_name, name_copy + 9 * index);
+    const std::int16_t opponent = load16(rdram, chapter) < 3 ? load16(rdram, next_level) : 7;
+    store32(rdram, p2_name, load32(rdram, opponent_names + 4u * static_cast<std::uint32_t>(opponent)));
+    store32(rdram, 0x800E1210u, 0);
+    store16(rdram, page_exit, 0);
+    for (const std::uint32_t player : {load32(rdram, player_index_1), load32(rdram, player_index_2)}) {
+        const std::uint32_t entry = name_copy + 9 * player;
+        if (load8(rdram, entry) != 0) continue;
+        const char default_name[] = "PLAYER ";
+        for (std::uint32_t i = 0; i < 7; ++i) store8(rdram, entry + i, static_cast<std::uint8_t>(default_name[i]));
+        store8(rdram, entry + 7, static_cast<std::uint8_t>('1' + player));
+        store8(rdram, entry + 8, 0);
+    }
+    // A pressed.
+    call(func_8007ADF8, rdram, ctx, music_player_jingle_a);
+    call(func_8007ADF8, rdram, ctx, jingle_player);
+    store8(rdram, 0x8010B34Au, 0);
+    store8(rdram, 0x80109DB2u, 0);
+    call(func_8007AEE0, rdram, ctx, effects_player);
+    // The hand-over, once the grid has gone.
+    clear_menu_presentation(rdram);
+    store16(rdram, pause_row, -1);
+    store16(rdram, players_page, -1);
+    close_menus(rdram);
+    store16(rdram, extra_row, -1);
+    store16(rdram, kept_next_level, load16(rdram, next_level));
+    store16(rdram, new_game_flag, 1);
+    call(func_800CC6E0, rdram, ctx);
+    store16(rdram, next_level, load16(rdram, kept_next_level));
+    store16(rdram, level_count, load16(rdram, kept_next_level));
+}
+
 // A mode from the Single page's mode list (Rescue, Puzzle; Time Trial and
 // Lines to follow), as the player page and its mode list do it. Returns false
 // when the menus would not have started it the usual way.
@@ -255,7 +335,8 @@ bool start_single(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
 
     // 1. The mode page's confirm, on the mode's row.
     const std::int16_t row = mode_number == mode_rescue ? 0 : mode_number == mode_hide_and_seek ? 1
-                           : mode_number == mode_puzzle ? 2 : mode_number == mode_time_trial ? 3 : 5;
+                           : mode_number == mode_puzzle ? 2 : mode_number == mode_time_trial ? 3
+                           : mode_number == mode_vs_cpu ? 4 : 5;
 
     store16(rdram, mode_row_memory, row);
     store16(rdram, flag_a, 1);
@@ -268,6 +349,16 @@ bool start_single(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
     store16(rdram, chapter, 0);
     store16(rdram, mode, mode_number);
     if (mode_number == mode_lines) store16(rdram, flag_a, 2);
+    if (mode_number == mode_vs_cpu) {  // the confirm's two-player settings (0x800463C4)
+        store16(rdram, 0x800E44A4u, 1);
+        store16(rdram, flag_b, 2);
+        store16(rdram, 0x801125F6u, 1);  // player 1's context + 0x23D6
+        store16(rdram, 0x8011585Eu, 0);  // player 2's
+        store16(rdram, 0x800E08A8u, 1);
+        store16(rdram, 0x800E08ACu, 0);
+        store16(rdram, 0x800E08B0u, 0);
+        store32(rdram, two_humans, 0);
+    }
     store16(rdram, level_count, 0);
     store16(rdram, next_level, 0);
     store16(rdram, chapter, 0);
@@ -288,6 +379,12 @@ bool start_single(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
     // level itself, so it is noted only.
     if (mode_number != mode_time_trial && (load16(rdram, level_count) > 0 || load16(rdram, stage_count) > 0 || load16(rdram, saved_page_flag) != 0))
         log("note", request, "saved_progress_page_skipped");
+
+    if (mode_number == mode_vs_cpu) {
+        versus_players_page(rdram, ctx);
+        log("started", request);
+        return true;
+    }
 
     // 2. The player page's hand-over, with the grid gone as after its fly-out.
     clear_menu_presentation(rdram);
@@ -399,6 +496,7 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
     case DirectMode::Puzzle: started = start_single(rdram, ctx, request, mode_puzzle); break;
     case DirectMode::Lines: started = start_single(rdram, ctx, request, mode_lines); break;
     case DirectMode::HideAndSeek: started = start_single(rdram, ctx, request, mode_hide_and_seek); break;
+    case DirectMode::Versus: started = start_single(rdram, ctx, request, mode_vs_cpu); break;
     case DirectMode::Training: started = start_training(rdram, ctx, request); break;
     }
     finish(started ? direct_start::Result::Started : direct_start::Result::Refused);

@@ -95,7 +95,7 @@ Each stage has a level record (L): 20 bytes, with flags, the playfield layers, b
 | Score and speed goals | Time Trial clock context `+0x2B0C`: starts at 18,059 frames (about 5:01) in mode 2 and counts down; modes 4, 5 and 7 count up (G, "The original Time Trial's clock") | Time Trial: clock and sphere bonus (`func_800C7C90`). Others: to find | Per mode so far |
 | Friend inside | The rescued robot (Rescue's chapter-end scene); not yet located in memory | Rescue | Per chapter |
 | Playfield size and shape | Fixed: 9 layers × 32 × 32 cells round a sphere (G) | All modes | No (engine limit) |
-| Opponent intelligence | Not found yet. VS CPU's start sets player 2 settings (below) | VS CPU | Owner wants per stage |
+| Opponent intelligence | Not found yet. The computer is player 2: its robot is the level number (player 2's context `+0x3102`) and its name comes from the table at `0x800E08B4` by level; its skill is still to find, probably per level | VS CPU | Owner wants per stage |
 
 ### What the mode page sets per mode (D)
 
