@@ -48,7 +48,7 @@ So the frame it plays comes from a counter plus a per-frame step, and the animat
 ## Still open
 
 - **Mesh motion or texture motion?** The swirl and colour shifts seen in play may be keyframed object motion (the tunnel turning and scaling) or the object's own material or texture data. To tell them apart: take two RT64 inspector frames about 1 s apart in Story 1:1. Compare the first draws, before the sphere: vertex positions, tile offsets (`uls`/`ult`), and whether a TLUT is loaded and changes between the frames.
-- **Is it music-driven?** `docs/REDESIGN.md` calls the backgrounds music-driven. In the driver above, the frame advances by the counter and step only, with no sign of the music. To check, read where `0x80160C64` is written.
+- ~~Is it music-driven?~~ **No** (2026-11-10). The step `0x80160C64` is set by the frame loop `func_800CC6E0` (at `0x800CCF28`–`0x800CCF90`), just before each call to `func_80070118`, from `0x800E4484`, the count of video retraces since the last game frame (reset each loop, 1 at start; capped at 5 in Puzzle, mode 4). So the background plays its keyframes at a fixed speed in real time, with no link to the music. A music-driven background would be BlockPlanet's own addition: for example, the frame passed at `0x80071BA0` scaled by the audio level or tempo.
 - The texture sizes and formats in the 25 objects; Hide & Seek's extra handling.
 
 ## Feasibility (2026-11-10)
