@@ -106,7 +106,7 @@ All modes: `0x800DFD4C`, `0x8015D980`, `0x800DFD50`, `0x800DFD54` set to 1, the 
 | Rescue (1) | None. With saved progress the game opens another page first (`0x800E1232`). |
 | Hide & Seek (5) | None at the confirm; its own page follows the hand-over (`0x800E1234`). |
 | Lines (9) | `0x800DFD4C` = 2 (meaning unknown). |
-| Puzzle (4) | None. |
+| Puzzle (4) | None at the confirm. The puzzle number is the level (`0x800E449C` before the set-up, context `+0x23BA`); the chapter stays 0. Every mode's row is also saved (`0x80102B07`, from the mode page's row memory `0x800E0756`). |
 | Time Trial (2) | None at the confirm; skips the saved-progress check. |
 | VS CPU (6) | `0x800E44A4` = 1, `0x8015D980` = 2, player 1 context `+0x23D6` = 1, player 2 context `+0x23D6` = 0, `0x800E08A8` = 1, `0x800E08AC` = 0, `0x800E08B0` = 0, `0x800E088C` = 0; level counters cleared again at the hand-over. Practice and VS player menus also offer pieces, layers, core area and rounds (above). |
 | Training (3) | From the Training page: training type `0x800E44AC` (1 Basics, 2 Advanced, 3 Puzzle), player 1's port from the first connected controller, `0x80113323` = 0 (1 marks the attract demo), the name at `0x800ECC4C`, character 4, and bit 0 of the save's first byte set and written. The game's own jump (`0x800DFE8C`, from a game over) sets `0x800DFDFC` = 1 and another name instead. |

@@ -106,6 +106,9 @@ constexpr std::uint32_t extra_source = 0x800E07E4u;      // s8
 constexpr std::uint32_t name = 0x800E13C8u;              // the player's name (9 bytes)
 constexpr std::uint32_t name_copy = 0x800E0784u;  // also where the save's name is read
 constexpr std::uint32_t name_cursor = 0x800E13C0u;
+// The mode list's row, kept by the mode page in its row memory (0x800E0754 +
+// 2) and saved by func_80065660 into the save (0x80102B07): the mode last chosen.
+constexpr std::uint32_t mode_row_memory = 0x800E0756u;
 constexpr std::uint32_t p1_port = 0x80113320u;
 constexpr std::uint32_t p1_character = 0x80113322u;
 constexpr std::uint32_t p1_extra = 0x80113323u;
@@ -116,6 +119,9 @@ constexpr std::uint32_t new_game_flag = 0x801125C6u;
 constexpr std::uint32_t after_new_game = 0x80112D18u;
 
 constexpr std::int16_t mode_rescue = 1;
+constexpr std::int16_t mode_time_trial = 2;
+constexpr std::int16_t mode_puzzle = 4;
+constexpr std::int16_t mode_lines = 9;
 constexpr std::int16_t mode_training = 3;
 // Training.
 constexpr std::uint32_t training_type = 0x800E44ACu;  // 1 Basics, 2 Advanced, 3 Puzzle
@@ -153,6 +159,7 @@ const char* mode_name(const DirectStartRequest& request) {
     switch (request.mode) {
     case DirectMode::Rescue: return "rescue";
     case DirectMode::Training: return "training";
+    case DirectMode::Puzzle: return "puzzle";
     }
     return "";
 }
@@ -216,9 +223,10 @@ bool start_training(std::uint8_t* rdram, recomp_context* ctx, const DirectStartR
     return true;
 }
 
-// Story (Rescue). Returns false (nothing written) when the menus would not
-// have started it the usual way.
-bool start_rescue(std::uint8_t* rdram, recomp_context* ctx, const DirectStartRequest& request) {
+// A mode from the Single page's mode list (Rescue, Puzzle; Time Trial and
+// Lines to follow), as the player page and its mode list do it. Returns false
+// when the menus would not have started it the usual way.
+bool start_single(std::uint8_t* rdram, recomp_context* ctx, const DirectStartRequest& request, std::int16_t mode_number) {
     // 0. The player page's opening: the player's name.
     call(func_800656C8, rdram, ctx);
     if (load8(rdram, name_copy) == 0) {
@@ -234,7 +242,10 @@ bool start_rescue(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
     }
     store32(rdram, name_cursor, 0);
 
-    // 1. The mode page's confirm.
+    // 1. The mode page's confirm, on the mode's row.
+    const std::int16_t row = mode_number == mode_rescue ? 0 : mode_number == mode_puzzle ? 2
+                           : mode_number == mode_time_trial ? 3 : 5;
+    store16(rdram, mode_row_memory, row);
     store16(rdram, flag_a, 1);
     store16(rdram, flag_b, 1);
     store16(rdram, flag_c, 1);
@@ -243,7 +254,8 @@ bool start_rescue(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
     store16(rdram, next_level, 0);
     store16(rdram, stage_count, 0);
     store16(rdram, chapter, 0);
-    store16(rdram, mode, mode_rescue);
+    store16(rdram, mode, mode_number);
+    if (mode_number == mode_lines) store16(rdram, flag_a, 2);
     store16(rdram, level_count, 0);
     store16(rdram, next_level, 0);
     store16(rdram, chapter, 0);
@@ -259,9 +271,10 @@ bool start_rescue(std::uint8_t* rdram, recomp_context* ctx, const DirectStartReq
         log("refused", request, "save_check");
         return false;
     }
-    // With saved progress Rescue opens another original page first
-    // (0x800E1232); BlockPlanet chooses the chapter itself, so it is noted only.
-    if (load16(rdram, level_count) > 0 || load16(rdram, stage_count) > 0 || load16(rdram, saved_page_flag) != 0)
+    // With saved progress the mode list opens another original page first
+    // (0x800E1232; not for Time Trial); BlockPlanet chooses the chapter and
+    // level itself, so it is noted only.
+    if (mode_number != mode_time_trial && (load16(rdram, level_count) > 0 || load16(rdram, stage_count) > 0 || load16(rdram, saved_page_flag) != 0))
         log("note", request, "saved_progress_page_skipped");
 
     // 2. The player page's hand-over, with the grid gone as after its fly-out.
@@ -369,7 +382,8 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
     }
     bool started = false;
     switch (request.mode) {
-    case DirectMode::Rescue: started = start_rescue(rdram, ctx, request); break;
+    case DirectMode::Rescue: started = start_single(rdram, ctx, request, mode_rescue); break;
+    case DirectMode::Puzzle: started = start_single(rdram, ctx, request, mode_puzzle); break;
     case DirectMode::Training: started = start_training(rdram, ctx, request); break;
     }
     finish(started ? direct_start::Result::Started : direct_start::Result::Refused);
