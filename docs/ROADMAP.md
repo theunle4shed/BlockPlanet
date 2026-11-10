@@ -125,6 +125,18 @@ See [the feasibility notes](research/blockplanet-play-backgrounds.md#pinch-mode-
 
 The owner's idea: the background turns against the sphere's spin, or with it. Today it does not react at all: measured in Story 1:1, it changes no more while the sphere spins than when idle. The background would follow the sphere's rotation (the board's view position plus the sub-cell rotation used by `func_800ADD6C`, addresses still to name), applied as a rotation of the background's matrices at its draw (`0x80071BA0`), extra animation speed, or a shift of the background layer. See [the notes](research/blockplanet-play-backgrounds.md#counter-motion-the-owners-second-idea-2026-11-10). Nothing is built until the owner decides.
 
+### Brick skybox background (design idea, research first, 2026-11-10)
+
+The owner's design: "inside a sphere (just a skybox) and high spins counter to the play sphere. Bricks would need to be different colours to the current stage." The camera sits inside a huge sphere of bricks that spins fast against the play sphere's rotation, in the colours the stage does not use (darkened), so the board stays readable.
+
+The sketch:
+- BlockPlanet generates the brick sphere and draws it in the game's background slot (`0x80071BA0`), with the game's brick texture read at run time.
+- It is driven by the sphere's rotation, as in counter-motion.
+- It comes with a strength setting (off, gentle, normal, wild) and a reduced-motion option.
+- Medium effort.
+
+See [the sketch](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10). It waits for the owner's approval.
+
 ### Your own music: MP3, OGG and FLAC (M)
 
 Play music files from the player's device instead of, or alongside, the game's soundtrack: silence the game's music channels, keep sound effects, and mix the decoded file into the output. Public-domain decoders such as `dr_mp3`, `dr_flac` and `stb_vorbis` fit the GPL license. Needs: a music folder setting, playlist and shuffle options, and the jukebox menu. Works well with the visualizer, which reacts to whatever is playing.

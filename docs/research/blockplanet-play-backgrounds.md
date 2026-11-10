@@ -134,4 +134,68 @@ The background changes no more while the sphere spins than when idle. It follows
   - It must stay comfortable to watch, so it needs an option to turn it off or down.
   - Presentation only: the game's rotation and timing are untouched.
 
+## Brick skybox: the owner's design idea (2026-11-10)
+
+In the owner's words: "Imagine this for a trippy background.. inside a sphere (just a skybox) and high spins counter to the play sphere. Bricks would need to be different colours to the current stage."
+
+So the camera sits inside a huge sphere made of bricks, seen from the inside like a skybox. It spins fast against the play sphere's rotation, and its bricks use colours the current stage does not, so the board stays readable. **A sketch for the owner to approve; nothing is built.**
+
+### Recommended: (a) BlockPlanet builds the brick sphere and draws it in the background's place
+
+- **Where it draws:** in the background's own slot, the call at `0x80071BA0`. When the brick skybox is chosen, BlockPlanet skips the game's scene draw there and appends its own F3D commands to the game's display list instead (the next free command at `0x800F22B4`). This is how BlockPlanet already adds its title ring (`src/graphics/title_hooks.cpp`) and how it draws the board's faces (`src/graphics/sphere_faces.cpp`). Because it is the background's slot, it lands in the off-screen background layer, and the sphere, pieces and magic are drawn over it as now. No depth problems arise with the board.
+- **The mesh:** BlockPlanet's own, generated, so it is ours and can be committed:
+  - a sphere of brick-shaped quads seen from inside (faces wound inwards), for example 32 around by 16 high, like the board's grid;
+  - each brick slightly inset with a bevel, so it reads as bricks and not a smooth ball, with the grid's lighting cues (a lighter top edge, a darker bottom edge) in its vertex colours;
+  - the menu grid's equal-angle patch layout (`src/ui/ui_grid.cpp`) is the starting point, mirrored to face inwards.
+- **Brick texture:** the game's own brick texture, already loaded in memory during play (the board's faces use it, through the per-block texture coordinates at `0x8015EDA8`). It is read at run time, never copied into Git. The ROM marble the menu grid uses is an alternative. Either way the colour comes from the vertex colours, so one texture serves any colour set.
+- **Its own camera:** its own projection and an identity modelview with our rotation, pushed and popped, then the game's projection put back, as the title ring does.
+
+### Other options
+
+- **(b) The game's board mesh, inverted and scaled up:** the board's mesh (`func_800ADD6C`'s 16 × 16 patch table) covers only the half of the sphere facing the camera and is rebuilt as the board turns. Turned inside out, it would need the whole sphere and its own rotation, so it ends up a new mesh anyway, with the game's builder in the way. Not recommended.
+- **(c) The game's background scene, recoloured:** keep one of the 25 scenes and change its lights' colours and rotation. It is cheap, but it is still the tunnel, not a brick sphere. It could serve as the reduced-motion fallback (below).
+- **(d) Drawn outside the game, in RT64 or under the frame:** the most freedom (shaders), but our drawing would have to sit behind the game's 3D. That means renderer changes, against a slot the game already gives us. Not needed for this design.
+
+### Spin source
+
+- The play sphere turns as the board moves under a fixed view. Its rotation is the board's view position (32 cells around, plus rows) together with the sub-cell rotation `func_800ADD6C` uses. The addresses are still to name: a `BLOCKPLANET_WATCH` on the player context while holding left and then up will find them.
+- The skybox's angular velocity is then −k × the sphere's angular velocity, k being the strength, plus a slow drift of its own so it is never still. The angular velocity is the per-frame change, wrapped at 32 cells.
+- The skybox is smoothed with a critically damped spring, so it starts and stops softly and never snaps. "High spins" means k well above 1, for example 2 to 4 times the sphere's speed, for the owner's trippy look.
+
+### A contrasting colour set
+
+- The stage's brick colours are known at level set-up. Byte 14 of the level record, the colour set, picks entries of the six-entry colour table at `0x800E4508` into `0x8013D188` onwards. The number of colours is at `0x8013D186` (`docs/research/blockplanet-level-data.md`).
+- The skybox takes **the colours the stage does not use**: a stage uses two to four of the six, so two to four remain. The game's own brick colours are read at run time.
+- They are darkened and slightly desaturated, for example to 40 to 60 % brightness, so the background never competes with the board.
+- If a stage were ever to use all six, the skybox would fall back to a hue rotated half way round the colour wheel from the stage's average.
+- A colour-blind check is to do: the stage's colours and the skybox's should differ in brightness, not only in hue.
+
+### Performance
+
+- The mesh has 32 × 16 = 512 bricks: about 1,000 triangles and 2,048 vertices. That is 128 `G_VTX` loads of 16, a few thousand commands. The game's own background is 260 commands, and the board draws several thousand triangles a frame, so this is the same order of work. It is trivial for RT64 on the test machine, but it should be measured before and after, as `AGENTS.md` asks.
+- The vertices only need building once. Each frame changes only the rotation matrix, plus the vertex colours if they pulse. So the per-frame CPU cost is one matrix and a copy of the command list.
+- Only the inner half facing the camera needs drawing, so about half the bricks can be culled.
+
+### Motion comfort
+
+A fast counter-spin around the viewer is the most likely thing in this design to make people feel sick. The plan:
+- **A strength setting** (Options): off, gentle, normal, wild. "Wild" is the owner's high spin. The default should be gentle until it has been tried by several people.
+- **A reduced-motion option:** the skybox does not counter-spin. It drifts slowly at a fixed speed, or holds still. It also follows the system's reduced-motion setting where one is available.
+- **Caps:**
+  - a top angular speed, so even wild stays below roughly half a turn a second;
+  - no sudden starts: the spring above;
+  - no flashing above 3 Hz, if pulses are added for pinch mode.
+- **Readability:** keep the skybox dim and low in contrast, keep the play sphere's silhouette clear, and keep the stage's colours out of it.
+
+### Effort and risk
+
+- **Effort:** medium:
+  - the mesh and its commands (adapted from the title ring's and the menu grid's code);
+  - the hook that skips the game's draw at `0x80071BA0`;
+  - the spin source (a watch, then a few reads);
+  - the colour choice;
+  - the options.
+- **Risk:** low to medium. The draw slot is known and the drawing technique is already in use. The open points are the spin-source addresses and how the off-screen background layer treats a full sphere's worth of draws.
+- It could share code with pinch mode (pulses, tints) and with counter-motion (the same rotation input).
+
 A note on ownership: backgrounds BlockPlanet draws itself (the last row) would be entirely BlockPlanet's own art and code, so they could be committed. Changes to the original ones must keep using the player's ROM at run time.
