@@ -222,9 +222,9 @@ std::string hud_material_colour(int material) {
     case 32: return "#e8c020";  // yellow
     case 33: return "#3050d8";  // blue
     case 34: return "#30b048";  // green
-    case 35: return "#d83838";
-    case 36: return "#a048d8";
-    case 37: return "#f08020";
+    case 35: return "#c838c0";  // magenta
+    case 36: return "#9880e0";  // pale lavender
+    case 37: return "#d83838";  // red
     default: return "#a0a0a0";
     }
 }
@@ -2887,7 +2887,11 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
         static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
                                       "Training", "Training", "Puzzle Training"};
         loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
-        if (const auto path = blockplanet::ui::menu_path(); !path.empty()) launch_path = path;
+        // A restart from the pause keeps the menus the game was first
+        // started from: the pause screen is not a place to come back to.
+        if (const auto path = blockplanet::ui::menu_path();
+            !path.empty() && std::none_of(path.begin(), path.end(), [](const auto& s) { return s.first == "pause"; }))
+            launch_path = path;
         loading_since = std::chrono::steady_clock::now();
         loading_active = true;
     }
