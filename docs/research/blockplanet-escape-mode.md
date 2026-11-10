@@ -70,12 +70,19 @@ Effort: medium (a few hooks, one matrix rebuilt per frame). Risk: medium, mostly
 
 ### Not yet found (what step 2 still needs from the game)
 
-These three would come from write watches on the real game, as the pause flag was found:
+These three come from write watches on the real game, as the pause flag was found (the first two are found, below):
 1. **The landing routine:** a write watch on the block values under the cursor's column during a drop. It names the function that searches the column and writes the piece's cells, and gives the layer it picks.
 2. **Where a drop loses a heart:** a write watch on `+0x2D7E` during a drop that loses one. It names the "miss" test: what makes a drop a miss today (no matching shape touched, or the piece not fitting, to confirm).
 3. **Gravity:** writes to the block values during a gravity combo. That names the routine that moves unsupported blocks down.
 
 **Research aid:** `BLOCKPLANET_BOARD_LOG=1` logs, during play, each board cell that changes each frame: layer, x, y, and the value before and after (`board` events). It also logs the cursor and hearts when they change (`board_player`). Paired with a debugger's write watch for the writing function, it shows a drop's cells and layer, the heart a miss costs, and a gravity combo's moves, frame by frame.
+
+### Found with the watches (2026-11-10, Story 1:1, `BLOCKPLANET_BOARD_LOG` and debugger write watches)
+
+The planes' base in 1:1 is `0x80116BF0`.
+- **The piece is stamped into the board every frame while held.** `func_800CB1E8` (from `func_8009AB60` ← `func_800A348C` ← `func_800CD3B8` ← `func_80070118`) writes the hovering piece into the board at its target layer with `func_8008BE58` (through `func_8008BB24`), then removes it with `func_8008CA34` (through `func_8008CE04`). A write watch on one cell fired every frame, alternating the piece's value and 0, 229 times in about 60 s. This is likely for the landing marker or the drawing. **The landing layer is chosen in `func_800CB1E8` or `func_8008BB24`, before the stamp**, so that is where Escape's reversed landing would go: there, the search runs from the core outwards and the piece goes below the first block. A real landing shows in the log as a stamp that is not removed: the test's drops stacked at layers 2, 3 and then 4.
+- **Hearts are lost in `func_800940F0`**, from `func_8009423C` ← `func_800CD3B8`: 3 → 2 → 1 → 0. The final 0 → −1, the game over, is in `func_800CD3B8` itself. In 1:1 every test drop cost a heart while its piece still landed, so this is the game's penalty for a drop that matches nothing, not a miss: today a piece always lands on something. **Escape's miss test is therefore new**: a drop with no block above it, inside the reversed landing search. It would call the same heart loss (`func_8009423C`, or `func_800940F0` directly), and dissolve the piece instead of stamping it.
+- **Gravity:** not yet found. It needs a block left unsupported (a poke is planned).
 
 ### What Escape would change
 
