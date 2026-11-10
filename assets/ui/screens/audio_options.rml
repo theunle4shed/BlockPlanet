@@ -3,7 +3,7 @@
     <title>Audio</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="blue">
     <div id="panel">
         <div class="title">Audio</div>
         <div class="subtitle">Changes apply and save straight away</div>

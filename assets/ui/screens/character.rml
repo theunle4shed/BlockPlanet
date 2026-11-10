@@ -3,7 +3,7 @@
     <title>Character</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="blue">
     <div id="panel">
         <div class="title">Character</div>
         <div class="subtitle" data-text="character_for"></div>

@@ -1,5 +1,7 @@
 #include "ui_system.h"
 
+#include "grid_texture.h"
+#include "ui_grid.h"
 #include "ui_navigator.h"
 #include "ui_renderer.h"
 
@@ -22,6 +24,9 @@
 
 namespace blockplanet::ui {
 namespace {
+
+// The grid test screen (below).
+bool grid_lab_command(const std::string& command);
 
 // Menus are laid out for a 1080-pixel-high screen and scaled to the window.
 constexpr float design_height = 1080.0f;
@@ -53,6 +58,7 @@ std::unique_ptr<Renderer> renderer;
 std::unique_ptr<System> system_interface;
 Rml::Context* context = nullptr;
 std::unique_ptr<Navigator> navigator;
+std::unique_ptr<MenuGrid> grid;  // the menu grid (ui_grid.h)
 bool started = false;
 bool start_failed = false;
 
@@ -115,6 +121,10 @@ bool start(std::uint32_t width, std::uint32_t height) {
     if (context == nullptr) return false;
     context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
     navigator = std::make_unique<Navigator>(context, assets_path / "screens");
+    grid = std::make_unique<MenuGrid>(asset("grid.rml"));
+    for (const auto& [name, value] : grid_lab_values()) navigator->set_setting(name, value);
+    navigator->set_setting("grid_theme", "blue");
+    navigator->set_setting("grid_show", "both");
     std::fprintf(stdout, "{\"event\":\"ui_started\",\"width\":%u,\"height\":%u}\n", width, height);
     std::fflush(stdout);
     return true;
@@ -233,7 +243,10 @@ void apply_requests() {
         }
     }
     std::lock_guard lock(requests_mutex);
-    while (auto command = navigator->take_command()) commands.push_back(*command);
+    while (auto command = navigator->take_command()) {
+        // The grid test screen's settings and buttons stay here.
+        if (!grid_lab_command(*command)) commands.push_back(*command);
+    }
     if (navigator->is_open()) shown_path = navigator->path();
     shown_screen = navigator->current_screen();
     // Keep the flag set while requests are still waiting.
@@ -757,6 +770,12 @@ bool update_loading_document() {
         text = loading_text;
         opacity = loading_opacity;
     }
+    // While the menu grid flies out into it, the cover waits for the tiles to
+    // pass; once let through, it never dips (a grid held over it, as after a
+    // restart from the pause, flies out behind it).
+    static float allowed = 0.0f;
+    allowed = opacity <= 0.0f ? 0.0f : std::max(allowed, grid ? grid->cover_allowance() : 1.0f);
+    opacity *= allowed;
     if (opacity <= 0.0f) {
         if (loading_document != nullptr) loading_document->Hide();
         return false;
@@ -778,7 +797,8 @@ bool update_hud_document() {
         std::lock_guard lock(hud_mutex);
         hud = hud_wanted;
     }
-    const bool show = hud.has_value() && !navigator->is_open();
+    // Not under the menu grid (it covers the board while it is up or flying).
+    const bool show = hud.has_value() && !navigator->is_open() && !(grid && grid->visible());
     if (!show) {
         if (hud_document != nullptr) hud_document->Hide();
         std::lock_guard lock(hud_mutex);
@@ -853,6 +873,47 @@ bool update_hud_document() {
     return true;
 }
 
+// The menu grid behind the open screens, in the colour they ask for.
+// The menu grid behind the open screens, in the colour they ask for. With
+// no screen asking, the game's colour (set_grid_override), else it flies out
+// (into the loading cover when one is wanted).
+std::mutex grid_override_mutex;
+std::string grid_override;
+// The grid test screen (grid_lab.rml, for tuning): its colour, and whether
+// the grid is shown (its Fly in and Fly out buttons).
+std::string lab_theme = "blue";
+bool lab_present = true;
+std::string lab_show = "both";  // both, tiles or background
+void update_grid() {
+    const auto screens = navigator->documents();
+    const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    std::string colour = grid_colour_of(screens);
+    if (navigator->current_screen() == "grid_lab") colour = lab_present ? lab_theme : "";
+    else if (colour.empty()) {
+        std::lock_guard lock(grid_override_mutex);
+        colour = grid_override;
+    }
+    bool cover = false;
+    {
+        std::lock_guard lock(loading_mutex);
+        cover = loading_opacity > 0.0f;
+    }
+    const bool lab = navigator->current_screen() == "grid_lab";
+    grid->set_backdrop(lab);
+    grid->set_layers(!lab || lab_show != "background", !lab || lab_show != "tiles");
+    grid->update(context, colour, now, cover);
+    // Research: BLOCKPLANET_GRID_LOG=1 logs the grid's state every frame
+    // while it is drawn (and the frame it goes), to tell its own dark frames
+    // from the game's.
+    static const bool grid_log = std::getenv("BLOCKPLANET_GRID_LOG") != nullptr;
+    static bool was_visible = false;
+    if (grid_log && (grid->visible() || was_visible))
+        std::fprintf(stdout, "{\"event\":\"grid_frame\",\"t\":%.3f,\"asked\":\"%s\",\"visible\":%d,\"leaving\":%d,\"cover\":%d,\"presence\":%.2f,\"far\":%.2f}\n",
+                     now, colour.c_str(), int(grid->visible()), int(grid->leaving()), int(cover), grid->presence(), grid->far_alpha());
+    was_visible = grid->visible();
+    for (auto* document : screens) document->SetClass("on-grid", grid->visible());
+}
+
 void hook_init(plume::RenderInterface* render_interface, plume::RenderDevice* device) {
     renderer = std::make_unique<Renderer>(render_interface, device);
 }
@@ -877,10 +938,33 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
         return;
     }
     apply_requests();
+    update_grid();
     const bool hud_visible = update_hud_document();
     const bool loading_visible = update_loading_document();
     const bool label_visible = update_label_document();
-    if (navigator->is_open() || hud_visible || loading_visible || label_visible) {
+    // Research (BLOCKPLANET_GRID_LOG=1): every document drawn, with its
+    // opacity, each frame while the grid is up and for 1.5 s after it goes.
+    {
+        static const bool grid_log = std::getenv("BLOCKPLANET_GRID_LOG") != nullptr;
+        static double grid_gone_at = -1.0;
+        const double t = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (grid->visible()) grid_gone_at = -1.0;
+        else if (grid_gone_at < 0.0) grid_gone_at = t;
+        if (grid_log && (grid->visible() || t - grid_gone_at < 1.5)) {
+            std::string shown;
+            for (int i = 0; i < context->GetNumDocuments(); ++i) {
+                auto* document = context->GetDocument(i);
+                if (document == nullptr || !document->IsVisible()) continue;
+                char entry[160];
+                std::snprintf(entry, sizeof(entry), "%s{\"title\":\"%s\",\"opacity\":%.2f}", shown.empty() ? "" : ",",
+                              document->GetTitle().c_str(), document->GetProperty<float>("opacity"));
+                shown += entry;
+            }
+            std::fprintf(stdout, "{\"event\":\"ui_frame\",\"t\":%.3f,\"menus\":%d,\"hud\":%d,\"loading\":%d,\"label\":%d,\"grid\":%d,\"documents\":[%s]}\n",
+                         t, int(navigator->is_open()), int(hud_visible), int(loading_visible), int(label_visible), int(grid->visible()), shown.c_str());
+        }
+    }
+    if (navigator->is_open() || hud_visible || loading_visible || label_visible || grid->visible()) {
         if (context->GetDimensions() != Rml::Vector2i(int(width), int(height))) {
             context->SetDimensions(Rml::Vector2i(int(width), int(height)));
             context->SetDensityIndependentPixelRatio(dp_ratio(float(height)));
@@ -906,6 +990,7 @@ void hook_draw(plume::RenderCommandList* list, plume::RenderFramebuffer* framebu
 
 void hook_deinit() {
     hud_document = nullptr;
+    grid.reset();
     navigator.reset();
     if (started) {
         if (context != nullptr) Rml::RemoveContext("main");
@@ -916,6 +1001,42 @@ void hook_deinit() {
 }
 
 } // namespace
+
+void set_rom(std::span<const std::uint8_t> rom) { set_grid_rom(rom); }
+
+namespace {
+
+// The grid test screen (assets/ui/screens/grid_lab.rml; the owner's request,
+// to tune the grid's motion by eye): its settings change grid_tuning at
+// once, its buttons fly the grid in and out. Returns whether `command` was
+// one of them. Each change is logged, so the values can be reported.
+bool grid_lab_command(const std::string& command) {
+    if (command == "grid_fly_in" || command == "grid_fly_out") {
+        lab_present = command == "grid_fly_in";
+        return true;
+    }
+    if (command.rfind("setting:grid_", 0) != 0) return false;
+    const auto equals = command.find('=');
+    if (equals == std::string::npos) return true;
+    const std::string name = command.substr(8, equals - 8), value = command.substr(equals + 1);
+    if (name == "grid_theme") lab_theme = value;
+    else if (name == "grid_show") lab_show = value;
+    else grid_lab_set(name, value);
+    navigator->set_setting(name, value);
+    // The values so far, for the owner to report.
+    std::string all;
+    for (const auto& [setting, shown] : grid_lab_values()) all += ",\"" + setting + "\":" + shown;
+    std::fprintf(stdout, "{\"event\":\"grid_tuning\",\"theme\":\"%s\"%s}\n", lab_theme.c_str(), all.c_str());
+    std::fflush(stdout);
+    return true;
+}
+
+} // namespace
+
+void set_grid_override(const std::string& colour) {
+    std::lock_guard lock(grid_override_mutex);
+    grid_override = colour;
+}
 
 void install(const std::filesystem::path& assets) {
     assets_path = assets;

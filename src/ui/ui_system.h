@@ -6,8 +6,10 @@
 
 #include "ui_actions.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -17,6 +19,16 @@ namespace blockplanet::ui {
 // the folder holding the menu screens and fonts (ui/ beside the game).
 // BLOCKPLANET_UI_TEST=1 opens the main menu at start.
 void install(const std::filesystem::path& assets);
+// The player's ROM (big-endian, kept by the caller for the whole run), for
+// the menu grid's tile texture (ui_grid.h). Without it the grid uses a plain
+// texture made here. Call before install.
+void set_rom(std::span<const std::uint8_t> rom);
+// Shows the menu grid in `colour` (a name as in data-grid) while no open
+// screen asks for one: the game uses it over its own animations (from the
+// Start press that pauses, until its pause tiles have gone after Resume, and
+// on the way back to its menu after Quit). Empty: none; the grid flies out
+// (or, once a screen opens, takes that screen's colour).
+void set_grid_override(const std::string& colour);
 
 // Opens the menus at a screen (ui/screens/<screen>.rml), or closes them.
 // Applied at the next frame.
