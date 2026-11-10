@@ -32,12 +32,14 @@
 // new-game routine, so the first level is built there.
 
 #include "tetrisphere/direct_start.h"
+#include "tetrisphere/box_art.h"
 
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
 #include "tetrisphere/runtime.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -162,6 +164,7 @@ constexpr std::uint32_t training_cleared_b = 0x800E4480u;
 
 std::mutex mutex;
 std::atomic<bool> intro_restart{false};
+std::atomic<bool> title_restart{false};
 // A profile change's cartridge save (under `mutex`).
 std::optional<std::filesystem::path> save_switch;
 std::optional<bool> save_switch_result;
@@ -452,6 +455,7 @@ void cancel() {
 }
 
 void request_intro_restart() { intro_restart.store(true); }
+void request_title_restart() { title_restart.store(true); }
 
 void request_save_switch(const std::filesystem::path& path) {
     std::lock_guard lock(mutex);
@@ -477,9 +481,164 @@ bool enabled() {
 } // namespace direct_start
 } // namespace tetrisphere
 
+
+// The box art's flow (the owner's design, 2026-11-10; include/tetrisphere/box_art.h,
+// docs/UI.md "The box art on the grid"), once a frame before the intro or
+// title runs:
+// - the logo or the intro, A or Start: the intro ends at once (as the box
+//   art hand-over in box_art_hooks.cpp), straight to the box art;
+// - the box art holds (the title's own 15 s timeout, 0x800E1208 at 901, is
+//   held off) until a press or BlockPlanet's attract timer;
+// - A or Start: the title leaves for the menus (allowed at once, though the
+//   title itself waits 4 s), never into the game's Training for a new save;
+// - B: the launch animation again (the intro restart);
+// - the attract timer: the title leaves, the game's main menu (behind
+//   BlockPlanet's grid) has its idle timer run out so it starts its demo, and
+//   the game comes back to its title, and so the box art, when the demo ends.
+namespace {
+
+using namespace tetrisphere;
+
+constexpr std::uint32_t buttons = 0x800DFD98u;          // the title's buttons word
+constexpr std::uint32_t menu_idle_since = 0x800E1214u;  // u32: the menu timer at the last input
+constexpr std::uint32_t demo_running = 0x800E11F8u;     // u16: another attract path (not the demos)
+constexpr std::uint32_t save_read = 0x800DF770u;        // u8: the save has been read (the title waits for it)
+constexpr std::uint16_t button_a = 0x8000u, button_b = 0x4000u, button_start = 0x1000u;
+
+bool box_art_enabled() {
+    static const bool on = [] {
+        const char* v = std::getenv("BLOCKPLANET_BOX_ART");
+        return v == nullptr || v[0] != '0';
+    }();
+    return on;
+}
+
+// Seconds on the box art before the demo (BLOCKPLANET_ATTRACT_SECONDS; the title's own 15).
+double attract_seconds() {
+    static const double seconds = [] {
+        const char* v = std::getenv("BLOCKPLANET_ATTRACT_SECONDS");
+        return v ? std::atof(v) : 15.0;
+    }();
+    return seconds;
+}
+
+void end_intro_now(std::uint8_t* rdram) {
+    using namespace tetrisphere::guest;
+    store32(rdram, menu_timer_a, 0);
+    store32(rdram, menu_timer_b, 0);
+    store16(rdram, intro_done, 1);
+    store32(rdram, arena_top, load32(rdram, intro_arena_mark));
+}
+
+void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
+    using namespace tetrisphere;
+    using namespace tetrisphere::guest;
+    static std::uint16_t held = 0;
+    static std::chrono::steady_clock::time_point since{};
+    static bool on_box_art = false;
+    const std::uint16_t now_held = static_cast<std::uint16_t>(load32(rdram, buttons) >> 16) | static_cast<std::uint16_t>(load32(rdram, buttons));
+    const std::uint16_t pressed = static_cast<std::uint16_t>(now_held & ~held);
+    held = now_held;
+    if (!box_art_enabled()) return;
+    const bool intro = load16(rdram, intro_done) == 0 && load16(rdram, title_done) == 0;
+    const bool title = load16(rdram, intro_done) == 1 && load16(rdram, title_done) == 0 && load16(rdram, demo_running) == 0;
+    auto phase = box_art::phase().load();
+    // The demo has started playing: the tiles may fly out.
+    if (phase == box_art::Phase::ToDemo && load16(rdram, main_row) == -1 &&
+        (load16(rdram, mode) == 10 || load16(rdram, mode) == 3)) {
+        box_art::phase().store(box_art::Phase::Demo);
+        std::fprintf(stdout, "{\"event\":\"box_art_demo\"}\n");
+        std::fflush(stdout);
+    }
+    if (intro) {
+        on_box_art = false;
+        if ((pressed & (button_a | button_start)) != 0 && load8(rdram, save_read) != 0) {
+            end_intro_now(rdram);
+            std::fprintf(stdout, "{\"event\":\"box_art_skip\"}\n");
+            std::fflush(stdout);
+        }
+        return;
+    }
+    if (!title) {
+        on_box_art = false;
+        // On the way to the demo: in the game's main menu, its idle timer is
+        // run out (the time of the last input, 0x800E1214, set far back), so
+        // the menu starts its demo itself (func at 0x8004FB3C: mode 10, or 3
+        // every sixth time, then its grid flies out), as after sitting idle.
+        if (phase == box_art::Phase::ToDemo && load16(rdram, title_done) == 1 && load16(rdram, main_row) >= 0 &&
+            load16(rdram, submenu_row) < 0)
+            store32(rdram, menu_idle_since, load32(rdram, menu_timer_a) - 32000u);
+        return;
+    }
+    // On the box art.
+    if (!on_box_art) {
+        on_box_art = true;
+        since = std::chrono::steady_clock::now();
+        // Back from the demo: the title from its start (it builds its scenes
+        // only from phase 0, and the held letters never let it get there).
+        if (phase != box_art::Phase::None) title_restart.store(true);
+        box_art::phase().store(box_art::Phase::None);
+    }
+    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - since).count();
+    if ((pressed & button_b) != 0) {
+        intro_restart.store(true);
+        std::fprintf(stdout, "{\"event\":\"box_art_back\"}\n");
+        std::fflush(stdout);
+        return;
+    }
+    if ((pressed & (button_a | button_start)) != 0) {
+        // Leave the title as it does on a press (0x80069500), for its menus,
+        // even with a brand-new save (no Training jump). Done here: the
+        // title reads its buttons after they are polled again this frame.
+        store8(rdram, training_jump, 0);
+        call(func_8007ADF8, rdram, ctx, jingle_player);
+        call(func_8007AEE0, rdram, ctx, effects_player);
+        store16(rdram, title_left, 1);
+        call(func_8003E460, rdram, ctx);  // player 1's controller
+        store32(rdram, menu_scene_copy, load32(rdram, menu_scene_source));
+        store16(rdram, title_done, 1);
+        store16(rdram, title_exits, static_cast<std::int16_t>(load16(rdram, title_exits) + 1));
+        store32(rdram, menu_timer_a, 0);
+        store32(rdram, menu_timer_b, 0);
+        std::fprintf(stdout, "{\"event\":\"box_art_press\"}\n");
+        std::fflush(stdout);
+        return;
+    }
+    if (seconds >= attract_seconds()) {
+        store8(rdram, training_jump, 0);
+        store32(rdram, menu_timer_a, 901);  // the title's own timeout: it leaves for its menus
+        box_art::phase().store(box_art::Phase::ToDemo);
+        std::fprintf(stdout, "{\"event\":\"box_art_attract\"}\n");
+        std::fflush(stdout);
+        return;
+    }
+    if (static_cast<std::int32_t>(load32(rdram, menu_timer_a)) > 880) store32(rdram, menu_timer_a, 880);
+}
+
+} // namespace
+
 extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace tetrisphere;
     using namespace tetrisphere::guest;
+    box_art_frame(rdram, ctx);
+    // Back to the box art (Back from "Who is playing?"): the title from its
+    // start, in its scene memory's place, held as the box art again.
+    if (title_restart.load() && load16(rdram, main_row) >= 0 && load16(rdram, intro_done) == 1) {
+        title_restart.store(false);
+        store32(rdram, arena_top, load32(rdram, intro_arena_mark));
+        store16(rdram, title_done, 0);
+        store32(rdram, title_phase, 0);
+        store16(rdram, title_left, 0);
+        store32(rdram, menu_timer_a, 0);
+        store32(rdram, menu_timer_b, 0);
+        store32(rdram, 0x800E1210u, 0);
+        for (std::uint32_t row = main_row; row <= 0x800E1236u; row += 2) store16(rdram, row, -1);
+        store16(rdram, main_row, 0);
+        store16(rdram, page_exit, 0);
+        clear_menu_presentation(rdram);
+        std::fprintf(stdout, "{\"event\":\"title_restart\"}\n");
+        std::fflush(stdout);
+    }
     // Back to the intro (Back from "Who is playing?"): as at boot, the intro's
     // scene memory rewound to where it started it, the intro, title and their
     // counters from the start, no menu open and no grid; then the loop goes
@@ -502,6 +661,7 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
         std::fprintf(stdout, "{\"event\":\"intro_restart\"}\n");
         std::fflush(stdout);
     }
+    blockplanet_box_art_update(rdram);  // the under layer follows the title (box_art_hooks.cpp)
     std::lock_guard lock(mutex);
     // A profile change: when no block of the save is waiting to be written
     // (the save thread only writes while the game's thread waits, so none

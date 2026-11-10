@@ -56,6 +56,15 @@ std::uint32_t rgba5551(std::uint32_t rgb) {
 
 } // namespace
 
+// Once a frame, from the game's main loop (direct_start_hooks.cpp): whether the
+// box art shows, so the under layer follows the title exactly (the menus'
+// first frames draw no scene at all).
+extern "C" void blockplanet_box_art_update(const std::uint8_t* rdram) {
+    const bool title = enabled() && on_title(rdram) && load16(rdram, 0x800E11F8u) == 0;
+    tetrisphere::box_art::showing().store(title, std::memory_order_relaxed);
+    tetrisphere::under_layer::wanted().store(title, std::memory_order_relaxed);
+}
+
 // From the draw filter (src/graphics/pause_draw_hooks.cpp), for each scene
 // drawn by func_8002D93C: returns true when the call is replaced.
 extern "C" bool blockplanet_box_art_scene(std::uint8_t* rdram, recomp_context* ctx) {
@@ -77,8 +86,6 @@ extern "C" bool blockplanet_box_art_scene(std::uint8_t* rdram, recomp_context* c
         }
     }
     const bool title = enabled() && on_title(rdram);
-    tetrisphere::box_art::showing().store(title, std::memory_order_relaxed);
-    tetrisphere::under_layer::wanted().store(title, std::memory_order_relaxed);
     const std::uint32_t backdrop = load32(rdram, backdrop_scene_pointer);
     if (!title || backdrop == 0 || static_cast<std::uint32_t>(ctx->r4) != backdrop) return false;
     std::uint32_t dl = load32(rdram, display_list_pointer);

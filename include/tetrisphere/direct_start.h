@@ -53,6 +53,10 @@ bool enabled();
 // game's thread at its next frame outside play; ignored during play.
 void request_intro_restart();
 
+// Back to the box art (Back from "Who is playing?", docs/UI.md): the title
+// from its start, without the intro. Done at the game's next frame in its menus.
+void request_title_restart();
+
 // Changes the cartridge save in use without restarting the game (a profile
 // change): once the game has nothing waiting to be written, the save behind
 // it becomes `path` (empty: a guest's, in memory only) and the game reads it

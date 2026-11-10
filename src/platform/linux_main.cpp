@@ -2209,6 +2209,7 @@ bool title_seen = false;
 bool title_restart_pending = false;
 // Profile changes in place (no relaunch, the owner's request 2026-11-10).
 std::filesystem::path trophy_definitions_path;
+std::optional<std::chrono::steady_clock::time_point> box_art_returning_since;  // Back from "Who is playing?" to the box art
 std::string profile_to_remove;  // removed once the game has let go of its save
 bool start_chapter_given = false;  // --start-chapter: progress is not recorded
 
@@ -3116,15 +3117,21 @@ bool handle_profile_command(const std::string& command) {
         blockplanet::ui::request_close();  // the picker opens in its place
         return true;
     }
-    // Back to the intro, as at boot, without restarting the game (the owner's
-    // request, 2026-11-10): the game's thread plays the intro again, and
-    // "Who is playing?" opens again after the title.
+    // Back from "Who is playing?" (the owner's design, 2026-11-10): to the box
+    // art, over the grid that stays up (Back there plays the launch animation
+    // again); without the box art, to the intro, as at boot. Neither restarts
+    // the game; "Who is playing?" opens again after the title.
     if (command == "back_to_title") {
         profile_picked = false;
         title_seen = false;
         title_restart_pending = true;
         blockplanet::ui::request_close();
-        tetrisphere::direct_start::request_intro_restart();
+        if (tetrisphere::box_art::enabled()) {
+            box_art_returning_since = std::chrono::steady_clock::now();
+            tetrisphere::direct_start::request_title_restart();
+        } else {
+            tetrisphere::direct_start::request_intro_restart();
+        }
         return true;
     }
     if (command == "profiles") {
@@ -4004,7 +4011,12 @@ bool handle_profile_command(const std::string& command) {
             const bool at_game_menu = guest_rdram != nullptr && title_seen && !title_now &&
                                       guest::load16(guest_rdram, 0x800E121C) >= 0 &&
                                       guest::load16(guest_rdram, 0x800E122E) < 0;  // not in the credits
-            if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !launching() &&
+            // Not on the way to the box art's demo, nor during it.
+            // The box art (the game's title) holds for a press: the menus
+            // open only once the game has left its intro and title.
+            const bool box_art_demo = tetrisphere::box_art::phase().load() != tetrisphere::box_art::Phase::None ||
+                                      (tetrisphere::box_art::enabled() && guest::load16(guest_rdram, 0x800E1646) == 0);
+            if (!original_menus && at_game_menu && !box_art_demo && !blockplanet::ui::menus_open() && !launching() &&
                 !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0) {
                 if (profile_picked && !launch_path.empty()) {
                     // Back from a game (game over, Exit, an episode's end): the menus it started from.
@@ -4157,9 +4169,18 @@ bool handle_profile_command(const std::string& command) {
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
                 grid_quit_at.reset();
             const bool over_pause = start_at || paused || unpaused_at || grid_quit_at;
-            // The box art shows over BlockPlanet's grid (tetrisphere/box_art.h).
+            // The box art shows over BlockPlanet's grid (tetrisphere/box_art.h),
+            // which stays up as the title hands over to the menus (half a
+            // second, until they open), on the way back to it from them, and
+            // on the way to the demo, over the game's own menu.
             const bool box_art = tetrisphere::box_art::showing().load(std::memory_order_relaxed);
-            blockplanet::ui::set_grid_override(over_pause && !launching() ? "pause" : (box_art ? "blue" : ""));
+            static std::optional<std::chrono::steady_clock::time_point> box_art_left;
+            if (box_art) box_art_left = now_g, box_art_returning_since.reset();
+            const bool box_art_handover = box_art_left && now_g - *box_art_left < std::chrono::milliseconds(500);
+            const bool box_art_returning = box_art_returning_since && now_g - *box_art_returning_since < std::chrono::seconds(3);
+            const bool to_demo = tetrisphere::box_art::phase().load() == tetrisphere::box_art::Phase::ToDemo;
+            const bool box_art_grid = box_art || box_art_handover || box_art_returning || to_demo;
+            blockplanet::ui::set_grid_override(over_pause && !launching() ? "pause" : (box_art_grid ? "blue" : ""));
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
         // over (0x800E1202 back to 0 while the end menu fades in), to see
