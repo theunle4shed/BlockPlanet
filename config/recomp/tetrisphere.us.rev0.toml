@@ -423,12 +423,12 @@ before_vram = 0x800299A0
 text = "blockplanet_audio_frame(rdram, ctx);"
 
 # Direct starts (src/graphics/direct_start_hooks.cpp): where the top-level
-# loop checks the game's own Training start, once a frame outside the intro,
-# title, attract demo and endings, BlockPlanet starts the mode it asked for
-# without the original menus.
+# loop checks whether the title is over (0x800E1646), once a frame outside
+# the attract demo and endings (on the title and in the menus), BlockPlanet
+# starts the mode it asked for without the original menus.
 [[patches.hook]]
 func = "func_80070118"
-before_vram = 0x80070288
+before_vram = 0x8007025C
 text = "blockplanet_direct_start(rdram, ctx);"
 
 # Music and effects levels (Options): every call that sets a music player's

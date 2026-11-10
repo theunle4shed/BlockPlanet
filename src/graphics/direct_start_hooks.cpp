@@ -2,10 +2,17 @@
 // docs/research/blockplanet-game-state.md, "Starting modes directly").
 //
 // blockplanet_direct_start runs from a hook in the game's top-level loop
-// (func_80070118 at 0x80070288), on the game's thread, once a frame while the
-// intro, title, attract demo and endings are not running: the place where the
-// game checks its own direct start (the byte at 0x800DFE8C, which starts
-// Training Basics without menus). It does what the original menus do when a
+// (func_80070118 at 0x8007025C), on the game's thread, once a frame while the
+// attract demo and endings are not running: where the loop checks whether
+// the title is over (0x800E1646) before the game's own direct start (the byte
+// at 0x800DFE8C, which starts Training Basics without menus) and the menus.
+// BlockPlanet's menus are often used while the game itself still shows its
+// title behind them; then the title's exit is done first, as the title does
+// when it hands over to the main menu (func_800685FC at 0x80069500): its
+// jingle player stopped, 0x800E16B4 = 1, player 1's controller chosen
+// (func_8003E460; without it player 1 has none), 0x800F22C0 set, then
+// 0x800E1646 = 1, its count at 0x800E16B8 and the menu timers cleared; the
+// loop then goes on into play. It does what the original menus do when a
 // mode is confirmed, in the same order, without their pages:
 //
 // 0. The player page's opening (func_8004127C at 0x80041884): the save's
@@ -45,6 +52,8 @@ void func_80066CE8(std::uint8_t* rdram, recomp_context* ctx);
 void func_800CC6E0(std::uint8_t* rdram, recomp_context* ctx);
 void func_8003E460(std::uint8_t* rdram, recomp_context* ctx);
 void func_80066E6C(std::uint8_t* rdram, recomp_context* ctx);
+void func_8007ADF8(std::uint8_t* rdram, recomp_context* ctx);
+void func_8007AEE0(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace tetrisphere {
@@ -61,6 +70,13 @@ constexpr std::uint32_t page_exit = 0x800E11FCu;     // a page's closing phase, 
 constexpr std::uint32_t menu_timer_a = 0x800E1208u;  // u32 menu frame counters
 constexpr std::uint32_t menu_timer_b = 0x800E120Cu;
 constexpr std::uint32_t training_jump = 0x800DFE8Cu;  // u8: the game's own Training start
+constexpr std::uint32_t title_done = 0x800E1646u;      // u16: 0 while the intro and title run
+constexpr std::uint32_t title_exits = 0x800E16B8u;     // s16: counted by the title at each exit
+constexpr std::uint32_t title_left = 0x800E16B4u;      // s16: set when the title hands over
+constexpr std::uint32_t jingle_player = 0x80109DC0u;
+constexpr std::uint32_t effects_player = 0x8010B358u;
+constexpr std::uint32_t menu_scene_copy = 0x800F22C0u;  // set from 0x801028D0 at the title's exit
+constexpr std::uint32_t menu_scene_source = 0x801028D0u;
 // The menus' grid transition (static_0_8003B1A4): 0 none, 4 flying in,
 // 1 shown, 5 flying out (then 0). The player page hands over only once its
 // fly-out has ended (0); a direct start removes a shown grid at once.
@@ -114,10 +130,14 @@ std::mutex mutex;
 std::optional<DirectStartRequest> waiting;
 std::optional<direct_start::Result> outcome;
 
+gpr address_arg(std::uint32_t value) { return static_cast<gpr>(static_cast<std::int64_t>(static_cast<std::int32_t>(value))); }
+
 // Calls a game function, leaving the caller's registers as they were, and
-// returns its v0.
-gpr call(void (*function)(std::uint8_t*, recomp_context*), std::uint8_t* rdram, recomp_context* ctx) {
+// returns its v0. a0 is passed when given.
+gpr call(void (*function)(std::uint8_t*, recomp_context*), std::uint8_t* rdram, recomp_context* ctx,
+         std::optional<std::uint32_t> a0 = std::nullopt) {
     const recomp_context saved = *ctx;
+    if (a0) ctx->r4 = address_arg(*a0);
     function(rdram, ctx);
     const gpr result = ctx->r2;
     *ctx = saved;
@@ -334,6 +354,19 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
         return;
     }
     last_busy = nullptr;
+    if (load16(rdram, title_done) == 0) {
+        // Still on the game's own title: leave it as the title does.
+        call(func_8007ADF8, rdram, ctx, jingle_player);
+        call(func_8007AEE0, rdram, ctx, effects_player);
+        store16(rdram, title_left, 1);
+        call(func_8003E460, rdram, ctx);  // player 1's controller
+        store32(rdram, menu_scene_copy, load32(rdram, menu_scene_source));
+        store16(rdram, title_done, 1);
+        store16(rdram, title_exits, static_cast<std::int16_t>(load16(rdram, title_exits) + 1));
+        store32(rdram, menu_timer_a, 0);
+        store32(rdram, menu_timer_b, 0);
+        log("note", request, "from_title");
+    }
     bool started = false;
     switch (request.mode) {
     case DirectMode::Rescue: started = start_rescue(rdram, ctx, request); break;
