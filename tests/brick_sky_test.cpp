@@ -98,6 +98,10 @@ int main() {
     }
     assert(ended && last_projection == 0x80123450u);
     assert(vertex_loads == 6 * 8 * 8 / 2 + 2);  // two bricks a load, then the frame and the horizon
+    // At 21:9 the comfort frame reaches the picture's edges, past the 4:3 frame's.
+    brick_sky::build(rdram.data(), s, m, 0, 0, 21.0f / 9.0f);
+    const std::uint32_t comfort = brick_sky::memory + 0x9000u + 16u * std::uint32_t(bricks.size());
+    assert(load16(rdram.data(), comfort) == -280 && load16(rdram.data(), comfort + 16) == 280);
     assert(triangles == 6 * 8 * 8 * brick_sky::triangles_per_brick + 8 + 2);
     std::puts("brick_sky ok");
     return 0;

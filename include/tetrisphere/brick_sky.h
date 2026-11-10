@@ -21,7 +21,7 @@ struct Settings {
     bool against = true;              // turn against the sphere (true) or with it
     float fov_degrees = 70.0f;        // the sky's field of view: wider looks further away
     std::string comfort = "frame";    // none, frame, horizon, both: something still for the eye
-    std::string colours = "violet";   // violet, teal, amber, rose, grey
+    std::string colours = "amber";    // violet, teal, amber, rose, grey (amber: no blue, which Story 1:1 uses)
     float brightness = 0.55f;         // 0.3 .. 1
 };
 
@@ -69,11 +69,16 @@ constexpr std::uint32_t memory_end = 0x807F8000u;
 // then the comfort layer) into BlockPlanet's memory and returns its
 // address, or 0 if it does not fit. `projection` is the projection to load
 // again at the end (0: none). Ends with G_ENDDL; call it with one G_DL.
-std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std::uint32_t projection, int frame);
+std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std::uint32_t projection, int frame,
+                    float picture_aspect = 4.0f / 3.0f);
 
 // Called at the game's background draw (0x8002D93C with the background
 // scene, from the main loop) during play: when the sky is on, adds it to the
 // game's display list and returns true (skip the game's background).
 bool draw(std::uint8_t* rdram);
+
+// The game picture's shape (width / height, 4:3 or wider when expanded), so
+// the comfort layer reaches the picture's edges, not the 4:3 frame's.
+void set_picture_aspect(float aspect);
 
 } // namespace tetrisphere::brick_sky

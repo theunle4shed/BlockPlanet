@@ -240,7 +240,14 @@ A fast counter-spin around the viewer is the most likely thing in this design to
   - it is capped at half a turn a second;
   - it drifts slowly unless set to Still;
   - nothing flashes.
-- **Not yet checked on the real game:** that the background layer takes the sky as expected, the direction signs on each axis, the frame rate, and the look at each aspect ratio. To be recorded holding left, right, up and down.
+- **First run on the real game** (2026-11-10, the parent session, Story 1:1, the defaults):
+  - The bricks show behind the sphere, and the sphere, pieces and HUD draw on top with no flicker. The board's lighting is unchanged.
+  - Holding left and then up, the sky's yaw and pitch speeds went to about −0.5 rad/s and eased, the same sign mapping on both axes. Whether "against" looks right is for the owner to judge by eye.
+  - **Frame rate** on that machine's slow GPU, the same script: about 33 fps with the sky (display lists 16–24 ms) against about 22 fps with the game's own background (23–45 ms). The sky is cheaper than the game's lit, mipmapped tunnel.
+  - Pause and Resume work; Quit and the next level are not yet tested.
+  - Fixed after the run:
+    - the comfort frame was drawn in the 4:3 frame's units, so at 16:9 and 21:9 it showed as seams at the 4:3 edges; it now reaches the picture's own edges;
+    - the default colours are now amber, since violet and blue were close to Story 1:1's blue bricks.
 
 ### Effort and risk
 

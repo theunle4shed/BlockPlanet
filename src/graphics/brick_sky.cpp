@@ -14,6 +14,7 @@
 #include "tetrisphere/guest_memory.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -61,6 +62,7 @@ Settings from_environment() {
 
 std::mutex mutex;
 Settings current = from_environment();
+std::atomic<float> picture_aspect{4.0f / 3.0f};
 
 using Colour = std::array<float, 3>;
 std::vector<Colour> palette(const std::string& name) {
@@ -226,7 +228,8 @@ std::vector<Vertex> bricks(const Settings& s, int per_face, float radius) {
     return out;
 }
 
-std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std::uint32_t projection, int /*frame*/) {
+std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std::uint32_t projection, int /*frame*/,
+                    float picture_aspect) {
     // Matrices: the sky's perspective (4:3, as the game's frame), its turn,
     // and a flat projection for the comfort layer (the frame's centred units).
     const float f = 1.0f / std::tan(s.fov_degrees * pi / 360.0f), aspect = 4.0f / 3.0f;
@@ -248,15 +251,20 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
     const auto sky = bricks(s);
     std::vector<Vertex> comfort;
     const bool frame = s.comfort == "frame" || s.comfort == "both", horizon = s.comfort == "horizon" || s.comfort == "both";
+    // The flat projection is the 4:3 frame's units (x 160 at its edge); an
+    // expanded picture shows more on each side, so the comfort layer reaches
+    // the picture's own edges (seen as seams at the 4:3 edges otherwise).
+    const int half_w = int(std::lround(120.0f * std::clamp(picture_aspect, 4.0f / 3.0f, 4.0f)));
+    const int inner_w = half_w - 42;
     if (frame) {
         // A still, dark frame at the edges: opaque-ish at the edge, clear inside.
-        for (const auto [x, y, a] : std::array<std::array<int, 3>, 8>{{{-160, 120, 210}, {160, 120, 210}, {160, -120, 210}, {-160, -120, 210},
-                                                                     {-118, 84, 0}, {118, 84, 0}, {118, -84, 0}, {-118, -84, 0}}})
+        for (const auto [x, y, a] : std::array<std::array<int, 3>, 8>{{{-half_w, 120, 210}, {half_w, 120, 210}, {half_w, -120, 210}, {-half_w, -120, 210},
+                                                                     {-inner_w, 84, 0}, {inner_w, 84, 0}, {inner_w, -84, 0}, {-inner_w, -84, 0}}})
             comfort.push_back({std::int16_t(x), std::int16_t(y), 0, 0, 0, 0, std::uint8_t(a)});
     }
     if (horizon) {
         // A still, faint line across the middle (it shows either side of the sphere).
-        for (const auto [x, y, a] : std::array<std::array<int, 3>, 4>{{{-160, 2, 60}, {160, 2, 60}, {160, -2, 60}, {-160, -2, 60}}})
+        for (const auto [x, y, a] : std::array<std::array<int, 3>, 4>{{{-half_w, 2, 60}, {half_w, 2, 60}, {half_w, -2, 60}, {-half_w, -2, 60}}})
             comfort.push_back({std::int16_t(x), std::int16_t(y), 0, 210, 220, 240, std::uint8_t(a)});
     }
     const std::uint32_t vertex_bytes = std::uint32_t((sky.size() + comfort.size()) * 16u);
@@ -332,6 +340,10 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
     return commands_start;
 }
 
+void set_picture_aspect(float aspect) {
+    if (aspect > 0.5f && aspect < 10.0f) picture_aspect = aspect;
+}
+
 bool draw(std::uint8_t* rdram) {
     const Settings s = settings();
     if (!s.on) return false;
@@ -355,7 +367,7 @@ bool draw(std::uint8_t* rdram) {
         }
     }
     static int frame = 0;
-    const std::uint32_t list = build(rdram, s, motion, projection, frame++);
+    const std::uint32_t list = build(rdram, s, motion, projection, frame++, picture_aspect.load());
     if (list == 0) return false;
     store32(rdram, dl, 0x06000000u);  // G_DL: call ours, then come back
     store32(rdram, dl + 4u, list);

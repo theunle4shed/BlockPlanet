@@ -3687,6 +3687,7 @@ bool handle_profile_command(const std::string& command) {
         publish_audio_settings();
         publish_hud_settings();
         publish_sky_settings();
+        if (const auto frame = picture_frame()) tetrisphere::brick_sky::set_picture_aspect(frame->aspect);
         // Back at the game's menu after leaving play from BlockPlanet: open
         // BlockPlanet's menus (the stage list after a single stage).
         if (return_to_menu_chapter && !continue_mode && !mode_launcher.active() && guest_rdram != nullptr &&
