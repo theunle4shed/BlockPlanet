@@ -22,8 +22,8 @@
              data-options="40:40°,50:50°,60:60°,70:70°,80:80°,90:90°,100:100°,110:110°,120:120°">Field of view<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="item value" id="sky_comfort" data-setting="sky_comfort" data-description="Something that stays still for the eye while the sky turns: a dark frame at the edges, a faint line across the middle, or both."
              data-options="none:None,frame:Frame,horizon:Horizon line,both:Frame and line">Comfort layer<span class="value"></span></div>
-        <div class="item value" id="sky_colours" data-setting="sky_colours" data-description="The bricks' colours. Pick ones the stage does not use, so the board stays easy to read (the stage's own colours are not read yet)."
-             data-options="violet:Violet,teal:Teal,amber:Amber,rose:Rose,grey:Grey">Colours<span class="value"></span></div>
+        <div class="item value" id="sky_colours" data-setting="sky_colours" data-description="The bricks' colours. Not the stage's: the brick colours the stage does not use (being checked), so the board stays easy to read."
+             data-options="stage:Not the stage's,violet:Violet,teal:Teal,amber:Amber,rose:Rose,grey:Grey">Colours<span class="value"></span></div>
         <div class="item value slider" id="sky_brightness" data-setting="sky_brightness" data-description="How bright the bricks are. Dim keeps the sphere easy to read."
              data-options="30:30 %,40:40 %,55:55 %,70:70 %,85:85 %,100:100 %">Brightness<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="item" id="back" data-action="back">Back</div>

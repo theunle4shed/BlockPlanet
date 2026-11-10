@@ -65,7 +65,8 @@ Settings current = from_environment();
 std::atomic<float> picture_aspect{4.0f / 3.0f};
 
 using Colour = std::array<float, 3>;
-std::vector<Colour> palette(const std::string& name) {
+std::vector<Colour> palette(const std::string& name, const std::vector<int>& stage_types) {
+    if (name == "stage") return stage_contrast(stage_types);
     if (name == "teal") return {{0.15f, 0.62f, 0.60f}, {0.18f, 0.44f, 0.72f}, {0.10f, 0.50f, 0.45f}};
     if (name == "amber") return {{0.88f, 0.56f, 0.16f}, {0.80f, 0.34f, 0.14f}, {0.70f, 0.48f, 0.20f}};
     if (name == "rose") return {{0.82f, 0.30f, 0.52f}, {0.60f, 0.26f, 0.72f}, {0.75f, 0.38f, 0.40f}};
@@ -137,7 +138,9 @@ bool apply(Settings& s, const std::string& name, const std::string& value) {
     else if (name == "sky_fov") s.fov_degrees = std::clamp(float(std::atof(value.c_str())), 30.0f, 130.0f);
     else if (name == "sky_comfort") {
         if (value == "none" || value == "frame" || value == "horizon" || value == "both") s.comfort = value;
-    } else if (name == "sky_colours") s.colours = value;
+    } else if (name == "sky_colours") {
+        if (value == "stage" || value == "violet" || value == "teal" || value == "amber" || value == "rose" || value == "grey") s.colours = value;
+    }
     else if (name == "sky_brightness") s.brightness = std::clamp(float(std::atof(value.c_str())) / 100.0f, 0.3f, 1.0f);
     else return false;
     return true;
@@ -192,7 +195,7 @@ std::vector<Vertex> bricks(const Settings& s, int per_face, float radius) {
         {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}}, {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}},
         {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}}, {{0, 0, -1}, {-1, 0, 0}, {0, 1, 0}},
     }};
-    const auto colours = palette(s.colours);
+    const auto colours = palette(s.colours, s.stage_types);
     const float step = (pi / 2.0f) / float(per_face), inset = 0.12f;
     std::vector<Vertex> out;
     out.reserve(std::size_t(6 * per_face * per_face * vertices_per_brick));
@@ -344,8 +347,51 @@ void set_picture_aspect(float aspect) {
     if (aspect > 0.5f && aspect < 10.0f) picture_aspect = aspect;
 }
 
+std::array<float, 3> type_colour(int type) {
+    switch (type) {
+    case 0x20: return {0.20f, 0.36f, 0.86f};  // blue (or yellow: to confirm)
+    case 0x21: return {0.92f, 0.80f, 0.18f};  // yellow (or blue)
+    case 0x22: return {0.86f, 0.22f, 0.18f};  // red (guess)
+    case 0x23: return {0.22f, 0.72f, 0.30f};  // green (guess)
+    case 0x24: return {0.58f, 0.28f, 0.80f};  // purple (guess)
+    case 0x25: return {0.62f, 0.64f, 0.68f};  // grey (guess)
+    default: return {0.6f, 0.6f, 0.6f};
+    }
+}
+
+std::vector<std::array<float, 3>> stage_contrast(const std::vector<int>& used) {
+    std::vector<std::array<float, 3>> out;
+    for (int type = 0x20; type <= 0x25; ++type)
+        if (std::find(used.begin(), used.end(), type) == used.end()) out.push_back(type_colour(type));
+    if (out.empty()) return palette("amber", {});  // a stage with all six: a fixed set
+    return out;
+}
+
+std::vector<int> stage_brick_types(const std::uint8_t* rdram) {
+    std::vector<int> types;
+    const int count = std::clamp<int>(load16(rdram, 0x8013D186u), 0, 6);
+    for (int k = 0; k < count; ++k) {
+        const std::uint32_t record = load32(rdram, 0x8013D188u + 4u * std::uint32_t(k));
+        if (record < 0x80000000u || record >= 0x80400000u) continue;
+        const int type = load16(rdram, record + 2u);
+        if (type >= 0x20 && type <= 0x25) types.push_back(type);
+    }
+    return types;
+}
+
 bool draw(std::uint8_t* rdram) {
-    const Settings s = settings();
+    Settings s = settings();
+    if (s.colours == "stage") {
+        s.stage_types = stage_brick_types(rdram);
+        static std::vector<int> logged;
+        if (s.stage_types != logged) {
+            logged = s.stage_types;
+            std::string list;
+            for (const int t : logged) list += (list.empty() ? "" : ",") + std::to_string(t);
+            std::fprintf(stdout, "{\"event\":\"brick_sky_stage_types\",\"types\":[%s]}\n", list.c_str());
+            std::fflush(stdout);
+        }
+    }
     if (!s.on) return false;
     if (load32(rdram, background_scene) == 0) return false;
     std::uint32_t dl = load32(rdram, display_list_pointer);

@@ -103,6 +103,25 @@ int main() {
     const std::uint32_t comfort = brick_sky::memory + 0x9000u + 16u * std::uint32_t(bricks.size());
     assert(load16(rdram.data(), comfort) == -280 && load16(rdram.data(), comfort + 16) == 280);
     assert(triangles == 6 * 8 * 8 * brick_sky::triangles_per_brick + 8 + 2);
+    // Stage contrast: the types the stage does not use, read from its records.
+    {
+        std::vector<std::uint8_t> ram(0x800000);
+        store16(ram.data(), 0x8013D186u, 2);
+        store32(ram.data(), 0x8013D188u, 0x80127CF0u);
+        store32(ram.data(), 0x8013D18Cu, 0x80128458u);
+        store16(ram.data(), 0x80127CF2u, 0x21);
+        store16(ram.data(), 0x8012845Au, 0x20);
+        const auto used = brick_sky::stage_brick_types(ram.data());
+        assert((used == std::vector<int>{0x21, 0x20}));
+        const auto contrast = brick_sky::stage_contrast(used);
+        assert(contrast.size() == 4 && contrast[0] == brick_sky::type_colour(0x22));
+        assert(brick_sky::stage_contrast({0x20, 0x21, 0x22, 0x23, 0x24, 0x25}).size() == 3);  // all used: the fixed set
+        brick_sky::Settings st;
+        st.colours = "stage";
+        st.stage_types = used;
+        assert(!brick_sky::bricks(st).empty());
+        assert(brick_sky::set("sky_colours", "stage") && brick_sky::settings().colours == "stage");
+    }
     std::puts("brick_sky ok");
     return 0;
 }

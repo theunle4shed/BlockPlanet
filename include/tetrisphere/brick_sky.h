@@ -21,7 +21,8 @@ struct Settings {
     bool against = true;              // turn against the sphere (true) or with it
     float fov_degrees = 70.0f;        // the sky's field of view: wider looks further away
     std::string comfort = "frame";    // none, frame, horizon, both: something still for the eye
-    std::string colours = "amber";    // violet, teal, amber, rose, grey (amber: no blue, which Story 1:1 uses)
+    std::string colours = "amber";    // stage (the colours the stage does not use), violet, teal, amber, rose, grey
+    std::vector<int> stage_types;     // for "stage": the brick types the stage uses (0x20 .. 0x25), read in play
     float brightness = 0.55f;         // 0.3 .. 1
 };
 
@@ -57,6 +58,18 @@ struct Vertex { std::int16_t x, y, z; std::uint8_t r, g, b, a; };
 // vertices (its outer corners, dark like mortar, then its face's corners),
 // on a sphere of `radius`, seen from the inside.
 std::vector<Vertex> bricks(const Settings& s, int per_face = 8, float radius = 1000.0f);
+
+// The six brick colours by type (0x20 .. 0x25), as the sky shows them.
+// PROVISIONAL: the game's six colours are blue, yellow, red, green, purple
+// and grey, and Story 1:1 uses types 0x20 and 0x21 (blue and yellow, which
+// is which not yet known); the rest of the order is a guess to confirm.
+std::array<float, 3> type_colour(int type);
+// For "stage": the colours of the brick types the stage does not use.
+std::vector<std::array<float, 3>> stage_contrast(const std::vector<int>& used);
+// The brick types the current stage uses: its colour count (0x8013D186)
+// and the brick-type records it points at (0x8013D188 on; each record's
+// second halfword is its type).
+std::vector<int> stage_brick_types(const std::uint8_t* rdram);
 constexpr int vertices_per_brick = 8;
 constexpr int triangles_per_brick = 10;
 
