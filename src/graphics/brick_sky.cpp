@@ -503,12 +503,13 @@ void set_picture_aspect(float aspect) {
 
 std::array<float, 3> type_colour(int type) {
     switch (type) {
-    case 0x20: return {0.20f, 0.36f, 0.86f};  // blue (or yellow: to confirm)
-    case 0x21: return {0.92f, 0.80f, 0.18f};  // yellow (or blue)
-    case 0x22: return {0.86f, 0.22f, 0.18f};  // red (guess)
-    case 0x23: return {0.22f, 0.72f, 0.30f};  // green (guess)
-    case 0x24: return {0.58f, 0.28f, 0.80f};  // purple (guess)
-    case 0x25: return {0.62f, 0.64f, 0.68f};  // grey (guess)
+    // Seen in play (2026-11-10): Story 1:1, 2:1, 4:1, 6:1, Lines 1:1, Puzzle 12.
+    case 0x20: return {0.92f, 0.80f, 0.18f};  // yellow
+    case 0x21: return {0.20f, 0.36f, 0.86f};  // blue
+    case 0x22: return {0.22f, 0.72f, 0.30f};  // green
+    case 0x23: return {0.80f, 0.26f, 0.70f};  // magenta
+    case 0x24: return {0.86f, 0.22f, 0.18f};  // red (0x24 and 0x25 are red and lavender, which is which to confirm)
+    case 0x25: return {0.70f, 0.62f, 0.90f};  // pale lavender
     default: return {0.6f, 0.6f, 0.6f};
     }
 }

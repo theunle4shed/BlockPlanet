@@ -407,7 +407,7 @@ int main(int argc, char** argv) {
             navigator.set_setting("sky_direction", "against");
             navigator.set_setting("sky_fov", "70");
             navigator.set_setting("sky_comfort", "frame");
-            navigator.set_setting("sky_colours", "amber");
+            navigator.set_setting("sky_colours", "stage");
             navigator.set_setting("sky_brightness", "55");
             navigator.open("sky_lab");
             advance(now + 2.0);

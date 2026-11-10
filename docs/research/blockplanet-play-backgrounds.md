@@ -198,9 +198,20 @@ So the camera sits inside a huge sphere made of bricks, seen from the inside lik
 
 ### A contrasting colour set
 
-**Read in play (2026-11-10, a Story 1:1 RAM dump).** The six words at `0x800E4508` are not colours. They point at six **brick-type records** 0x768 bytes apart (`0x80127CF0` onwards). Each record's second halfword is its brick type, 0x20 to 0x25 (the colours 32–37), followed by small counts and a long run of 0/1 halfwords, which look like shape grids. `0x8013D186` is the stage's colour count (2 in Story 1:1), and `0x8013D188` onwards holds pointers to the records it uses (types 0x21 and 0x20 there). So the types a stage uses are known, and the colour of each type comes from its texture. The game's six brick colours are blue, yellow, red, green, purple and grey. Which type is which colour is still to confirm: Story 1:1's 0x20 and 0x21 are blue and yellow, in some order.
+**Read in play (2026-11-10, a Story 1:1 RAM dump).** The six words at `0x800E4508` are not colours. They point at six **brick-type records** 0x768 bytes apart (`0x80127CF0` onwards). Each record's second halfword is its brick type, 0x20 to 0x25 (the colours 32–37), followed by small counts and a long run of 0/1 halfwords, which look like shape grids. `0x8013D186` is the stage's colour count (2 in Story 1:1), and `0x8013D188` onwards holds pointers to the records it uses (types 0x21 and 0x20 there). So the types a stage uses are known, and the colour of each type comes from its texture. The game's six brick colours are blue, yellow, red, green, purple and grey. **The types' colours, seen in play** (2026-11-10, the stage's types logged against the board's colours):
 
-**In the experiment:** the Colours setting "Not the stage's" reads the stage's types (`stage_brick_types`) and uses the colours of the other types, darkened by the brightness setting. It falls back to a fixed set if a stage used all six. The type-to-colour table (`type_colour`) is provisional until the mapping is confirmed. Each change of the stage's types is logged as `brick_sky_stage_types`. The default stays Amber until then.
+| Stage | Types | Board |
+| --- | --- | --- |
+| Story 1:1 | 0x21, 0x20 | blue, yellow |
+| Story 2:1 | 0x21, 0x23 | blue, magenta |
+| Story 4:1 | 0x21, 0x23 | blue, magenta |
+| Story 6:1 | 0x20, 0x24, 0x25 | yellow, red, pale lavender |
+| Lines 1:1 | 0x21, 0x20 | blue, yellow |
+| Puzzle 12 | 0x21, 0x20, 0x22 | yellow, green (and blue) |
+
+So **0x20 yellow, 0x21 blue, 0x22 green, 0x23 magenta**. 0x24 and 0x25 are red and pale lavender, which is which still to split by a stage with only one of them.
+
+**In the experiment:** the Colours setting "Not the stage's" reads the stage's types (`stage_brick_types`) and uses the colours of the other types, darkened by the brightness setting. It falls back to a fixed set if a stage used all six. The type-to-colour table (`type_colour`) follows the mapping above, with 0x24 and 0x25 guessed as red and lavender. Each change of the stage's types is logged as `brick_sky_stage_types`. **This is the default.**
 
 
 - The stage's brick colours are known at level set-up. Byte 14 of the level record, the colour set, picks entries of the six-entry colour table at `0x800E4508` into `0x8013D188` onwards. The number of colours is at `0x8013D186` (`docs/research/blockplanet-level-data.md`).
