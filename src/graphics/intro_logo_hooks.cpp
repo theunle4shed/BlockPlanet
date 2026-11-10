@@ -191,9 +191,64 @@ bool face_enabled() {
     return on;
 }
 
+
+// The N keeps turning (the owner's notes, 2026-11-10): its spin about its
+// own vertical axis (about 1.3 degrees a frame at the end) stops dead at
+// frame 657, as the wordmark fades, which looks abrupt. From the frame its
+// turn stops, it goes on turning at its last rate until the logo leaves.
+// The stop is found from the N's own matrix (its first row's angle about
+// the vertical), so it holds wherever the logo starts.
+// BLOCKPLANET_INTRO_LOGO_SPIN=0 keeps the original stop.
+void keep_spinning(std::uint8_t* rdram, std::uint32_t scene) {
+    static const bool on = [] {
+        const char* v = std::getenv("BLOCKPLANET_INTRO_LOGO_SPIN");
+        return v == nullptr || v[0] != '0';
+    }();
+    if (!enabled() || !on) return;
+    if (scene == 0 || scene != load32(rdram, logo_scene_pointer) || load16(rdram, 0x800E1648u) != 0) return;
+    static std::uint32_t seen_scene = 0;
+    static int last_frame = -1, end_frame = -1;
+    static double last_angle = 0, rate = 0, end_angle = 0;
+    const int frame = static_cast<int>(load32(rdram, scene + 0x24u));
+    if (scene != seen_scene || frame < last_frame) {  // a new logo
+        seen_scene = scene, last_frame = -1, end_frame = -1, rate = 0;
+    }
+    const std::uint32_t buffer = load8(rdram, scene + 0x3Du) & 1u;
+    const std::uint32_t at = load32(rdram, scene + 0x14u) + buffer * 0x40u;
+    Matrix m = read_matrix(rdram, at);
+    const double angle = std::atan2(m.m[0][2], m.m[0][0]);
+    if (end_frame < 0) {
+        if (last_frame >= 0 && frame > last_frame) {
+            double step = angle - last_angle;
+            if (step > M_PI) step -= 2 * M_PI;
+            if (step < -M_PI) step += 2 * M_PI;
+            step /= frame - last_frame;
+            if (std::fabs(step) < 1e-4 && std::fabs(rate) > 1e-3)
+                end_frame = last_frame, end_angle = last_angle;  // the turn has stopped
+            else
+                rate = step;
+        }
+        if (frame != last_frame) last_frame = frame, last_angle = angle;
+        if (end_frame < 0) return;
+    }
+    last_frame = frame;
+    // Turned on about its own vertical (row vectors: rows 0 and 2 mixed).
+    const double turn = end_angle + rate * (frame - end_frame) - angle;
+    const double c = std::cos(turn), s = std::sin(turn);
+    Matrix r = m;
+    for (int j = 0; j < 3; ++j) {
+        r.m[0][j] = c * m.m[0][j] + s * m.m[2][j];
+        r.m[2][j] = -s * m.m[0][j] + c * m.m[2][j];
+    }
+    write_matrix(rdram, at, r);
+}
 } // namespace
 
 extern "C" void blockplanet_logo_object_draw(std::uint8_t* rdram, std::uint32_t scene, int object) {
+    if (object == 0) {
+        keep_spinning(rdram, scene);
+        return;
+    }
     if (!enabled() || !face_enabled() || (object != 1 && object != 2)) return;
     if (scene == 0 || scene != load32(rdram, logo_scene_pointer) || load16(rdram, 0x800E1648u) != 0) return;
     const std::uint32_t buffer = load8(rdram, scene + 0x3Du) & 1u;
