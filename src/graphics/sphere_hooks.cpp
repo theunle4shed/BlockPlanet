@@ -28,6 +28,7 @@
 // guest memory (except the stack below the caller's frame, which holds
 // scratch data). Live guest memory is never changed by the check.
 
+#include "tetrisphere/escape_view.h"
 #include "tetrisphere/recomp_support.h"
 #include "tetrisphere/runtime.h"
 #include "tetrisphere/guest_memory.h"
@@ -706,6 +707,13 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
     // quarters are skipped), for stills of the background alone.
     static const bool hide = std::getenv("BLOCKPLANET_HIDE_SPHERE") != nullptr;
     if (hide) return true;
+    // Research: BLOCKPLANET_ESCAPE_VIEW=1, the Escape mode's view from inside
+    // (src/graphics/escape_view.cpp) in place of the sphere.
+    if (tetrisphere::escape_view::enabled()) {
+        static bool drawn = false;
+        if (quadrant == 0) drawn = tetrisphere::escape_view::draw(rdram);
+        if (drawn) return true;
+    }
     if (quadrant == 0) stats_sphere_begin(rdram);
     const Mode m = mode_for("quadrants");
     if (m == Mode::Original) return false;

@@ -292,3 +292,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-10: Game over screen
 
 - The game over menu now matches BlockPlanet's menus (the owner's request). After the 3D GAME OVER animation, red tiles fly in as the game's end menu fades in. BlockPlanet's panel, on the side as the pause's, then shows "Game over" with the stage, and the game's own choices in sentence case with icons: Try again, Training (when offered) and Exit. Versus' end shows Continue and Exit. Choices drive the game's own menu, as the pause does. Exit returns to the menus the game was started from. The game's Wheels and menu text are no longer drawn behind it.
+
+## 2026-11-10: Escape mode, step 1 (research)
+
+- A visual prototype of the Escape mode idea, off by default (`BLOCKPLANET_ESCAPE_VIEW=1`). The board is drawn as seen from inside the sphere, its blocks' undersides looking out, with no core, and holes where a column is dug to the core. Play and the rules are unchanged; the cursor and pieces are still drawn from outside.
