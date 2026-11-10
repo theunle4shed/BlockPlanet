@@ -214,7 +214,11 @@ First technical notes (not yet researched):
   - In board terms, pieces rise from the core's side and stop below the first block, gravity stays inwards, and a miss is a drop with nothing above.
   - **The goal (the owner, 2026-11-10):** escape by opening a 3 × 3, 5 × 5 or 7 × 7 hole (set per level) right through the shell. This is very likely the game's own core-opening check unchanged: in a shell board, a column's core is "uncovered" exactly when a hole runs through every layer.
   - Still to find on the game: the landing routine, the miss test and gravity (three write watches).
-  - Estimate: large on the game's engine (medium if landing and the miss test are each in one place), with medium to high risk. BlockPlanet's own engine would carry it without that risk.
+  - **Found with write watches:**
+    - the landing is in one place (`func_800CB1E8`, which stamps the held piece at its target layer);
+    - the heart loss is one call (`func_800940F0` from `func_8009423C`). Today it is the no-match penalty; a piece always lands, so Escape's miss test is new.
+    - Gravity is not yet found. The routine that removed a poked block was the piece checker, not gravity.
+  - **Estimate now: medium to large, with medium risk** on the game's engine, if gravity is also in one place. BlockPlanet's own engine remains the long-term alternative.
 - **Multiphasic:** the transition fits what is already known: the core can be resized in the mesh builder (the `BLOCKPLANET_SPHERE_CORE_SCALE` experiment), BlockPlanet draws the sphere, and an indestructible block type exists (type 47, Puzzle's border). The "core picture" stage would need art for the next stage drawn on the core, and a way to load the next level without leaving play (the game builds a level between levels today). Earning lives needs a rule (for example a score or combo threshold) and a HUD element.
 
 **Custom backgrounds for new modes** (the owner, 2026-11-10: "Don't incorporate the brick sky yet.. I'm thinking we can use some custom ones for new game modes"). BlockPlanet's own play backgrounds, such as the brick sky (below and in [the research](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10)), belong to new game modes: the modes above, any later ones such as the Phear-inspired mode, and the rulesets per stage, where the background is one of a stage's variables. They don't belong in the original modes' pool, which keeps the game's own 25.

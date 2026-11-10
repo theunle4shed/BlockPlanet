@@ -82,7 +82,12 @@ These three come from write watches on the real game, as the pause flag was foun
 The planes' base in 1:1 is `0x80116BF0`.
 - **The piece is stamped into the board every frame while held.** `func_800CB1E8` (from `func_8009AB60` ← `func_800A348C` ← `func_800CD3B8` ← `func_80070118`) writes the hovering piece into the board at its target layer with `func_8008BE58` (through `func_8008BB24`), then removes it with `func_8008CA34` (through `func_8008CE04`). A write watch on one cell fired every frame, alternating the piece's value and 0, 229 times in about 60 s. This is likely for the landing marker or the drawing. **The landing layer is chosen in `func_800CB1E8` or `func_8008BB24`, before the stamp**, so that is where Escape's reversed landing would go: there, the search runs from the core outwards and the piece goes below the first block. A real landing shows in the log as a stamp that is not removed: the test's drops stacked at layers 2, 3 and then 4.
 - **Hearts are lost in `func_800940F0`**, from `func_8009423C` ← `func_800CD3B8`: 3 → 2 → 1 → 0. The final 0 → −1, the game over, is in `func_800CD3B8` itself. In 1:1 every test drop cost a heart while its piece still landed, so this is the game's penalty for a drop that matches nothing, not a miss: today a piece always lands on something. **Escape's miss test is therefore new**: a drop with no block above it, inside the reversed landing search. It would call the same heart loss (`func_8009423C`, or `func_800940F0` directly), and dissolve the piece instead of stamping it.
-- **Gravity:** not yet found. It needs a block left unsupported (a poke is planned).
+- **Gravity: not yet found.** A block poked to float in Story 1:1 (layer 3 over empty layers 1 and 2, at x 10, y 10) did not fall. About 4 s later, after a drop, `func_8008CA34` removed it, called from `func_800CC0D0` ← `func_800CC408` ← `func_800CD3B8`. That is **not gravity but the board's piece checker**, already known from Training's stripes (`docs/TRAINING_REDESIGN.md`):
+  - every frame it checks 5 cells on layers 1 to 7;
+  - it finds each cell's piece through its shape table (`func_80093214`, `0x8014CC98`) and checks that every cell of the shape is still there (`func_800924E0`);
+  - it removes pieces that aren't whole.
+
+  The poked block was a lone cell of a four-cell piece, so it was removed as broken; support had nothing to do with it. Gravity proper (a whole piece left hanging after the blocks under it clear, the game's "gravity combos") still needs a real run: dig out the blocks under an intact piece with a matching drop, then watch the cell below it. The two board changes during the combo (removed at layer L, written at L − 1) will name the routine.
 
 ### What Escape would change
 
@@ -104,6 +109,16 @@ What each part takes:
 | Matching and combos | Unchanged, in board terms: shapes still match by type, and only the direction pieces arrive from changes | None | Low |
 | Inside view | Step 1 plus the cursor, pieces and marker (above). The underside drawn is the lowest block per column, not layer 1, once boards are shells | Medium | Medium |
 | The goal: an S × S hole through the shell | **Very likely the game's own core-opening check, unchanged.** That check (`func_800AB4C8` after a clear, when the goal type `0x800E44A4` is 3) tries every S × S square at even corners, wrapping, with S the level's opening size (player context `+0x23E4`: twice the level record's byte 12, so even sizes from 2 to 10 today; Escape's 3, 5 and 7 would be new, odd values). It counts uncovered rows with `func_800AA3A4` on the exposed-core map (`0x800E44C8`, a bit per column set while the core under it is uncovered, that is with no block above it in any layer). In a shell board a column is uncovered exactly when a hole runs through every layer, so the same check is the escape. To confirm: whether odd sizes work with the even-corner search (a 3 × 3 hole may need odd corners too), and that the map is rebuilt from all layers rather than from the lowest one | Small | Low to medium |
+
+**Estimate, after the watches (2026-11-10):**
+- **Landing is in one place** (`func_800CB1E8` / `func_8008BB24` choose the layer, then `func_8008BE58` stamps the piece). A reversed landing (searching from the core outwards, the piece placed under the first block) and the new miss test (nothing above: dissolve and call the heart loss, `func_8009423C`) both go there. **Medium.**
+- **The heart loss is one call**, reused as it is. **Small.**
+- **The win** is very likely the game's own core-opening check (above), plus odd sizes. **Small to medium.**
+- **Shell boards** at level start, through the game's own board helpers so the masks and the column map agree. **Medium.**
+- **The inside view**, with the cursor, piece and marker drawn from inside. **Medium.**
+- **Gravity:** unknown until found. If it is one routine moving whole pieces down a layer, Escape keeps it as it is (inwards) and adds a dissolve at the core line: small to medium. If it is spread through the combo code, it is larger.
+- **The piece checker** (`func_800CC0D0`) works on whole pieces regardless of direction, so it should be unaffected.
+- **Overall: medium to large, with medium risk**, down from "large, medium to high". It is feasible on the game's engine as long as gravity is found in one place. Next for that: the gravity run above.
 
 **Estimate:**
 - **Built on the game's engine:** large overall, about as large as the roadmap expected. The view is the easy part, and is mostly shown now. The landing reversal and the shell boards are the core of it. Medium to high risk, because landing, gravity and matching share the board helpers' assumptions (towards the core is down).
