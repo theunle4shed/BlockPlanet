@@ -243,6 +243,8 @@ A fast counter-spin around the viewer is the most likely thing in this design to
 
 ### The experiment (built 2026-11-10, the owner's go: "just an experiment for now")
 
+**Status (the owner, 2026-11-10): parked.** "Don't incorporate the brick sky yet.. I'm thinking we can use some custom ones for new game modes." It stays a research experiment behind its switch. Play backgrounds stays Original by default, Mixed is not offered to players, and the setting does not move to Options > Graphics. No further work is planned for now (the play sphere's texture is not started). Custom backgrounds such as this one belong to new game modes (`docs/ROADMAP.md`).
+
 - **Code:** `src/graphics/brick_sky.cpp` (`include/tetrisphere/brick_sky.h`), tested in `tests/brick_sky_test.cpp`. It is off unless turned on by `BLOCKPLANET_BRICK_SKY=1` or Options > **Sky test** > Brick sky (open from the pause's Options, then Resume to see it). `BLOCKPLANET_BRICK_SKY_SET="sky_spin=wild,sky_comfort=none"` sets the others for recordings. `BLOCKPLANET_BRICK_SKY_LOG=1` logs the sky's turn twice a second.
 - **The sky:** a cube-sphere of 6 × 8 × 8 = 384 bricks at radius 1,000, laid out at equal angles as the menu grid is, seen from the centre.
   - Each brick has 8 vertices: dark mortar corners and an inset face, lighter at its top edge.

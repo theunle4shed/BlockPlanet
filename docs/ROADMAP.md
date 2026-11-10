@@ -135,7 +135,7 @@ The sketch:
 - It comes with a strength setting (off, gentle, normal, wild) and a reduced-motion option.
 - Medium effort.
 
-See [the sketch](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10). **Experiment built (2026-11-10, the owner's go).** It is one more background in the pool, not a replacement: Options > Sky test > Play backgrounds is Original (the default), Mixed (it takes one stage in four, always the same ones) or Brick sky only. It has spin strength, direction, field of view, a comfort layer, colours and brightness. To be recorded on the real game.
+See [the sketch](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10). **Experiment built (2026-11-10, the owner's go), and parked there by the owner's choice:** it stays a research experiment behind its switch (Options > Sky test, Play backgrounds defaulting to Original). It is not for the original modes' pool, and it isn't offered to players. It is kept for new game modes (see Custom backgrounds for new modes). No more work on it for now; the play sphere's texture, for one, is not started.
 
 ### Your own music: MP3, OGG and FLAC (M)
 
@@ -204,6 +204,8 @@ First technical notes (not yet researched):
 
 - **Escape:** the camera inside the sphere means the renderer drawing the inner faces and culling differently (BlockPlanet now draws the sphere itself, `docs/research/blockplanet-game-state.md`). Dropping onto the underside reverses the drop direction and gravity, which is game logic spread over many functions (the board limits table in the same document); likely the largest change of the two.
 - **Multiphasic:** the transition fits what is already known: the core can be resized in the mesh builder (the `BLOCKPLANET_SPHERE_CORE_SCALE` experiment), BlockPlanet draws the sphere, and an indestructible block type exists (type 47, Puzzle's border). The "core picture" stage would need art for the next stage drawn on the core, and a way to load the next level without leaving play (the game builds a level between levels today). Earning lives needs a rule (for example a score or combo threshold) and a HUD element.
+
+**Custom backgrounds for new modes** (the owner, 2026-11-10: "Don't incorporate the brick sky yet.. I'm thinking we can use some custom ones for new game modes"). BlockPlanet's own play backgrounds, such as the brick sky (below and in [the research](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10)), belong to new game modes: the modes above, any later ones such as the Phear-inspired mode, and the rulesets per stage, where the background is one of a stage's variables. They don't belong in the original modes' pool, which keeps the game's own 25.
 
 ### Custom characters you can save (M to L, plus art)
 
