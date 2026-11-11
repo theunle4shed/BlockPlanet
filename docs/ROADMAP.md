@@ -88,6 +88,8 @@ Replace the original menus (title, mode select, options, controls, graphics) wit
 
 Direction: a modern, simple, TV-like menu (large focus states, few items per screen, quick transitions), with no option to keep the original menus.
 
+**Language, starting with English (UK) and English (US) (idea, the owner's, 2026-11-11).** BlockPlanet's text is written in British English (Colour, Centred, Grey). A Language option would offer English (UK) and English (US) first (Colour/Color, Centre/Center, Grey/Gray, Favourite/Favorite, Customise/Customize, Licence/License), defaulting to the system's region, and make room for other languages later. Needs: every menu, card and HUD string moved out of the screens (`assets/ui/screens/*.rml`) and the C++ lists into a string table per language, with English (UK) as the source; the text rewrites for the game's own lines (`proper_case`, `fix_wording`) run per language too; the on-screen keyboard gets a layout per language. Nothing from the game's text is stored (it stays read from the player's copy); only BlockPlanet's own text is translated.
+
 ## Phase 3: audio and visuals
 
 ### Background animations: understand them (research M)
