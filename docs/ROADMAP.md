@@ -60,6 +60,8 @@ A menu that lists every music track and sound effect and plays them. Research: f
 
 `--casual` refills hearts as soon as one is lost and stops the Time Trial clock at 30 seconds, so a game never ends. Trophies are paused while it is on. It becomes an Options setting with the new menus. Requested both for testing later stages and as a relaxed way to play.
 
+**Casual refinements (the owner's request, 2026-11-11, low priority).** Casual needs no lives and no countdown at all: hide the hearts and the drop timer and always win (today hearts refill and the Time Trial clock stops at 30 seconds, but both still show). And an episode is offered in Casual, Time Attack and Score Attack only once it has been played in Story (the episode lists follow Story's progress, not their own).
+
 ## Phase 2: presentation
 
 ### Variable screen sizes: ultrawide, vertical and any window shape (L)

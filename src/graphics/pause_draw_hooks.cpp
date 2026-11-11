@@ -209,11 +209,37 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
         const auto model = static_cast<std::uint32_t>(ctx->r4);
         // Losing a life: the original HUD's skull, drawn where the held magic
         // sits (matrix 0x801309A8) while no magic is held (losing a life
-        // also loses it). Hidden with the original HUD in Story.
-        if (hud_hidden.load(std::memory_order_relaxed) && static_cast<std::uint32_t>(ctx->r7) == 0x801309A8u &&
-            guest16(rdram, 0x800E121Cu) == -1 && guest16(rdram, 0x800E44A8u) == 1 &&
-            rdram[((0x80110220u + 0x702u) & 0x7FFFFFu) ^ 3u] == 0xFFu)
-            return true;
+        // also loses it). Hidden with the original HUD in Story. But a magic
+        // just used is drawn through the same matrix too (its flight and its
+        // effect, such as the dynamite's sparks), and the game waits for
+        // those animations to finish before the magic goes off: skipping
+        // them left the magic hanging forever (the owner's report,
+        // 2026-11-11). So from a use (held magic gone with no heart lost)
+        // until nothing has been drawn there for half a second, nothing is
+        // skipped.
+        if (static_cast<std::uint32_t>(ctx->r7) == 0x801309A8u) {
+            using Clock = std::chrono::steady_clock;
+            static std::int8_t last_held = -1;
+            static int last_hearts = -1;
+            static bool magic_in_use = false;
+            static Clock::time_point use_started{}, last_draw{};
+            const auto now = Clock::now();
+            const auto held = static_cast<std::int8_t>(rdram[((0x80110220u + 0x702u) & 0x7FFFFFu) ^ 3u]);
+            const int hearts = guest16(rdram, 0x80110220u + 0x2D7Eu);
+            if (last_held >= 0 && held < 0 && !(last_hearts >= 0 && hearts < last_hearts)) {
+                magic_in_use = true;
+                use_started = now;
+            }
+            last_held = held;
+            last_hearts = hearts;
+            const bool quiet = now - last_draw > std::chrono::milliseconds(500) && now - use_started > std::chrono::milliseconds(500);
+            if (magic_in_use && (quiet || now - use_started > std::chrono::seconds(20)))
+                magic_in_use = false;
+            last_draw = now;
+            if (!magic_in_use && hud_hidden.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
+                guest16(rdram, 0x800E44A8u) == 1 && held < 0)
+                return true;
+        }
         if (model_log) {
             static std::mutex mutex;
             static std::set<std::uint32_t> seen;
