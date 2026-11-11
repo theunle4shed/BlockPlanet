@@ -283,3 +283,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-11: Fan research
 
 - Research (2026-11-09): what Tetrisphere players and critics say (wishes, complaints, known bugs of the original and of emulators, what they love, cut content), with sources and a comparison with the roadmap: `docs/research/fan-feedback.md`.
+- Research (2026-11-11): Tetrisphere's cheat codes (name codes, GameShark and Action Replay), what game variable each changes according to BlockPlanet's memory map, and the most promising modifiers with how to build each as an option: `docs/research/cheat-codes.md`.
