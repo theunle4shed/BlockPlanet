@@ -220,8 +220,9 @@ void keep_spinning(std::uint8_t* rdram, std::uint32_t scene) {
     if (end_frame < 0) {
         if (last_frame >= 0 && frame > last_frame) {
             double step = angle - last_angle;
-            if (step > M_PI) step -= 2 * M_PI;
-            if (step < -M_PI) step += 2 * M_PI;
+            constexpr double pi = 3.14159265358979323846;  // (MSVC has no M_PI by default)
+            if (step > pi) step -= 2 * pi;
+            if (step < -pi) step += 2 * pi;
             step /= frame - last_frame;
             if (std::fabs(step) < 1e-4 && std::fabs(rate) > 1e-3)
                 end_frame = last_frame, end_angle = last_angle;  // the turn has stopped
