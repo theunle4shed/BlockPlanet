@@ -2660,7 +2660,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     std::fflush(stdout);
 
     ultramodern::renderer::GraphicsConfig graphics{};
-    graphics.developer_mode = false;
+    graphics.developer_mode = run_options.developer;
     graphics.res_option = ultramodern::renderer::Resolution::Auto;
     graphics.wm_option = fullscreen_requested
         ? ultramodern::renderer::WindowMode::Fullscreen

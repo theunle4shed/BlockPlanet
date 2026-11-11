@@ -220,7 +220,6 @@ class Context final : public ultramodern::renderer::RendererContext {
 public:
     Context(std::uint8_t* rdram, ultramodern::renderer::WindowHandle window,
             bool developer_mode) {
-        (void)developer_mode;
         RT64::Application::Core core{};
 #ifdef _WIN32
         core.window = window.window;
@@ -270,7 +269,9 @@ public:
         app_->userConfig.resolution = RT64::UserConfiguration::Resolution::WindowIntegerScale;
         app_->userConfig.aspectRatio = RT64::UserConfiguration::AspectRatio::Original;
         app_->userConfig.displayBuffering = RT64::UserConfiguration::DisplayBuffering::Triple;
-        app_->userConfig.developerMode = false;
+        // --developer: RT64's inspector on F1 (it then takes keyboard and mouse
+        // input itself, through an SDL event filter, while it is open).
+        app_->userConfig.developerMode = developer_mode;
         if (run_options.msaa_samples) {
             switch (*run_options.msaa_samples) {
                 case 0: app_->userConfig.antialiasing = RT64::UserConfiguration::Antialiasing::None; break;
