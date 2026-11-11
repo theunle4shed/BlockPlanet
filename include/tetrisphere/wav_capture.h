@@ -16,6 +16,10 @@ public:
     bool open(const char* path, std::uint32_t sample_rate);
     bool append(const std::int16_t* samples, std::size_t sample_count);
     bool active() const { return file_ != nullptr; }
+    // The audio output's rate can change after the file is opened (the
+    // runtime first opens a placeholder rate, then the game sets its own):
+    // the header follows it.
+    bool set_sample_rate(std::uint32_t sample_rate);
 
 private:
     bool update_header();

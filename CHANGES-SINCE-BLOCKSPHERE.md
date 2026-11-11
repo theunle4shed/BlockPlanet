@@ -277,3 +277,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Menus: the panels and the dimming behind them are black instead of dark blue (the owner's choice), to sit better on the menu grid's and the game's different coloured backgrounds.
 - Menus: the black panels are a little more see-through (70%, was 85%), the owner's request.
 - Roadmap: the Adventure idea (one map of stages mixing Story and Puzzle, later Lines, Escape and Multiphasic).
+- Fixed: an audio capture (`TETRISPHERE_AUDIO_CAPTURE_WAV`) was labelled 48000 Hz although the game plays at 44100 Hz, so it played back 8.8% fast and sharp. The capture opened on the runtime's placeholder rate and never followed the game's; its header now follows the output rate.

@@ -300,7 +300,8 @@ int verify_wav_capture(const char* output_path) {
     };
     {
         tetrisphere::WavCapture capture;
-        if (!capture.open(output_path, 32'000) ||
+        // Opened at the runtime's placeholder rate, then moved to the game's.
+        if (!capture.open(output_path, 48'000) || !capture.set_sample_rate(32'000) ||
             !capture.append(samples.data(), samples.size())) {
             return fail("PCM capture could not write queued SDL samples");
         }
@@ -319,7 +320,7 @@ int verify_wav_capture(const char* output_path) {
                (std::uint32_t{bytes[offset + 2]} << 16u) |
                (std::uint32_t{bytes[offset + 3]} << 24u);
     };
-    if (little_u32(24) != 32'000u || little_u32(40) != samples.size() * 2u) {
+    if (little_u32(24) != 32'000u || little_u32(28) != 128'000u || little_u32(40) != samples.size() * 2u) {
         return fail("PCM capture WAV header does not match queued samples");
     }
     return 0;

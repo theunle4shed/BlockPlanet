@@ -77,6 +77,12 @@ bool WavCapture::update_header() {
            std::fflush(file_) == 0 && std::fseek(file_, 0, SEEK_END) == 0;
 }
 
+bool WavCapture::set_sample_rate(std::uint32_t sample_rate) {
+    if (file_ == nullptr || sample_rate == 0) return false;
+    sample_rate_ = sample_rate;
+    return update_header();
+}
+
 void WavCapture::close() {
     if (file_ != nullptr) {
         update_header();
