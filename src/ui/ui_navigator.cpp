@@ -302,6 +302,13 @@ void Navigator::handle(Action action) {
     case Action::Alt:
         activate(screen, "data-alt");
         break;
+    case Action::Alt2: {
+        // A screen-wide action (the body's data-alt2), not the focused item's.
+        Rml::Element* body = screen.document;
+        const auto action = body->GetAttribute<Rml::String>("data-alt2", "");
+        if (action.rfind("command:", 0) == 0) commands_.push_back(action.substr(8));
+        break;
+    }
     }
 }
 

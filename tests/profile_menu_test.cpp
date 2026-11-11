@@ -43,14 +43,16 @@ int main(int argc, char** argv) {
     // The playing profile comes first, then the others and Guest; New
     // profile is every item's Alt button.
     auto list = profile_list(store, false);
-    assert(list.size() == 4);
+    assert(list.size() == 3);
     assert(list[0].label == "Sam" && list[0].note == "playing now" && list[0].action == "command:profile:" + sam);
     assert(list[1].label == "Player 1" && list[1].note.empty());
-    assert(list[3].action == "command:profile_guest" && list[3].alt == "command:profile_new");
-    // As a guest no profile is playing; Guest just closes the menus.
+    assert(list[2].alt == "command:profile_new" && list[0].image == "/blockplanet-ui/coins/none.png");
+    // Play as guest is its own button: as a guest it just closes the menus
+    // (or carries on at the start-up choice); otherwise it restarts as one.
     list = profile_list(store, true);
-    assert(list.size() == 4 && list[0].label == "Player 1" && list[3].note.find("playing now") != std::string::npos &&
-           list[3].action == "close");
+    assert(list.size() == 3 && list[0].label == "Player 1" && list[0].note.empty());
+    assert(profile_guest_action(true, false) == "close" && profile_guest_action(true, true) == "profile_picked" &&
+           profile_guest_action(false, false) == "profile_guest");
 
     // The playing profile can be kept; another one restarts the game.
     auto actions = profile_actions(store, sam, false);
@@ -88,7 +90,7 @@ int main(int argc, char** argv) {
     assert(coin_list[1].image == "/blockplanet-ui/coins/bolt.png" && coin_list[1].image_colour == coin_colour(5) &&
            coin_list[1].label.empty() && coin_list[1].action == "command:profile_pick_coin:" + sam + ":bolt:5");
     assert(coin_colour(0).empty() && coin_colour(3) == "#8ed850" && coin_colour(8).empty());
-    assert(profile_list(store, false)[0].image.empty());
+    assert(profile_list(store, false)[0].image == "/blockplanet-ui/coins/none.png");  // a plain coin
     assert(store.set_coin("Sam", "crown", error));
     coin_list = coin_choices(store, sam, colours);
     assert(!coin_list[0].focus && coin_list[10].focus && coin_list[10].image_colour == coin_colour(3) &&

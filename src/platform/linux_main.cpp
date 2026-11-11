@@ -2493,7 +2493,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     if (std::getenv("BLOCKPLANET_HIDE_BUILD_LABEL") == nullptr) blockplanet::ui::set_build_label(BLOCKPLANET_BUILD_LABEL);
 #endif
     // The menus' button hints before any input (menu_input.cpp then follows the device).
-    blockplanet::ui::set_button_text("new_profile_hint", "[k:T] New profile");
+    blockplanet::ui::set_button_text("new_profile_hint", "[k:T] New profile\u00A0\u00A0\u00A0[k:G] Play as guest");
     blockplanet::ui::set_button_text("move_back", "[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back");
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
@@ -3159,6 +3159,12 @@ bool handle_profile_command(const std::string& command) {
     }
     if (const auto id = argument("profile_play:")) {
         if (const auto* profile = profile_by_id(store, *id)) restart_as(profile->name, false);
+        return true;
+    }
+    if (command == "profile_guest_button") {
+        const auto action = profile_guest_action(guest_session, !profile_picked);
+        if (action == "close") blockplanet::ui::request_close();
+        else blockplanet::ui::send_command(action);
         return true;
     }
     if (command == "profile_guest") restart_as(std::nullopt, true);

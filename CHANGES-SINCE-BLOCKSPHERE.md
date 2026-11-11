@@ -294,3 +294,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Fixed: on Windows the profile coins showed as plain coloured squares (the pictures were not found through RmlUi's paths relative to the screen). Pictures of BlockPlanet's own are now read straight from the menu folder.
 - Research notes: Puzzle's undrawn bottom rows under BlockPlanet's HUD (still open).
 - New: developer tools (the owner's request). `--developer`, or choice 7 in BlockPlanet.bat, turns on RT64's inspector: F1 opens it; its Debugger tab pauses a frame, picks and highlights each drawn shape, and has a free camera to look behind the sphere and backdrops (docs/DEVELOPER-TOOLS.md).
+- Profiles: each profile's coin sits in the icon's place (a plain coin when none is chosen), so the names line up; Play as guest is now a button of its own (Y, or G on a keyboard), shown in the hint beside New profile (the owner's request).

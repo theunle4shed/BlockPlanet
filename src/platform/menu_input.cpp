@@ -67,8 +67,12 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         const std::string now = !pad ? std::string("[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back")
                                      : std::string("[d:pad] Move\u00A0\u00A0\u00A0[") + f + ":" + physical_button_label(family, bindings.cancel) + "] Back";
         if (now != hint) blockplanet::ui::set_button_text("move_back", hint = now);
+        // The profile list's hint: New profile (Alt) and Play as guest (Alt2).
+        const std::string spec2 = !pad ? std::string("[k:G]")
+                                       : std::string("[") + f + ":" + physical_button_label(family, bindings.face_up) + "]";
+        const std::string profiles_hint = spec + " New profile\u00A0\u00A0\u00A0" + spec2 + " Play as guest";
         static std::string new_hint;
-        if (spec + " New profile" != new_hint) blockplanet::ui::set_button_text("new_profile_hint", new_hint = spec + " New profile");
+        if (profiles_hint != new_hint) blockplanet::ui::set_button_text("new_profile_hint", new_hint = profiles_hint);
     }
     auto send = [](Action action) {
         blockplanet::ui::queue_action(action);
@@ -116,6 +120,8 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
             return event.key.repeat ? true : send(Action::Back);
         case SDL_SCANCODE_T:
             return event.key.repeat ? true : send(Action::Alt);
+        case SDL_SCANCODE_G:
+            return event.key.repeat ? true : send(Action::Alt2);
         default: return true;  // other keys do nothing while the menus are open
         }
     }
@@ -126,6 +132,7 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         if (button == sdl_button(bindings.confirm)) return send(Action::Confirm);
         if (button == sdl_button(bindings.cancel)) return send(Action::Back);
         if (button == sdl_button(bindings.face_left)) return send(Action::Alt);
+        if (button == sdl_button(bindings.face_up)) return send(Action::Alt2);
         switch (button) {
         case SDL_CONTROLLER_BUTTON_DPAD_UP: return send(Action::Up);
         case SDL_CONTROLLER_BUTTON_DPAD_DOWN: return send(Action::Down);

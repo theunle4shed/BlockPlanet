@@ -306,7 +306,7 @@ body.centred .hint { display: block; margin-top: 20dp; }
               display: inline-block; width: 1.5em; vertical-align: middle; }
 
 /* Pictures before a label (profile coins): about the text's height. */
-.item img.picture { width: 1.1em; height: 1.1em; vertical-align: middle; margin-right: 14dp; }
+.item img.picture { width: 1.1em; height: 1.1em; vertical-align: middle; margin-right: 0.4em; }
 /* The coin screen: five to a row, pictures only. The colour step: four to
    a row, each coin above its colour's name. */
 .tiles.coins .item { width: 18%; height: 100dp; font-size: 24dp; text-align: center; padding: 8dp 2dp; }
