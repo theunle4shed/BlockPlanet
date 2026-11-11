@@ -534,7 +534,15 @@ UNDER_LAYER_HELPER = """    // BlockPlanet's under layer (tetrisphere/under_laye
         desc.pixelShader = pixel.get();
         desc.pipelineLayout = library->videoInterfacePixel.pipelineLayout.get();
         cover.pixel = device->createGraphicsPipeline(desc);
-        return cover.linear != nullptr;
+        // All three or none: a missing one swapped in would be bound as null.
+        if (cover.linear == nullptr || cover.nearest == nullptr || cover.pixel == nullptr) {
+            cover.linear.reset();
+            cover.nearest.reset();
+            cover.pixel.reset();
+            cover.failed = true;
+            return false;
+        }
+        return true;
     }
 
 """

@@ -1281,14 +1281,15 @@ BuildMatrices build_matrices(std::uint8_t* rdram) {
 // Scales what was drawn from `from` on (to the list's end now) by `size`
 // about a point on screen: each projection it loads (G_MTX, projection) is
 // replaced by a scaled copy, except the game's own projection put back at the
-// end; nothing is drawn while the size is still 0.
+// end; while the size is still 0 it is drawn at a point.
 void build_in(std::uint8_t* rdram, const BuildMatrices& matrices, int group, std::uint32_t from, float size, float cx, float cy) {
     const std::uint32_t to = load32(rdram, display_list_pointer);
     if (size >= 0.9999f && size <= 1.0001f) return;
-    if (size <= 0.001f) {
-        put32(rdram, display_list_pointer, from);  // not drawn yet
-        return;
-    }
+    // Not yet in: drawn at a thousandth of its size (a point) rather than
+    // taken back out of the list, whose commands the game's scene code may
+    // count on having been sent (its texture loads; taking them out was
+    // followed by a renderer crash in one boot in eight, 2026-11-11).
+    size = std::max(size, 0.001f);
     std::uint32_t game_projection = 0;
     for (std::uint32_t at = from - 8u, n = 0; n < 4096 && at >= 0x80000000u; at -= 8u, ++n) {
         const std::uint32_t w0 = load32(rdram, at);
