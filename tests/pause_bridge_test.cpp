@@ -170,7 +170,7 @@ int main() {
         set(0x800DFF08, 1);
         t += std::chrono::milliseconds(50);
         e = end.update(m, labels, false, t);
-        assert(e.open_menu && e.title == "Game over" && e.items.size() == 3 && end.hide_original() && end.exit_row() == 1);
+        assert(e.open_menu && e.title == "Game Over" && e.items.size() == 3 && end.hide_original() && end.exit_row() == 1);
         t += std::chrono::milliseconds(50);
         assert(!end.update(m, {}, true, t).open_menu);  // open: nothing more (the game's text is hidden now)
         t += std::chrono::milliseconds(50);

@@ -2590,6 +2590,8 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                                     "\n\nPlease send it with a short note of what you were doing.";
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "BlockPlanet", message.c_str(), nullptr);
     }
+    // The box art's flow events also go to the diagnostics file.
+    tetrisphere::direct_start::set_event_sink([](const std::string& line) { diagnostic_log().perf(line); });
     std::fprintf(stdout, "{\"event\":\"diagnostic_file_ready\",\"run_id\":\"%s\"}\n",
                  run_id());
     std::fflush(stdout);

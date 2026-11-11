@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <string>
 
 namespace tetrisphere {
 
@@ -56,6 +57,13 @@ void request_intro_restart();
 // Back to the box art (Back from "Who is playing?", docs/UI.md): the title
 // from its start, without the intro. Done at the game's next frame in its menus.
 void request_title_restart();
+
+// The box art's flow events (box_art_*, title_restart, intro_restart and
+// changes of the game's reset flag 0x800DF728): printed on stdout and also
+// handed to this sink (the diagnostics file in the game's data folder), so a
+// player's run can be read back without a console.
+void set_event_sink(void (*sink)(const std::string& json_line));
+void log_event(const std::string& json_line);
 
 // Guest play: player 1's name in the game is "Guest" (no name is asked for).
 void set_guest(bool guest);

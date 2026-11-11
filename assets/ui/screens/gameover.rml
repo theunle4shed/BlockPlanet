@@ -1,6 +1,6 @@
 <rml>
 <head>
-    <title>Game over</title>
+    <title>Game Over</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
 <!-- BlockPlanet's panel over the game's end menus (game over: Try again,
@@ -10,7 +10,7 @@
      in once the GAME OVER animation has shown. -->
 <body data-grid="red" class="over-pause">
     <div id="panel">
-        <div class="header" data-text="end_title">Game over</div>
+        <div class="header" data-text="end_title">Game Over</div>
         <div class="subtitle" data-text="end_where"></div>
         <div class="list" data-list="end"></div>
     </div>

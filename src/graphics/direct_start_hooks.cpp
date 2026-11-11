@@ -463,6 +463,21 @@ void cancel() {
 
 void request_intro_restart() { intro_restart.store(true); }
 void request_title_restart() { title_restart.store(true); }
+
+namespace {
+std::atomic<void (*)(const std::string&)> event_sink{nullptr};
+}
+void set_event_sink(void (*sink)(const std::string&)) { event_sink.store(sink); }
+void log_event(const std::string& json_line) {
+    // With the time since start, for reading a run back.
+    static const auto start = std::chrono::steady_clock::now();
+    const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+    std::string line = json_line;
+    if (!line.empty() && line.back() == '}') line.insert(line.size() - 1, ",\"ms\":" + std::to_string(ms));
+    std::fprintf(stdout, "%s\n", line.c_str());
+    std::fflush(stdout);
+    if (auto* sink = event_sink.load()) sink(line);
+}
 void set_guest(bool guest) { guest_play.store(guest); }
 
 void request_save_switch(const std::filesystem::path& path) {
@@ -575,8 +590,7 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
     if (phase == box_art::Phase::ToDemo && load16(rdram, main_row) == -1 &&
         (load16(rdram, mode) == 10 || load16(rdram, mode) == 3)) {
         box_art::phase().store(box_art::Phase::Demo);
-        std::fprintf(stdout, "{\"event\":\"box_art_demo\"}\n");
-        std::fflush(stdout);
+        direct_start::log_event("{\"event\":\"box_art_demo\"}");
     }
     if (intro && box_art::handover_pending().exchange(false)) {
         end_intro_now(rdram, ctx);  // the hand-over asked for in the intro's last frame (box_art_hooks.cpp)
@@ -586,8 +600,7 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
         on_box_art = false;
         if ((pressed & (button_a | button_start)) != 0 && load8(rdram, save_read) != 0) {
             end_intro_now(rdram, ctx);
-            std::fprintf(stdout, "{\"event\":\"box_art_skip\"}\n");
-            std::fflush(stdout);
+            direct_start::log_event("{\"event\":\"box_art_skip\"}");
         }
         return;
     }
@@ -614,8 +627,7 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
             !title_restart.load()) {
             title_restart.store(true);
             box_art::phase().store(box_art::Phase::None);  // the restart is under way (once)
-            std::fprintf(stdout, "{\"event\":\"box_art_demo_to_menu\"}\n");
-            std::fflush(stdout);
+            direct_start::log_event("{\"event\":\"box_art_demo_to_menu\"}");
         }
         return;
     }
@@ -633,14 +645,12 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
     if (!in_place && blockplanet_title_in_place()) {
         in_place = true;
         since = std::chrono::steady_clock::now();
-        std::fprintf(stdout, "{\"event\":\"box_art_in_place\"}\n");
-        std::fflush(stdout);
+        direct_start::log_event("{\"event\":\"box_art_in_place\"}");
     }
     const double seconds = in_place ? std::chrono::duration<double>(std::chrono::steady_clock::now() - since).count() : 0.0;
     if ((pressed & button_b) != 0) {
         intro_restart.store(true);
-        std::fprintf(stdout, "{\"event\":\"box_art_back\"}\n");
-        std::fflush(stdout);
+        direct_start::log_event("{\"event\":\"box_art_back\"}");
         return;
     }
     // Leave the title as it does on a press (0x80069500), for its menus,
@@ -662,15 +672,13 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
     };
     if ((pressed & (button_a | button_start)) != 0) {
         leave_title();
-        std::fprintf(stdout, "{\"event\":\"box_art_press\"}\n");
-        std::fflush(stdout);
+        direct_start::log_event("{\"event\":\"box_art_press\"}");
         return;
     }
     if (seconds >= attract_seconds()) {
         leave_title();
         box_art::phase().store(box_art::Phase::ToDemo);
-        std::fprintf(stdout, "{\"event\":\"box_art_attract\"}\n");
-        std::fflush(stdout);
+        direct_start::log_event("{\"event\":\"box_art_attract\"}");
         return;
     }
     if (static_cast<std::int32_t>(load32(rdram, menu_timer_a)) > 880) store32(rdram, menu_timer_a, 880);
@@ -691,14 +699,23 @@ extern "C" void blockplanet_attract_guard(std::uint8_t* rdram, recomp_context*) 
     using namespace tetrisphere;
     using namespace tetrisphere::guest;
     constexpr std::uint32_t reset_signal = 0x800DF728u;
-    if (!box_art_enabled() || load32(rdram, reset_signal) == 0 || load16(rdram, demo_running) != 0) return;
+    // Each change of the flag, for the diagnostics file.
+    static std::uint32_t last = 0;
+    const std::uint32_t value = load32(rdram, reset_signal);
+    if (value != last) {
+        last = value;
+        direct_start::log_event("{\"event\":\"reset_flag\",\"value\":" + std::to_string(value) + ",\"attract\":" +
+                                std::to_string(load16(rdram, demo_running)) + "}");
+    }
+    if (!box_art_enabled() || value == 0 || load16(rdram, demo_running) != 0) return;
     const bool outside_play = load16(rdram, title_done) == 0 || load16(rdram, main_row) >= 0 ||
                               box_art::phase().load() != box_art::Phase::None;
-    std::fprintf(stdout, "{\"event\":\"box_art_reset_signal\",\"cleared\":%s,\"intro\":%d,\"title\":%d,\"row\":%d,\"mode\":%d}\n",
-                 outside_play ? "true" : "false", int(load16(rdram, intro_done)), int(load16(rdram, title_done)), int(load16(rdram, main_row)),
-                 int(load16(rdram, mode)));
-    std::fflush(stdout);
-    if (outside_play) store32(rdram, reset_signal, 0);
+    char line[200];
+    std::snprintf(line, sizeof line, "{\"event\":\"box_art_reset_signal\",\"cleared\":%s,\"intro\":%d,\"title\":%d,\"row\":%d,\"mode\":%d}",
+                  outside_play ? "true" : "false", int(load16(rdram, intro_done)), int(load16(rdram, title_done)), int(load16(rdram, main_row)),
+                  int(load16(rdram, mode)));
+    direct_start::log_event(line);
+    if (outside_play) store32(rdram, reset_signal, 0), last = 0;
 }
 
 extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx) {
@@ -720,8 +737,7 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
         store16(rdram, main_row, 0);
         store16(rdram, page_exit, 0);
         clear_menu_presentation(rdram);
-        std::fprintf(stdout, "{\"event\":\"title_restart\"}\n");
-        std::fflush(stdout);
+        direct_start::log_event("{\"event\":\"title_restart\"}");
     }
     // Back to the intro (Back from "Who is playing?"): as at boot, the intro's
     // scene memory rewound to where it started it, the intro, title and their
@@ -742,8 +758,7 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
         store16(rdram, main_row, 0);
         store16(rdram, page_exit, 0);
         clear_menu_presentation(rdram);
-        std::fprintf(stdout, "{\"event\":\"intro_restart\"}\n");
-        std::fflush(stdout);
+        direct_start::log_event("{\"event\":\"intro_restart\"}");
     }
     blockplanet_box_art_update(rdram);  // the under layer follows the title (box_art_hooks.cpp)
     std::lock_guard lock(mutex);

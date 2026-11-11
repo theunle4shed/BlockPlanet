@@ -207,7 +207,7 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
         auto items = end_menu_items(labels, &exit_row_);
         if (items.empty()) return out;
         items_ = std::move(items);
-        title_ = game_over ? "Game over" : "Match over";
+        title_ = game_over ? "Game Over" : "Match Over";
         showing_ = true;
         out.active = true;
     }

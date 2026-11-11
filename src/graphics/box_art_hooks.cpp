@@ -11,12 +11,14 @@
 // with it.
 
 #include "tetrisphere/box_art.h"
+#include "tetrisphere/direct_start.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
 #include "tetrisphere/under_layer.h"
 
 #include <cstdint>
 #include <cstdio>
+#include <string>
 #include <cstdlib>
 #include <cstring>
 
@@ -80,8 +82,8 @@ extern "C" bool blockplanet_box_art_scene(std::uint8_t* rdram, recomp_context* c
             // the intro runs (direct_start_hooks.cpp): changing the intro's
             // state here, inside its own frame, is not safe.
             if (!tetrisphere::box_art::handover_pending().exchange(true)) {
-                std::fprintf(stdout, "{\"event\":\"box_art_from_intro\",\"frame\":%d}\n", static_cast<int>(load32(rdram, intro + 0x24u)));
-                std::fflush(stdout);
+                tetrisphere::direct_start::log_event("{\"event\":\"box_art_from_intro\",\"frame\":" +
+                                                     std::to_string(static_cast<int>(load32(rdram, intro + 0x24u))) + "}");
             }
             ctx->r2 = 0;
             return true;  // not drawn: the next frame is the title's
