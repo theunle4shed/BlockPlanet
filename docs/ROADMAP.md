@@ -162,6 +162,7 @@ Puzzle limits its play area with a border of type 47 blocks (the purple "out of 
 - **Medals:** each stage awards gold, silver or bronze against that stage's own challenge, and remembers the best medal won there.
 - **Points and unlocks:** medals convert to points, which unlock further stages on the map. Some small side branches open only on a gold.
 - **Independent stages:** once unlocked, any stage can be played at any time, in any order. Lives come from each stage's own configuration, not from a run.
+- **Themes as rewards:** stages can come with their own theme (sphere look and background), and finishing them unlocks that theme for use anywhere. Example, Neutron: bright blue brick borders, dark grey bricks, the selected bricks lit in neon too, and a matching background. See the themes note in [REDESIGN.md](REDESIGN.md) §12.
 - **Story stays as it is,** perhaps renamed (for example "Classic") so the two are told apart.
 - Open for later: the map's look and navigation on the sphere, the medal thresholds per stage type, the points cost of each unlock, and how it fits the rulesets-per-stage idea and the direct starts (every mode can be started at any stage).
 

@@ -282,3 +282,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Fixed: on a window taller than wide, the menu panels ran off the right edge (the panel is 720 wide). They now fit the window's width.
 - Design notes: the colour-blindness idea (choose block colours; current piece in colour with the rest greyscale, power-ups and special blocks kept in colour), under Accessibility.
 - Design notes: the sphere themes idea (pick the sphere's colours and texture design; the current look stays the default), under Long-term engagement.
+- Design notes: themes also cover the background and can be unlocked through Adventure stages; first example theme, Neutron (bright blue brick borders, dark grey bricks, neon selection).

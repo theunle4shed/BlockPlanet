@@ -342,6 +342,7 @@ Not in the original brief, but essential for a modern release.
 - **Custom levels:** share designed spheres with a short code (the generator research supports this).
 - **Cosmetics earned through play:** sphere themes, block skins, visualiser presets. No paid randomised rewards.
   - *Idea (the owner's, 2026-11-11):* a theme picker for the sphere's colours and texture design, with the current look as the default theme. Themes would be BlockPlanet's own original art. They change only how blocks are drawn, not their type, so they work with the colour-blind options in section 11 (a type's chosen colour or pattern wins over the theme). The flat, glowing look planned for the prototype-era mode (ROADMAP, Phase 4) would be one theme in the same system.
+  - A theme covers the background as well as the sphere. Themes can be unlocked through Adventure stages. Example, *Neutron*: bright blue borders on every brick, dark grey brick faces, the selected bricks lit in neon, and a background to match. Power-ups and special blocks still need to read clearly in every theme.
 - **Seasonal events:** optional, low-pressure, built from seeds and presets rather than new content drops.
 
 ## What to keep, change or drop
