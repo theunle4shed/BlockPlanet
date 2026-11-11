@@ -34,6 +34,7 @@
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_extended.h"
 #include "tetrisphere/sphere_faces.h"
+#include "tetrisphere/game_over_shell.h"
 #include "tetrisphere/sphere_grid.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/sphere_quadrants.h"
@@ -717,6 +718,7 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
         if (quadrant == 0) begin_extended_vertices(rdram);
         draw_extended_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant), extended_sphere);
         if (quadrant == 3) {
+            draw_game_over_shell(rdram, extended_sphere);  // game_over_shell.cpp
             stats_sphere_end(rdram);
             end_extended_vertices(rdram);
         }

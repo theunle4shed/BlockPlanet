@@ -305,6 +305,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/sphere_mesh.cpp
     src/graphics/sphere_cell.cpp
     src/graphics/sphere_quadrants.cpp
+    src/graphics/game_over_shell.cpp
     src/graphics/sphere_faces.cpp
     src/graphics/sphere_grid.cpp
     src/graphics/sphere_extended.cpp
@@ -457,6 +458,7 @@ add_executable(tetrisphere_diag
     src/graphics/sphere_mesh.cpp
     src/graphics/sphere_cell.cpp
     src/graphics/sphere_quadrants.cpp
+    src/graphics/game_over_shell.cpp
     src/graphics/sphere_faces.cpp
     src/graphics/sphere_grid.cpp
     src/graphics/sphere_extended.cpp
@@ -1129,6 +1131,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/sphere_mesh.cpp
         src/graphics/sphere_cell.cpp
         src/graphics/sphere_quadrants.cpp
+        src/graphics/game_over_shell.cpp
         src/graphics/sphere_faces.cpp
         src/graphics/sphere_grid.cpp
         src/graphics/sphere_extended.cpp
