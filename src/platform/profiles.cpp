@@ -11,7 +11,9 @@
 namespace tetrisphere {
 namespace {
 
-constexpr int schema_version = 2;  // 2 added character and palette
+// 2 added character and palette. The optional "coin" (2026-11-11) needs no
+// new version: earlier builds ignore it.
+constexpr int schema_version = 2;
 constexpr const char* list_file = "profiles.json";
 
 bool same_name(std::string_view a, std::string_view b) {
@@ -71,7 +73,8 @@ bool ProfileStore::load(std::string& error) {
         }
         for (const auto& entry : document.at("profiles")) {
             Profile p{entry.at("id").get<std::string>(), entry.at("name").get<std::string>(),
-                      entry.value("character", std::string{}), entry.value("palette", 0)};
+                      entry.value("character", std::string{}), entry.value("palette", 0),
+                      entry.value("coin", std::string{})};
             const bool numeric = !p.id.empty() && std::all_of(p.id.begin(), p.id.end(), [](char c) {
                 return c >= '0' && c <= '9';
             });
@@ -98,7 +101,8 @@ bool ProfileStore::load(std::string& error) {
 bool ProfileStore::save(std::string& error) const {
     nlohmann::json list = nlohmann::json::array();
     for (const auto& p : profiles_)
-        list.push_back({{"id", p.id}, {"name", p.name}, {"character", p.character}, {"palette", p.palette}});
+        list.push_back({{"id", p.id}, {"name", p.name}, {"character", p.character}, {"palette", p.palette},
+                        {"coin", p.coin}});
     const nlohmann::json document{{"schema_version", schema_version}, {"active", active_id_}, {"profiles", list}};
     return write_atomically(data_directory_ / list_file, document.dump(2) + "\n", error);
 }
@@ -138,7 +142,7 @@ bool ProfileStore::add(std::string_view name, std::string& error) {
         error = "a profile with that name already exists";
         return false;
     }
-    profiles_.push_back({next_id(), std::string(name), {}, 0});
+    profiles_.push_back({next_id(), std::string(name), {}, 0, {}});
     return save(error);
 }
 
@@ -165,6 +169,23 @@ bool ProfileStore::set_character(std::string_view name, std::string_view charact
     }
     it->character = std::string(character);
     it->palette = palette;
+    return save(error);
+}
+
+bool ProfileStore::set_coin(std::string_view name, std::string_view coin, std::string& error) {
+    auto it = std::find_if(profiles_.begin(), profiles_.end(), [&](const Profile& p) { return same_name(p.name, name); });
+    if (it == profiles_.end()) {
+        error = "no profile with that name";
+        return false;
+    }
+    const bool valid = coin.size() <= 32 && std::all_of(coin.begin(), coin.end(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
+    });
+    if (!valid) {
+        error = "coins are up to 32 of a-z, 0-9 and '-'";
+        return false;
+    }
+    it->coin = std::string(coin);
     return save(error);
 }
 
@@ -205,7 +226,7 @@ bool ProfileStore::remove(std::string_view name, std::string& error) {
     {
         std::ofstream(source / "profile.json", std::ios::binary)
             << nlohmann::json{{"id", removed.id}, {"name", removed.name}, {"character", removed.character},
-                              {"palette", removed.palette}}.dump(2) << "\n";
+                              {"palette", removed.palette}, {"coin", removed.coin}}.dump(2) << "\n";
     }
     std::filesystem::rename(source, destination, code);
     if (code) {
@@ -213,7 +234,7 @@ bool ProfileStore::remove(std::string_view name, std::string& error) {
         return false;
     }
     profiles_.erase(it);
-    if (profiles_.empty()) profiles_.push_back({next_id(), "Player 1", {}, 0});
+    if (profiles_.empty()) profiles_.push_back({next_id(), "Player 1", {}, 0, {}});
     if (std::none_of(profiles_.begin(), profiles_.end(), [&](const Profile& p) { return p.id == active_id_; }))
         active_id_ = profiles_.front().id;
     return save(error);
@@ -230,7 +251,8 @@ std::vector<DeletedProfile> ProfileStore::deleted() const {
             const auto document = nlohmann::json::parse(in);
             result.push_back({entry.path().filename().string(),
                               {document.at("id").get<std::string>(), document.at("name").get<std::string>(),
-                               document.value("character", std::string{}), document.value("palette", 0)}});
+                               document.value("character", std::string{}), document.value("palette", 0),
+                               document.value("coin", std::string{})}});
         } catch (const std::exception&) {
         }
     }

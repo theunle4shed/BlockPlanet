@@ -22,6 +22,8 @@ std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, b
         const std::string action = !picker ? "command:profile:" + profile.id
                                    : playing ? "command:profile_picked" : "command:profile_play:" + profile.id;
         items.push_back({"profile" + profile.id, profile.name, note, action, true});
+        items.back().image = coin_image(profile.coin);
+        if (!items.back().image.empty()) items.back().image_colour = coin_colour(profile.palette);
     };
     if (!guest) add(store.active(), true);
     for (const auto& profile : store.profiles())
@@ -46,6 +48,7 @@ std::vector<blockplanet::ui::ListItem> profile_actions(const ProfileStore& store
     items.push_back({"rename", "Rename", "", "command:profile_rename:" + id, true});
     items.push_back({"character", "Character", character_label(profile->character),
                      "command:profile_character:" + id, true});
+    items.push_back({"coin", "Coin", coin_label(profile->coin), "command:profile_coin:" + id, true});
     items.push_back({"delete", "Delete " + profile->name, "", "command:profile_delete:" + id, true});
     return items;
 }
@@ -86,6 +89,48 @@ std::vector<blockplanet::ui::ListItem> character_choices(const ProfileStore& sto
     for (const auto& character : characters())
         items.push_back({character.id, character.label, profile->character == character.id ? "chosen" : "",
                          prefix + character.id, true});
+    return items;
+}
+
+const std::vector<Coin>& coins() {
+    static const std::vector<Coin> list{{"bolt", "Bolt"},     {"visor", "Visor"},   {"cyclops", "Cyclops"},
+                                        {"cat", "Cat"},       {"helmet", "Helmet"}, {"rocket", "Rocket"},
+                                        {"planet", "Planet"}, {"bricks", "Bricks"}, {"spark", "Spark"},
+                                        {"crown", "Crown"},   {"heart", "Heart"},   {"music", "Music"}};
+    return list;
+}
+
+std::string coin_label(const std::string& id) {
+    for (const auto& coin : coins())
+        if (id == coin.id) return coin.label;
+    return {};
+}
+
+std::string coin_image(const std::string& id) {
+    return coin_label(id).empty() ? std::string{} : "../coins/" + id + ".png";
+}
+
+std::string coin_colour(int palette) {
+    // Original, Crimson, Amber, Lime, Teal, Sky, Violet, Rose (colour_names()).
+    static const char* tints[] = {"", "#e04848", "#f2b030", "#8ed850", "#3fc8b8", "#50a8f0", "#a080f0", "#f070a8"};
+    return palette > 0 && palette < 8 ? tints[palette] : "";
+}
+
+std::vector<blockplanet::ui::ListItem> coin_choices(const ProfileStore& store, const std::string& id) {
+    std::vector<blockplanet::ui::ListItem> items;
+    const auto* profile = profile_by_id(store, id);
+    if (profile == nullptr) return items;
+    const std::string prefix = "command:profile_set_coin:" + id + ":";
+    items.push_back({"none", "None", profile->coin.empty() ? "chosen" : "", prefix + "none", true, 1,
+                     profile->coin.empty()});
+    items.back().image = "../coins/none.png";  // a plain coin
+    items.back().image_colour = coin_colour(profile->palette);
+    for (const auto& coin : coins()) {
+        items.push_back({coin.id, coin.label, profile->coin == coin.id ? "chosen" : "", prefix + coin.id, true, 1,
+                         profile->coin == coin.id});
+        items.back().image = coin_image(coin.id);
+        items.back().image_colour = coin_colour(profile->palette);
+    }
     return items;
 }
 

@@ -2971,6 +2971,7 @@ bool handle_profile_command(const std::string& command) {
         blockplanet::ui::set_list("profiles", profile_list(store, guest_session, !profile_picked));
         blockplanet::ui::set_list("profile_actions", profile_actions(store, id, guest_session));
         blockplanet::ui::set_list("characters", character_choices(store, id));
+        blockplanet::ui::set_list("coins", coin_choices(store, id));
     };
     const auto show_name = [&](const std::string& hint) {
         blockplanet::ui::set_text("name_edit", name_editor.text() + "|");
@@ -3037,6 +3038,30 @@ bool handle_profile_command(const std::string& command) {
         blockplanet::ui::request_show("character");
         return true;
     }
+    if (const auto id = argument("profile_coin:")) {
+        const auto* profile = profile_by_id(store, *id);
+        if (profile == nullptr) return true;
+        character_profile_id = *id;  // the colour row edits this profile too
+        blockplanet::ui::set_text("coin_for", "For " + profile->name);
+        blockplanet::ui::set_setting("profile_colour", std::to_string(profile->palette));
+        blockplanet::ui::set_list("coins", coin_choices(store, *id));
+        blockplanet::ui::request_show("coin");
+        return true;
+    }
+    if (const auto choice = argument("profile_set_coin:")) {
+        const auto colon = choice->find(':');
+        if (colon == std::string::npos) return true;
+        const auto id = choice->substr(0, colon);
+        const auto coin = choice->substr(colon + 1);
+        const auto* profile = profile_by_id(store, id);
+        if (profile == nullptr) return true;
+        std::string error;
+        const std::string name = profile->name;
+        if (!store.set_coin(name, coin == "none" ? "" : coin, error))
+            std::fprintf(stderr, "Could not set the coin: %s\n", error.c_str());
+        refresh(id);
+        return true;
+    }
     if (const auto choice = argument("profile_set_character:")) {
         const auto colon = choice->find(':');
         if (colon == std::string::npos) return true;
@@ -3060,6 +3085,7 @@ bool handle_profile_command(const std::string& command) {
         if (!store.set_character(name, profile->character, palette, error))
             std::fprintf(stderr, "Could not set the colour: %s\n", error.c_str());
         blockplanet::ui::set_setting("profile_colour", std::to_string(profile_by_id(store, character_profile_id)->palette));
+        refresh(character_profile_id);  // the coins take the new colour
         return true;
     }
     if (const auto id = argument("profile:")) {

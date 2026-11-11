@@ -305,6 +305,13 @@ body.centred .hint { display: block; margin-top: 20dp; }
 .item .icon { font-family: lucide; font-weight: normal; font-style: normal; font-size: 0.9em;
               display: inline-block; width: 1.5em; vertical-align: middle; }
 
+/* Pictures before a label (profile coins): about the text's height. */
+.item img.picture { width: 1.1em; height: 1.1em; vertical-align: middle; margin-right: 14dp; }
+/* The coin screen: five to a row, each coin above its name. */
+.tiles.coins .item { width: 18%; height: 128dp; font-size: 24dp; text-align: center; padding: 8dp 2dp; }
+.tiles.coins .item img.picture { display: block; width: 72dp; height: 72dp; margin: 0dp auto 4dp auto; }
+.tiles.coins .item .note { font-size: 20dp; }
+
 /* The grid test screen: a narrow panel at the left, leaving the grid in view. */
 body.lab #panel { left: 40dp; width: 640dp; top: 20dp; padding: 28dp 36dp; max-height: 96vh; }
 body.lab .item { font-size: 26dp; padding: 3dp 20dp; }

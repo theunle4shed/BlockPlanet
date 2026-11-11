@@ -27,6 +27,9 @@ struct Profile {
     // available ones come with the profile screen) and its colour variant.
     std::string character;
     int palette = 0;
+    // The profile's coin (BlockPlanet's own emblems, assets/ui/coins; empty
+    // for none), shown beside its name and tinted with the colour variant.
+    std::string coin;
 };
 
 // A deleted profile that can still be restored.
@@ -55,6 +58,8 @@ public:
     // Sets the profile's character (up to 32 of a-z, 0-9, '-'; empty for
     // none) and colour variant (0 to 7).
     bool set_character(std::string_view name, std::string_view character, int palette, std::string& error);
+    // Sets the profile's coin (the same form as a character id; empty for none).
+    bool set_coin(std::string_view name, std::string_view coin, std::string& error);
     // Renames a profile (its folder keeps its id). A change of case only is
     // allowed; another profile's name is not.
     bool rename(std::string_view name, std::string_view new_name, std::string& error);

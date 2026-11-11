@@ -629,6 +629,7 @@ add_executable(profile_menu_test tests/profile_menu_test.cpp src/platform/profil
     src/platform/profiles.cpp src/platform/relaunch.cpp)
 target_include_directories(profile_menu_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")
+target_compile_definitions(profile_menu_test PRIVATE BLOCKPLANET_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 if(MSVC)
     target_compile_options(profile_menu_test PRIVATE /UNDEBUG)
 else()

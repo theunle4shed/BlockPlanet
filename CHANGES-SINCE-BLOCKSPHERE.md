@@ -285,3 +285,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Design notes: themes also cover the background and can be unlocked through Adventure stages; first example theme, Neutron (bright blue brick borders, dark grey bricks, neon selection).
 - Research notes: the faint drifting robot coins over the title and menu backdrop.
 - Roadmap: the profile icons idea (robot-coin emblems; our own vector designs recommended, or the game's coins read from the player's copy).
+- Profiles: a coin for each profile, chosen on a new Coin screen (Profile > Coin) and shown beside its name, in the profile's colour. Twelve coins of BlockPlanet's own (Bolt, Visor, Cyclops, Cat, Helmet, Rocket, Planet, Bricks, Spark, Crown, Heart, Music), drawn by `tools/art/coins.py`; menu lists can now show a picture before a label.
