@@ -159,7 +159,7 @@ Read from the generated code by the parent session, and given here as addresses 
   - `func_800ACB94` (input) sets the piece id at `+0x24AA`, the position at `+0x24AC` and `+0x24AE` (the cursor + 7, wrapped to 31), `+0x24B0` = 8, and the flags at `+0x24B2` = `0x5595`.
   - In `func_800CD3B8`, at `0x800CDA5C`, it takes a slot: one of 64 at context `+0x25CC`, 20 bytes each (`func_800921A8`). At `0x800CDC30` it sets `+0x24B0` to `func_8008AB0C` − 1 and starts the visual (`func_800C0308`).
   - The slot processor `func_8009423C`, with flag 1, sets slot `+0xE` to `func_8008AB0C` − 1 again (`0x80094450`).
-  - With flag 4 it stamps at `+0xE` + 1 and runs the match. Below the threshold it removes the piece (`0x80094BB8`), plays the dissolve effect `func_800BCF78`, sets context `+0x1C4` = 1 and calls the heart loss `func_800940F0` (`0x80094BF4`). So a no-match drop dissolves, which still needs confirming in play (check 1 below).
+  - With flag 4 it stamps at `+0xE` + 1 and runs the match. Below the threshold it removes the piece (`0x80094BB8`), plays the dissolve effect `func_800BCF78`, sets context `+0x1C4` = 1 and calls the heart loss `func_800940F0` (`0x80094BF4`). In play, though, an ordinary no-match drop keeps its piece (check 1 below), so that branch is for something else.
   - The real drop recomputes the layer and never reuses `+0x2444`.
 
 **Escape's reversed landing.** Replace `func_8008AB0C` and `func_8008AA00` behind a switch:
@@ -227,7 +227,7 @@ What each draws:
 
 ### Checks still open on the real game
 
-1. A no-match drop: does the piece stay or dissolve? Break at `0x80094B4C` against `0x80094BF4`.
+1. ~~A no-match drop: does the piece stay or dissolve?~~ **It stays** (an earlier `BLOCKPLANET_BOARD_LOG` run, Story 1:1). Four no-match drops each cost a heart, and each piece was written and kept, stacking at layers 2, 3 and 4 with no removal after. So the remove-and-dissolve branch at `0x80094BB8` does not run for an ordinary no-match drop: either its threshold test passes, or it is for something else. The heart is lost and the piece lands. Escape's miss (nothing above) is a new path, as planned; it can't reuse that branch unchanged, though its parts (remove, `func_800BCF78`, `func_800940F0`) are the ones to call.
 2. Gravity: break at `0x800AF7F8` and `0x80094DC8` during a real gravity combo.
 3. Odd S: poke `+0x23E4` = 3, then patch the corner steps.
 4. A shell board: poke the fill loop's start.
