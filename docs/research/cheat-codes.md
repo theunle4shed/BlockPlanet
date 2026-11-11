@@ -47,7 +47,7 @@ Player 1's context starts at `0x80110220` and player 2's at `0x80113488`, `0x326
 | `80115890 0000` | Infinite time, P2 | P2's `+0x2408`: one byte off from P1's `+0x2409`, so one of the two is probably mistyped (a 16-bit value's high and low bytes). | Single source | [Almar's Guides](https://almarsguides.com/retro/walkthroughs/N64/Games/Tetrisphere/Gameshark/SingleandVSModeCodes/) |
 | `810CECBC 2400` | Infinite time, both players | Patches the instruction at `0x800CECBC` into a do-nothing: probably the line that advances a timer. | Single source | [Almar's Guides](https://almarsguides.com/retro/walkthroughs/N64/Games/Tetrisphere/Gameshark/) |
 | `81094B44 2400` | Never miss | Patches the instruction at `0x80094B44`: probably the heart loss on a bad drop. | Single source | [Almar's Guides](https://almarsguides.com/retro/walkthroughs/N64/Games/Tetrisphere/Gameshark/) |
-| `8011265F 00AD` | Secret cheat menu screen | Context `+0x243F`, unknown to BlockPlanet. No source says what the screen shows. | Agreed (several sites, Codejunkies) | [Almar's Guides](https://almarsguides.com/retro/walkthroughs/N64/Games/Tetrisphere/Gameshark/SingleandVSModeCodes/), [Codejunkies](http://us.codejunkies.com/search/codes/Tetrisphere_Nintendo-64_6295981-6___.aspx), [Cheatmasters](https://w.cheatmasters.com/n64/tetis_p.html), [GameGenie.com](https://gamegenie.com/cheats/gameshark/n64/tetrisphere.html) |
+| `8011265F 00AD` | Secret cheat menu screen | Context `+0x243F`: **a running counter** (tested 2026-11-11, see below). Probably not a menu. | Agreed (several sites, Codejunkies) | [Almar's Guides](https://almarsguides.com/retro/walkthroughs/N64/Games/Tetrisphere/Gameshark/SingleandVSModeCodes/), [Codejunkies](http://us.codejunkies.com/search/codes/Tetrisphere_Nintendo-64_6295981-6___.aspx), [Cheatmasters](https://w.cheatmasters.com/n64/tetis_p.html), [GameGenie.com](https://gamegenie.com/cheats/gameshark/n64/tetrisphere.html) |
 | `80112D18 vvvv`, `80112D1A vvvv` | Score modifier P1 (smaller, larger) | The score, context `+0x2AF8` (u32, `0x80112D18`): its high and low halves. ("Replace the X's with F's for a quick score gain".) | Agreed | [Total Cheats](http://www.total-cheats.com/n64/tetrisphere.html), [GameGenie.com](https://gamegenie.com/cheats/gameshark/n64/tetrisphere.html), [CheatCC](https://www.cheatcc.com/articles/tetrisphere-cheats-codes-cheat-codes-for-nintendo-64-n64-n64/) |
 | `810E12DC 0001` | Stage select | The match count of the level-select name (`+;<>^`, the table entry at `0x800E12D8`). | Single source, but matches the table exactly | [CodeTwink](http://www.codetwink.com/view-cheats-1641-title-tetrisphere.html) |
 | `810E12E4 0001` | Unlock Lines | The match count of LINES, the next entry. | Single source, but matches the table | [CodeTwink](http://www.codetwink.com/view-cheats-1641-title-tetrisphere.html) |
@@ -71,8 +71,19 @@ For each: what the code showed, how BlockPlanet could do it as an option, and wh
 | **Unlock everything** | Stage select, Lines | Done or planned in the menus (Lines from the start, level select by chapter, `--unlock-all`). | No modifier needed. |
 | **Extra music** | G + alien + MEBOY | Find what the name sets, and offer the nine songs in the jukebox and music choice. | Planned; confirm the nine songs and whether they count among the 23 tracks already named. |
 | **The vortex scene** | VORTEX | Find what the name and the held Reset start, and play the scene from an Extras item or as a jukebox visual. | New, small and delightful. |
-| **The secret cheat menu** | `8011265F 00AD` | Research first: write `0xAD` to context `+0x243F` in a test build and record what appears. It may be a developer menu with more switches. | Research item; could feed the Modifiers menu. |
+| **The secret cheat menu** | `8011265F 00AD` | Tested once (below): the address is a running counter, and a single write showed nothing. Testing properly needs a write every frame, as the cheat device does. Most likely an animation or timer frozen at one value, not a menu. | Low priority until a per-frame test shows something. |
 | **A piece of your choice** | Not a known code; came up in the question | BlockPlanet already knows the piece queue (context `+0x2374`, nine halfwords). An option could set the next piece, or bias the queue (more wild pieces, one shape only). | A Custom or training modifier, and a puzzle-making tool. |
+
+### Test of the "secret cheat menu" code (2026-11-11)
+
+Tested by the parent session on the real game, in Story 1:1 on a recent BlockPlanet build:
+
+- Context `+0x243F` (`0x8011265F`) is a **running counter**: in play it rose by about 4 every 50 ms (179, 183, 187 … 206).
+- A **single write** of `0xAD` was overwritten at once, and nothing new appeared in play or in the pause.
+- A GameShark `80` code writes its value **every frame**, so the "menu" most likely comes from freezing this counter at `0xAD`: an animation or timer state held still, not a real menu.
+- **Unconfirmed.** A proper test needs a write every frame (a watch-style tool); BlockPlanet's poke tool cannot do that yet.
+
+The P1 context base `0x80110220` was confirmed in the same test.
 
 Not worth offering: the score modifier (it only breaks records) and the activators (BlockPlanet has its own controls).
 
@@ -82,4 +93,4 @@ Not worth offering: the score modifier (it only breaks records) and the activato
 2. **Where a write is still the simplest,** keep it in the game options layer (`src/platform/game_options.cpp`), which already refills hearts for Casual only while a game is being played and not in VS CPU, rather than writing blindly.
 3. **One Modifiers screen,** grouped as Assists (drop timer, forgiving drops, infinite hearts) and Fun (magic, pieces). Each item has a one-line explanation, as Options already does. Saved per profile, and off for online play unless the host turns them on.
 4. **Records and trophies stay honest:** modifiers pause trophies, and records made with modifiers are marked or kept separately.
-5. **Verify each code first** in a build with the player's ROM: set the value or patch the instruction, watch the effect, and find the function it touches in the generated code. The single-source codes (never miss, both-players time, stage select, Lines) and the unknown addresses (`+0x2409`, `+0x243F`) need this most.
+5. **Verify each code first** in a build with the player's ROM: set the value or patch the instruction, watch the effect, and find the function it touches in the generated code. The single-source codes (never miss, both-players time, stage select, Lines) and the unknown address `+0x2409` need this most; `+0x243F` needs a test that writes every frame.
