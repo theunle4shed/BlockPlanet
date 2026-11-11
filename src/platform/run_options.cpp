@@ -114,6 +114,10 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             else return invalid("sphere must be original or extended");
             continue;
         }
+        if (argument == "--developer") {
+            result.developer = true;
+            continue;
+        }
         if (argument == "--casual") {
             result.casual = true;
             continue;
@@ -171,6 +175,8 @@ const char* run_options_help() {
            "                                   stops at 30 s. Trophies are paused\n"
            "  --start-chapter=N                Start Rescue at chapter N (testing). Trophies are paused\n"
            "  --unlock-all                     Every Story episode and stage open in the menus (testing)\n"
+           "  --developer                      RT64's developer inspector: F1 opens it (draw calls,\n"
+           "                                   a free camera to look behind things)\n"
            "  --perf-log                       Report frame timings every 5 seconds\n"
            "  --help                           Show this help\n"
            "Examples: tetrisphere --fullscreen --msaa4x\n"

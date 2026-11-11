@@ -30,15 +30,17 @@ echo   3  Get the latest changes and rebuild
 echo   4  Try a branch (pick from a list)
 echo   5  Back to the main build
 echo   6  Quit
+echo   7  Play with developer tools (F1 opens them in the game)
 echo.
 set CHOICE=
-set /p CHOICE=Choose 1-6: 
+set /p CHOICE=Choose 1-7: 
 if "%CHOICE%"=="1" goto play
 if "%CHOICE%"=="2" goto unlocked
 if "%CHOICE%"=="3" goto update
 if "%CHOICE%"=="4" goto branch
 if "%CHOICE%"=="5" goto main
 if "%CHOICE%"=="6" exit /b 0
+if "%CHOICE%"=="7" goto developer
 goto menu
 
 :play
@@ -46,6 +48,9 @@ call :run
 goto menu
 :unlocked
 call :run --unlock-all
+goto menu
+:developer
+call :run --developer
 goto menu
 
 :update

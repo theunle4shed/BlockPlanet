@@ -23,19 +23,23 @@ std::vector<blockplanet::ui::ListItem> profile_list(const ProfileStore& store, b
         const std::string action = !picker ? "command:profile:" + profile.id
                                    : playing ? "command:profile_picked" : "command:profile_play:" + profile.id;
         items.push_back({"profile" + profile.id, profile.name, note, action, true});
-        items.back().image = coin_image(profile.coin);
-        if (!items.back().image.empty()) items.back().image_colour = coin_colour(profile.palette);
+        // Its coin in the icon's place, as on the main menu, so the names
+        // line up; a plain coin for a profile without one.
+        items.back().image = profile.coin.empty() ? "/blockplanet-ui/coins/none.png" : coin_image(profile.coin);
+        items.back().image_colour = coin_colour(profile.palette);
     };
     if (!guest) add(store.active(), true);
     for (const auto& profile : store.profiles())
         if (guest || profile.id != store.active().id) add(profile, false);
-    // A guest plays as a character chosen at random (the owner's choice).
-    static const std::string guest_character = characters()[std::rand() % characters().size()].label;
-    items.push_back({"guest", "Play as Guest", guest_character + (guest && !picker ? " \u00B7 playing now" : " \u00B7 nothing is saved"),
-                     guest ? (picker ? "command:profile_picked" : "close") : "command:profile_guest", true});
+    // Play as guest is a button of its own (the owner's choice, 2026-11-11):
+    // profile_guest_action() and the hint under the list.
     // New profile is the Alt button's (the hint under the list), on every item.
     for (auto& item : items) item.alt = "command:profile_new";
     return items;
+}
+
+std::string profile_guest_action(bool guest, bool picker) {
+    return guest ? (picker ? "profile_picked" : "close") : "profile_guest";
 }
 
 std::vector<blockplanet::ui::ListItem> profile_actions(const ProfileStore& store, const std::string& id, bool guest) {

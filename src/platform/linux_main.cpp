@@ -2531,7 +2531,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     if (std::getenv("BLOCKPLANET_HIDE_BUILD_LABEL") == nullptr) blockplanet::ui::set_build_label(BLOCKPLANET_BUILD_LABEL);
 #endif
     // The menus' button hints before any input (menu_input.cpp then follows the device).
-    blockplanet::ui::set_button_text("new_profile_hint", "[k:T] New profile");
+    blockplanet::ui::set_button_text("new_profile_hint", "[k:T] New profile\u00A0\u00A0\u00A0[k:G] Play as guest");
     blockplanet::ui::set_button_text("move_back", "[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back");
     if (!initialize_eeprom(eeprom_path, eeprom_error)) {
         show_error(eeprom_error.c_str());
@@ -2702,7 +2702,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     std::fflush(stdout);
 
     ultramodern::renderer::GraphicsConfig graphics{};
-    graphics.developer_mode = false;
+    graphics.developer_mode = run_options.developer;
     graphics.res_option = ultramodern::renderer::Resolution::Auto;
     graphics.wm_option = fullscreen_requested
         ? ultramodern::renderer::WindowMode::Fullscreen
@@ -3366,6 +3366,12 @@ bool handle_profile_command(const std::string& command) {
     }
     if (command == "profile_guest") {
         switch_profile(std::nullopt, true);
+        return true;
+    }
+    if (command == "profile_guest_button") {
+        const auto action = profile_guest_action(guest_session, !profile_picked);
+        if (action == "close") blockplanet::ui::request_close();
+        else blockplanet::ui::send_command(action);
         return true;
     }
     if (const auto id = argument("profile_delete_confirmed:")) {

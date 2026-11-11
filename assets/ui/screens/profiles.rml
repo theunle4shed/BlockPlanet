@@ -3,7 +3,7 @@
     <title>Profiles</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body data-grid="blue" class="compact shared" data-back="command:back_to_title">
+<body data-grid="blue" class="compact shared" data-back="command:back_to_title" data-alt2="command:profile_guest_button">
     <div id="panel">
         <div class="title">Tetrisphere™</div>
         <div class="version" id="version"></div>

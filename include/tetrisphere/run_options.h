@@ -45,6 +45,8 @@ struct RunOptions {
     bool perf_log = false;
     // Casual play: no game over. Trophies are paused.
     bool casual = false;
+    // RT64's developer inspector (F1): frames, draw calls, a free camera.
+    bool developer = false;
     // Start Rescue at this chapter (1-based), for testing. Trophies are paused.
     std::optional<int> start_chapter;
     // Every Story episode and stage open in the menus, for testing.

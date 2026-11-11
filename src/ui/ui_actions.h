@@ -7,7 +7,9 @@ namespace blockplanet::ui {
 // Menu navigation, from any input device.
 // Alt is the second button (X on most pads, T on keyboard): an item's
 // data-alt action, such as Training on Story.
-enum class Action { Up, Down, Left, Right, Confirm, Back, Alt };
+// Alt2 is the third button (Y on most pads, G on keyboard): the screen's
+// data-alt2 action (Play as guest on the profile list).
+enum class Action { Up, Down, Left, Right, Confirm, Back, Alt, Alt2 };
 
 // An item of a list the game fills in (data-list in a screen).
 struct ListItem {
