@@ -158,7 +158,12 @@ Puzzle limits its play area with a border of type 47 blocks (the purple "out of 
 
 ### New game modes (ideas, saved for later, 2026-11-05)
 
-**Adventure (idea, the owner's, 2026-11-11).** One journey on a map of stages, each stage its own game type, in place of separate Story and Puzzle lists: Rescue (Story) stages and Puzzle stages share the same map, so the campaign and the puzzles become one route. Later, stages of the new types join it too (Lines, Escape, Multiphasic). Open questions for later: the map's look (a path round a planet would fit the theme), how stages unlock (branching routes, optional puzzle stages), how lives and score carry between stage types, and where the existing Story chapters' messages and endings fall. Builds on the direct starts (every mode can now be started at any stage) and on the rulesets-per-stage idea.
+**Adventure (idea, the owner's, 2026-11-11).** One journey on a map of stages drawn on a planet or sphere, each stage its own game type. Rescue (Story) and Puzzle stages share the map, and later stages of the new types join it (Lines, Escape, Multiphasic), so Adventure also gives a taste of modes the player can then unlock on their own.
+- **Medals:** each stage awards gold, silver or bronze against that stage's own challenge, and remembers the best medal won there.
+- **Points and unlocks:** medals convert to points, which unlock further stages on the map. Some small side branches open only on a gold.
+- **Independent stages:** once unlocked, any stage can be played at any time, in any order. Lives come from each stage's own configuration, not from a run.
+- **Story stays as it is,** perhaps renamed (for example "Classic") so the two are told apart.
+- Open for later: the map's look and navigation on the sphere, the medal thresholds per stage type, the points cost of each unlock, and how it fits the rulesets-per-stage idea and the direct starts (every mode can be started at any stage).
 
 **Escape.** The player and the camera start inside the sphere. No core layer is visible. The player drops blocks onto the underside of the existing blocks. Orphaned blocks can still drop to the core with gravity. Blocks that miss their target cannot stay under the core line: if the player misses, the block dissolves and they lose a life.
 
