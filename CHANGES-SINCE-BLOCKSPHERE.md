@@ -278,3 +278,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Menus: the black panels are a little more see-through (70%, was 85%), the owner's request.
 - Roadmap: the Adventure idea (one map of stages mixing Story and Puzzle, later Lines, Escape and Multiphasic).
 - Fixed: an audio capture (`TETRISPHERE_AUDIO_CAPTURE_WAV`) was labelled 48000 Hz although the game plays at 44100 Hz, so it played back 8.8% fast and sharp. The capture opened on the runtime's placeholder rate and never followed the game's; its header now follows the output rate.
+- Fixed: choosing Skip lesson in Training stopped play with an empty speech bubble. The game's SKIP jumps to the lesson's "skip to" text (`0x8013D25C`, set from the lesson's record), and the lessons tested (Basics, Advanced, Puzzle) have none, so it jumped to nothing. Skip lesson is now offered only when the lesson has somewhere to skip to.
