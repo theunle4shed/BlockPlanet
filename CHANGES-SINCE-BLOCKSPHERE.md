@@ -335,6 +335,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - (2026-11-10) The box art builds up instead of popping in (the owner's notes): from the title song's last big hit, the ring with the core's light, then the robots, then the Bombs grow into place one after another, settling as the letters' red edge light comes up, and then the copyright lines fade in. `BLOCKPLANET_TITLE_BUILD=0` shows it all at once.
 - (2026-11-10) The box art holds for 6 s before the demo (was 15 s), counted from when the whole picture is in place; `BLOCKPLANET_ATTRACT_SECONDS` changes it. The title is now left directly for the demo, as on a press, rather than by the game's own timeout, which took several seconds more.
 - (2026-11-10) Fixed: after the box art, game over went to the game's SCORES name entry (hidden under the red grid) instead of the end menu, and direct starts were refused ("save_check") on a new save. Ending the intro early (the hand-over into the box art and the Start skip) skipped the game's start-up save check, which gives a new save its defaults, high-score tables included; it is now run as the intro would.
+- (2026-11-11) With the box art on, the game's other attract path (`0x800DF728`, `func_8005C410`; seen on Windows as the box art building twice and the H2O logo animation playing between demos) is kept from starting outside play, and logged as `box_art_reset_signal` when it would have.
 
 ## 2026-11-10: Guest play
 

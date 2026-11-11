@@ -678,6 +678,29 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
 
 } // namespace
 
+// The top loop's other attract path (func_80070118 at 0x80070180): when
+// 0x800DF728 is set (func_8002A140 on a scheduler message 4, func_80028824,
+// or the callback func_800700E8) and the save has been read, it sets
+// 0x800E11F8 and runs func_8005C410 instead of the intro, title, menus or
+// play, then returns to the title. On Windows the owner saw the box art
+// rebuild and the H2O logo animation play between demos (2026-11-11), which
+// the box art's loop (box art, hold, demo, box art) does not want. With the
+// box art on, outside play, the flag is cleared before that check and logged
+// (box_art_reset_signal), so its source can be traced.
+extern "C" void blockplanet_attract_guard(std::uint8_t* rdram, recomp_context*) {
+    using namespace tetrisphere;
+    using namespace tetrisphere::guest;
+    constexpr std::uint32_t reset_signal = 0x800DF728u;
+    if (!box_art_enabled() || load32(rdram, reset_signal) == 0 || load16(rdram, demo_running) != 0) return;
+    const bool outside_play = load16(rdram, title_done) == 0 || load16(rdram, main_row) >= 0 ||
+                              box_art::phase().load() != box_art::Phase::None;
+    std::fprintf(stdout, "{\"event\":\"box_art_reset_signal\",\"cleared\":%s,\"intro\":%d,\"title\":%d,\"row\":%d,\"mode\":%d}\n",
+                 outside_play ? "true" : "false", int(load16(rdram, intro_done)), int(load16(rdram, title_done)), int(load16(rdram, main_row)),
+                 int(load16(rdram, mode)));
+    std::fflush(stdout);
+    if (outside_play) store32(rdram, reset_signal, 0);
+}
+
 extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace tetrisphere;
     using namespace tetrisphere::guest;

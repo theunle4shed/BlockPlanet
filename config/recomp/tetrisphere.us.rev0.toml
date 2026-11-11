@@ -581,6 +581,15 @@ text = "blockplanet_fn_probe(rdram, ctx, 0x800685FCu);"
 func = "func_80070118"
 text = "blockplanet_fn_probe(rdram, ctx, 0x80070118u);"
 
+# The top loop's other attract path (0x800E11F8, func_8005C410), started when
+# 0x800DF728 is set (a scheduler message 4 in func_8002A140, or a callback):
+# with the box art on it is kept from interrupting the box art's own loop
+# (direct_start_hooks.cpp).
+[[patches.hook]]
+func = "func_80070118"
+before_vram = 0x80070180
+text = "blockplanet_attract_guard(rdram, ctx);"
+
 
 # The title (func_800685FC) draws the letters scene (0x800E1670) until its
 # animation ends, then clears the pointer. BlockPlanet can keep it there,
