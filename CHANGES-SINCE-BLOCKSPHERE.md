@@ -281,3 +281,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Fixed: choosing Skip lesson in Training stopped play with an empty speech bubble. The game's SKIP jumps to the lesson's "skip to" text (`0x8013D25C`, set from the lesson's record), and the lessons tested (Basics, Advanced, Puzzle) have none, so it jumped to nothing. Skip lesson is now offered only when the lesson has somewhere to skip to.
 - Fixed: on a window taller than wide, the menu panels ran off the right edge (the panel is 720 wide). They now fit the window's width.
 - Design notes: the colour-blindness idea (choose block colours; current piece in colour with the rest greyscale, power-ups and special blocks kept in colour), under Accessibility.
+- Design notes: the sphere themes idea (pick the sphere's colours and texture design; the current look stays the default), under Long-term engagement.
