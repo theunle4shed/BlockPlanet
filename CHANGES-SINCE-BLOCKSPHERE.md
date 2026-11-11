@@ -275,3 +275,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `tools/audio/dcm_to_midi.py`, a research tool that converts the game's DCM1 songs from the player's own ROM into MIDI files (one track per voice) under `.local/`, and documented the song format in `docs/research/blockplanet-game-state.md`.
 - Added `tools/audio/dcm_render.py`, which renders the DCM1 songs with the game's own samples (from the player's ROM) to WAV files under `.local/`, and documented the sample bank format.
 - Menus: the panels and the dimming behind them are black instead of dark blue (the owner's choice), to sit better on the menu grid's and the game's different coloured backgrounds.
+- Menus: the black panels are a little more see-through (70%, was 85%), the owner's request.
