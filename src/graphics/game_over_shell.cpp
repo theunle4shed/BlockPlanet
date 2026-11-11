@@ -103,6 +103,10 @@ double ease_out(double u) {
 
 } // namespace
 
+bool game_over_shell_wanted(const std::uint8_t* rdram) {
+    return enabled() && load16(rdram, p1_hearts) == -1 && load16(rdram, main_row) == -1;
+}
+
 void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     if (!enabled()) return;
     if (std::getenv("BLOCKPLANET_GAMEOVER_SHELL_LOG") != nullptr) {  // research
