@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cstdint>
+#include <chrono>
 #include <deque>
 #include <memory>
 #include <unordered_map>
@@ -56,6 +57,7 @@ private:
     // Resources RmlUi has released, kept until frames still in flight are done.
     struct Retired {
         std::uint64_t frame;
+        std::chrono::steady_clock::time_point at;
         std::unique_ptr<Geometry> geometry;
         std::unique_ptr<Texture> texture;
         std::unique_ptr<plume::RenderBuffer> buffer;
