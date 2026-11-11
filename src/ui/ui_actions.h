@@ -21,7 +21,7 @@ struct ListItem {
     std::string description;  // shown in the screen's #description while focused
     std::string alt;          // data-alt: what the Alt button does on this item
     std::string icon;         // an icon before the label (a character of the menus' icon font, UTF-8)
-    std::string image;        // a picture before the label (a path from the screens folder, such as ../coins/bolt.png)
+    std::string image;        // a picture before the label ("/blockplanet-ui/coins/bolt.png" from the menu folder, or a path from the screens folder)
     std::string image_colour; // its tint (#rrggbb, multiplied), or empty
     std::string classes;      // extra classes for the item (space-separated), for its look
     std::string alt_label;    // data-alt-label: the Alt button's hint on this item

@@ -1040,6 +1040,7 @@ void set_grid_override(const std::string& colour) {
 
 void install(const std::filesystem::path& assets) {
     assets_path = assets;
+    ui_asset_root() = assets;
     RT64::SetRenderHooks(hook_init, hook_draw, hook_deinit);
     const char* test = std::getenv("BLOCKPLANET_UI_TEST");
     if (test != nullptr && std::string(test) == "1") request_open("main");

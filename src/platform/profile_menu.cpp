@@ -108,7 +108,7 @@ std::string coin_label(const std::string& id) {
 }
 
 std::string coin_image(const std::string& id) {
-    return coin_label(id).empty() ? std::string{} : "../coins/" + id + ".png";
+    return coin_label(id).empty() ? std::string{} : "/blockplanet-ui/coins/" + id + ".png";
 }
 
 std::string coin_colour(int palette) {
@@ -126,7 +126,7 @@ std::vector<blockplanet::ui::ListItem> coin_choices(const ProfileStore& store, c
     // None clears the coin straight away: there is no colour to pick.
     items.push_back({"none", "", "", "command:profile_set_coin:" + id + ":none:" + std::to_string(profile->palette),
                      true, 1, profile->coin.empty()});
-    items.back().image = "../coins/none.png";  // a plain coin
+    items.back().image = "/blockplanet-ui/coins/none.png";  // a plain coin
     items.back().image_colour = coin_colour(profile->palette);
     items.back().description = "None";
     for (std::size_t i = 0; i < coins().size(); ++i) {

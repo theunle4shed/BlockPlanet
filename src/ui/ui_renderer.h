@@ -12,6 +12,7 @@
 #include "plume_render_interface.h"
 
 #include <array>
+#include <filesystem>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -19,6 +20,12 @@
 #include <vector>
 
 namespace blockplanet::ui {
+
+// BlockPlanet's menu folder (ui/ beside the game). Pictures named
+// "/blockplanet-ui/<path>" are read from it directly, not through RmlUi's
+// paths relative to the screen (which failed for the profile coins on
+// Windows, 2026-11-11, showing plain squares).
+std::filesystem::path& ui_asset_root();
 
 class Renderer final : public Rml::RenderInterface {
 public:

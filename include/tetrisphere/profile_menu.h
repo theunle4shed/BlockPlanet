@@ -65,7 +65,8 @@ struct Coin {
 const std::vector<Coin>& coins();
 // The coin's label, or "" for none or an unknown id.
 std::string coin_label(const std::string& id);
-// The coin's picture, from the screens folder ("" for none or unknown).
+// The coin's picture ("/blockplanet-ui/coins/<id>.png", read from the menu
+// folder by the menus' renderer; "" for none or unknown).
 std::string coin_image(const std::string& id);
 // A colour variant's tint for coins (#rrggbb; Original keeps the silver).
 std::string coin_colour(int palette);
