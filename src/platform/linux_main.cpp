@@ -2318,7 +2318,13 @@ void set_audio_frequency(std::uint32_t frequency) {
         std::exit(70);
     }
     const char* capture_path = std::getenv("TETRISPHERE_AUDIO_CAPTURE_WAV");
-    if (capture_path != nullptr && *capture_path != '\0' && !audio_capture.active()) {
+    if (audio_capture.active()) {
+        // A later rate (the game's own, after the runtime's placeholder):
+        // the capture's header follows it.
+        audio_capture.set_sample_rate(frequency);
+        return;
+    }
+    if (capture_path != nullptr && *capture_path != '\0') {
         if (!audio_capture.open(capture_path, frequency)) {
             std::fprintf(stderr,
                          "{\"event\":\"fatal_audio_capture\","

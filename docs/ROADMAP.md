@@ -194,6 +194,13 @@ Puzzle limits its play area with a border of type 47 blocks (the purple "out of 
 
 ### New game modes (ideas, saved for later, 2026-11-05)
 
+**Adventure (idea, the owner's, 2026-11-11).** One journey on a map of stages drawn on a planet or sphere, each stage its own game type. Rescue (Story) and Puzzle stages share the map, and later stages of the new types join it (Lines, Escape, Multiphasic), so Adventure also gives a taste of modes the player can then unlock on their own.
+- **Medals:** each stage awards gold, silver or bronze against that stage's own challenge, and remembers the best medal won there.
+- **Points and unlocks:** medals convert to points, which unlock further stages on the map. Some small side branches open only on a gold.
+- **Independent stages:** once unlocked, any stage can be played at any time, in any order. Lives come from each stage's own configuration, not from a run.
+- **Story stays as it is,** perhaps renamed (for example "Classic") so the two are told apart.
+- Open for later: the map's look and navigation on the sphere, the medal thresholds per stage type, the points cost of each unlock, and how it fits the rulesets-per-stage idea and the direct starts (every mode can be started at any stage).
+
 **Escape.** The player and the camera start inside the sphere. No core layer is visible. The player drops blocks onto the underside of the existing blocks. Orphaned blocks can still drop to the core with gravity. Blocks that miss their target cannot stay under the core line: if the player misses, the block dissolves and they lose a life.
 
 **Multiphasic.** Several levels stitched together seamlessly through visual trickery. It starts with stage 1, which looks the same as usual: dig down to the core. But the core looks like a different sphere with a different block combination (purely representative, the core picture design) and is faded. The core cannot be destroyed, and anything dropped on top of it follows the normal core rules. Once the target core size is reached (4 × 4 etc.), there is a detonation and all remaining blocks are thrown off the sphere. The trick (the transition): what remains is the core, decorated to look exactly like the next stage. It grows to match the next phase's (level's) starting size and is replaced by the actual next level, and play continues with the new block set. As it is a long game, it needs a way to earn lives.

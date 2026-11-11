@@ -54,6 +54,7 @@ int main() {
     set(0x800E121C, -1);
     set(0x800E44A8, 3);
     set(0x800E44AC, 1);  // Basics
+    store32(m, 0x8013D25C, 0x8013D27D);  // the lesson has a "skip to" text
     set(0x800E1228, 0);
     out = step(bridge, false);
     assert(out.open_menu && out.items.size() == 5 && out.items[1].label == "Restart Lesson" &&
@@ -133,6 +134,8 @@ int main() {
     assert(out.open_menu);  // a real pause afterwards
     // Story and Hide & Seek restart the chapter, after asking; others the level.
     assert(restarts_chapter(1) && restarts_chapter(5) && !restarts_chapter(4));
+    // No "skip to" text: no Skip lesson.
+    assert(pause_items(3, 1, false).size() == 4 && pause_items(3, 1, true).size() == 5);
     assert(pause_items(4, 0)[1].label == "Restart Level" && pause_items(4, 0)[1].action == "command:pause_restart");
     assert(pause_items(1, 0)[1].label == "Restart Chapter" &&
            pause_items(1, 0)[1].action == "command:pause_restart_chapter");

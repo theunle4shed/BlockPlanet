@@ -349,6 +349,10 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Added `tools/audio/dcm_render.py`, which renders the DCM1 songs with the game's own samples (from the player's ROM) to WAV files under `.local/`, and documented the sample bank format.
 - (2026-11-10) The title's letters fly in again at the start of the box art (the owner's request): they form as in the original, in time with the title's song, whose hit for their explosion had been playing over letters already in place, and are then held; the ring, the robots and the light come in after them, as in the original. The same for the hand-over from the intro, a skip, the replay after B and the return after a demo. `BLOCKPLANET_BOX_ART_INSTANT=1` starts the box art with the letters already formed.
 - Menus: the panels and the dimming behind them are black instead of dark blue (the owner's choice), to sit better on the menu grid's and the game's different coloured backgrounds.
+- Menus: the black panels are a little more see-through (70%, was 85%), the owner's request.
+- Roadmap: the Adventure idea (one map of stages mixing Story and Puzzle, later Lines, Escape and Multiphasic).
+- Fixed: an audio capture (`TETRISPHERE_AUDIO_CAPTURE_WAV`) was labelled 48000 Hz although the game plays at 44100 Hz, so it played back 8.8% fast and sharp. The capture opened on the runtime's placeholder rate and never followed the game's; its header now follows the output rate.
+- Fixed: choosing Skip lesson in Training stopped play with an empty speech bubble. The game's SKIP jumps to the lesson's "skip to" text (`0x8013D25C`, set from the lesson's record), and the lessons tested (Basics, Advanced, Puzzle) have none, so it jumped to nothing. Skip lesson is now offered only when the lesson has somewhere to skip to.
 
 ## 2026-11-10: Game over screen
 

@@ -43,14 +43,17 @@ bool can_restart(int game_mode, int training_type) {
     }
 }
 
-std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_type) {
+std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_type, bool can_skip) {
     std::vector<blockplanet::ui::ListItem> items{{"resume", "Resume", "", "command:pause_resume", true, 1, true}};
     if (can_restart(game_mode, training_type))
         items.push_back(restarts_chapter(game_mode)
             ? blockplanet::ui::ListItem{"restart", "Restart Chapter", "", "command:pause_restart_chapter", true}
             : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart Lesson" : "Restart Level", "",
                                         "command:pause_restart", true});
-    if (game_mode == training) items.push_back({"skip", "Skip Lesson", "", "command:pause_skip", true});
+    // The game's SKIP jumps to the lesson's "skip to" text (0x8013D25C, from
+    // the lesson record); a lesson without one (Basics) has nowhere to go and
+    // play stops, so Skip is only offered when there is somewhere to skip to.
+    if (game_mode == training && can_skip) items.push_back({"skip", "Skip Lesson", "", "command:pause_skip", true});
     // A short guide to the mode (BlockPlanet's own words), to read.
     if (game_mode == 1 || game_mode == 4 || game_mode == 5 || game_mode == 6 || game_mode == 9)
         items.push_back({"howto", "How to Play", "", "command:pause_howto", true});
@@ -124,7 +127,7 @@ PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Cl
     if (!showing_ && !choice_) {
         showing_ = true;
         out.open_menu = true;
-        out.items = pause_items(load16(rdram, mode), load16(rdram, 0x800E44ACu));
+        out.items = pause_items(load16(rdram, mode), load16(rdram, 0x800E44ACu), load32(rdram, 0x8013D25Cu) != 0);
         return out;
     }
     // Closing the menus (Back) means Resume.
