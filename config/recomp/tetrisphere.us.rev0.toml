@@ -508,6 +508,14 @@ text = "blockplanet_logo_scene_stepped(rdram, ctx);"
 func = "func_800321D4"
 text = "if (blockplanet_scene_object(rdram, ctx)) return;"
 
+# The scenes' object pass (func_80031A98, a0 the scene): it draws only the
+# objects whose opacity byte (record +0x80) is not 0. The intro's sphere hides
+# bricks a 4:3 camera would not see that way; BlockPlanet can keep them
+# (intro_logo_hooks.cpp, blockplanet_intro_bricks).
+[[patches.hook]]
+func = "func_80031A98"
+text = "blockplanet_intro_bricks(rdram, ctx);"
+
 # Research: first call of candidate scene routines (BLOCKPLANET_FN_PROBE=1).
 [[patches.hook]]
 func = "func_8003FE3C"

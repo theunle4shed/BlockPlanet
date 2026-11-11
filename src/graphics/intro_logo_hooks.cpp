@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <vector>
 
 extern "C" void func_8002F55C(std::uint8_t* rdram, recomp_context* ctx);
@@ -296,4 +297,45 @@ extern "C" void blockplanet_music_log(std::uint8_t* rdram, recomp_context* ctx) 
                  load16(rdram, 0x800E1646u), frame_of(logo_scene_pointer), frame_of(intro_scene_pointer),
                  static_cast<int>(load32(rdram, 0x800E1208u)));
     std::fflush(stdout);
+}
+
+// The intro's sphere close-up (the owner's report, 2026-11-11): the intro
+// scene (pointer at 0x800E1670) is made of separate brick objects, and as the
+// camera closes in, bricks a 4:3 view would not see are faded out by the
+// scene itself (their opacity byte, record +0x80, keyed to 0), so wider or
+// taller windows show holes in the sphere. Through the close-up, an object
+// of the intro scene that has been seen fully opaque is kept opaque, so the
+// sphere stays whole at any window shape. BLOCKPLANET_INTRO_BRICKS=0 keeps
+// the original fades.
+extern "C" void blockplanet_intro_bricks(std::uint8_t* rdram, recomp_context* ctx) {
+    static const bool on = [] {
+        const char* v = std::getenv("BLOCKPLANET_INTRO_BRICKS");
+        return v == nullptr || v[0] != '0';
+    }();
+    if (!on) return;
+    const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r4);
+    if (scene == 0 || scene != load32(rdram, intro_scene_pointer) || load16(rdram, 0x800E1648u) != 0) return;
+    static std::uint32_t seen_scene = 0;
+    static std::vector<bool> opaque;
+    const int count = static_cast<int>(load32(rdram, scene + 0x10u));
+    if (scene != seen_scene || static_cast<int>(opaque.size()) != count) {
+        seen_scene = scene;
+        opaque.assign(static_cast<std::size_t>(std::max(count, 0)), false);
+    }
+    // Only through the sphere's close-up (scene frames 120 to 300, where the
+    // bricks that drop out are the sphere's own; later fades are the intro's
+    // own effects, which must still happen). BLOCKPLANET_INTRO_BRICKS_TO=frame.
+    static const int last_frame = [] {
+        const char* v = std::getenv("BLOCKPLANET_INTRO_BRICKS_TO");
+        return v ? std::atoi(v) : 300;
+    }();
+    const int frame = static_cast<int>(load32(rdram, scene + 0x24u));
+    if (frame > last_frame) return;
+    const std::uint32_t objects = load32(rdram, scene + 0x14u);
+    for (int k = 0; k < count && k < 512; ++k) {
+        const std::uint32_t at = objects + static_cast<std::uint32_t>(k) * object_size + 0x80u;
+        const std::uint8_t alpha = load8(rdram, at);
+        if (alpha == 0xFF) opaque[static_cast<std::size_t>(k)] = true;
+        else if (alpha == 0 && opaque[static_cast<std::size_t>(k)]) store8(rdram, at, 0xFF);
+    }
 }

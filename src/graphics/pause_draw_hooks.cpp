@@ -645,6 +645,19 @@ extern "C" bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ct
     const int object = static_cast<int>(ctx->r7);
     if (blockplanet_title_object(rdram, scene, object, static_cast<std::uint32_t>(ctx->r6))) return true;
     blockplanet_logo_object_draw(rdram, scene, object);  // the N64 logo's wordmark, straight on
+    if (std::getenv("BLOCKPLANET_OBJECT_COUNT") != nullptr) {  // research: objects drawn per frame of a scene
+        static std::uint32_t last_scene = 0, last_frame = 0;
+        static int count = 0;
+        static std::string seen;
+        const std::uint32_t frame = guest32(rdram, scene + 0x24u);
+        if (scene != last_scene || frame != last_frame) {
+            if (last_scene != 0 && count > 0)
+                std::fprintf(stdout, "{\"event\":\"object_count\",\"scene\":\"0x%08X\",\"frame\":%u,\"count\":%d,\"objects\":\"%s\"}\n", last_scene, last_frame, count, seen.c_str());
+            last_scene = scene, last_frame = frame, count = 0, seen.clear();
+        }
+        ++count;
+        seen += std::to_string(object) + ",";
+    }
     // While BlockPlanet's menus are open over the game's own menus, its 3D
     // menu scenes (the ring with its character, the MENU sign) are not drawn:
     // only the grid background stays (the owner's choice, 2026-11-08).

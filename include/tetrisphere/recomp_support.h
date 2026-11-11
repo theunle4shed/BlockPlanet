@@ -60,6 +60,7 @@ bool blockplanet_box_art_scene(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_music_log(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_box_art_update(const std::uint8_t* rdram);
 void blockplanet_logo_object_draw(std::uint8_t* rdram, std::uint32_t scene, int object);
+void blockplanet_intro_bricks(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_scale_music_volume(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_scale_effects_volume(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, uint32_t helper);
