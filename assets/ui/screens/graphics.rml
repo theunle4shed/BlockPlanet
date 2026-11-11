@@ -3,7 +3,7 @@
     <title>Graphics</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body class="compact">
+<body data-grid="blue" class="compact">
     <div id="panel">
         <div class="title">Graphics</div>
         <div class="subtitle">Changes apply and save straight away</div>

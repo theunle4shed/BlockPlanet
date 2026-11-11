@@ -9,6 +9,7 @@
 #include "tetrisphere/perf_metrics.h"
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/run_options.h"
+#include "tetrisphere/runtime.h"
 #include "tetrisphere/recomp_support.h"
 
 #ifdef _WIN32
@@ -258,6 +259,8 @@ public:
 
         // BlockPlanet's menu layer draws through RT64's hooks, which must be
         // registered before RT64 starts.
+        // The menu grid's tile texture is read from the ROM (ui_grid.h).
+        blockplanet::ui::set_rom(tetrisphere::runtime_rom_bytes());
         blockplanet::ui::install(ui_assets_directory());
         RT64::ApplicationConfiguration config{};
         config.appId = "tetrisphere-m1";

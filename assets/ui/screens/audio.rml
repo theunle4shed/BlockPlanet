@@ -3,7 +3,7 @@
     <title>Audio</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body class="over-pause">
+<body data-grid="blue" class="over-pause">
     <div id="panel">
         <div class="title">Audio</div>
         <div class="subtitle">Track changes play straight away and last for this game</div>

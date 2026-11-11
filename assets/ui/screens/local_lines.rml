@@ -3,7 +3,7 @@
     <title>Lines for two</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="green">
     <div id="panel">
         <div class="title">Lines</div>
         <div class="subtitle">Two players</div>

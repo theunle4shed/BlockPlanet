@@ -3,12 +3,13 @@
     <title>Options</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body>
+<body data-grid="blue">
     <div id="panel">
         <div class="title">Options</div>
         <div class="subtitle">Settings for this PC and your profile</div>
         <div class="item" id="graphics" data-description="The picture, the display and text size." data-action="open:graphics"><span class="icon"></span>Graphics</div>
         <div class="item" id="audio" data-description="Music and sound-effect volumes, and which music plays." data-action="command:audio_screen"><span class="icon"></span>Audio</div>
+        <div class="item" id="grid_lab" data-description="A temporary screen for tuning the menu grid's motion and colours." data-action="open:grid_lab">Grid test<span class="note">for tuning</span></div>
         <div class="item" id="back" data-action="back">Back</div>
         <div id="description" class="description"></div>
     </div>

@@ -3,7 +3,7 @@
     <title>Credits</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body class="credits">
+<body data-grid="blue" class="credits">
     <div id="panel">
         <div class="title">Credits</div>
         <div class="subtitle">The people who made Tetrisphere</div>

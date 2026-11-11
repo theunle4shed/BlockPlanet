@@ -1,0 +1,25 @@
+<rml>
+<head>
+    <title>Grid</title>
+    <!-- The menu grid (docs/UI.md, Menu grid): behind every menu screen
+         with data-grid. The tiles are placed, tilted and coloured by
+         ui_grid.cpp; this only holds them. -->
+    <style>
+        body { width: 100%; height: 100%; }
+        /* The test screen's backdrop (ui_grid.h, set_backdrop): black behind
+           everything while it is open, so a fly-out there does not reveal
+           the game's own menus. */
+        #grid-backdrop { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-color: #000000; display: none; }
+        #grid-backdrop.on { display: block; }
+        #grid-far { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-color: #06090e; }
+        #grid-tiles { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+        /* Each tile's matrix (ui_grid.cpp) carries it from the top left onto its patch of the sphere. */
+        .grid-tile { position: absolute; left: 0; top: 0; transform-origin: 0px 0px 0px; }
+    </style>
+</head>
+<body>
+    <div id="grid-backdrop"></div>
+    <div id="grid-far"></div>
+    <div id="grid-tiles"></div>
+</body>
+</rml>

@@ -42,7 +42,7 @@ Bar fills keep their own colours (drop `#F5C21F`, magic `#9C5CF0`, default `#38C
 
 | | Fill | Rim | Radius | Padding |
 |---|---|---|---|---|
-| Menu panel | `#0B1020` at 85% (`D8`) | 3 `#F0F0F0` | 24 | 48 (long lists 40 48) |
+| Menu panel | black `#000000` at 70% (`B3`, more see-through at the owner's request; was blue `#0B1020`, the owner's choice 2026-11-10, to suit the coloured backgrounds) | 3 `#F0F0F0` | 24 | 48 (long lists 40 48) |
 | Card panel | `#0B1020` at 94% (`F0`) | 3 `#F0F0F0` | 24 | in em, so it follows the text |
 | HUD container | `#0B1020` at 75% (`C0`, D8) | none | 24 | 16 24 20 |
 | Inside a panel (description, name field, keys) | white at 6% (`#FFFFFF10`) | none | 14 | 16 28 |

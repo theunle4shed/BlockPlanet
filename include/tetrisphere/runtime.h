@@ -49,6 +49,8 @@ bool load_initial_image(std::span<const std::uint8_t> rom,
                         std::size_t size);
 void initialize_ipl3_state(std::uint8_t* rdram);
 void set_runtime_rom(std::span<const std::uint8_t> rom);
+// The ROM given to set_runtime_rom (kept by the caller for the whole run).
+std::span<const std::uint8_t> runtime_rom_bytes();
 // An empty path keeps the save in memory only (guest play).
 bool initialize_eeprom(const std::filesystem::path& path, std::string& error);
 [[noreturn]] void await_runtime_handoff();
