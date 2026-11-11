@@ -284,3 +284,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Design notes: the sphere themes idea (pick the sphere's colours and texture design; the current look stays the default), under Long-term engagement.
 - Design notes: themes also cover the background and can be unlocked through Adventure stages; first example theme, Neutron (bright blue brick borders, dark grey bricks, neon selection).
 - Research notes: the faint drifting robot coins over the title and menu backdrop.
+- Roadmap: the profile icons idea (robot-coin emblems; our own vector designs recommended, or the game's coins read from the player's copy).
