@@ -144,7 +144,7 @@ All ten were decided as recommended:
 
 ## Exit labels (the owner, 2026-11-11)
 
-Every way out says where it goes: **Exit to <place>**, where the place is the title of the screen it returns to, in Title Case ("Exit to Story", "Exit to Stages", "Exit to Solo", "Exit to Main Menu" when the way back is empty or the main menu). An exit that closes the game is **Exit to Desktop**. When the place is not known, plain **Exit**. Icons stay as they are. In BlockPlanet: the main menu's Exit to Desktop, the pause's way out of play (it was "Quit to menu") and the Game Over and Match Over panels' Exit (`blockplanet::ui::exit_to_label`, from the screen's `<title>`).
+Every way out says where it goes: **Exit to <place>**, where the place is the title of the screen it returns to, in Title Case ("Exit to Story", "Exit to Stages", "Exit to Solo", "Exit to Main Menu" when the way back is empty or the main menu). An exit that closes the game is **Exit to Desktop**. When the place is not known, plain **Exit**. Icons stay as they are. In BlockPlanet: the main menu's Exit to Desktop, the pause's way out of play (it was "Quit to menu") and the Game Over and Match Over panels' Exit (`blockplanet::ui::exit_to_label`, from the screen's `<title>`; from the stage list, its heading, "Exit to Chapter 1").
 
 ## Title Case for labels (the owner, 2026-11-11)
 

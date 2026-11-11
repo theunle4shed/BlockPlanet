@@ -125,6 +125,8 @@ bool loading_active = false;
 // way out of it (finished, game over, Quit to menu) goes back there.
 std::vector<std::pair<std::string, std::size_t>> launch_path;
 int launch_stages_chapter = 0;  // the stage list's chapter in that path, to refresh its bests
+std::string stages_title_now;     // the stage list's heading as last set ("Chapter 2", "Puzzles")
+std::string launch_place;         // that heading when a game started from the stage list, for "Exit to ..."
 // Opens the launch path again (once a second at most: the request takes a
 // frame or two), refreshing the stage list's bests first. The path is kept:
 // the menus may close once more as play ends.
@@ -2934,7 +2936,7 @@ void begin_launch_presentation(LaunchMode mode) {
     // from: the pause screen is not a place to come back to.
     if (const auto path = blockplanet::ui::menu_path();
         !path.empty() && std::none_of(path.begin(), path.end(), [](const auto& s) { return s.first == "pause"; }))
-        launch_path = path;
+        launch_path = path, launch_place = path.back().first == "stages" ? stages_title_now : std::string();
     loading_since = std::chrono::steady_clock::now();
     loading_active = true;
 }
@@ -3114,6 +3116,11 @@ void switch_profile(std::optional<std::string> name, bool guest, const std::stri
     }
     const auto trophies = profile_path / "trophies.json";
     switch_trophies(trophy_definitions_path, guest ? nullptr : &trophies);
+    // A new or changed profile starts at the main menu, not where the last
+    // game was started from (it opened Solo after New profile, the owner's
+    // report, 2026-11-11).
+    launch_path.clear();
+    launch_place.clear();
     profile_picked = true;
     std::fprintf(stdout, "{\"event\":\"profile_switch\",\"id\":\"%s\",\"guest\":%s}\n",
                  guest ? "" : profiles.active().id.c_str(), guest ? "true" : "false");
@@ -3810,7 +3817,7 @@ bool handle_profile_command(const std::string& command) {
                 auto& records = profile_data.progress.episode_records;
                 const auto& times = records["puzzle"][0].best_levels;
                 const auto& moves = records["puzzle_moves"][0].best_levels;
-                blockplanet::ui::set_text("stages_title", "Puzzles");
+                blockplanet::ui::set_text("stages_title", stages_title_now = "Puzzles");
                 blockplanet::ui::set_text("stages_subtitle", "Choose a puzzle");
                 blockplanet::ui::set_list("stages", puzzle_list(profile_data.progress.puzzles_solved, times, moves));
                 blockplanet::ui::request_show("stages");
@@ -3857,7 +3864,7 @@ bool handle_profile_command(const std::string& command) {
                 if (const auto m = profile_data.progress.episode_records.find(variant_records(menu_variant)); m != profile_data.progress.episode_records.end())
                     if (const auto c = m->second.find(chapter); c != m->second.end()) best = c->second.best_levels;
                 if (menu_variant == PlayVariant::ScoreAttack) best.clear();  // points, not times: not shown as times
-                blockplanet::ui::set_text("stages_title", "Chapter " + std::to_string(chapter));
+                blockplanet::ui::set_text("stages_title", stages_title_now = "Chapter " + std::to_string(chapter));
                 blockplanet::ui::set_text("stages_subtitle", "The whole episode, or one stage");
                 blockplanet::ui::set_list("stages", story_stages(chapter, done, best, 10, unlock_all_testing));
                 launch_stages_chapter = chapter;
@@ -4004,7 +4011,13 @@ bool handle_profile_command(const std::string& command) {
             };
             // "Exit to <place>": where the way out of play goes (the launch
             // path's last screen; docs/STYLE.md).
-            const auto exit_label = [&] { return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first); };
+            // From the stage list, its heading, which is what the player sees
+            // there ("Exit to Chapter 2", "Exit to Puzzles"), rather than the
+            // screen's name, Stages.
+            const auto exit_label = [&] {
+                if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + launch_place;
+                return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
+            };
             if (pause.open_menu) {
                 blockplanet::ui::set_text("pause_where", where_now());
                 auto pause_items = pause.items;
