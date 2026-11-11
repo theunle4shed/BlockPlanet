@@ -1219,8 +1219,8 @@ std::string screen_title(const std::string& screen) {
     std::string word;
     std::string out;
     const auto flush = [&] {
-        static const char* small[] = {"a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to"};
-        bool keep = !first && std::any_of(std::begin(small), std::end(small), [&](const char* w) { return word == w; });
+        static const char* joining_words[] = {"a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to"};
+        bool keep = !first && std::any_of(std::begin(joining_words), std::end(joining_words), [&](const char* w) { return word == w; });
         if (!word.empty() && !keep) word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
         out += word;
         word.clear();
