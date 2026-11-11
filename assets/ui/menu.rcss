@@ -328,6 +328,52 @@ body.shared .hint { display: block; margin-top: 20dp; }
 .tiles.coins.named .item { width: 23%; height: 132dp; }
 .tiles.coins.named .item img.picture { margin-bottom: 4dp; }
 
+/* Minefield (the owner's idea, 2026-11-11): a square grid of cells; covered
+   cells raised and light, uncovered ones dark with their number in a colour
+   of its own, flags in the menus' orange, mines white (the one hit on red). */
+body.minefield #panel { top: 4vh; padding: 28dp 48dp 24dp 48dp; max-height: 94vh; }
+/* The whole field shows at once (about 600 dp square at every size), so the
+   list does not scroll as other lists do. */
+.list.field { margin: 8dp 0dp 12dp 0dp; max-height: 2000dp; overflow-y: visible; text-align: center;
+               font-size: 1dp; line-height: 1dp; }  /* rows as tall as their cells */
+.field .item.cell {
+    display: inline-block;
+    box-sizing: border-box;
+    margin: 0dp 3dp 3dp 0dp;
+    vertical-align: top;
+    padding: 0dp;
+    border-radius: 6dp;
+    text-align: center;
+    font-weight: bold;
+    color: #f8f8f8;
+    background-color: #ffffff10;
+}
+/* The field exactly as wide as its row of cells (cell + 3 dp gap each). */
+body.size9 .list.field { width: 549dp; margin-left: auto; margin-right: auto; }
+body.size12 .list.field { width: 552dp; margin-left: auto; margin-right: auto; }
+body.size16 .list.field { width: 560dp; margin-left: auto; margin-right: auto; }
+body.size9 .field .item.cell { width: 58dp; height: 58dp; line-height: 58dp; font-size: 34dp; }
+body.size12 .field .item.cell { width: 43dp; height: 43dp; line-height: 43dp; font-size: 26dp; }
+body.size16 .field .item.cell { width: 32dp; height: 32dp; line-height: 32dp; font-size: 20dp; }
+.field .item.cell.covered, .field .item.cell.flag { background-color: #5a6a8c; }
+.field .item.cell.open { background-color: #ffffff0a; }
+.field .item.cell.focused { background-color: #f8f8f8; color: #10141c; }
+.field .item.cell.covered.focused, .field .item.cell.flag.focused { background-color: #c8d4ee; }
+.field .item.cell .icon { width: auto; font-size: 0.8em; }
+.field .item.cell.flag { color: #f5821f; }
+.field .item.cell.mine { background-color: #ffffff10; color: #f8f8f8; }
+.field .item.cell.hit { background-color: #c02828; color: #f8f8f8; }
+.field .item.cell.wrong { background-color: #5a6a8c; color: #ffffff60; }
+.field .item.cell.n1 { color: #50a8f0; }
+.field .item.cell.n2 { color: #6ed36a; }
+.field .item.cell.n3 { color: #f06060; }
+.field .item.cell.n4 { color: #b090f8; }
+.field .item.cell.n5 { color: #f2b030; }
+.field .item.cell.n6 { color: #3fc8b8; }
+.field .item.cell.n7 { color: #f070a8; }
+.field .item.cell.n8 { color: #c8c8c8; }
+.field .item.cell.focused.open { color: #10141c; }
+
 /* The grid test screen: a narrow panel at the left, leaving the grid in view. */
 body.lab #panel { left: 40dp; width: 640dp; top: 20dp; padding: 28dp 36dp; max-height: 96vh; }
 body.lab .item { font-size: 26dp; padding: 3dp 20dp; }

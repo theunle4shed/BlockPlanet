@@ -366,6 +366,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Roadmap: a Language option, starting with English (UK) and English (US) (Colour/Color and so on).
 - Fixed: a magic used in play (the owner saw it with the dynamite in Casual) never went off: the sphere stayed dark and the marked bricks glowed for ever. Hiding the original HUD's skull also hid the used magic's flight and effects, which are drawn in the same place, and the game waits for those to finish. They now stay drawn from the moment a magic is used until they end.
 - Roadmap: Casual without lives or a countdown, and episodes in Casual, Time Attack and Score Attack only once played in Story (the owner's request).
+- New (test): Minefield in Solo, BlockPlanet's own take on the hidden-mines puzzle (the owner's idea): three grid sizes, numbers for the mines around each cell, flags, and a safe first cell. Menu list items can now carry their own style classes and Alt button hint.
 
 ## 2026-11-10: Game over screen
 

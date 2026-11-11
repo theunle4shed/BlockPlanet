@@ -1,0 +1,16 @@
+<rml>
+<head>
+    <title>Minefield</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body data-grid="green" class="centred minefield size9">
+    <div id="panel">
+        <div class="title">Minefield</div>
+        <div class="subtitle" data-text="minefield_status"></div>
+        <div class="list field" data-list="minefield_cells" data-columns="9"></div>
+        <div class="item" id="again" data-action="command:minefield_again">New Field</div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

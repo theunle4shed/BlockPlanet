@@ -1,0 +1,15 @@
+<rml>
+<head>
+    <title>Minefield</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body data-grid="green">
+    <div id="panel">
+        <div class="title">Minefield</div>
+        <div class="subtitle">Find the hidden mines without setting one off</div>
+        <div class="list" data-list="minefield_sizes"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div class="hint">Each number tells you how many of the eight cells around it hide a mine. Flag the mines; uncover everything else.</div>
+    </div>
+</body>
+</rml>

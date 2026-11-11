@@ -24,6 +24,7 @@
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
+#include "tetrisphere/minefield.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/brick_sky.h"
 #include "tetrisphere/pause_draw.h"
@@ -63,6 +64,8 @@
 
 #include <array>
 #include <atomic>
+#include <optional>
+#include <random>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -155,6 +158,9 @@ bool guest_session = false;
 // The name screen's text, and the profile the character screen is for.
 NameEditor name_editor;
 std::string character_profile_id;
+// Minefield (BlockPlanet's own puzzle on the menus, tetrisphere/minefield.h).
+std::optional<tetrisphere::Minefield> minefield;
+int minefield_size = 0;
 // The coin screen's colours (random each time it opens, the owner's choice).
 std::vector<int> coin_screen_colours;
 ProfileSaveData profile_data;
@@ -3151,6 +3157,42 @@ bool handle_profile_command(const std::string& command) {
         } else {
             tetrisphere::direct_start::request_intro_restart();
         }
+        return true;
+    }
+    // Minefield: a size, then the field (one screen per width).
+    const auto show_minefield = [&](int focus) {
+        blockplanet::ui::set_text("minefield_status", minefield_status(*minefield));
+        blockplanet::ui::set_list("minefield_cells", minefield_cells(*minefield, focus));
+    };
+    const auto new_minefield = [&](bool open_screen) {
+        const auto& size = minefield_sizes()[static_cast<std::size_t>(minefield_size)];
+        minefield.emplace(size.width, size.height, size.mines, std::random_device{}());
+        // Focus the middle cell of a new field.
+        show_minefield((size.height / 2) * size.width + size.width / 2);
+        if (open_screen) blockplanet::ui::request_show("minefield_" + std::to_string(size.width));
+    };
+    if (command == "minefield") {
+        blockplanet::ui::set_list("minefield_sizes", minefield_size_choices());
+        blockplanet::ui::request_show("minefield");
+        return true;
+    }
+    if (const auto size = argument("minefield_start:")) {
+        const int chosen = std::atoi(size->c_str());
+        if (chosen < 0 || chosen >= static_cast<int>(minefield_sizes().size())) return true;
+        minefield_size = chosen;
+        new_minefield(true);
+        return true;
+    }
+    if (command == "minefield_again" && minefield) {
+        new_minefield(false);
+        return true;
+    }
+    if (const auto cell = argument("minefield_open:"); cell && minefield) {
+        if (minefield->open(std::atoi(cell->c_str()))) show_minefield(-1);
+        return true;
+    }
+    if (const auto cell = argument("minefield_flag:"); cell && minefield) {
+        if (minefield->toggle_flag(std::atoi(cell->c_str()))) show_minefield(-1);
         return true;
     }
     if (command == "profiles") {
