@@ -146,6 +146,12 @@ void Navigator::fill(Screen& screen) {
             if (entry.focus) element->SetAttribute("data-focus", true);
             if (!entry.description.empty()) element->SetAttribute("data-description", entry.description);
             if (!entry.alt.empty()) element->SetAttribute("data-alt", entry.alt);
+            if (!entry.alt_label.empty()) element->SetAttribute("data-alt-label", entry.alt_label);
+            for (std::size_t from = 0; from < entry.classes.size();) {
+                const auto space = std::min(entry.classes.find(' ', from), entry.classes.size());
+                if (space > from) element->SetClass(entry.classes.substr(from, space - from), true);
+                from = space + 1;
+            }
             if (entry.span > 1) {
                 element->SetAttribute("data-span", entry.span);
                 element->SetClass("span" + std::to_string(entry.span), true);
