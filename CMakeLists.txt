@@ -35,6 +35,10 @@ set(N64MODERN_RUNTIME_ROOT "${CMAKE_SOURCE_DIR}/.local/deps/N64ModernRuntime"
 if(MSVC)
     add_compile_options(
         "/experimental:deterministic"
+        # Debug information in every object file (no shared .pdb to lock while
+        # building in parallel), for a .pdb beside the executable so a crash
+        # report's offsets can be named. Code and speed are unchanged.
+        "$<$<COMPILE_LANGUAGE:C,CXX>:/Z7>"
         # Source files are UTF-8: without this, MSVC read BlockPlanet's
         # "\u..." text (icons, the middle dot) in the old code page and the
         # menus showed boxes and gaps on Windows (the owner's report).
@@ -1415,6 +1419,9 @@ if(TETRISPHERE_GAME_ENABLED)
                 VERBATIM)
         endforeach()
         target_link_options(tetrisphere-m1 PRIVATE "/DELAYLOAD:dxcompiler.dll")
+        # tetrisphere-m1.pdb beside the executable (crash reports give offsets
+        # into it); the linker keeps its usual Release optimisations.
+        target_link_options(tetrisphere-m1 PRIVATE "/DEBUG:FULL" "/OPT:REF" "/OPT:ICF")
         add_custom_command(TARGET tetrisphere-m1 POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
                 "${RT64_ROOT}/src/contrib/dxc/bin/x64/dxcompiler.dll"
