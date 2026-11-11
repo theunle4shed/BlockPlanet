@@ -3906,9 +3906,15 @@ bool handle_profile_command(const std::string& command) {
                 }
                 return where;
             };
+            // "Exit to <place>": where the way out of play goes (the launch
+            // path's last screen; docs/STYLE.md).
+            const auto exit_label = [&] { return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first); };
             if (pause.open_menu) {
                 blockplanet::ui::set_text("pause_where", where_now());
-                blockplanet::ui::set_list("pause", pause.items);
+                auto pause_items = pause.items;
+                for (auto& item : pause_items)
+                    if (item.id == "quit") item.label = exit_label();
+                blockplanet::ui::set_list("pause", pause_items);
                 blockplanet::ui::request_open("pause");
             }
             // The game's end menus (game over, Versus' end) under BlockPlanet's
@@ -3923,7 +3929,10 @@ bool handle_profile_command(const std::string& command) {
             if (end.open_menu) {
                 blockplanet::ui::set_text("end_title", end.title);
                 blockplanet::ui::set_text("end_where", where_now());
-                blockplanet::ui::set_list("end", end.items);
+                auto end_items = end.items;
+                for (auto& item : end_items)
+                    if (item.id == "exit") item.label = exit_label();
+                blockplanet::ui::set_list("end", end_items);
                 blockplanet::ui::request_open("gameover");
             }
             // Only in play: back at the game's menu (after Quit), the menus shown are the launch path's.

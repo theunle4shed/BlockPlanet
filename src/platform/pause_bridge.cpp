@@ -55,7 +55,7 @@ std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_t
     if (game_mode == 1 || game_mode == 4 || game_mode == 5 || game_mode == 6 || game_mode == 9)
         items.push_back({"howto", "How to Play", "", "command:pause_howto", true});
     items.push_back({"options", "Options", "", "open:options", true});
-    items.push_back({"quit", "Quit to menu", "", "command:pause_quit", true});
+    items.push_back({"quit", "Exit", "", "command:pause_quit", true});  // "Exit to <place>" (linux_main)
     // Icons (Lucide, the menus' icon font): play, restart, skip, help, settings, leave.
     for (auto& item : items)
         item.icon = item.id == "resume" ? "\uE140" : item.id == "restart" ? "\uE14C" : item.id == "skip" ? "\uE164"

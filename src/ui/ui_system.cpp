@@ -12,6 +12,9 @@
 #include <RmlUi/Core.h>
 
 #include <algorithm>
+#include <cctype>
+#include <iterator>
+#include <fstream>
 #include <array>
 #include <cmath>
 #include <chrono>
@@ -1200,6 +1203,45 @@ void set_pad(bool pad) {
 void send_command(const std::string& command) {
     std::lock_guard lock(requests_mutex);
     commands.push_back(command);
+}
+
+std::string screen_title(const std::string& screen) {
+    if (screen.empty() || screen.find_first_of("/\\.") != std::string::npos) return {};
+    std::ifstream file(assets_path / "screens" / (screen + ".rml"));
+    if (!file) return {};
+    const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    const auto open = text.find("<title>");
+    const auto close = open == std::string::npos ? open : text.find("</title>", open);
+    if (close == std::string::npos) return {};
+    std::string title = text.substr(open + 7, close - open - 7);
+    // Title Case: each word capitalised, but for short joining words.
+    bool start = true, first = true;
+    std::string word;
+    std::string out;
+    const auto flush = [&] {
+        static const char* small[] = {"a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to"};
+        bool keep = !first && std::any_of(std::begin(small), std::end(small), [&](const char* w) { return word == w; });
+        if (!word.empty() && !keep) word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
+        out += word;
+        word.clear();
+        first = false;
+    };
+    for (char ch : title) {
+        if (ch == ' ') {
+            flush();
+            out += ' ';
+        } else {
+            word += ch;
+        }
+    }
+    flush();
+    (void)start;
+    return out;
+}
+
+std::string exit_to_label(const std::string& screen) {
+    const std::string place = screen_title(screen.empty() ? "main" : screen);
+    return place.empty() ? "Exit" : "Exit to " + place;
 }
 
 std::string current_screen() {

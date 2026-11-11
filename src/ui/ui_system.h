@@ -74,6 +74,12 @@ void set_alt_button(const std::string& spec);
 void send_command(const std::string& command);
 // The screen on top, as of the last frame; empty when the menus are closed.
 std::string current_screen();
+// A screen's title (its rml's <title>, in Title Case for item labels: "Main
+// Menu", "Story for Two"); empty when the screen is not known.
+std::string screen_title(const std::string& screen);
+// "Exit to <place>" for the screen a way out returns to ("Exit to Main Menu"
+// when none), or plain "Exit" when its title is not known (docs/STYLE.md).
+std::string exit_to_label(const std::string& screen);
 
 // BlockPlanet's in-game HUD (docs/HUD_DESIGN.md), drawn over the game while
 // no menu is open. Placeholder art until the owner's designs are in.

@@ -337,6 +337,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - (2026-11-10) Fixed: after the box art, game over went to the game's SCORES name entry (hidden under the red grid) instead of the end menu, and direct starts were refused ("save_check") on a new save. Ending the intro early (the hand-over into the box art and the Start skip) skipped the game's start-up save check, which gives a new save its defaults, high-score tables included; it is now run as the intro would.
 - (2026-11-11) With the box art on, the game's other attract path (`0x800DF728`, `func_8005C410`; seen on Windows as the box art building twice and the H2O logo animation playing between demos) is kept from starting outside play, and logged as `box_art_reset_signal` when it would have.
 - (2026-11-11) The box art's flow events (`box_art_*`, `title_restart`, `intro_restart`, and each change of the game's reset flag `0x800DF728` as `reset_flag`) also go to the diagnostics file in the data folder, with the time since the first of them, so a player can send them without a console. The game over panel is headed "Game Over" ("Match Over" in Versus).
+- (2026-11-11) Every way out says where it goes (the owner's rule, now in `docs/STYLE.md`): the main menu's Exit is "Exit to Desktop"; the pause's "Quit to menu" and the Game Over and Match Over panels' Exit are "Exit to <place>", the title of the screen play returns to ("Exit to Story", "Exit to Main Menu"), or plain "Exit" when it is not known.
 
 ## 2026-11-10: Guest play
 
