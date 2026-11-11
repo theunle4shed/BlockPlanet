@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>Colour</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body data-grid="blue">
+    <div id="panel">
+        <div class="title">Colour</div>
+        <div class="subtitle" data-text="coin_colour_for"></div>
+        <div class="list tiles coins named" data-list="coin_colours" data-columns="4"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+    </div>
+</body>
+</rml>

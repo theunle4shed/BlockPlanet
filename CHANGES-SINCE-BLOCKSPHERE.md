@@ -356,6 +356,16 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Fixed: an audio capture (`TETRISPHERE_AUDIO_CAPTURE_WAV`) was labelled 48000 Hz although the game plays at 44100 Hz, so it played back 8.8% fast and sharp. The capture opened on the runtime's placeholder rate and never followed the game's; its header now follows the output rate.
 - Fixed: choosing Skip lesson in Training stopped play with an empty speech bubble. The game's SKIP jumps to the lesson's "skip to" text (`0x8013D25C`, set from the lesson's record), and the lessons tested (Basics, Advanced, Puzzle) have none, so it jumped to nothing. Skip lesson is now offered only when the lesson has somewhere to skip to.
 - Fixed: on a window taller than wide, the menu panels ran off the right edge (the panel is 720 wide). They now fit the window's width.
+- Design notes: the colour-blindness idea (choose block colours; current piece in colour with the rest greyscale, power-ups and special blocks kept in colour), under Accessibility.
+- Design notes: the sphere themes idea (pick the sphere's colours and texture design; the current look stays the default), under Long-term engagement.
+- Design notes: themes also cover the background and can be unlocked through Adventure stages; first example theme, Neutron (bright blue brick borders, dark grey bricks, neon selection).
+- Research notes: the faint drifting robot coins over the title and menu backdrop.
+- Roadmap: the profile icons idea (robot-coin emblems; our own vector designs recommended, or the game's coins read from the player's copy).
+- Profiles: a coin for each profile, chosen on a new Coin screen (Profile > Coin) and shown beside its name, in the profile's colour. Twelve coins of BlockPlanet's own (Bolt, Visor, Cyclops, Cat, Helmet, Rocket, Planet, Bricks, Spark, Crown, Heart, Music), drawn by `tools/art/coins.py`; menu lists can now show a picture before a label.
+- Profiles: the Coin screen shows the coins without names, each in a random colour; picking one asks for its colour next, starting at the colour it showed (the owner's request).
+- Roadmap: a Language option, starting with English (UK) and English (US) (Colour/Color and so on).
+- Fixed: a magic used in play (the owner saw it with the dynamite in Casual) never went off: the sphere stayed dark and the marked bricks glowed for ever. Hiding the original HUD's skull also hid the used magic's flight and effects, which are drawn in the same place, and the game waits for those to finish. They now stay drawn from the moment a magic is used until they end.
+- Roadmap: Casual without lives or a countdown, and episodes in Casual, Time Attack and Score Attack only once played in Story (the owner's request).
 
 ## 2026-11-10: Game over screen
 

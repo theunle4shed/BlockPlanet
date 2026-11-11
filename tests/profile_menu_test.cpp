@@ -54,14 +54,15 @@ int main(int argc, char** argv) {
 
     // The playing profile can be kept; another one restarts the game.
     auto actions = profile_actions(store, sam, false);
-    assert(actions.size() == 4 && actions[0].action == "close" && actions[3].action == "command:profile_delete:" + sam);
+    assert(actions.size() == 5 && actions[0].action == "close" && actions[3].action == "command:profile_coin:" + sam &&
+           actions[4].action == "command:profile_delete:" + sam);
     actions = profile_actions(store, "1", false);
     assert(actions[0].label == "Play as Player 1" && actions[0].action == "command:profile_play:1");
     actions = profile_actions(store, sam, true);
     assert(actions[0].action == "command:profile_play:" + sam);
     assert(profile_actions(store, "99", false).empty());
 
-    assert(actions.size() == 4 && actions[1].action == "command:profile_rename:" + sam &&
+    assert(actions.size() == 5 && actions[1].action == "command:profile_rename:" + sam &&
            actions[2].action == "command:profile_character:" + sam && actions[2].note.empty());
 
     // Characters: None, then the six robots; the chosen one is marked and
@@ -75,6 +76,39 @@ int main(int argc, char** argv) {
     assert(profile_list(store, false)[0].note == "Gyro \u00B7 playing now");
     assert(profile_actions(store, sam, false)[2].note == "Gyro");
     assert(character_label("nobody").empty() && colour_names().size() == 8);
+
+    // Coins: None, then BlockPlanet's twelve, pictures only, each in the
+    // colour given (the profile's own coin keeps the profile's colour);
+    // picking one goes on to its colour, starting at that colour.
+    std::vector<int> colours(12, 5);
+    colours[9] = 1;
+    auto coin_list = coin_choices(store, sam, colours);
+    assert(coin_list.size() == 13 && coin_list[0].focus && coin_list[0].image == "../coins/none.png" &&
+           coin_list[0].label.empty() && coin_list[0].action == "command:profile_set_coin:" + sam + ":none:3");
+    assert(coin_list[1].image == "../coins/bolt.png" && coin_list[1].image_colour == coin_colour(5) &&
+           coin_list[1].label.empty() && coin_list[1].action == "command:profile_pick_coin:" + sam + ":bolt:5");
+    assert(coin_colour(0).empty() && coin_colour(3) == "#8ed850" && coin_colour(8).empty());
+    assert(profile_list(store, false)[0].image.empty());
+    assert(store.set_coin("Sam", "crown", error));
+    coin_list = coin_choices(store, sam, colours);
+    assert(!coin_list[0].focus && coin_list[10].focus && coin_list[10].image_colour == coin_colour(3) &&
+           coin_list[10].action == "command:profile_pick_coin:" + sam + ":crown:3");
+    auto colour_list = coin_colour_choices(sam, "crown", 6);
+    assert(colour_list.size() == 8 && colour_list[6].focus && !colour_list[0].focus &&
+           colour_list[6].label == "Violet" && colour_list[6].image == "../coins/crown.png" &&
+           colour_list[6].image_colour == coin_colour(6) &&
+           colour_list[6].action == "command:profile_set_coin:" + sam + ":crown:6");
+    assert(coin_colour_choices(sam, "nobody", 0).empty());
+    const auto random_colours = random_coin_colours();
+    assert(random_colours.size() == 12 &&
+           std::all_of(random_colours.begin(), random_colours.end(), [](int c) { return c >= 0 && c < 8; }));
+    assert(profile_list(store, false)[0].image == "../coins/crown.png" &&
+           profile_list(store, false)[0].image_colour == "#8ed850");
+    assert(profile_actions(store, sam, false)[3].note == "Crown" && coin_label("nobody").empty() &&
+           coin_image("nobody").empty());
+    for (const auto& coin : coins())
+        assert(std::filesystem::exists(std::filesystem::path(BLOCKPLANET_SOURCE_DIR) / "assets/ui/coins" /
+                                       (std::string(coin.id) + ".png")));
 
     // Names: on-screen keys (shift lasts one letter), typing, limits.
     NameEditor editor;

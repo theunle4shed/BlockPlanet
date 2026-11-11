@@ -87,7 +87,8 @@ int profile_command(const std::filesystem::path& data_dir, int argc, char** argv
     if (command == "profiles" && argc == 1) {
         auto list = nlohmann::json::array();
         for (const auto& p : profiles.profiles())
-            list.push_back({{"id", p.id}, {"name", p.name}, {"character", p.character}, {"palette", p.palette}});
+            list.push_back({{"id", p.id}, {"name", p.name}, {"character", p.character}, {"palette", p.palette},
+                            {"coin", p.coin}});
         auto deleted = nlohmann::json::array();
         for (const auto& d : profiles.deleted()) deleted.push_back({{"name", d.profile.name}, {"folder", d.folder}});
         std::cout << nlohmann::json{{"active", profiles.active().name}, {"profiles", list}, {"deleted", deleted}}.dump()

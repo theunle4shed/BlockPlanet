@@ -68,7 +68,7 @@ def main():
         assert run("profile-use", "Sam").returncode == 0
         profiles = json.loads(run("profiles").stdout)
         assert profiles["active"] == "Sam"
-        assert {"id": "2", "name": "Sam", "character": "rescue-2", "palette": 3} in profiles["profiles"]
+        assert {"id": "2", "name": "Sam", "character": "rescue-2", "palette": 3, "coin": ""} in profiles["profiles"]
         assert run("profile-delete", "Sam").returncode == 0
         profiles = json.loads(run("profiles").stdout)
         assert profiles["active"] == "Player 1" and [d["name"] for d in profiles["deleted"]] == ["Sam"]

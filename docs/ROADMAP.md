@@ -60,6 +60,8 @@ A menu that lists every music track and sound effect and plays them. Research: f
 
 `--casual` refills hearts as soon as one is lost and stops the Time Trial clock at 30 seconds, so a game never ends. Trophies are paused while it is on. It becomes an Options setting with the new menus. Requested both for testing later stages and as a relaxed way to play.
 
+**Casual refinements (the owner's request, 2026-11-11, low priority).** Casual needs no lives and no countdown at all: hide the hearts and the drop timer and always win (today hearts refill and the Time Trial clock stops at 30 seconds, but both still show). And an episode is offered in Casual, Time Attack and Score Attack only once it has been played in Story (the episode lists follow Story's progress, not their own).
+
 ## Phase 2: presentation
 
 ### Variable screen sizes: ultrawide, vertical and any window shape (L)
@@ -89,6 +91,8 @@ Replace the original menus (title, mode select, options, controls, graphics) wit
 Direction: a modern, simple, TV-like menu (large focus states, few items per screen, quick transitions), with no option to keep the original menus.
 
 **Idea: toasts (2026-11-10, not built).** A short note over the menus that fades in and out by itself after a few seconds, with nothing to dismiss, in the menus' note colour, for passing information such as "Playing as Guest. Progress isn't saved." A version was built and withdrawn the same day (the owner left guest play as it was); it could return when a screen needs one.
+
+**Language, starting with English (UK) and English (US) (idea, the owner's, 2026-11-11).** BlockPlanet's text is written in British English (Colour, Centred, Grey). A Language option would offer English (UK) and English (US) first (Colour/Color, Centre/Center, Grey/Gray, Favourite/Favorite, Customise/Customize, Licence/License), defaulting to the system's region, and make room for other languages later. Needs: every menu, card and HUD string moved out of the screens (`assets/ui/screens/*.rml`) and the C++ lists into a string table per language, with English (UK) as the source; the text rewrites for the game's own lines (`proper_case`, `fix_wording`) run per language too; the on-screen keyboard gets a layout per language. Nothing from the game's text is stored (it stays read from the player's copy); only BlockPlanet's own text is translated.
 
 ## Phase 3: audio and visuals
 
@@ -198,6 +202,7 @@ Puzzle limits its play area with a border of type 47 blocks (the purple "out of 
 - **Medals:** each stage awards gold, silver or bronze against that stage's own challenge, and remembers the best medal won there.
 - **Points and unlocks:** medals convert to points, which unlock further stages on the map. Some small side branches open only on a gold.
 - **Independent stages:** once unlocked, any stage can be played at any time, in any order. Lives come from each stage's own configuration, not from a run.
+- **Themes as rewards:** stages can come with their own theme (sphere look and background), and finishing them unlocks that theme for use anywhere. Example, Neutron: bright blue brick borders, dark grey bricks, the selected bricks lit in neon too, and a matching background. See the themes note in [REDESIGN.md](REDESIGN.md) §12.
 - **Story stays as it is,** perhaps renamed (for example "Classic") so the two are told apart.
 - Open for later: the map's look and navigation on the sphere, the medal thresholds per stage type, the points cost of each unlock, and how it fits the rulesets-per-stage idea and the direct starts (every mode can be started at any stage).
 
@@ -267,6 +272,8 @@ A sensible first milestone is two players online with VS-style attacks, then fou
 Each needs its text found (much of it is pictures in the main archive; the asset catalogue lists them) and the screen's timing kept.
 
 **Progress (2026-11-07):** the game's text routine (`func_800382B4`) is hooked, and its font 0 (menus, the Try Again / Exit / Training menu, the original HUD's numbers) is now drawn in BlockPlanet's font at the game's own positions. Font 1 (the cards) done too: it types its text out word by word (the empty first frames were the typing, not a different encoding). Cards read as text (words joined into lines). Still to do: font 2,, the pictures with text in them (the Try Again hint). Alignment is done: each string is fitted to the width the game's font would give it.
+
+**Profile icons from the robot coins (idea, the owner's, 2026-11-11; route 1's first twelve coins done the same day, the owner keeping all of them for now).** Each profile picks an emblem shown next to its name (profile list, "Who is playing?", records, VS), in the spirit of the faint robot coins that drift over the original's menu backdrop (eight coins, seven robots and a swirl; see the game-state notes). Tracing the game's coins into vectors and committing them would be art derived from the game, which the project rules forbid, so two routes: (1) recommended, BlockPlanet's own vector coin emblems, drawn fresh in the same style (round coin, raised rim, a simple robot face) but not copies, sharp at any size, tinted in the profile's colour, and usable for the menu grid's drifting coins and themes too; (2) the game's own coins, read from the player's copy at start-up and smoothed and tinted there, never stored in the project (only 44 × 44, so soft when large).
 
 **Records without name entry (decided 2026-11-07).** Profiles already have a name, so record screens use the profile's name instead of asking for one (the original's name entry stays only for its cheat codes, if kept at all).
 

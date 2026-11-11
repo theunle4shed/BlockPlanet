@@ -329,6 +329,7 @@ Not in the original brief, but essential for a modern release.
 
 - **Photosensitivity:** a flashing and strobe limiter for visualisers, a calm background option, and a startup warning. Audio-reactive visuals are the highest risk in this design.
 - **Colour:** block pairs differ mainly by colour (two colour types per chapter in the original). Add colour-blind palettes and optional patterns or symbols on block types.
+  - *Idea (the owner's, 2026-11-11):* let the player change each block type's colour, and a focus option that keeps the current piece in colour and shows the rest of the sphere in greyscale, leaving power-ups and special blocks in colour so they still stand out. BlockPlanet already draws the sphere's faces itself and knows each brick's type (see [the game-state notes](research/blockplanet-game-state.md)), so recolouring or greying by type is a drawing change, not a game change.
 - **Motion:** reduce camera motion, sphere rotation smoothing, and an option to turn off screen shake.
 - **Difficulty:** casual play with no game over (already implemented as `--casual`), adjustable fall speed, and assist options such as a longer drop guide. Assist modes pause trophies, as casual play does now.
 - **Input:** full remapping (inherited from Blocksphere), hold or toggle choices, and one-handed layouts.
@@ -340,6 +341,8 @@ Not in the original brief, but essential for a modern release.
 - **Daily challenge and weekly seed** with friends' leaderboards (needs seeding).
 - **Custom levels:** share designed spheres with a short code (the generator research supports this).
 - **Cosmetics earned through play:** sphere themes, block skins, visualiser presets. No paid randomised rewards.
+  - *Idea (the owner's, 2026-11-11):* a theme picker for the sphere's colours and texture design, with the current look as the default theme. Themes would be BlockPlanet's own original art. They change only how blocks are drawn, not their type, so they work with the colour-blind options in section 11 (a type's chosen colour or pattern wins over the theme). The flat, glowing look planned for the prototype-era mode (ROADMAP, Phase 4) would be one theme in the same system.
+  - A theme covers the background as well as the sphere. Themes can be unlocked through Adventure stages. Example, *Neutron*: bright blue borders on every brick, dark grey brick faces, the selected bricks lit in neon, and a background to match. Power-ups and special blocks still need to read clearly in every theme.
 - **Seasonal events:** optional, low-pressure, built from seeds and presets rather than new content drops.
 
 ## What to keep, change or drop

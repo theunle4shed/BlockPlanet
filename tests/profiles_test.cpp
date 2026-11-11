@@ -84,6 +84,13 @@ int main(int argc, char** argv) {
         assert(store.rename("SAMMY", "Sam", error));
         assert(store.set_character("Sam", "", 0, error) && store.find("Sam")->character.empty());
         assert(store.set_character("Sam", "rescue-3", 2, error));
+        // Coins: the same form as characters; kept across a reload.
+        assert(store.set_coin("Sam", "rocket", error) && !store.set_coin("Sam", "Bad Coin", error));
+        assert(!store.set_coin("Nobody", "rocket", error));
+    }
+    {
+        ProfileStore store(data);
+        assert(store.load(error) && store.find("Sam")->coin == "rocket");
     }
     // Deleting moves the profile aside; restoring brings it and its files back.
     {
@@ -97,7 +104,8 @@ int main(int argc, char** argv) {
         assert(!std::filesystem::exists(data / "profiles" / "2"));
         assert(store.add("Alex", error) && store.find("Alex")->id == "3");  // id 2 is still held
         assert(store.restore("sam", error));
-        assert(store.find("Sam")->id == "2" && store.find("Sam")->character == "rescue-3");
+        assert(store.find("Sam")->id == "2" && store.find("Sam")->character == "rescue-3" &&
+               store.find("Sam")->coin == "rocket");
         assert(read(data / "profiles" / "2" / "cartridge.eep") == "sam's save");
         assert(store.deleted().empty() && !store.restore("Sam", error));
     }

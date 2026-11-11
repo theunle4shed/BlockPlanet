@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="256" height="256">
+<defs>
+<filter id="emboss" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+  <feColorMatrix in="SourceGraphic" type="luminanceToAlpha" result="h"/>
+  <feGaussianBlur in="h" stdDeviation="0.9" result="hb"/>
+  <feDiffuseLighting in="hb" surfaceScale="5" diffuseConstant="1.05" lighting-color="#ffffff" result="lit">
+    <feDistantLight azimuth="225" elevation="52"/>
+  </feDiffuseLighting>
+  <feComposite in="lit" in2="SourceAlpha" operator="in"/>
+</filter>
+</defs>
+<g filter="url(#emboss)">
+<circle cx="50" cy="50" r="48" fill="#ffffff"/>
+<circle cx="50" cy="50" r="41.5" fill="#3a3a3a"/>
+<circle cx="50" cy="50" r="40" fill="#808080"/>
+<path d="M28 40 L32 18 L46 32 L54 32 L68 18 L72 40 Q74 72 50 74 Q26 72 28 40 Z" fill="#ffffff"/>
+<path d="M38 46 l6 4 l-6 4 Z" fill="#3a3a3a"/><path d="M62 46 l-6 4 l6 4 Z" fill="#3a3a3a"/>
+<circle cx="50" cy="60" r="3" fill="#3a3a3a"/>
+<path d="M22 58 H36 M22 64 H36 M64 58 H78 M64 64 H78" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+</g>
+</svg>
