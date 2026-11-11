@@ -15,6 +15,8 @@
 #endif
 
 #include <algorithm>
+#include <fstream>
+#include <iterator>
 #include <cstring>
 
 namespace blockplanet::ui {
@@ -195,6 +197,11 @@ void Renderer::ReleaseGeometry(Rml::CompiledGeometryHandle handle) {
     retired_.push_back({frame_, std::chrono::steady_clock::now(), std::unique_ptr<Geometry>(reinterpret_cast<Geometry*>(handle)), nullptr, nullptr});
 }
 
+std::filesystem::path& ui_asset_root() {
+    static std::filesystem::path root;
+    return root;
+}
+
 Rml::TextureHandle Renderer::LoadTexture(Rml::Vector2i& dimensions, const Rml::String& source) {
     // The menu grid's tiles (grid_texture.h): made in memory, not a file.
     if (source == "blockplanet-grid-tile") {
@@ -203,17 +210,29 @@ Rml::TextureHandle Renderer::LoadTexture(Rml::Vector2i& dimensions, const Rml::S
         dimensions = {atlas.width, atlas.height};
         return create_texture(atlas.rgba.data(), atlas.width, atlas.height);
     }
-    // Read through RmlUi's file interface, decode with stb_image.
-    Rml::FileInterface* files = Rml::GetFileInterface();
-    Rml::FileHandle file = files->Open(source);
-    // RmlUi drops the leading '/' of an absolute path (files BlockPlanet makes
-    // in its data directory, such as the title's lines): try it with one.
-    if (!file && !source.empty() && source[0] != '/') file = files->Open("/" + source);
-    if (!file) return 0;
-    const std::size_t size = files->Length(file);
-    std::vector<std::uint8_t> bytes(size);
-    files->Read(bytes.data(), size, file);
-    files->Close(file);
+    std::vector<std::uint8_t> bytes;
+    // BlockPlanet's own pictures in the menu folder (see ui_asset_root()).
+    const auto prefix = source.find("blockplanet-ui/");
+    if (prefix != Rml::String::npos && prefix <= 1) {
+        const auto relative = std::filesystem::u8path(source.substr(prefix + 15));
+        if (relative.empty() || relative.is_absolute() || relative.string().find("..") != std::string::npos) return 0;
+        std::ifstream in(ui_asset_root() / relative, std::ios::binary);
+        if (!in) return 0;
+        bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    } else {
+        // Read through RmlUi's file interface, decode with stb_image.
+        Rml::FileInterface* files = Rml::GetFileInterface();
+        Rml::FileHandle file = files->Open(source);
+        // RmlUi drops the leading '/' of an absolute path (files BlockPlanet makes
+        // in its data directory, such as the title's lines): try it with one.
+        if (!file && !source.empty() && source[0] != '/') file = files->Open("/" + source);
+        if (!file) return 0;
+        const std::size_t size = files->Length(file);
+        bytes.resize(size);
+        files->Read(bytes.data(), size, file);
+        files->Close(file);
+    }
+    if (bytes.empty()) return 0;
     int width = 0, height = 0, channels = 0;
     stbi_uc* pixels = stbi_load_from_memory(bytes.data(), static_cast<int>(bytes.size()), &width, &height, &channels, 4);
     if (pixels == nullptr) return 0;

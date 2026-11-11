@@ -1120,6 +1120,7 @@ void set_grid_override(const std::string& colour) {
 
 void install(const std::filesystem::path& assets) {
     assets_path = assets;
+    ui_asset_root() = assets;
     RT64::SetRenderHooks(hook_init, hook_draw, hook_deinit);
     tetrisphere::under_layer::draw_function().store(hook_under);
     const char* test = std::getenv("BLOCKPLANET_UI_TEST");
