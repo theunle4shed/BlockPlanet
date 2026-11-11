@@ -292,6 +292,12 @@ body.credits .hint { margin-top: 28dp; text-align: center; }
 
 /* A screen alone on the screen (Who is playing?): centred. */
 body.centred #panel { left: 50%; margin-left: -360dp; top: 26vh; }
+/* Taller than wide: every panel fits the window's width instead of running
+   off its right edge (the fixed 720dp panel is wider than a narrow window). */
+@media (orientation: portrait) {
+    #panel, body.lab #panel { left: 4vw; width: 92vw; }
+    body.centred #panel { left: 4vw; margin-left: 0dp; }
+}
 body.centred .hint { display: block; margin-top: 20dp; }
 
 /* Who is playing? and the main menu share one panel (the owner's request,
