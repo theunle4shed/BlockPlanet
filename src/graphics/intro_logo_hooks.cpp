@@ -78,6 +78,18 @@ std::uint32_t prepared_scene = 0;
 int last_frame = 0;  // a frame lower than the last: the logo started again
 std::vector<std::uint8_t> held;  // the held objects' records, one after the other
 
+// A scene's object count: its source data (scene +0x1C) holds, at the
+// offset in its word +8, the number of objects (as the object pass
+// func_80031A98 reads it). 0 when that does not look like a scene.
+std::uint32_t scene_object_count(const std::uint8_t* rdram, std::uint32_t scene) {
+    const std::uint32_t data = load32(rdram, scene + 0x1Cu);
+    if (data < 0x80000000u || data >= 0x80800000u) return 0;
+    const std::uint32_t table = data + load32(rdram, data + 8u);
+    if (table < 0x80000000u || table >= 0x80800000u) return 0;
+    const std::uint32_t count = load32(rdram, table);
+    return count <= 256u ? count : 0;
+}
+
 void step(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene) {
     const recomp_context saved = *ctx;
     ctx->r4 = static_cast<gpr>(static_cast<std::int64_t>(static_cast<std::int32_t>(scene)));
@@ -118,8 +130,21 @@ void logo_scene(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene, b
         const std::uint32_t end = load32(rdram, intro_scene_pointer);
         if (end <= scene || end - scene > 0x100000u || objects < scene || objects + 6 * object_size > end) return;
         if (frame >= hold_frame()) return;
-        // Save the scene, step it on to the hold frame, keep the two objects.
-        std::vector<std::uint8_t> saved(host(rdram, scene), host(rdram, end));
+        // Save the scene (its header and object records only: memory beyond
+        // them, up to the intro scene, holds data the intro may still be
+        // loading in the background, and putting an old copy of that back
+        // corrupted the intro's scene file, which crashed its later steps,
+        // func_8002F55C, now and then; 2026-11-11), step it on to the hold
+        // frame, keep the two objects.
+        const std::uint32_t count = scene_object_count(rdram, scene);
+        if (count == 0 || count > 64u) {
+            static bool told = false;
+            if (!told) told = true, std::fprintf(stdout, "{\"event\":\"intro_logo_count\",\"count\":%u,\"objects\":\"0x%08X\",\"scene\":\"0x%08X\",\"end\":\"0x%08X\"}\n", count, objects, scene, end);
+            return;
+        }
+        const std::uint32_t records_end = objects + count * object_size;
+        if (records_end > end) return;
+        std::vector<std::uint8_t> saved(host(rdram, scene), host(rdram, records_end));
         while (static_cast<int>(load32(rdram, frame_address)) < hold_frame()) {
             step(rdram, ctx, scene);
             store32(rdram, frame_address, load32(rdram, frame_address) + 1u);
@@ -135,8 +160,9 @@ void logo_scene(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene, b
             step(rdram, ctx, scene);
             store32(rdram, frame_address, load32(rdram, frame_address) + 1u);
         }
-        std::fprintf(stdout, "{\"event\":\"intro_logo_held\",\"scene\":\"0x%08X\",\"from_frame\":%d,\"start_frame\":%d,\"hold_frame\":%d,\"end_frame\":%d}\n",
-                     scene, frame, start_frame(), hold_frame(), static_cast<int>(load32(rdram, load32(rdram, scene + 0x1Cu) + 0xCu)));
+        std::fprintf(stdout, "{\"event\":\"intro_logo_held\",\"scene\":\"0x%08X\",\"from_frame\":%d,\"start_frame\":%d,\"hold_frame\":%d,\"end_frame\":%d,\"saved\":%u,\"to_intro\":%u,\"data\":\"0x%08X\"}\n",
+                     scene, frame, start_frame(), hold_frame(), static_cast<int>(load32(rdram, load32(rdram, scene + 0x1Cu) + 0xCu)),
+                     records_end - scene, end - scene, load32(rdram, end + 0x1Cu));
         std::fflush(stdout);
     }
     if (!hold || frame >= hold_frame() || held.size() != held_list().size() * state_size) return;
@@ -317,7 +343,7 @@ extern "C" void blockplanet_intro_bricks(std::uint8_t* rdram, recomp_context* ct
     if (scene == 0 || scene != load32(rdram, intro_scene_pointer) || load16(rdram, 0x800E1648u) != 0) return;
     static std::uint32_t seen_scene = 0;
     static std::vector<bool> opaque;
-    const int count = static_cast<int>(load32(rdram, scene + 0x10u));
+    const int count = static_cast<int>(scene_object_count(rdram, scene));
     if (scene != seen_scene || static_cast<int>(opaque.size()) != count) {
         seen_scene = scene;
         opaque.assign(static_cast<std::size_t>(std::max(count, 0)), false);
