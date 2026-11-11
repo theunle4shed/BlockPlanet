@@ -329,6 +329,7 @@ Not in the original brief, but essential for a modern release.
 
 - **Photosensitivity:** a flashing and strobe limiter for visualisers, a calm background option, and a startup warning. Audio-reactive visuals are the highest risk in this design.
 - **Colour:** block pairs differ mainly by colour (two colour types per chapter in the original). Add colour-blind palettes and optional patterns or symbols on block types.
+  - *Idea (the owner's, 2026-11-11):* let the player change each block type's colour, and a focus option that keeps the current piece in colour and shows the rest of the sphere in greyscale, leaving power-ups and special blocks in colour so they still stand out. BlockPlanet already draws the sphere's faces itself and knows each brick's type (see [the game-state notes](research/blockplanet-game-state.md)), so recolouring or greying by type is a drawing change, not a game change.
 - **Motion:** reduce camera motion, sphere rotation smoothing, and an option to turn off screen shake.
 - **Difficulty:** casual play with no game over (already implemented as `--casual`), adjustable fall speed, and assist options such as a longer drop guide. Assist modes pause trophies, as casual play does now.
 - **Input:** full remapping (inherited from Blocksphere), hold or toggle choices, and one-handed layouts.
