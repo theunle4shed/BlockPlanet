@@ -40,6 +40,7 @@ constexpr std::uint32_t main_row = 0x800E121Cu;
 constexpr int block_cells = 4;          // 32 cells round the sphere: 8 blocks a row, no gap
 constexpr double start_layers = 1.5;    // how far above its place a block starts (more comes at the camera)
 constexpr double fall_seconds = 0.5;    // each block's slide
+constexpr double bevel = 3.0;           // how far each block's corner normals lean out
 constexpr double spread_seconds = 0.7;  // the last block starts this long after the first
 
 // The face work area the sphere's face code reads (sphere_cell.cpp's table),
@@ -137,25 +138,27 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     // four corners inside the extended patch (it runs from -ring to 14 + ring).
     const auto origins = [&](std::uint32_t offset) {
         std::vector<int> out;
-        // Only over the game's own 15 x 15 patch (cells 0 to 14), the side
-        // facing the camera: blocks beyond it stand edge-on at the silhouette.
-        for (int r = -1; r + block_cells <= 16; ++r)
+        // Over the whole extended patch, so the shell reaches the sphere's
+        // rim (over the game's 15 x 15 alone a ring of the board showed).
+        for (int r = sphere.first_cell(); r + block_cells <= sphere.last_cell() + 1; ++r)
             if (((static_cast<std::uint32_t>(r) + offset) & (block_cells - 1)) == 0) out.push_back(r);
         return out;
     };
     const auto rows = origins(off_row), columns = origins(off_column);
     if (rows.empty() || columns.empty()) return;
 
-    // Dark blocks: the block texture (its bevelled edges, stretched over the
-    // 4 x 4 block) times a dark primitive colour, put back to the sphere's
-    // own combine after.
+    // Near-black blocks: a dark primitive colour times the lit shade (no
+    // texture: the one last loaded came out olive on the real game), put back
+    // to the sphere's own combine after. Each block's corner normals lean
+    // out from its middle, so its face shades a little towards its edges and
+    // the blocks read apart (a faint bevel).
     std::uint32_t previous_w0 = 0, previous_w1 = 0;
     for (std::uint32_t at = load32(rdram, display_list_pointer) - 8u, n = 0; n < 20000 && at >= 0x80000000u; at -= 8u, ++n)
         if ((load32(rdram, at) >> 24) == 0xFCu) {
             previous_w0 = load32(rdram, at), previous_w1 = load32(rdram, at + 4u);
             break;
         }
-    // gsDPSetCombineLERP(TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, 1) in both cycles.
+    // gsDPSetCombineLERP(PRIMITIVE, 0, SHADE, 0, 0, 0, 0, 1) in both cycles.
     const auto combine = [](std::uint32_t a, std::uint32_t b, std::uint32_t c, std::uint32_t d, std::uint32_t aa, std::uint32_t ab,
                             std::uint32_t ac, std::uint32_t ad) {
         const std::uint32_t w0 = 0xFC000000u | (a & 0xF) << 20 | (c & 0x1F) << 15 | (aa & 7) << 12 | (ac & 7) << 9 | (a & 0xF) << 5 | (c & 0x1F);
@@ -163,11 +166,11 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
                                  (ad & 7) << 9 | (d & 7) << 6 | (ab & 7) << 3 | (ad & 7);
         return std::pair{w0, w1};
     };
-    const auto [cw0, cw1] = combine(1 /*TEXEL0*/, 15 /*0*/, 3 /*PRIMITIVE*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 6 /*1*/);
+    const auto [cw0, cw1] = combine(3 /*PRIMITIVE*/, 15 /*0*/, 4 /*SHADE*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 6 /*1*/);
     static const bool plain = std::getenv("BLOCKPLANET_GAMEOVER_SHELL_PLAIN") != nullptr;  // research
     append(rdram, 0xE7000000u, 0);           // pipe sync
     if (!plain) append(rdram, cw0, cw1);
-    append(rdram, 0xFA000000u, 0x4A4C58FFu); // primitive colour: near black, a little blue
+    append(rdram, 0xFA000000u, 0x3A3C46FFu); // primitive colour: near black, a little blue
 
     Live memory(rdram);
     const double centre = (sphere.first_cell() + sphere.last_cell() + 1) / 2.0;
@@ -197,7 +200,15 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
                     memory.write16(corners[k].bottom[axis], static_cast<std::int16_t>(std::lround(e.outer[axis] + inner * e.inner[axis])));
                 }
                 const Normal& n = sphere.point_normal(r + corners[k].row * block_cells, c + corners[k].column * block_cells);
-                for (int axis = 0; axis < 3; ++axis) memory.write16(corner_normal[k][axis], n[axis]);
+                const Normal& middle = sphere.point_normal(r + block_cells / 2, c + block_cells / 2);
+                double v[3], length = 0.0;
+                for (int axis = 0; axis < 3; ++axis) {
+                    v[axis] = middle[axis] + bevel * (n[axis] - middle[axis]);
+                    length += v[axis] * v[axis];
+                }
+                length = std::sqrt(length);
+                for (int axis = 0; axis < 3; ++axis)
+                    memory.write16(corner_normal[k][axis], static_cast<std::int16_t>(length > 0 ? std::lround(v[axis] * 120.0 / length) : n[axis]));
             }
             for (int axis = 0; axis < 3; ++axis) {
                 memory.write16(row_normal_out[axis], sphere.row_normal(r)[axis]);
