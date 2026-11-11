@@ -286,3 +286,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Research notes: the faint drifting robot coins over the title and menu backdrop.
 - Roadmap: the profile icons idea (robot-coin emblems; our own vector designs recommended, or the game's coins read from the player's copy).
 - Profiles: a coin for each profile, chosen on a new Coin screen (Profile > Coin) and shown beside its name, in the profile's colour. Twelve coins of BlockPlanet's own (Bolt, Visor, Cyclops, Cat, Helmet, Rocket, Planet, Bricks, Spark, Crown, Heart, Music), drawn by `tools/art/coins.py`; menu lists can now show a picture before a label.
+- Profiles: the Coin screen shows the coins without names, each in a random colour; picking one asks for its colour next, starting at the colour it showed (the owner's request).

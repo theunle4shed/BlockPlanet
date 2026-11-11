@@ -13,8 +13,9 @@
 //   profile_character:ID       choose a character (character screen)
 //   profile_set_character:ID:CHARACTER   (CHARACTER "none" clears it)
 //   setting:profile_colour=N   the colour variant, on the character and coin screens
-//   profile_coin:ID            choose a coin (coin screen)
-//   profile_set_coin:ID:COIN   (COIN "none" clears it)
+//   profile_coin:ID            choose a coin (coin screen, each coin in a random colour)
+//   profile_pick_coin:ID:COIN:N   then its colour (coin colour screen, N selected)
+//   profile_set_coin:ID:COIN:N    the coin in colour variant N (COIN "none" clears it)
 // The name screen's keys report name_key:KEY (a character, or space,
 // delete, shift), typing on a keyboard reports name_type:TEXT, and Done
 // reports name_done.
@@ -68,8 +69,16 @@ std::string coin_label(const std::string& id);
 std::string coin_image(const std::string& id);
 // A colour variant's tint for coins (#rrggbb; Original keeps the silver).
 std::string coin_colour(int palette);
-// None, then the coins with their pictures; the chosen one is marked.
-std::vector<blockplanet::ui::ListItem> coin_choices(const ProfileStore& store, const std::string& id);
+// None, then the coins, pictures only (no names, the owner's choice). Each
+// coin shows in `colours[i]` (a colour variant per coins() entry; the
+// profile's own coin keeps the profile's colour) and is focused if chosen.
+std::vector<blockplanet::ui::ListItem> coin_choices(const ProfileStore& store, const std::string& id,
+                                                    const std::vector<int>& colours);
+// A colour variant (0 to 7) for each coin, at random.
+std::vector<int> random_coin_colours();
+// The chosen coin in each colour variant, named, with `selected` focused.
+std::vector<blockplanet::ui::ListItem> coin_colour_choices(const std::string& id, const std::string& coin,
+                                                           int selected);
 
 // The name being typed on the name screen, with an on-screen keyboard for
 // controllers: QWERTY with the numbers on top and a few symbols, then

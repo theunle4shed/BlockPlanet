@@ -77,17 +77,31 @@ int main(int argc, char** argv) {
     assert(profile_actions(store, sam, false)[2].note == "Gyro");
     assert(character_label("nobody").empty() && colour_names().size() == 8);
 
-    // Coins: None, then BlockPlanet's twelve, each with its picture, tinted
-    // with the colour variant (Original keeps the silver).
-    auto coin_list = coin_choices(store, sam);
-    assert(coin_list.size() == 13 && coin_list[0].note == "chosen" && coin_list[0].image == "../coins/none.png" &&
-           coin_list[0].action == "command:profile_set_coin:" + sam + ":none");
-    assert(coin_list[1].image == "../coins/bolt.png" && coin_list[1].image_colour == coin_colour(3));
+    // Coins: None, then BlockPlanet's twelve, pictures only, each in the
+    // colour given (the profile's own coin keeps the profile's colour);
+    // picking one goes on to its colour, starting at that colour.
+    std::vector<int> colours(12, 5);
+    colours[9] = 1;
+    auto coin_list = coin_choices(store, sam, colours);
+    assert(coin_list.size() == 13 && coin_list[0].focus && coin_list[0].image == "../coins/none.png" &&
+           coin_list[0].label.empty() && coin_list[0].action == "command:profile_set_coin:" + sam + ":none:3");
+    assert(coin_list[1].image == "../coins/bolt.png" && coin_list[1].image_colour == coin_colour(5) &&
+           coin_list[1].label.empty() && coin_list[1].action == "command:profile_pick_coin:" + sam + ":bolt:5");
     assert(coin_colour(0).empty() && coin_colour(3) == "#8ed850" && coin_colour(8).empty());
     assert(profile_list(store, false)[0].image.empty());
     assert(store.set_coin("Sam", "crown", error));
-    coin_list = coin_choices(store, sam);
-    assert(coin_list[10].label == "Crown" && coin_list[10].note == "chosen" && coin_list[10].focus);
+    coin_list = coin_choices(store, sam, colours);
+    assert(!coin_list[0].focus && coin_list[10].focus && coin_list[10].image_colour == coin_colour(3) &&
+           coin_list[10].action == "command:profile_pick_coin:" + sam + ":crown:3");
+    auto colour_list = coin_colour_choices(sam, "crown", 6);
+    assert(colour_list.size() == 8 && colour_list[6].focus && !colour_list[0].focus &&
+           colour_list[6].label == "Violet" && colour_list[6].image == "../coins/crown.png" &&
+           colour_list[6].image_colour == coin_colour(6) &&
+           colour_list[6].action == "command:profile_set_coin:" + sam + ":crown:6");
+    assert(coin_colour_choices(sam, "nobody", 0).empty());
+    const auto random_colours = random_coin_colours();
+    assert(random_colours.size() == 12 &&
+           std::all_of(random_colours.begin(), random_colours.end(), [](int c) { return c >= 0 && c < 8; }));
     assert(profile_list(store, false)[0].image == "../coins/crown.png" &&
            profile_list(store, false)[0].image_colour == "#8ed850");
     assert(profile_actions(store, sam, false)[3].note == "Crown" && coin_label("nobody").empty() &&

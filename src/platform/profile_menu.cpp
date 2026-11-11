@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <map>
+#include <random>
 
 namespace tetrisphere {
 
@@ -116,20 +117,47 @@ std::string coin_colour(int palette) {
     return palette > 0 && palette < 8 ? tints[palette] : "";
 }
 
-std::vector<blockplanet::ui::ListItem> coin_choices(const ProfileStore& store, const std::string& id) {
+std::vector<blockplanet::ui::ListItem> coin_choices(const ProfileStore& store, const std::string& id,
+                                                    const std::vector<int>& colours) {
     std::vector<blockplanet::ui::ListItem> items;
     const auto* profile = profile_by_id(store, id);
     if (profile == nullptr) return items;
-    const std::string prefix = "command:profile_set_coin:" + id + ":";
-    items.push_back({"none", "None", profile->coin.empty() ? "chosen" : "", prefix + "none", true, 1,
-                     profile->coin.empty()});
+    const std::string prefix = "command:profile_pick_coin:" + id + ":";
+    // None clears the coin straight away: there is no colour to pick.
+    items.push_back({"none", "", "", "command:profile_set_coin:" + id + ":none:" + std::to_string(profile->palette),
+                     true, 1, profile->coin.empty()});
     items.back().image = "../coins/none.png";  // a plain coin
     items.back().image_colour = coin_colour(profile->palette);
-    for (const auto& coin : coins()) {
-        items.push_back({coin.id, coin.label, profile->coin == coin.id ? "chosen" : "", prefix + coin.id, true, 1,
-                         profile->coin == coin.id});
+    items.back().description = "None";
+    for (std::size_t i = 0; i < coins().size(); ++i) {
+        const auto& coin = coins()[i];
+        const bool chosen = profile->coin == coin.id;
+        const int colour = chosen || i >= colours.size() ? profile->palette : colours[i];
+        items.push_back({coin.id, "", "", prefix + coin.id + ":" + std::to_string(colour), true, 1, chosen});
         items.back().image = coin_image(coin.id);
-        items.back().image_colour = coin_colour(profile->palette);
+        items.back().image_colour = coin_colour(colour);
+    }
+    return items;
+}
+
+std::vector<int> random_coin_colours() {
+    std::vector<int> colours;
+    static std::mt19937 random{std::random_device{}()};
+    std::uniform_int_distribution<int> pick(0, 7);
+    for (std::size_t i = 0; i < coins().size(); ++i) colours.push_back(pick(random));
+    return colours;
+}
+
+std::vector<blockplanet::ui::ListItem> coin_colour_choices(const std::string& id, const std::string& coin,
+                                                           int selected) {
+    std::vector<blockplanet::ui::ListItem> items;
+    if (coin_label(coin).empty()) return items;
+    for (int palette = 0; palette < 8; ++palette) {
+        items.push_back({"colour" + std::to_string(palette), colour_names()[palette], "",
+                         "command:profile_set_coin:" + id + ":" + coin + ":" + std::to_string(palette), true, 1,
+                         palette == selected});
+        items.back().image = coin_image(coin);
+        items.back().image_colour = coin_colour(palette);
     }
     return items;
 }
