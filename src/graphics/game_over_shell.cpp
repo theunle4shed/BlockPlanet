@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace tetrisphere::sphere {
@@ -118,7 +119,12 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
         return;
     }
     const auto now = std::chrono::steady_clock::now();
-    if (!running) running = true, started = now;
+    static std::unordered_map<std::uint32_t, double> delays;  // each block's start, by its first board cell
+    static const bool pin = [] {
+        const char* v = std::getenv("BLOCKPLANET_GAMEOVER_SHELL_PIN");
+        return v == nullptr || v[0] != '0';
+    }();
+    if (!running) running = true, started = now, delays.clear();
     const double seconds = std::chrono::duration<double>(now - started).count();
 
     const std::uint32_t context = load32(rdram, active_context);
@@ -182,7 +188,17 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
         for (int c : columns) {
             // From the edge of the view inwards, so the nearest blocks (which
             // loom largest as they slide) come last and close it.
-            const double delay = spread_seconds * (1.0 - std::hypot(r + 2.0 - centre, c + 2.0 - centre) / far);
+            // Each block keeps the start time it was given on the board cells it
+            // first appeared over (the owner's choice, 2026-11-11): as the
+            // sphere turns, the patch moves over the board a cell at a time,
+            // and a start time worked out afresh each frame made the blocks
+            // settle in two steps. BLOCKPLANET_GAMEOVER_SHELL_PIN=0 works it
+            // out afresh, for comparison.
+            const std::uint32_t board_cell = ((static_cast<std::uint32_t>(c) + off_column) & 0x1Fu) << 5 |
+                                             ((static_cast<std::uint32_t>(r) + off_row) & 0x1Fu);
+            const double fresh = spread_seconds * (1.0 - std::hypot(r + 2.0 - centre, c + 2.0 - centre) / far);
+            const auto pinned = delays.try_emplace(board_cell, fresh).first->second;
+            const double delay = pin ? pinned : fresh;
             const double u = (seconds - delay) / fall_seconds;
             if (u <= 0.0) continue;  // not yet
             int top = 1;

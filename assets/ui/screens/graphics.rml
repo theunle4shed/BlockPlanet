@@ -18,9 +18,9 @@
         <div class="item value" id="presentation_filter" data-description="How the finished picture is scaled to your screen: Pixel keeps edges crisp and even, Smooth softens them, Sharp uses the nearest pixels." data-setting="presentation_filter"
              data-options="pixel:Pixel,linear:Smooth,nearest:Sharp">Scaling<span class="value"></span></div>
         <div class="item value" id="hud_distance" data-description="Where the score, hearts and other panels sit: near the sphere, at the screen edges, or moving with the sphere." data-setting="hud_distance"
-             data-options="near:Near the sphere,edges:Screen edges,follow:Follow the sphere">HUD panels<span class="value"></span></div>
+             data-options="near:Near the sphere,edges:Screen edges,follow:Follow the sphere">HUD Panels<span class="value"></span></div>
         <div class="item value" id="text_size" data-description="The size of all text and panels: menus, the HUD, cards and Wheels’ speech." data-setting="text_size"
-             data-options="small:Small,default:Default,large:Large,larger:Larger">Text size<span class="value"></span></div>
+             data-options="small:Small,default:Default,large:Large,larger:Larger">Text Size<span class="value"></span></div>
         <div class="item" id="back" data-action="back">Back</div>
         <div id="description" class="description"></div>
     </div>

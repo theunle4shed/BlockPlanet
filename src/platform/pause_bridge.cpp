@@ -47,10 +47,10 @@ std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_t
     std::vector<blockplanet::ui::ListItem> items{{"resume", "Resume", "", "command:pause_resume", true, 1, true}};
     if (can_restart(game_mode, training_type))
         items.push_back(restarts_chapter(game_mode)
-            ? blockplanet::ui::ListItem{"restart", "Restart chapter", "", "command:pause_restart_chapter", true}
-            : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart lesson" : "Restart level", "",
+            ? blockplanet::ui::ListItem{"restart", "Restart Chapter", "", "command:pause_restart_chapter", true}
+            : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart Lesson" : "Restart Level", "",
                                         "command:pause_restart", true});
-    if (game_mode == training) items.push_back({"skip", "Skip lesson", "", "command:pause_skip", true});
+    if (game_mode == training) items.push_back({"skip", "Skip Lesson", "", "command:pause_skip", true});
     // A short guide to the mode (BlockPlanet's own words), to read.
     if (game_mode == 1 || game_mode == 4 || game_mode == 5 || game_mode == 6 || game_mode == 9)
         items.push_back({"howto", "How to Play", "", "command:pause_howto", true});
@@ -161,7 +161,7 @@ std::vector<blockplanet::ui::ListItem> end_menu_items(const std::vector<EndMenuB
         const int row = int(it - seen.begin());
         const std::string text = name;
         blockplanet::ui::ListItem item{text == "TRY AGAIN" ? "try_again" : text == "CONTINUE" ? "continue" : text == "TRAINING" ? "training" : "exit",
-                                       text == "TRY AGAIN" ? "Try again" : text == "CONTINUE" ? "Continue" : text == "TRAINING" ? "Training" : "Exit",
+                                       text == "TRY AGAIN" ? "Try Again" : text == "CONTINUE" ? "Continue" : text == "TRAINING" ? "Training" : "Exit",
                                        "", "command:end_choose:" + std::to_string(row), true};
         // Icons (Lucide, as the pause's): restart, play, help, leave.
         item.icon = text == "TRY AGAIN" ? "" : text == "CONTINUE" ? "" : text == "TRAINING" ? "" : "";

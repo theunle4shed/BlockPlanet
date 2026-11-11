@@ -28,7 +28,7 @@ int main() {
     out = step(bridge, false);
     assert(out.open_menu && bridge.hide_original());
     assert(out.items.size() == 5 && out.items[0].action == "command:pause_resume" && out.items[0].focus &&
-           out.items[1].action == "command:pause_restart_chapter" && out.items[1].label == "Restart chapter" &&
+           out.items[1].action == "command:pause_restart_chapter" && out.items[1].label == "Restart Chapter" &&
            out.items[2].action == "command:pause_howto" && out.items[2].label == "How to Play" &&
            out.items[3].action == "open:options" && out.items[4].action == "command:pause_quit");
     out = step(bridge, true);
@@ -56,7 +56,7 @@ int main() {
     set(0x800E44AC, 1);  // Basics
     set(0x800E1228, 0);
     out = step(bridge, false);
-    assert(out.open_menu && out.items.size() == 5 && out.items[1].label == "Restart lesson" &&
+    assert(out.open_menu && out.items.size() == 5 && out.items[1].label == "Restart Lesson" &&
            out.items[2].action == "command:pause_skip");
     out = step(bridge, false);  // menus are closed
     assert(out.inject && load16(m, 0x800E1228) == 0);
@@ -133,8 +133,8 @@ int main() {
     assert(out.open_menu);  // a real pause afterwards
     // Story and Hide & Seek restart the chapter, after asking; others the level.
     assert(restarts_chapter(1) && restarts_chapter(5) && !restarts_chapter(4));
-    assert(pause_items(4, 0)[1].label == "Restart level" && pause_items(4, 0)[1].action == "command:pause_restart");
-    assert(pause_items(1, 0)[1].label == "Restart chapter" &&
+    assert(pause_items(4, 0)[1].label == "Restart Level" && pause_items(4, 0)[1].action == "command:pause_restart");
+    assert(pause_items(1, 0)[1].label == "Restart Chapter" &&
            pause_items(1, 0)[1].action == "command:pause_restart_chapter");
     // Restart is offered only where the same place can be started again.
     assert(can_restart(1, 0) && can_restart(9, 0) && can_restart(3, 3) && !can_restart(3, 2) && !can_restart(7, 0));
@@ -145,7 +145,7 @@ int main() {
         std::vector<EndMenuBridge::Label> labels{{"TRY AGAIN", 100}, {"EXIT", 120}, {"TRAINING", 140}, {"PUSH", 10}};
         int exit_row = -2;
         const auto items = end_menu_items(labels, &exit_row);
-        assert(items.size() == 3 && items[0].label == "Try again" && items[1].label == "Training" && items[2].label == "Exit");
+        assert(items.size() == 3 && items[0].label == "Try Again" && items[1].label == "Training" && items[2].label == "Exit");
         assert(items[0].action == "command:end_choose:0" && items[1].action == "command:end_choose:2" &&
                items[2].action == "command:end_choose:1" && exit_row == 1 && items[0].focus);
         assert(end_menu_items({{"TRY AGAIN", 1}}).empty());  // no Exit: not the end menu

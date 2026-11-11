@@ -145,3 +145,7 @@ All ten were decided as recommended:
 ## Exit labels (the owner, 2026-11-11)
 
 Every way out says where it goes: **Exit to <place>**, where the place is the title of the screen it returns to, in Title Case ("Exit to Story", "Exit to Stages", "Exit to Solo", "Exit to Main Menu" when the way back is empty or the main menu). An exit that closes the game is **Exit to Desktop**. When the place is not known, plain **Exit**. Icons stay as they are. In BlockPlanet: the main menu's Exit to Desktop, the pause's way out of play (it was "Quit to menu") and the Game Over and Match Over panels' Exit (`blockplanet::ui::exit_to_label`, from the screen's `<title>`).
+
+## Title Case for labels (the owner, 2026-11-11)
+
+Menu item labels are in Title Case: each word capitalised but for short joining words in the middle (a, an, and, as, at, by, for, from, in, of, on, or, the, to, with), and the last word always ("Try Again", "Restart Chapter", "Play as Guest", "Exit to Main Menu", "Fly In"). Descriptions, notes ("coming later"), hints, option values, the screens' subtitles and every other sentence stay in sentence case.
