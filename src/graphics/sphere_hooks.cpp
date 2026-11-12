@@ -488,7 +488,9 @@ extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_contex
     latch_frame_mode();
     extended_ready = false;
     if (const int ring = frame_ring(); ring > 0 && load16(rdram, player_count) < 2) {
-        static const ExtendedBaseGrid grid(base_table(rdram), ring);
+        // Built once at the largest ring, so any ring up to it can be drawn
+        // (Minefield on the sphere asks for more than the setting's).
+        static const ExtendedBaseGrid grid(base_table(rdram), largest_ring);
         extended_sphere.build(ring, gather(rdram, ctx, false), grid);
         extended_ready = true;
     }
