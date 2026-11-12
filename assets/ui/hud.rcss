@@ -400,3 +400,19 @@ div { display: block; }
 #left.row .intro { background-color: #e8b81838; }
 #left.row .intro .label { color: #e8b818; }
 .card-para + .card-para, .card-para + .card-heading { margin-top: 0.55em; }
+
+/* Minefield on the sphere: each cell's number, flag or mine, over the cell. */
+.mark { position: absolute; width: 80dp; height: 60dp; line-height: 60dp; text-align: center;
+        font-size: 40dp; font-weight: bold; color: #f8f8f8; font-effect: outline(3dp #000000c0); }
+.mark.n1 { color: #50a8f0; }
+.mark.n2 { color: #6ed36a; }
+.mark.n3 { color: #f06060; }
+.mark.n4 { color: #b090f8; }
+.mark.n5 { color: #f2b030; }
+.mark.n6 { color: #3fc8b8; }
+.mark.n7 { color: #f070a8; }
+.mark.n8 { color: #c8c8c8; }
+.mark.flag { color: #f5821f; }
+.mark.mine { color: #f06060; }
+.mark.hit { color: #ffffff; font-size: 52dp; }
+.mark.found { color: #6ed36a; }

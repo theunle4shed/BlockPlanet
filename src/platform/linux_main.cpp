@@ -25,6 +25,7 @@
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/minefield.h"
+#include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
@@ -1054,6 +1055,16 @@ void update_hud() {
         popup.y = -view.sphere_radius * std::sin(b);  // the board's rows run upwards on screen
         view.popups.push_back(popup);
     }
+    // Minefield on the sphere: each cell's mark, placed the same way.
+    for (const auto& m : tetrisphere::minefield_sphere::marks(guest_rdram)) {
+        constexpr float step = 6.2831853f / 32.0f;
+        blockplanet::ui::HudView::Mark mark;
+        mark.text = m.text;
+        mark.kind = m.kind;
+        mark.x = view.sphere_radius * std::sin(m.dx * step);
+        mark.y = -view.sphere_radius * std::sin(m.dy * step);
+        view.marks.push_back(std::move(mark));
+    }
     show_hud(std::move(view));
 }
 
@@ -1158,6 +1169,7 @@ void poll_game_events() {
     poll_pokes();
     poll_type47_experiment();
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
+    tetrisphere::minefield_sphere::poll(const_cast<std::uint8_t*>(guest_rdram));
     const auto state = read_game_state(guest_rdram);
     const auto now = std::chrono::steady_clock::now();
     if (profile_recording && state.scene == -1 && last_play_poll != std::chrono::steady_clock::time_point{}) {
@@ -2244,7 +2256,7 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (port == 1 && !controller.connected) return false;
     const auto mapped = map_port_input(port, controller, keys,
                                        controller_bindings(), magic_control());
-    *buttons = mapped.buttons;
+    *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons) : mapped.buttons;
     note_start(mapped.buttons);
     *x = mapped.x;
     *y = mapped.y;
@@ -2981,6 +2993,13 @@ bool handle_profile_command(const std::string& command) {
         show_minefield((size.height / 2) * size.width + size.width / 2);
         if (open_screen) blockplanet::ui::request_show("minefield_" + std::to_string(size.width));
     };
+    // On the sphere (test): the next Casual 1:1 becomes the minefield.
+    if (command == "minefield_sphere") {
+        tetrisphere::minefield_sphere::arm(130);
+        blockplanet::ui::send_command("casual");
+        blockplanet::ui::send_command("chapter:1");
+        return true;
+    }
     if (command == "minefield") {
         blockplanet::ui::set_list("minefield_sizes", minefield_size_choices());
         blockplanet::ui::request_show("minefield");

@@ -142,6 +142,14 @@ struct HudView {
         float age = 0.0f;
     };
     std::vector<Popup> popups;
+    // Minefield on the sphere: numbers, flags and mines over the cells, in
+    // picture heights from the picture's centre (like the popups), still.
+    struct Mark {
+        std::string text;
+        std::string kind;  // a class: n1 .. n8, flag, mine, hit, found
+        float x = 0.0f, y = 0.0f;
+    };
+    std::vector<Mark> marks;
     // VS (docs/HUD_DESIGN.md, VS): one column per player at their half's
     // outer edge (rows above and below on tall screens), only what is needed.
     struct VersusPlayer {

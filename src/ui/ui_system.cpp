@@ -639,6 +639,11 @@ void place_popups(const HudView& hud) {
                "; opacity: " + std::to_string(alpha) + "; transform: scale(" + std::to_string(scale) + ");'><div class='points'>" +
                escape(p.text) + "</div>" + (p.note.empty() ? "" : "<div class='note'>" + escape(p.note) + "</div>") + "</div>";
     }
+    for (const auto& m : hud.marks) {
+        const float x = cx + m.x * ph, y = cy + m.y * ph;
+        rml += "<div class='mark " + escape(m.kind) + "' style='left: " + px_text(x - 40.0f * dp) + "; top: " +
+               px_text(y - 30.0f * dp) + ";'>" + escape(m.text) + "</div>";
+    }
     if (rml != shown) {
         layer->SetInnerRML(rml);
         shown = rml;
