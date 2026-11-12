@@ -65,7 +65,7 @@ int cursor_y(const std::uint8_t* rdram) { return 8 + guest::load16(rdram, player
 // every face from the sheet's first tile (texels 1 to 14). BlockPlanet keeps
 // such a table of its own in the free upper 4 MB and points every cube at it.
 // The sheet holds 16 such 16-texel tiles: the first is flat (no outline);
-// others are stripes, outlined cubes or bricks (a choice still to make); 113 and 225
+// others are stripes, outlined cubes (81 is used) or bricks; 113 and 225
 // sink each cube's centre (2026-11-12, stepping through them in play).
 // Research: BLOCKPLANET_MINEFIELD_TILE=x picks another tile's left texel.
 constexpr std::uint32_t smooth_table = 0x807F8000u;
@@ -74,8 +74,8 @@ constexpr int smooth_table_halves = 48;  // 0x60 bytes, like the game's
 void write_smooth_table(std::uint8_t* rdram) {
     static const int left = [] {
         const char* v = std::getenv("BLOCKPLANET_MINEFIELD_TILE");
-        const int x = v ? std::atoi(v) : 1;
-        return x >= 0 && x <= 241 ? x : 1;
+        const int x = v ? std::atoi(v) : 81;
+        return x >= 0 && x <= 241 ? x : 81;
     }();
     const std::int16_t a = std::int16_t(left), b = std::int16_t(left + 13);
     const std::int16_t corners[8] = {a, 14, b, 14, a, 1, b, 1};
