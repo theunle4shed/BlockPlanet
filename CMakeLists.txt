@@ -571,6 +571,9 @@ add_executable(run_options_test tests/run_options_test.cpp src/platform/run_opti
 target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")
 add_test(NAME run_options COMMAND run_options_test)
+add_executable(intro_cover_test tests/intro_cover_test.cpp)
+target_include_directories(intro_cover_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+add_test(NAME intro_cover COMMAND intro_cover_test)
 add_executable(mode_launcher_test tests/mode_launcher_test.cpp src/platform/mode_launcher.cpp)
 target_include_directories(mode_launcher_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)

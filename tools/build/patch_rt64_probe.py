@@ -733,7 +733,7 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
         source = replace_once(source,
             "                workloadConfig.aspectRatioTarget = std::max(derivedRatioTarget, workloadConfig.aspectRatioSource);",
             "                workloadConfig.aspectRatioTarget = tetrisphere::expand_aspect_target(derivedRatioTarget, workloadConfig.aspectRatioSource,\n"
-            "                    tetrisphere::intro_cover_active().load(std::memory_order_relaxed));")
+            "                    tetrisphere::intro_cover_active().load(std::memory_order_relaxed), tetrisphere::intro_max_aspect());")
         source = replace_once(source, "namespace RT64 {\n", "namespace RT64 {\n" + PAUSE_SNAPSHOT_HELPER)
         source = replace_once(source,
             "                    nativeColorHeight = fbPair.drawColorRect.bottom(true);",
