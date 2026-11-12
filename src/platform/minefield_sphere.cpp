@@ -1,6 +1,10 @@
 #include "tetrisphere/minefield_sphere.h"
+#include "tetrisphere/sphere_cell.h"
 
 #include "tetrisphere/guest_memory.h"
+#include "tetrisphere/recomp_support.h"
+#include "../ui/ui_renderer.h"
+#include "stb_image.h"
 
 #include <algorithm>
 #include <atomic>
@@ -11,6 +15,7 @@
 #include <optional>
 #include <random>
 #include <utility>
+#include <vector>
 
 namespace tetrisphere::minefield_sphere {
 namespace {
@@ -141,6 +146,8 @@ void clear_cell(std::uint8_t* rdram, int x, int y) {
 }
 
 void stop_locked() {
+    tetrisphere::sphere::cell_listener().store(nullptr);
+    tetrisphere::sphere::fill_training_gaps() = true;
     over_frames = 0;
     for (int c = 0; c < layer_cells; ++c) field_cells()[c].store(false, std::memory_order_relaxed);
     active_flag = false;
@@ -148,6 +155,48 @@ void stop_locked() {
     field.reset();
     built = false;
     frames_in_play = 0;
+}
+
+// The marks on the cells (numbers on the uncovered core, flags and, at the
+// end, mines on the cubes): drawn as textured tiles on the cells, after the
+// core passes (hook in func_800A348C at 0x800A37E4), from BlockPlanet's own
+// art (assets/ui/minefield/marks.png, tools/art/minefield_marks.py: twelve
+// 32 x 32 tiles, the digits 1 to 8, a flag, then a mine in white, green and
+// red), loaded into the free upper 4 MB as RGBA16 texels.
+constexpr std::uint32_t marks_texture = 0x807C0000u;  // 12 x 2 KB
+constexpr std::uint32_t marks_vertices = 0x807D0000u; // two 16 KB halves, by frame
+constexpr int marks_tile = 32;
+constexpr int marks_count = 12;
+constexpr int most_marks = 255;                       // 4 vertices (64 bytes) each, per half
+bool marks_texture_ready = false;
+
+// The cells the quadrant passes set up this frame, with the corners of each
+// column's base (the core's surface; a one-layer cube's top is a layer step
+// above), as BlockPlanet's cell setup works them out
+// (tetrisphere::sphere::cell_listener). Recorded and read on the game thread:
+// the passes run before the marks are drawn, in the same frame.
+std::vector<tetrisphere::sphere::CellCorners> frame_cells;
+
+void record_cell(const tetrisphere::sphere::CellCorners& cell) {
+    if (frame_cells.size() < 4096) frame_cells.push_back(cell);
+}
+
+bool load_marks_texture(std::uint8_t* rdram) {
+    const auto path = blockplanet::ui::ui_asset_root() / "minefield" / "marks.png";
+    int w = 0, h = 0, channels = 0;
+    stbi_uc* pixels = stbi_load(path.string().c_str(), &w, &h, &channels, 4);
+    if (pixels == nullptr) return false;
+    const bool fits = w >= marks_tile * marks_count && h >= marks_tile;
+    for (int k = 0; fits && k < marks_count; ++k)
+        for (int y = 0; y < marks_tile; ++y)
+            for (int x = 0; x < marks_tile; ++x) {
+                const stbi_uc* p = pixels + 4 * (y * w + k * marks_tile + x);
+                const std::uint16_t texel = std::uint16_t((p[0] >> 3) << 11 | (p[1] >> 3) << 6 | (p[2] >> 3) << 1 | (p[3] >= 128 ? 1 : 0));
+                guest::store16(rdram, marks_texture + std::uint32_t(k * marks_tile * marks_tile * 2 + 2 * (y * marks_tile + x)),
+                               static_cast<std::int16_t>(texel));
+            }
+    stbi_image_free(pixels);
+    return fits;
 }
 
 } // namespace
@@ -202,6 +251,8 @@ void poll(std::uint8_t* rdram) {
         built = true;
         active_flag = true;
         blue_field() = true;
+        tetrisphere::sphere::cell_listener().store(&record_cell);
+        tetrisphere::sphere::fill_training_gaps() = false;
         std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ready\",\"mines\":%d}\n", field->mines());
         std::fflush(stdout);
     }
@@ -273,8 +324,141 @@ void poll(std::uint8_t* rdram) {
         guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(guest::load16(rdram, player1 + 0x2B2A) - 1));
 }
 
+// The marks' display list: called on the game's thread after the core
+// passes, while the sphere's matrices are loaded.
+extern "C" void blockplanet_minefield_marks(std::uint8_t* rdram, recomp_context*) {
+    std::vector<tetrisphere::sphere::CellCorners> cells;
+    cells.swap(frame_cells);
+    if (!active_flag.load()) return;
+    if (!marks_texture_ready) marks_texture_ready = load_marks_texture(rdram);
+    if (!marks_texture_ready) return;
+    // The marks sit a twentieth of a layer above their cell, so the depth
+    // test keeps them in front of it (and behind any cube nearer the camera).
+    constexpr float above = 0.05f;
+    // Which tile each cell in view shows, and where its corners are.
+    struct Placed { int tile; std::int16_t corners[4][3]; };
+    std::vector<Placed> placed;
+    {
+        std::lock_guard lock(mutex);
+        if (!field) return;
+        const bool over = field->state() == Minefield::State::Lost || field->state() == Minefield::State::Won;
+        for (const auto& drawn : cells) {
+            const int c = field_at(drawn.cell % board, drawn.cell / board);
+            if (c < 0) continue;
+            const auto& cell = field->cell(c);
+            int tile = -1;
+            float lift = 1.0f;  // in layer steps above the column's base: 1 on a cube's top, 0 on the core
+            if (cell.open && !cell.mine) {
+                if (cell.count > 0) tile = cell.count - 1, lift = 0.0f;
+            } else if (cell.mine && over) {
+                // The owner's design: won, every mine green; lost, red, and
+                // the one uncovered white.
+                const bool won = field->state() == Minefield::State::Won;
+                tile = won ? 10 : c == field->exploded() ? 9 : 11;
+            } else if (cell.flag) {
+                tile = 8;
+            }
+            if (tile < 0) continue;
+            Placed p{tile, {}};
+            for (int k = 0; k < 4; ++k)
+                for (int axis = 0; axis < 3; ++axis)
+                    p.corners[k][axis] = static_cast<std::int16_t>(
+                        std::lround(drawn.top[k][axis] + (lift + above) * drawn.step[k][axis]));
+            placed.push_back(p);
+        }
+    }
+    if (placed.empty()) return;
+    std::sort(placed.begin(), placed.end(), [](const Placed& a, const Placed& b) { return a.tile < b.tile; });
+    if (int(placed.size()) > most_marks) placed.resize(std::size_t(most_marks));
+
+    constexpr std::uint32_t cursor = 0x800F22B4u;  // the display list's next free command
+    std::uint32_t dl = guest::load32(rdram, cursor);
+    if (dl < 0x80000000u || dl >= 0x80800000u) return;
+    const auto put = [&](std::uint32_t w0, std::uint32_t w1) {
+        guest::store32(rdram, dl, w0);
+        guest::store32(rdram, dl + 4u, w1);
+        dl += 8u;
+    };
+    // The game's state to put back afterwards: its last combine, render
+    // mode and texture setting this frame.
+    const std::uint32_t frame_start = guest::load32(rdram, 0x800F22B8u);
+    std::uint32_t last_combine[2] = {0, 0}, last_render[2] = {0, 0}, last_texture[2] = {0, 0};
+    // Its other mode settings the marks change: the palette (the sphere's
+    // textures use one, BA000E02 00008000), the cycle type and the level of
+    // detail.
+    std::uint32_t last_palette = 0x00008000u, last_cycle = 0x00100000u, last_lod = 0x00010000u;
+    if (frame_start >= 0x80000000u && frame_start < dl && dl - frame_start < 0x20000u)
+        for (std::uint32_t a = frame_start; a < dl; a += 8u) {
+            const std::uint32_t w0 = guest::load32(rdram, a), w1 = guest::load32(rdram, a + 4u);
+            if ((w0 >> 24) == 0xFCu) last_combine[0] = w0, last_combine[1] = w1;
+            else if (w0 == 0xB900031Du) last_render[0] = w0, last_render[1] = w1;
+            else if ((w0 >> 24) == 0xBBu) last_texture[0] = w0, last_texture[1] = w1;
+            else if (w0 == 0xBA000E02u) last_palette = w1;
+            else if (w0 == 0xBA001402u) last_cycle = w1;
+            else if (w0 == 0xBA001001u) last_lod = w1;
+        }
+    static int half = 0;
+    half ^= 1;
+    std::uint32_t vertex = marks_vertices + std::uint32_t(half) * 0x4000u;
+
+    put(0xE7000000u, 0);                      // G_RDPPIPESYNC
+    put(0xBA000E02u, 0);                      // G_SETOTHERMODE_H: no palette (the picture is plain RGBA 16-bit)
+    put(0xBA001402u, 0);                      // G_SETOTHERMODE_H: one cycle
+    put(0xBA001001u, 0);                      // G_SETOTHERMODE_H: no level of detail (it mixes in another tile)
+    put(0xFCFFFFFFu, 0xFFFCF279u);            // G_SETCOMBINE: the texture's colour and alpha alone (decal)
+    // G_SETOTHERMODE_L: blended by the texture's alpha (no anti-aliasing:
+    // its coverage rules halved every texel).
+    put(0xB900031Du, 0x00504050u);  // depth-compared (not written), a touch above the cell
+    put(0xBB000001u, 0xFFFFFFFFu);            // G_TEXTURE: on, tile 0, full scale
+    int loaded = -1;
+    for (const auto& p : placed) {
+        if (p.tile != loaded) {
+            loaded = p.tile;
+            const std::uint32_t image = marks_texture + std::uint32_t(p.tile * marks_tile * marks_tile * 2);
+            put(0xFD100000u | (marks_tile - 1), image);     // G_SETTIMG: RGBA 16-bit, 32 wide
+            put(0xF5100000u, 0x07000000u);                   // G_SETTILE 7 (load)
+            put(0xE6000000u, 0);                             // G_RDPLOADSYNC
+            put(0xF3000000u, 0x07000000u | (1023u << 12) | 256u);  // G_LOADBLOCK: 1,024 texels
+            put(0xE7000000u, 0);
+            put(0xF5101000u, 0x00080200u);                   // G_SETTILE 0: 8 words a line, clamped
+            put(0xF2000000u, 0x0007C07Cu);                   // G_SETTILESIZE: 32 x 32
+        }
+        // Texture corners for the face's corners 0 to 3 (turned half a turn
+        // from the corners' order, which runs from the far corner of the
+        // cell as the camera sees it).
+        static const int st[4][2] = {{32, 32}, {32, 0}, {0, 0}, {0, 32}};
+        for (int c = 0; c < 4; ++c) {
+            const std::uint32_t v = vertex + std::uint32_t(c) * 16u;
+            for (int a = 0; a < 3; ++a) guest::store16(rdram, v + 2u * std::uint32_t(a), p.corners[c][a]);
+            guest::store16(rdram, v + 6u, 0);
+            guest::store16(rdram, v + 8u, static_cast<std::int16_t>(st[c][0] << 5));
+            guest::store16(rdram, v + 10u, static_cast<std::int16_t>(st[c][1] << 5));
+            for (std::uint32_t b = 12; b < 15; ++b) guest::store8(rdram, v + b, 0);
+            guest::store8(rdram, v + 15u, 0xFF);
+        }
+        put(0x04300040u, vertex);                  // G_VTX: 4 vertices into slot 0
+        put(0xBF000000u, (0u << 16) | (10u << 8) | 20u);   // G_TRI1: 0, 1, 2
+        put(0xBF000000u, (0u << 16) | (20u << 8) | 30u);   // G_TRI1: 0, 2, 3
+        vertex += 64u;
+    }
+    // Put the game's state back for what it draws next.
+    put(0xE7000000u, 0);
+    if (last_combine[0] != 0) put(last_combine[0], last_combine[1]);
+    if (last_render[0] != 0) put(last_render[0], last_render[1]);
+    if (last_texture[0] != 0) put(last_texture[0], last_texture[1]);
+    put(0xBA000E02u, last_palette);
+    put(0xBA001402u, last_cycle);
+    put(0xBA001001u, last_lod);
+    guest::store32(rdram, cursor, dl);
+}
+
 std::vector<Mark> marks(const std::uint8_t* rdram) {
     std::vector<Mark> out;
+    // The marks are drawn on the cells themselves now (blockplanet_minefield_
+    // marks); BLOCKPLANET_MINEFIELD_FLOATING=1 shows the HUD's floating ones
+    // as well (the first version, kept for comparison).
+    static const bool floating = [] { const char* v = std::getenv("BLOCKPLANET_MINEFIELD_FLOATING"); return v && v[0] == '1'; }();
+    if (!floating) return out;
     if (rdram == nullptr || !active_flag.load()) return out;
     std::lock_guard lock(mutex);
     if (!field) return out;
