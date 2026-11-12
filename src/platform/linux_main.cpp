@@ -3007,10 +3007,13 @@ bool handle_profile_command(const std::string& command) {
         if (open_screen) blockplanet::ui::request_show("minefield_" + std::to_string(size.width));
     };
     // On the sphere (test): the next Casual 1:1 becomes the minefield.
-    if (command == "minefield_sphere") {
+    if (const auto size = argument("minefield_sphere:")) {
+        // Small 12 x 12, Medium 20 x 20, Full 32 x 32 (the whole sphere).
         // Research: BLOCKPLANET_MINEFIELD_MINES sets the count (for testing a loss).
+        static const int sides[] = {12, 20, 32}, counts[] = {20, 60, 130};
+        const int i = std::clamp(std::atoi(size->c_str()), 0, 2);
         const char* mines = std::getenv("BLOCKPLANET_MINEFIELD_MINES");
-        tetrisphere::minefield_sphere::arm(mines ? std::atoi(mines) : 130);
+        tetrisphere::minefield_sphere::arm(sides[i], sides[i], mines ? std::atoi(mines) : counts[i]);
         blockplanet::ui::send_command("casual");
         blockplanet::ui::send_command("chapter:1");
         return true;

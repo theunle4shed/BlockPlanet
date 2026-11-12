@@ -31,14 +31,24 @@
 namespace tetrisphere::minefield_sphere {
 
 // While on, BlockPlanet's sphere drawing shows inert blocks (value 423) as
-// blue cubes (src/graphics/sphere_quadrants.cpp).
+// blue cubes (src/graphics/sphere_quadrants.cpp) where in_field() marks the
+// board cell as part of the field; elsewhere they stay the purple wall.
 inline std::atomic<bool>& blue_field() {
     static std::atomic<bool> on{false};
     return on;
 }
+inline std::atomic<bool>* field_cells() {
+    static std::atomic<bool> cells[1024]{};
+    return cells;
+}
+inline bool in_field(int board_cell) {
+    return board_cell >= 0 && board_cell < 1024 && field_cells()[board_cell].load(std::memory_order_relaxed);
+}
 
-// The next game started becomes the minefield (the menu's test item).
-void arm(int mines);
+// The next game started becomes the minefield (the menu's test items): a
+// width x height field (up to 32 x 32, the whole board, which wraps), centred
+// on the cursor's starting cell; smaller fields are framed by the purple wall.
+void arm(int width, int height, int mines);
 bool armed();
 bool active();
 // Called each frame with player 1's buttons on their way to the game: notes

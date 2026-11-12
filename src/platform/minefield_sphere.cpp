@@ -2,6 +2,7 @@
 
 #include "tetrisphere/guest_memory.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -31,6 +32,8 @@ std::mutex mutex;
 std::atomic<bool> armed_flag{false};
 std::atomic<bool> active_flag{false};
 std::atomic<int> requested_mines{130};
+int field_width = 32, field_height = 32;
+int origin_x = 0, origin_y = 0;  // the board cell of the field's (0, 0)
 std::atomic<int> pending_open{0}, pending_flag{0};
 std::uint16_t last_buttons = 0;
 
@@ -41,6 +44,13 @@ std::vector<bool> shown_open;  // cells already cleared on the board
 int over_frames = 0;           // frames since the field was won or lost
 
 int cell_index(int x, int y) { return ((y % board + board) % board) * board + ((x % board + board) % board); }
+
+// The field cell (index) at a board cell, or -1 outside the field.
+int field_at(int bx, int by) {
+    const int fx = ((bx - origin_x) % board + board) % board, fy = ((by - origin_y) % board + board) % board;
+    if (fx >= field_width || fy >= field_height) return -1;
+    return fy * field_width + fx;
+}
 
 // The board cell under the cursor: the cursor's values (player 1 +0x2B2A,
 // +0x2B2E) count from the cell (8, 8) (measured by dropping pieces). Moving
@@ -53,6 +63,7 @@ void build_board(std::uint8_t* rdram) {
     const std::uint32_t masks = guest::load32(rdram, masks_pointer);
     const std::uint32_t columns = guest::load32(rdram, columns_pointer);
     for (int c = 0; c < layer_cells; ++c) {
+        field_cells()[c].store(field_at(c % board, c / board) >= 0, std::memory_order_relaxed);
         guest::store16(rdram, values + 2u * std::uint32_t(layer_cells + c), inert);
         guest::store8(rdram, masks + std::uint32_t(layer_cells + c), top_face);
         guest::store8(rdram, masks + std::uint32_t(c), 0);  // the core, covered
@@ -103,6 +114,7 @@ void clear_cell(std::uint8_t* rdram, int x, int y) {
 
 void stop_locked() {
     over_frames = 0;
+    for (int c = 0; c < layer_cells; ++c) field_cells()[c].store(false, std::memory_order_relaxed);
     active_flag = false;
     blue_field() = false;
     field.reset();
@@ -112,9 +124,11 @@ void stop_locked() {
 
 } // namespace
 
-void arm(int mines) {
+void arm(int width, int height, int mines) {
     std::lock_guard lock(mutex);
     requested_mines = mines;
+    field_width = std::clamp(width, 4, board);
+    field_height = std::clamp(height, 4, board);
     armed_flag = true;
     stop_locked();
 }
@@ -150,8 +164,12 @@ void poll(std::uint8_t* rdram) {
     // Let the stage set itself up first (about a second in play).
     if (!built && ++frames_in_play < 60) return;
     if (!built) {
+        // Centred on the cursor's starting cell (8, 8); the whole board wraps.
+        origin_x = 8 - field_width / 2;
+        origin_y = 8 - field_height / 2;
         build_board(rdram);
-        field.emplace(board, board, requested_mines.load(), std::random_device{}(), true);
+        field.emplace(field_width, field_height, requested_mines.load(), std::random_device{}(),
+                      field_width == board && field_height == board);
         shown_open.assign(layer_cells, false);
         built = true;
         active_flag = true;
@@ -167,10 +185,10 @@ void poll(std::uint8_t* rdram) {
     guest::store16(rdram, player1 + 0x2B10, 0);
     guest::store16(rdram, player1 + 0x23E4, board);
     const int x = cursor_x(rdram), y = cursor_y(rdram);
-    const int here = cell_index(x, y);
+    const int here = field_at(x, y);  // -1 on the wall: nothing happens
     for (int n = pending_flag.exchange(0); n > 0; --n) field->toggle_flag(here);
     for (int n = pending_open.exchange(0); n > 0; --n) {
-        if (field->open(here)) {
+        if (here >= 0 && field->open(here)) {
             std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"open\":[%d,%d],\"state\":%d}\n", x, y,
                          static_cast<int>(field->state()));
             std::fflush(stdout);
@@ -184,11 +202,11 @@ void poll(std::uint8_t* rdram) {
     const bool over = field->state() == Minefield::State::Lost || field->state() == Minefield::State::Won;
     if (over) ++over_frames;
     const bool clear_rest = field->state() == Minefield::State::Lost && over_frames > 30;
-    for (int c = 0; c < layer_cells; ++c) {
+    for (int c = 0; c < field->size(); ++c) {
         const auto& cell = field->cell(c);
         const bool clear = cell.open && !cell.mine ? true : clear_rest && !cell.mine;
         if (clear && !shown_open[std::size_t(c)]) {
-            clear_cell(rdram, c % board, c / board);
+            clear_cell(rdram, origin_x + c % field_width, origin_y + c / field_width);
             shown_open[std::size_t(c)] = true;
         }
     }
@@ -220,7 +238,8 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
     // Only the side facing the camera: up to 6 cells from the cursor.
     for (int dy = -7; dy <= 7; ++dy)
         for (int dx = -7; dx <= 7; ++dx) {
-            const int c = cell_index(x0 + dx, y0 + dy);
+            const int c = field_at(x0 + dx, y0 + dy);
+            if (c < 0) continue;
             const auto& cell = field->cell(c);
             Mark m;
             // The board's x runs right to left on screen (moving right lowers it).
