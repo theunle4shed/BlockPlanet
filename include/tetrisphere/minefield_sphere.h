@@ -69,6 +69,8 @@ bool active();
 // Called each frame with player 1's buttons on their way to the game: notes
 // presses of A (uncover) and B (flag) and removes both while active.
 std::uint16_t filter_input(std::uint16_t buttons);
+// The stick (the same frame's), likewise kept from leaving the field.
+void filter_stick(float& x, float& y);
 // Called each frame from the host's poll (after the game's options).
 void poll(std::uint8_t* rdram);
 // Whether the game's cursor marker (its shadow of the piece) is hidden: while

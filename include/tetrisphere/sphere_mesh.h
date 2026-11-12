@@ -65,6 +65,10 @@ double view_scale();
 enum class Detail { Original, Extended };
 constexpr int extended_detail_ring = 2;
 void set_detail(Detail detail);
+// While set, BlockPlanet draws the sphere itself whatever the detail setting
+// (Minefield on the sphere: its colours and cursor exist only in BlockPlanet's
+// drawing). The ring stays the setting's.
+void set_force_replace(bool on);
 
 // Which code draws the sphere this frame. Hook entry points are called from
 // the generated game code (see config/recomp/tetrisphere.us.rev0.toml).

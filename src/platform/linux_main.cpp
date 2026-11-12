@@ -2273,6 +2273,7 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     note_start(mapped.buttons);
     *x = mapped.x;
     *y = mapped.y;
+    if (port == 0) tetrisphere::minefield_sphere::filter_stick(*x, *y);
     static std::array<std::uint16_t, 2> previous{};
     if (mapped.buttons != previous[port]) {
         const auto family = port == 0 ? active_family.load() : active_p2_family.load();

@@ -120,9 +120,16 @@ double view_scale() { return requested_view_scale.load(); }
 
 void set_detail(Detail detail) { requested_detail.store(detail); }
 
+namespace {
+std::atomic<bool> force_replace{false};
+}
+
+void set_force_replace(bool on) { force_replace.store(on); }
+
 void latch_frame_mode() {
     const Detail detail = requested_detail.load();
-    const Mode m = mode_override().value_or(detail == Detail::Extended ? Mode::Replace : Mode::Original);
+    const Mode m = force_replace.load() ? Mode::Replace
+                                        : mode_override().value_or(detail == Detail::Extended ? Mode::Replace : Mode::Original);
     frame_mode.store(m);
     const int ring = ring_override().value_or(detail == Detail::Extended ? extended_detail_ring : 0);
     const int frame = m == Mode::Replace ? ring : 0;

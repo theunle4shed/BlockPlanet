@@ -1,5 +1,6 @@
 #include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/sphere_cell.h"
+#include "tetrisphere/sphere_mesh.h"
 
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
@@ -47,6 +48,12 @@ bool built = false;
 std::vector<bool> shown_open;  // cells already cleared on the board
 int over_frames = 0;           // frames since the field was won or lost
 int cursor_cell = -1, cursor_field = -1;  // the board and field cell last under the cursor
+// The directions the cursor may not move in (the field's edge), for the
+// input filters; and its last place inside the field.
+constexpr int edge_right = 1, edge_left = 2, edge_up = 4, edge_down = 8;
+std::atomic<int> edges{0};
+int inside_x = 0, inside_y = 0;
+bool inside_known = false;
 
 int cell_index(int x, int y) { return ((y % board + board) % board) * board + ((x % board + board) % board); }
 
@@ -149,6 +156,9 @@ void stop_locked() {
     tetrisphere::sphere::fill_training_gaps() = true;
     over_frames = 0;
     cursor_cell = cursor_field = -1;
+    edges = 0;
+    inside_known = false;
+    tetrisphere::sphere::set_force_replace(false);
     for (int c = 0; c < layer_cells; ++c) {
         field_cells()[c].store(false, std::memory_order_relaxed);
         cube_colours()[c].store(0, std::memory_order_relaxed);
@@ -269,7 +279,24 @@ std::uint16_t filter_input(std::uint16_t buttons) {
     if ((buttons & a) && !(last_buttons & a)) ++pending_open;
     if ((buttons & b) && !(last_buttons & b)) ++pending_flag;
     last_buttons = buttons;
-    return static_cast<std::uint16_t>(buttons & ~(a | b));
+    // The D-pad stops at the field's edge (the owner's request): right,
+    // left, up, down (N64 bits 0x0100, 0x0200, 0x0800, 0x0400).
+    const int blocked = edges.load();
+    std::uint16_t drop = a | b;
+    if (blocked & edge_right) drop |= 0x0100;
+    if (blocked & edge_left) drop |= 0x0200;
+    if (blocked & edge_up) drop |= 0x0800;
+    if (blocked & edge_down) drop |= 0x0400;
+    return static_cast<std::uint16_t>(buttons & ~drop);
+}
+
+void filter_stick(float& x, float& y) {
+    if (!active_flag.load()) return;
+    const int blocked = edges.load();
+    if ((blocked & edge_right) && x > 0) x = 0;
+    if ((blocked & edge_left) && x < 0) x = 0;
+    if ((blocked & edge_up) && y > 0) y = 0;
+    if ((blocked & edge_down) && y < 0) y = 0;
 }
 
 void poll(std::uint8_t* rdram) {
@@ -299,6 +326,7 @@ void poll(std::uint8_t* rdram) {
         active_flag = true;
         blue_field() = true;
         tetrisphere::sphere::fill_training_gaps() = false;
+        tetrisphere::sphere::set_force_replace(true);
         std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ready\",\"mines\":%d}\n", field->mines());
         std::fflush(stdout);
     }
@@ -363,7 +391,18 @@ void poll(std::uint8_t* rdram) {
     guest::store32(rdram, player1 + 0x2408, 0);
     guest::store16(rdram, player1 + 0x2B10, 0);
     guest::store16(rdram, player1 + 0x23E4, board);
+    // The cursor stays in the field: if it got out (the stick, or a press the
+    // filter missed), it goes back to its last place inside; then the
+    // directions that would leave the field are blocked.
+    if (field_at(cursor_x(rdram), cursor_y(rdram)) < 0 && inside_known) {
+        guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(inside_x - 8));
+        guest::store16(rdram, player1 + 0x2B2E, static_cast<std::int16_t>(inside_y - 8));
+    }
     const int x = cursor_x(rdram), y = cursor_y(rdram);
+    if (field_at(x, y) >= 0) inside_x = x, inside_y = y, inside_known = true;
+    // Moving right lowers x; up raises y.
+    edges = (field_at(x - 1, y) < 0 ? edge_right : 0) | (field_at(x + 1, y) < 0 ? edge_left : 0) |
+            (field_at(x, y + 1) < 0 ? edge_up : 0) | (field_at(x, y - 1) < 0 ? edge_down : 0);
     const int here = field_at(x, y);  // -1 on the wall: nothing happens
     for (int n = pending_flag.exchange(0); n > 0; --n) field->toggle_flag(here);
     for (int n = pending_open.exchange(0); n > 0; --n) {
