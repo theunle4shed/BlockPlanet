@@ -314,3 +314,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Minefield on the sphere (test): BlockPlanet draws the largest ring of extra cells (4 on every side) while the field is in play, so the cubes at the sphere's sides no longer pop in and out as the cursor moves (the game's 15 × 15 patch is a little less than the visible half, and even the Extended setting's 2 left some popping). The extended drawing's base grid is now built for the largest ring, so the ring can change in play.
 - Minefield on the sphere (test): Training's gap filling (single empty cells between bricks drawn as bricks) is off while the field is in play, so a single uncovered cell shows as a hole.
 - Minefield on the sphere (test): a flagged cell's cube turns yellow instead of carrying a flag icon (the owner's idea), and at the end the mines' cubes turn green when the field is won and red when it is lost.
+
+## 2026-11-11: Fan research
+
+- Research (2026-11-09): what Tetrisphere players and critics say (wishes, complaints, known bugs of the original and of emulators, what they love, cut content), with sources and a comparison with the roadmap: `docs/research/fan-feedback.md`.
+- Research (2026-11-11): Tetrisphere's cheat codes (name codes, GameShark and Action Replay), what game variable each changes according to BlockPlanet's memory map, and the most promising modifiers with how to build each as an option: `docs/research/cheat-codes.md`.
