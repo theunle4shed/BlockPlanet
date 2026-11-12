@@ -139,21 +139,6 @@ void draw_block(std::uint8_t* rdram, recomp_context* ctx, const QuadrantShape& s
 
 namespace {
 
-// Guest memory read and written in place.
-class LiveMemory final : public GuestMemory {
-public:
-    explicit LiveMemory(std::uint8_t* rdram) : rdram_(rdram) {}
-    std::uint8_t read8(std::uint32_t a) const override { return load8(rdram_, a); }
-    std::int16_t read16(std::uint32_t a) const override { return load16(rdram_, a); }
-    std::uint32_t read32(std::uint32_t a) const override { return load32(rdram_, a); }
-    void write8(std::uint32_t a, std::uint8_t v) override { store8(rdram_, a, v); }
-    void write16(std::uint32_t a, std::int16_t v) override { store16(rdram_, a, v); }
-    void write32(std::uint32_t a, std::uint32_t v) override { store32(rdram_, a, v); }
-
-private:
-    std::uint8_t* rdram_;
-};
-
 // The quadrant loop, with the cell setup and the patch size as parameters.
 template <typename PrepareCell, typename Room>
 void walk_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant, int ring, PrepareCell&& prepare_cell,
@@ -173,10 +158,6 @@ void walk_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant, 
              advance(rdram, cell_column, shape.columns_down)) {
             if (!room_left()) continue;
             prepare_cell();
-            if (const auto listener = cell_listener().load(std::memory_order_relaxed)) {
-                const LiveMemory memory(rdram);
-                listener(read_cell_corners(memory));
-            }
             for (store16(rdram, cell_layer, load16(rdram, first_layer));
                  load16(rdram, cell_layer) < load16(rdram, end_layer); advance(rdram, cell_layer, false)) {
                 lift_one_layer(rdram);
@@ -186,6 +167,21 @@ void walk_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant, 
     }
     ctx->r29 = static_cast<std::int32_t>(ctx->r29) + original_frame_bytes;
 }
+
+// Guest memory read and written in place.
+class LiveMemory final : public GuestMemory {
+public:
+    explicit LiveMemory(std::uint8_t* rdram) : rdram_(rdram) {}
+    std::uint8_t read8(std::uint32_t a) const override { return load8(rdram_, a); }
+    std::int16_t read16(std::uint32_t a) const override { return load16(rdram_, a); }
+    std::uint32_t read32(std::uint32_t a) const override { return load32(rdram_, a); }
+    void write8(std::uint32_t a, std::uint8_t v) override { store8(rdram_, a, v); }
+    void write16(std::uint32_t a, std::int16_t v) override { store16(rdram_, a, v); }
+    void write32(std::uint32_t a, std::uint32_t v) override { store32(rdram_, a, v); }
+
+private:
+    std::uint8_t* rdram_;
+};
 
 } // namespace
 

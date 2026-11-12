@@ -672,11 +672,3 @@ text = "ctx->r1 = S32(0x80800001u);"
 [[patches.hook]]
 func = "func_800382B4"
 text = "if (blockplanet_draw_filter(rdram, ctx, 0x800382B4u)) return;"
-
-# Minefield on the sphere: its marks (numbers, flags, mines) drawn on the
-# cells, after the core passes and before the cursor marker
-# (src/platform/minefield_sphere.cpp).
-[[patches.hook]]
-func = "func_800A348C"
-before_vram = 0x800A37E4
-text = "blockplanet_minefield_marks(rdram, ctx);"

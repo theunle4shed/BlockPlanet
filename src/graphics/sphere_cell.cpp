@@ -179,17 +179,6 @@ void finish_cell(GuestMemory& m, std::int32_t row, std::int32_t column,
 
 } // namespace
 
-CellCorners read_cell_corners(const GuestMemory& m) {
-    CellCorners out;
-    out.cell = (m.read16(out_cell) % 1024 + 1024) % 1024;
-    for (std::size_t k = 0; k < corners.size(); ++k)
-        for (int axis = 0; axis < 3; ++axis) {
-            out.top[k][axis] = m.read16(corners[k].top[axis]);
-            out.step[k][axis] = m.read16(corners[k].step[axis]);
-        }
-    return out;
-}
-
 void prepare_cell(GuestMemory& m) {
     const std::int32_t row = m.read16(cell_row);
     const std::int32_t column = m.read16(cell_column);

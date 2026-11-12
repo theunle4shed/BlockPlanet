@@ -11,7 +11,3 @@ extern "C" void tetrisphere_ui_span_begin(std::uint8_t*, recomp_context*,
                                            std::uint32_t, std::uint32_t) {}
 extern "C" void tetrisphere_ui_span_end(std::uint8_t*, recomp_context*,
                                          std::uint32_t) {}
-
-// Minefield on the sphere draws its marks in the game's display list; the
-// headless executor has no Minefield (src/platform/minefield_sphere.cpp).
-extern "C" void blockplanet_minefield_marks(std::uint8_t*, recomp_context*) {}

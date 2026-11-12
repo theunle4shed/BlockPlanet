@@ -17,9 +17,11 @@
 // (face mask bits 8, 4, 2, 1 for the neighbour at x - 1, x + 1, y - 1, y + 1),
 // as the game's own boards do (read from a Puzzle board, 2026-11-12).
 //
-// The numbers, flags and mines are drawn by BlockPlanet's HUD over the cells
-// (marks()), placed as the score pop-ups are: the cursor faces the camera, so
-// a cell dx cells away sits at the sphere's radius x sin(dx x 2pi/32).
+// The numbers are part of the core: BlockPlanet's own core tiles stand in for
+// the picture tiles Hide & Seek uses, and an uncovered cell's core value names
+// its number. Flagged cubes are drawn yellow; at the end the mines green (won)
+// or red (lost). The first version's numbers floating over the HUD (marks())
+// show with BLOCKPLANET_MINEFIELD_FLOATING=1.
 
 #include "tetrisphere/minefield.h"
 
