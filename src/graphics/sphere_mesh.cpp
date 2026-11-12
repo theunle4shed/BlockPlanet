@@ -131,7 +131,11 @@ void latch_frame_mode() {
     const Mode m = force_replace.load() ? Mode::Replace
                                         : mode_override().value_or(detail == Detail::Extended ? Mode::Replace : Mode::Original);
     frame_mode.store(m);
-    const int ring = ring_override().value_or(detail == Detail::Extended ? extended_detail_ring : 0);
+    int ring = ring_override().value_or(detail == Detail::Extended ? extended_detail_ring : 0);
+    // Forced (Minefield): at least the extended ring, so every cell on the
+    // visible half is drawn (the game's 15 x 15 patch is a little less than
+    // half the sphere, so cells popped in and out at its sides).
+    if (force_replace.load()) ring = std::max(ring, extended_detail_ring);
     const int frame = m == Mode::Replace ? ring : 0;
     frame_ring_value.store(frame);
     // Log each change of drawing mode.

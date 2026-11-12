@@ -67,7 +67,7 @@ constexpr int extended_detail_ring = 2;
 void set_detail(Detail detail);
 // While set, BlockPlanet draws the sphere itself whatever the detail setting
 // (Minefield on the sphere: its colours and cursor exist only in BlockPlanet's
-// drawing). The ring stays the setting's.
+// drawing), with at least the extended ring of cells.
 void set_force_replace(bool on);
 
 // Which code draws the sphere this frame. Hook entry points are called from
