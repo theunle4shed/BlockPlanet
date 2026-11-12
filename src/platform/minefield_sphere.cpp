@@ -452,14 +452,18 @@ void poll(std::uint8_t* rdram) {
             guest::store16(rdram, values + 2u * std::uint32_t(here_cell),
                            static_cast<std::int16_t>(first_picture_value + field->cell(under).count));
     }
-    // The cubes' colours: the cursor's lavender, flags yellow; at the end the
+    // The cubes' colours: flags yellow (under the cursor too, so a flag shows
+    // at once: the owner's call), the cursor's lavender; at the end the
     // mines green (won) or red (lost).
     {
         constexpr int yellow = 32, green = 34, lavender = 36, red = 37;
         const bool won = field->state() == Minefield::State::Won;
         for (int c = 0; c < field->size(); ++c) {
             const auto& cell = field->cell(c);
-            const int colour = over && cell.mine ? (won ? green : red) : c == here && !over ? lavender : cell.flag ? yellow : 0;
+            const bool cursor = c == here && !over;
+            const int colour = over && cell.mine ? (won ? green : red)
+                               : cell.flag ? yellow
+                               : cursor ? lavender : 0;
             cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(colour, std::memory_order_relaxed);
         }
     }
