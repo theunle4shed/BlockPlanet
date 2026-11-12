@@ -45,6 +45,19 @@ inline bool in_field(int board_cell) {
     return board_cell >= 0 && board_cell < 1024 && field_cells()[board_cell].load(std::memory_order_relaxed);
 }
 
+// A cube colour per board cell (a block type, 32 to 37: yellow, blue, green,
+// magenta, lavender, red), or 0 for the field's blue. Flagged cells are
+// yellow (the owner's idea, 2026-11-12: tidier than a flag icon); at the end
+// the mines are green when won, red when lost. Set by the field, read by the
+// sphere drawing.
+inline std::atomic<int>* cube_colours() {
+    static std::atomic<int> cells[1024]{};
+    return cells;
+}
+inline int cube_colour(int board_cell) {
+    return board_cell >= 0 && board_cell < 1024 ? cube_colours()[board_cell].load(std::memory_order_relaxed) : 0;
+}
+
 // The next game started becomes the minefield (the menu's test items): a
 // width x height field (up to 32 x 32, the whole board, which wraps), centred
 // on the cursor's starting cell; smaller fields are framed by the purple wall.

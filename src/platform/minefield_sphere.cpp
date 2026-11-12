@@ -149,7 +149,10 @@ void stop_locked() {
     tetrisphere::sphere::cell_listener().store(nullptr);
     tetrisphere::sphere::fill_training_gaps() = true;
     over_frames = 0;
-    for (int c = 0; c < layer_cells; ++c) field_cells()[c].store(false, std::memory_order_relaxed);
+    for (int c = 0; c < layer_cells; ++c) {
+        field_cells()[c].store(false, std::memory_order_relaxed);
+        cube_colours()[c].store(0, std::memory_order_relaxed);
+    }
     active_flag = false;
     blue_field() = false;
     field.reset();
@@ -317,6 +320,17 @@ void poll(std::uint8_t* rdram) {
             shown_open[std::size_t(c)] = true;
         }
     }
+    // The cubes' colours: flags yellow; at the end the mines green (won) or
+    // red (lost).
+    {
+        constexpr int yellow = 32, green = 34, red = 37;
+        const bool won = field->state() == Minefield::State::Won;
+        for (int c = 0; c < field->size(); ++c) {
+            const auto& cell = field->cell(c);
+            const int colour = over && cell.mine ? (won ? green : red) : cell.flag ? yellow : 0;
+            cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(colour, std::memory_order_relaxed);
+        }
+    }
     // The two turns: the cursor moves a cell every third frame from a second
     // after the end, 64 cells (two turns of the 32-cell board); the game eases
     // the sphere after it.
@@ -350,13 +364,6 @@ extern "C" void blockplanet_minefield_marks(std::uint8_t* rdram, recomp_context*
             float lift = 1.0f;  // in layer steps above the column's base: 1 on a cube's top, 0 on the core
             if (cell.open && !cell.mine) {
                 if (cell.count > 0) tile = cell.count - 1, lift = 0.0f;
-            } else if (cell.mine && over) {
-                // The owner's design: won, every mine green; lost, red, and
-                // the one uncovered white.
-                const bool won = field->state() == Minefield::State::Won;
-                tile = won ? 10 : c == field->exploded() ? 9 : 11;
-            } else if (cell.flag) {
-                tile = 8;
             }
             if (tile < 0) continue;
             Placed p{tile, {}};
