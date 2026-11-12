@@ -672,3 +672,10 @@ text = "ctx->r1 = S32(0x80800001u);"
 [[patches.hook]]
 func = "func_800382B4"
 text = "if (blockplanet_draw_filter(rdram, ctx, 0x800382B4u)) return;"
+
+# Minefield on the sphere: the game's cursor marker (the shadow of the piece
+# in hand, which follows the stage's pieces) is skipped while the field is in
+# play; the cell under the cursor shows it instead.
+[[patches.hook]]
+func = "func_8009AB60"
+text = "if (blockplanet_minefield_hide_marker(rdram, ctx)) return;"

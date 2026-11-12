@@ -71,6 +71,9 @@ bool active();
 std::uint16_t filter_input(std::uint16_t buttons);
 // Called each frame from the host's poll (after the game's options).
 void poll(std::uint8_t* rdram);
+// Whether the game's cursor marker (its shadow of the piece) is hidden: while
+// the field is in play the cell under the cursor shows it instead.
+bool hide_cursor_marker();
 
 // A number, flag or mine to draw over a cell, as an offset in cells from the
 // cursor on screen (dx to the right; dy up, as the board's rows run).

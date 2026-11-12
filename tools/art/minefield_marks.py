@@ -2,8 +2,10 @@
 """Minefield on the sphere: the numbers on the uncovered core (BlockPlanet's
 own art). Nine 16 x 16 core tiles in a row: a plain tile (no mines round the
 cell), then the digits 1 to 8 in the flat Minefield's colours with a dark
-outline, on the same pale ground. The image keeps to 255 colours, as the
-core's tiles are drawn through a 256-colour palette.
+outline, on the same pale ground. A second row holds the same nine tiles
+highlighted (a warm ground and a gold frame) for the cell under the cursor.
+The image keeps to 255 colours, as the core's tiles are drawn through a
+256-colour palette.
 
 BlockPlanet writes these tiles and their palette over the core's picture tiles
 (the ones Hide & Seek's pictures use, values 72 to 80) while the field is in
@@ -21,15 +23,19 @@ TILE = 16
 BIG = 8  # drawn large, then scaled down for smooth edges
 GROUND = (236, 238, 244)
 EDGE = (200, 204, 216)
+CURSOR_GROUND = (255, 236, 160)
+CURSOR_EDGE = (232, 150, 0)
 COLOURS = ["#2f86e0", "#2fa84a", "#e04646", "#7a52d8", "#d88a10", "#1aa596", "#d84a92", "#4a4a56"]
 
 
-def tile(text, font, colour):
+def tile(text, font, colour, cursor=False):
     size = TILE * BIG
-    im = Image.new("RGB", (size, size), GROUND)
+    im = Image.new("RGB", (size, size), CURSOR_GROUND if cursor else GROUND)
     d = ImageDraw.Draw(im)
-    # A faint edge, so neighbouring cells read as separate squares.
-    d.rectangle((0, 0, size - 1, size - 1), outline=EDGE, width=BIG // 2)
+    # A faint edge, so neighbouring cells read as separate squares; under the
+    # cursor, a gold frame.
+    d.rectangle((0, 0, size - 1, size - 1), outline=CURSOR_EDGE if cursor else EDGE,
+                width=BIG * 2 if cursor else BIG // 2)
     if text:
         stroke = BIG // 2 + 1
         box = d.textbbox((0, 0), text, font=font, stroke_width=stroke)
@@ -42,10 +48,11 @@ def tile(text, font, colour):
 
 def main():
     digits = ImageFont.truetype(os.path.join(FONTS, "LatoLatin-Bold.ttf"), 14 * BIG)
-    sheet = Image.new("RGB", (TILE * 9, TILE), GROUND)
-    sheet.paste(tile("", digits, None), (0, 0))
-    for n in range(1, 9):
-        sheet.paste(tile(str(n), digits, COLOURS[n - 1]), (n * TILE, 0))
+    sheet = Image.new("RGB", (TILE * 9, TILE * 2), GROUND)
+    for row, cursor in enumerate((False, True)):
+        sheet.paste(tile("", digits, None, cursor), (0, row * TILE))
+        for n in range(1, 9):
+            sheet.paste(tile(str(n), digits, COLOURS[n - 1], cursor), (n * TILE, row * TILE))
     sheet = sheet.quantize(colors=255, method=Image.Quantize.MEDIANCUT).convert("RGB")
     out = os.path.join(ROOT, "assets", "ui", "minefield", "core_digits.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)

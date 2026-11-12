@@ -2,6 +2,7 @@
 #include "tetrisphere/sphere_cell.h"
 
 #include "tetrisphere/guest_memory.h"
+#include "tetrisphere/recomp_support.h"
 #include "../ui/ui_renderer.h"
 #include "stb_image.h"
 
@@ -45,6 +46,7 @@ int frames_in_play = 0;
 bool built = false;
 std::vector<bool> shown_open;  // cells already cleared on the board
 int over_frames = 0;           // frames since the field was won or lost
+int cursor_cell = -1, cursor_field = -1;  // the board and field cell last under the cursor
 
 int cell_index(int x, int y) { return ((y % board + board) % board) * board + ((x % board + board) % board); }
 
@@ -146,6 +148,7 @@ void clear_cell(std::uint8_t* rdram, int x, int y) {
 void stop_locked() {
     tetrisphere::sphere::fill_training_gaps() = true;
     over_frames = 0;
+    cursor_cell = cursor_field = -1;
     for (int c = 0; c < layer_cells; ++c) {
         field_cells()[c].store(false, std::memory_order_relaxed);
         cube_colours()[c].store(0, std::memory_order_relaxed);
@@ -170,13 +173,19 @@ void stop_locked() {
 // mines round it.
 constexpr std::uint32_t picture_tiles = 0x80139F70u;    // nine 16 x 16 tiles, 0x100 bytes each
 constexpr std::uint32_t picture_palette = 0x80130F28u;  // 256 colours, 2 bytes each
+// The plain core (values 81 to 89) is one tile with its own palette; plain
+// cells are all under cubes, so BlockPlanet draws the cursor's highlighted
+// tile there and gives the uncovered cell under the cursor value 81.
+constexpr std::uint32_t plain_tile = 0x80139E70u;
+constexpr std::uint32_t plain_palette = 0x80130D28u;
+constexpr std::int16_t plain_value = 81;
 constexpr int core_tile = 16;
 constexpr int core_tiles = 9;
 constexpr std::int16_t first_picture_value = 72;
 
 struct CoreDigits {
     std::vector<std::uint16_t> palette;  // RGBA 16-bit
-    std::vector<std::uint8_t> indices;   // core_tiles x 16 x 16, tile after tile
+    std::vector<std::uint8_t> indices;   // core_tiles x 16 x 16, tile after tile; then the highlighted ones
 };
 
 // Loads the sheet once: its colours become the palette (at most 256).
@@ -187,11 +196,12 @@ const std::optional<CoreDigits>& core_digits() {
         stbi_uc* pixels = stbi_load(path.string().c_str(), &w, &h, &channels, 4);
         if (pixels == nullptr) return std::nullopt;
         CoreDigits out;
-        bool fits = w >= core_tile * core_tiles && h >= core_tile;
-        for (int k = 0; fits && k < core_tiles; ++k)
+        bool fits = w >= core_tile * core_tiles && h >= 2 * core_tile;
+        for (int k = 0; fits && k < 2 * core_tiles; ++k)
             for (int y = 0; fits && y < core_tile; ++y)
                 for (int x = 0; x < core_tile; ++x) {
-                    const stbi_uc* p = pixels + 4 * (y * w + k * core_tile + x);
+                    const int row = k / core_tiles, column = k % core_tiles;
+                    const stbi_uc* p = pixels + 4 * ((row * core_tile + y) * w + column * core_tile + x);
                     const auto colour = std::uint16_t((p[0] >> 3) << 11 | (p[1] >> 3) << 6 | (p[2] >> 3) << 1 | 1);
                     auto at = std::find(out.palette.begin(), out.palette.end(), colour);
                     if (at == out.palette.end()) {
@@ -213,11 +223,15 @@ const std::optional<CoreDigits>& core_digits() {
 
 // Writes the tiles and the palette over the picture tiles (each frame while
 // the field is in play, in case the stage reloads them).
-void write_core_digits(std::uint8_t* rdram) {
+// `cursor_count`: the mines round the uncovered cell under the cursor, whose
+// highlighted tile goes in the plain core's tile (-1: none).
+void write_core_digits(std::uint8_t* rdram, int cursor_count) {
     const auto& digits = core_digits();
     if (!digits) return;
-    for (std::size_t i = 0; i < digits->palette.size(); ++i)
+    for (std::size_t i = 0; i < digits->palette.size(); ++i) {
         guest::store16(rdram, picture_palette + 2u * std::uint32_t(i), static_cast<std::int16_t>(digits->palette[i]));
+        guest::store16(rdram, plain_palette + 2u * std::uint32_t(i), static_cast<std::int16_t>(digits->palette[i]));
+    }
     // Core value 72 + k draws picture slot 3 x (k / 3) + 2 - k % 3 (each row of
     // three runs the other way; found by comparing the field with the core).
     constexpr std::size_t tile_bytes = core_tile * core_tile;
@@ -226,6 +240,10 @@ void write_core_digits(std::uint8_t* rdram) {
         for (std::size_t i = 0; i < tile_bytes; ++i)
             guest::store8(rdram, picture_tiles + std::uint32_t(slot * tile_bytes + i), digits->indices[std::size_t(k) * tile_bytes + i]);
     }
+    if (cursor_count >= 0 && cursor_count < core_tiles)
+        for (std::size_t i = 0; i < tile_bytes; ++i)
+            guest::store8(rdram, plain_tile + std::uint32_t(i),
+                          digits->indices[std::size_t(core_tiles + cursor_count) * tile_bytes + i]);
 }
 
 } // namespace
@@ -291,14 +309,18 @@ void poll(std::uint8_t* rdram) {
     {
         const std::uint32_t values = guest::load32(rdram, values_pointer);
         bool replaced = false;
+        int why_cell = -1, why_value = 0, why_layer = 0;
         for (int c = 0; c < layer_cells && !replaced; ++c) {
             const std::int16_t v = guest::load16(rdram, values + 2u * std::uint32_t(layer_cells + c));
-            replaced = (v != 0 && v != inert) || guest::load16(rdram, values + 2u * std::uint32_t(2 * layer_cells + c)) != 0;
+            const std::int16_t v2 = guest::load16(rdram, values + 2u * std::uint32_t(2 * layer_cells + c));
+            replaced = (v != 0 && v != inert) || v2 != 0;
+            if (replaced) why_cell = c, why_value = v2 != 0 ? v2 : v, why_layer = v2 != 0 ? 2 : 1;
         }
         if (replaced) {
             build_board(rdram);
             shown_open.assign(layer_cells, false);
-            std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"rebuilt\"}\n");
+            std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"rebuilt\",\"cell\":[%d,%d],\"layer\":%d,\"value\":%d}\n",
+                         why_cell % board, why_cell / board, why_layer, why_value);
             std::fflush(stdout);
         }
     }
@@ -330,11 +352,15 @@ void poll(std::uint8_t* rdram) {
         guest::store16(rdram, player1 + 0x2386, static_cast<std::int16_t>(piece));
         // (The queue is left alone: holding 24 there as well crashed the game.)
     }
-    // The drop timer never runs out (+0x2B10 counts up to 600), and the
+    // The drop timer never runs out (below), and the
     // stage is never won: it ends when an S x S square of the core is
     // uncovered (S at +0x23E4, 4 to 8 in Rescue), so S is the whole board,
     // which the mines always keep covered. (Turning the goal off instead,
     // 0x800E44A4 = 0, stopped the holes being drawn.)
+    // The drop timer is a float (+0x2408, counting up to the limit at
+    // 0x800F116C, 6000) that +0x2B10 (up to 600) is worked out from: both
+    // are held at 0, so the game never drops a piece on its own.
+    guest::store32(rdram, player1 + 0x2408, 0);
     guest::store16(rdram, player1 + 0x2B10, 0);
     guest::store16(rdram, player1 + 0x23E4, board);
     const int x = cursor_x(rdram), y = cursor_y(rdram);
@@ -367,15 +393,34 @@ void poll(std::uint8_t* rdram) {
             shown_open[std::size_t(c)] = true;
         }
     }
-    write_core_digits(rdram);
-    // The cubes' colours: flags yellow; at the end the mines green (won) or
-    // red (lost).
+    // The cursor (the owner's report, 2026-11-12: the game's shadow follows
+    // the stage's pieces, so it is hidden and the cell itself shows it): an
+    // uncovered cell under it shows its highlighted tile, a cube turns
+    // lavender.
     {
-        constexpr int yellow = 32, green = 34, red = 37;
+        const std::uint32_t values = guest::load32(rdram, values_pointer);
+        const int here_cell = cell_index(x, y);
+        const int under = here;
+        const bool open_here = under >= 0 && field->cell(under).open && !field->cell(under).mine;
+        if (cursor_cell >= 0 && cursor_cell != here_cell && cursor_field >= 0 && field->cell(cursor_field).open)
+            guest::store16(rdram, values + 2u * std::uint32_t(cursor_cell),
+                           static_cast<std::int16_t>(first_picture_value + field->cell(cursor_field).count));
+        cursor_cell = here_cell;
+        cursor_field = under;
+        if (open_here) guest::store16(rdram, values + 2u * std::uint32_t(here_cell), plain_value);
+        write_core_digits(rdram, open_here && !over ? field->cell(under).count : -1);
+        if (open_here && over)
+            guest::store16(rdram, values + 2u * std::uint32_t(here_cell),
+                           static_cast<std::int16_t>(first_picture_value + field->cell(under).count));
+    }
+    // The cubes' colours: the cursor's lavender, flags yellow; at the end the
+    // mines green (won) or red (lost).
+    {
+        constexpr int yellow = 32, green = 34, lavender = 36, red = 37;
         const bool won = field->state() == Minefield::State::Won;
         for (int c = 0; c < field->size(); ++c) {
             const auto& cell = field->cell(c);
-            const int colour = over && cell.mine ? (won ? green : red) : cell.flag ? yellow : 0;
+            const int colour = over && cell.mine ? (won ? green : red) : c == here && !over ? lavender : cell.flag ? yellow : 0;
             cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(colour, std::memory_order_relaxed);
         }
     }
@@ -385,6 +430,8 @@ void poll(std::uint8_t* rdram) {
     if (over && over_frames > 60 && over_frames <= 60 + 64 * 3 && over_frames % 3 == 0)
         guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(guest::load16(rdram, player1 + 0x2B2A) - 1));
 }
+
+bool hide_cursor_marker() { return active_flag.load(); }
 
 std::vector<Mark> marks(const std::uint8_t* rdram) {
     std::vector<Mark> out;
@@ -457,3 +504,7 @@ std::string counter() {
 }
 
 } // namespace tetrisphere::minefield_sphere
+
+extern "C" bool blockplanet_minefield_hide_marker(std::uint8_t*, recomp_context*) {
+    return tetrisphere::minefield_sphere::hide_cursor_marker();
+}
