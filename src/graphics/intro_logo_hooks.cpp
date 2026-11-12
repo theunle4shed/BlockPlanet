@@ -356,8 +356,21 @@ extern "C" void blockplanet_intro_bricks(std::uint8_t* rdram, recomp_context* ct
         return v ? std::atoi(v) : 300;
     }();
     const int frame = static_cast<int>(load32(rdram, scene + 0x24u));
-    if (frame > last_frame) return;
     const std::uint32_t objects = load32(rdram, scene + 0x14u);
+    // Research: BLOCKPLANET_INTRO_BRICKS_LOG=1 logs, every 10 scene frames,
+    // the objects hidden, those never seen opaque and those half faded.
+    static const bool log = std::getenv("BLOCKPLANET_INTRO_BRICKS_LOG") != nullptr;
+    if (log && frame % 10 == 0) {
+        int hidden = 0, never = 0, part = 0;
+        for (int k = 0; k < count && k < 512; ++k) {
+            const std::uint8_t a = load8(rdram, objects + static_cast<std::uint32_t>(k) * object_size + 0x80u);
+            if (a == 0) ++hidden, never += opaque[static_cast<std::size_t>(k)] ? 0 : 1;
+            else if (a != 0xFF) ++part;
+        }
+        std::fprintf(stdout, "{\"event\":\"intro_bricks\",\"frame\":%d,\"count\":%d,\"hidden\":%d,\"never_opaque\":%d,\"partial\":%d}\n",
+                     frame, count, hidden, never, part);
+    }
+    if (frame > last_frame) return;
     for (int k = 0; k < count && k < 512; ++k) {
         const std::uint32_t at = objects + static_cast<std::uint32_t>(k) * object_size + 0x80u;
         const std::uint8_t alpha = load8(rdram, at);
