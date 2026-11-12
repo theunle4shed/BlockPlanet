@@ -412,6 +412,7 @@ div { display: block; }
 .mark.n6 { color: #3fc8b8; }
 .mark.n7 { color: #f070a8; }
 .mark.n8 { color: #c8c8c8; }
+.mark.flag, .mark.mine, .mark.hit, .mark.found { font-family: lucide; font-weight: normal; font-size: 34dp; }
 .mark.flag { color: #f5821f; }
 .mark.mine { color: #f06060; }
 .mark.hit { color: #ffffff; font-size: 52dp; }

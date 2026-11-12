@@ -1055,13 +1055,26 @@ void update_hud() {
         popup.y = -view.sphere_radius * std::sin(b);  // the board's rows run upwards on screen
         view.popups.push_back(popup);
     }
-    // Minefield on the sphere: each cell's mark, placed the same way.
+    // Minefield on the sphere: the panel counts the mines left instead of
+    // the time and progress, and each cell's mark is placed as above.
+    if (const auto mines = tetrisphere::minefield_sphere::counter(); !mines.empty()) {
+        view.time_label = "Mines";
+        view.time = mines;
+        view.time_delta.clear();
+        view.best.clear();
+        view.splits.clear();
+        view.progress = -1.0f;
+        view.story_score.clear();
+        view.story_gains.clear();
+        view.combo = 0;
+    }
     for (const auto& m : tetrisphere::minefield_sphere::marks(guest_rdram)) {
         constexpr float step = 6.2831853f / 32.0f;
         blockplanet::ui::HudView::Mark mark;
         mark.text = m.text;
         mark.kind = m.kind;
-        mark.x = view.sphere_radius * std::sin(m.dx * step);
+        // On the ball: longitude dx, latitude dy (a cell is 1/32 of a turn).
+        mark.x = view.sphere_radius * std::cos(m.dy * step) * std::sin(m.dx * step);
         mark.y = -view.sphere_radius * std::sin(m.dy * step);
         view.marks.push_back(std::move(mark));
     }
@@ -2995,7 +3008,9 @@ bool handle_profile_command(const std::string& command) {
     };
     // On the sphere (test): the next Casual 1:1 becomes the minefield.
     if (command == "minefield_sphere") {
-        tetrisphere::minefield_sphere::arm(130);
+        // Research: BLOCKPLANET_MINEFIELD_MINES sets the count (for testing a loss).
+        const char* mines = std::getenv("BLOCKPLANET_MINEFIELD_MINES");
+        tetrisphere::minefield_sphere::arm(mines ? std::atoi(mines) : 130);
         blockplanet::ui::send_command("casual");
         blockplanet::ui::send_command("chapter:1");
         return true;

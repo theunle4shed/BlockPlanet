@@ -3,6 +3,7 @@
 #include "tetrisphere/guest_memory.h"
 
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <mutex>
 #include <optional>
@@ -35,6 +36,7 @@ std::optional<Minefield> field;
 int frames_in_play = 0;
 bool built = false;
 std::vector<bool> shown_open;  // cells already cleared on the board
+int over_frames = 0;           // frames since the field was won or lost
 
 int cell_index(int x, int y) { return ((y % board + board) % board) * board + ((x % board + board) % board); }
 
@@ -82,6 +84,7 @@ void clear_cell(std::uint8_t* rdram, int x, int y) {
 }
 
 void stop_locked() {
+    over_frames = 0;
     active_flag = false;
     blue_field() = false;
     field.reset();
@@ -155,16 +158,27 @@ void poll(std::uint8_t* rdram) {
             std::fflush(stdout);
         }
     }
-    // Every uncovered cell (and, at the end, every mine) is cleared on the board.
+    // Every uncovered cell is cleared on the board. At the end (the owner's
+    // design): won, every mine is marked green; lost, red, and half a second
+    // later every other cube goes. The mines stay as cubes under their marks:
+    // a board with no cube left counts as the core opened, and the stage
+    // ends. Then the sphere turns round twice to show where they all were.
     const bool over = field->state() == Minefield::State::Lost || field->state() == Minefield::State::Won;
+    if (over) ++over_frames;
+    const bool clear_rest = field->state() == Minefield::State::Lost && over_frames > 30;
     for (int c = 0; c < layer_cells; ++c) {
         const auto& cell = field->cell(c);
-        const bool clear = cell.open || (over && cell.mine);
+        const bool clear = cell.open && !cell.mine ? true : clear_rest && !cell.mine;
         if (clear && !shown_open[std::size_t(c)]) {
             clear_cell(rdram, c % board, c / board);
             shown_open[std::size_t(c)] = true;
         }
     }
+    // The two turns: the cursor moves a cell every third frame from a second
+    // after the end, 64 cells (two turns of the 32-cell board); the game eases
+    // the sphere after it.
+    if (over && over_frames > 60 && over_frames <= 60 + 64 * 3 && over_frames % 3 == 0)
+        guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(guest::load16(rdram, player1 + 0x2B2A) - 1));
 }
 
 std::vector<Mark> marks(const std::uint8_t* rdram) {
@@ -173,20 +187,35 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
     std::lock_guard lock(mutex);
     if (!field) return out;
     const int x0 = cursor_x(rdram), y0 = cursor_y(rdram);
+    // Where the sphere is turned to, in cells, following its smooth turn:
+    // its angles (+0x2B42, +0x2B46; 8,192 a turn, so 256 a cell) ease
+    // towards 128 + 256 x the cursor's values (measured 2026-11-12).
+    const auto view = [&](std::uint32_t angle, int cursor) {
+        float v = (float(guest::load16(rdram, player1 + angle)) - 128.0f) / 256.0f;
+        // The angle wraps every 32 cells: keep it next to the cursor.
+        while (v - float(cursor) > 16.0f) v -= 32.0f;
+        while (v - float(cursor) < -16.0f) v += 32.0f;
+        return v;
+    };
+    const float vx = view(0x2B42, x0 - 8), vy = view(0x2B46, y0 - 8);
     const bool over = field->state() == Minefield::State::Lost || field->state() == Minefield::State::Won;
     // Only the side facing the camera: up to 6 cells from the cursor.
-    for (int dy = -6; dy <= 6; ++dy)
-        for (int dx = -6; dx <= 6; ++dx) {
+    for (int dy = -7; dy <= 7; ++dy)
+        for (int dx = -7; dx <= 7; ++dx) {
             const int c = cell_index(x0 + dx, y0 + dy);
             const auto& cell = field->cell(c);
             Mark m;
-            m.dx = float(-dx);  // the board's x runs right to left on screen (moving right lowers it)
-            m.dy = float(dy);
+            // The board's x runs right to left on screen (moving right lowers it).
+            m.dx = -(float(x0 - 8 + dx) - vx);
+            m.dy = float(y0 - 8 + dy) - vy;
+            // Only cells on the side facing the camera (and not at its very edge).
+            constexpr float cell_angle = 6.2831853f / 32.0f;
+            if (std::cos(m.dx * cell_angle) * std::cos(m.dy * cell_angle) < 0.25f) continue;
             if (cell.mine && (over || cell.open)) {
-                m.text = "✕";  // a cross: the mine
+                m.text = "\uE2FF";  // the icon font's bomb
                 m.kind = c == field->exploded() ? "hit" : (field->state() == Minefield::State::Won ? "found" : "mine");
             } else if (cell.flag) {
-                m.text = "!";
+                m.text = "\uE0D6";  // the icon font's flag
                 m.kind = "flag";
             } else if (cell.open && cell.count > 0) {
                 m.text = std::to_string(cell.count);
@@ -203,6 +232,17 @@ std::string status() {
     if (!active_flag.load()) return {};
     std::lock_guard lock(mutex);
     return field ? minefield_status(*field) : std::string{};
+}
+
+std::string counter() {
+    if (!active_flag.load()) return {};
+    std::lock_guard lock(mutex);
+    if (!field) return {};
+    switch (field->state()) {
+    case Minefield::State::Won: return "Cleared";
+    case Minefield::State::Lost: return "Boom";
+    default: return std::to_string(field->mines() - field->flags());
+    }
 }
 
 } // namespace tetrisphere::minefield_sphere

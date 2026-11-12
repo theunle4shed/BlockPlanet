@@ -57,5 +57,8 @@ struct Mark {
 std::vector<Mark> marks(const std::uint8_t* rdram);
 // "N mines left", or the result; empty when not active.
 std::string status();
+// For the HUD's panel: the mines left to flag, "Cleared" or "Boom"; empty
+// when not active.
+std::string counter();
 
 } // namespace tetrisphere::minefield_sphere
