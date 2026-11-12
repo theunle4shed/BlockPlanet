@@ -351,6 +351,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/profile_save.cpp
     src/platform/profile_menu.cpp
     src/platform/minefield.cpp
+    src/platform/window_placement.cpp
     src/platform/pause_bridge.cpp
     src/platform/story_hud.cpp
     src/platform/developer_records.cpp
@@ -646,6 +647,15 @@ else()
     target_compile_options(minefield_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME minefield COMMAND minefield_test)
+
+add_executable(window_placement_test tests/window_placement_test.cpp src/platform/window_placement.cpp)
+target_include_directories(window_placement_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(window_placement_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(window_placement_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME window_placement COMMAND window_placement_test)
 
 add_executable(trophies_test tests/trophies_test.cpp src/platform/trophies.cpp)
 target_include_directories(trophies_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
@@ -1074,6 +1084,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/profile_save.cpp
         src/platform/profile_menu.cpp
         src/platform/minefield.cpp
+        src/platform/window_placement.cpp
         src/platform/pause_bridge.cpp
         src/platform/story_hud.cpp
         src/platform/developer_records.cpp

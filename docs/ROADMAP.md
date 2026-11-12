@@ -107,6 +107,15 @@ Analyze the audio the game outputs (BlockPlanet already receives every PCM buffe
 - **Drive the original backgrounds:** write those levels into the background's animation parameters each frame, if the research finds suitable ones. Original look, music-reactive.
 - **Add new backgrounds:** draw host-side shader backgrounds into the background layer. Fully new visuals, the most freedom, and the basis for user-made visualizers later.
 
+### Another game's stages as backgrounds (idea, saved for later, 2026-11-12)
+
+The owner's idea: if the player owns another N64 game as well, use its stages as backdrops behind the sphere. As now, nothing from either game is committed: BlockPlanet reads the player's own copy at install time. Running both recompiled games in one program is not practical (each expects the whole console: memory, graphics state, timing). Three ways in, best first:
+- **Extract the stage art at install:** a converter reads the other game's stage models and textures and BlockPlanet draws them in 3D behind the sphere, as it does the tunnel. Realistic only for a game whose formats are already documented.
+- **Pre-render backdrops at install:** play through its stages once, recording looping clips or panoramas. Works for any game, but flat.
+- **Run the other game alongside, unseen,** and use its live picture as the backdrop. The most striking, the heaviest and the most fragile.
+
+Depends on which game; starts with that choice.
+
 ### Your own music: MP3, OGG and FLAC (M)
 
 Play music files from the player's device instead of, or alongside, the game's soundtrack: silence the game's music channels, keep sound effects, and mix the decoded file into the output. Public-domain decoders such as `dr_mp3`, `dr_flac` and `stb_vorbis` fit the GPL license. Needs: a music folder setting, playlist and shuffle options, and the jukebox menu. Works well with the visualizer, which reacts to whatever is playing.

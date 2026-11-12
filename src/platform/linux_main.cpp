@@ -39,6 +39,7 @@
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/wav_capture.h"
 #include "tetrisphere/window_mode_controller.h"
+#include "tetrisphere/window_placement.h"
 #include "tetrisphere/pc_settings_hook.h"
 #include "tetrisphere/controls_sdl.h"
 
@@ -72,6 +73,7 @@
 #include <memory>
 #include <string>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <set>
 #include <vector>
@@ -2060,6 +2062,40 @@ void remember_windowed_bounds() {
     SDL_GetWindowSize(window, &windowed_bounds.w, &windowed_bounds.h);
 }
 
+// The window's place between launches (window_placement.h): saved a second
+// after it last moved or changed size, and on the way out, while windowed.
+std::optional<std::chrono::steady_clock::time_point> window_placement_dirty;
+
+std::filesystem::path window_placement_path() { return application_data_directory() / "window.txt"; }
+
+std::optional<tetrisphere::WindowPlacement> load_window_placement() {
+    std::ifstream in(window_placement_path());
+    if (!in) return std::nullopt;
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const auto saved = tetrisphere::parse_window_placement(text);
+    if (!saved) return std::nullopt;
+    std::vector<tetrisphere::ScreenArea> screens;
+    for (int display = 0; display < SDL_GetNumVideoDisplays(); ++display) {
+        SDL_Rect r{};
+        if (SDL_GetDisplayUsableBounds(display, &r) == 0) screens.push_back({r.x, r.y, r.w, r.h});
+    }
+    return tetrisphere::usable_window_placement(*saved, screens);
+}
+
+void save_window_placement() {
+    window_placement_dirty.reset();
+    if (window == nullptr) return;
+    const Uint32 flags = SDL_GetWindowFlags(window);
+    if (flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MINIMIZED)) return;
+    tetrisphere::WindowPlacement placement;
+    SDL_GetWindowPosition(window, &placement.x, &placement.y);
+    SDL_GetWindowSize(window, &placement.width, &placement.height);
+    placement.maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0;
+    std::error_code error;
+    std::filesystem::create_directories(window_placement_path().parent_path(), error);
+    std::ofstream(window_placement_path(), std::ios::trunc) << tetrisphere::format_window_placement(placement);
+}
+
 bool enter_fullscreen(const char*& kind) {
     bool exact_uhd = false;
     if (active_settings.graphics.resolution == GraphicsResolution::P2160) {
@@ -2592,11 +2628,18 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         usable_display = SDL_Rect{0, 0, 960, 720};
     const auto [window_width, window_height] = graphics_window_size(
         active_settings.graphics, usable_display.w, usable_display.h);
+    // Where the window was last time, if it still fits a screen.
+    const auto placement = load_window_placement();
     window = SDL_CreateWindow("Tetrisphere",
-                              SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              window_width, window_height,
+                              placement ? placement->x : SDL_WINDOWPOS_CENTERED,
+                              placement ? placement->y : SDL_WINDOWPOS_CENTERED,
+                              placement ? placement->width : window_width,
+                              placement ? placement->height : window_height,
                               SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
                                   SDL_WINDOW_ALLOW_HIGHDPI);
+    if (window != nullptr && placement && placement->maximized &&
+        active_settings.graphics.window_mode != GraphicsWindowMode::Fullscreen)
+        SDL_MaximizeWindow(window);
     if (window == nullptr) {
         show_error(SDL_GetError());
         std::exit(70);
@@ -2900,6 +2943,7 @@ void stop_game() {
 
 // Saves everything, stops the game and closes its devices and window.
 void shut_down() {
+    save_window_placement();
     stop_game();
     // RT64's event-filter userdata dies with its rendering thread. Controller
     // teardown can emit SDL events, so remove the filter before closing devices.
@@ -3319,6 +3363,8 @@ bool handle_profile_command(const std::string& command) {
             }
             if (!applied.empty()) std::fflush(stdout);
         }
+        if (window_placement_dirty && std::chrono::steady_clock::now() - *window_placement_dirty > std::chrono::seconds(1))
+            save_window_placement();
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 close_game();
@@ -3327,6 +3373,10 @@ bool handle_profile_command(const std::string& command) {
                 event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                 window_mode_controller->focus_lost();
             }
+            if (event.type == SDL_WINDOWEVENT &&
+                (event.window.event == SDL_WINDOWEVENT_MOVED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+                 event.window.event == SDL_WINDOWEVENT_MAXIMIZED || event.window.event == SDL_WINDOWEVENT_RESTORED))
+                window_placement_dirty = std::chrono::steady_clock::now();
             const auto before_removal = event.type == SDL_CONTROLLERDEVICEREMOVED
                 ? controller_ports.snapshot()
                 : std::array<ControllerPortSnapshot, 2>{};
