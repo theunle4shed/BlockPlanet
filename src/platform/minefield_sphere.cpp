@@ -205,6 +205,27 @@ void poll(std::uint8_t* rdram) {
         std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ready\",\"mines\":%d}\n", field->mines());
         std::fflush(stdout);
     }
+    // Research: BLOCKPLANET_MINEFIELD_CORE_TILES steps the core cells through
+    // their texture sheet's 16-texel tiles (their own table at core_table),
+    // one every 2 seconds (logged).
+    static const bool core_tiles = std::getenv("BLOCKPLANET_MINEFIELD_CORE_TILES") != nullptr;
+    if (core_tiles) {
+        constexpr std::uint32_t core_table = 0x807F8100u;
+        static int frame = 0, shown = -1;
+        const int tile = (frame++ / 120) % 32;
+        if (tile != shown) {
+            shown = tile;
+            const int a = (tile % 16) * 16 + 1, b = a + 13, top = (tile / 16) * 16 + 1;
+            const std::int16_t corners[8] = {std::int16_t(a), std::int16_t(top + 13), std::int16_t(b), std::int16_t(top + 13),
+                                             std::int16_t(a), std::int16_t(top), std::int16_t(b), std::int16_t(top)};
+            for (int i = 0; i < smooth_table_halves; ++i)
+                guest::store16(rdram, core_table + 2u * std::uint32_t(i), corners[i % 8]);
+            const std::uint32_t entries = guest::load32(rdram, entries_pointer);
+            for (int c = 0; c < layer_cells; ++c) guest::store32(rdram, entries + 4u * std::uint32_t(c), core_table);
+            std::fprintf(stdout, "{\"event\":\"core_tile\",\"x\":%d,\"y\":%d}\n", a, top);
+            std::fflush(stdout);
+        }
+    }
     // The cursor's shadow marks one cell (the owner's idea, 2026-11-12): the
     // piece in hand (+0x2386) holds shape-table
     // entry 24, a fixed 1 x 1 piece (23 is an L of three; holding the
