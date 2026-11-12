@@ -108,7 +108,7 @@ std::optional<int> ring_override() {
         const char* setting = std::getenv("BLOCKPLANET_SPHERE_RING");
         if (setting == nullptr) return std::nullopt;
         const int n = std::atoi(setting);
-        return n < 0 ? 0 : (n > 4 ? 4 : n);
+        return n < 0 ? 0 : (n > largest_ring ? largest_ring : n);
     }();
     return value;
 }
@@ -120,11 +120,22 @@ double view_scale() { return requested_view_scale.load(); }
 
 void set_detail(Detail detail) { requested_detail.store(detail); }
 
+namespace {
+std::atomic<bool> force_replace{false};
+}
+
+void set_force_replace(bool on) { force_replace.store(on); }
+
 void latch_frame_mode() {
     const Detail detail = requested_detail.load();
-    const Mode m = mode_override().value_or(detail == Detail::Extended ? Mode::Replace : Mode::Original);
+    const Mode m = force_replace.load() ? Mode::Replace
+                                        : mode_override().value_or(detail == Detail::Extended ? Mode::Replace : Mode::Original);
     frame_mode.store(m);
-    const int ring = ring_override().value_or(detail == Detail::Extended ? extended_detail_ring : 0);
+    int ring = ring_override().value_or(detail == Detail::Extended ? extended_detail_ring : 0);
+    // Forced (Minefield): the largest ring, so every cell on the visible half
+    // is drawn (the game's 15 x 15 patch is a little less than half the
+    // sphere, and even the extended ring left cubes popping in at the sides).
+    if (force_replace.load()) ring = largest_ring;
     const int frame = m == Mode::Replace ? ring : 0;
     frame_ring_value.store(frame);
     // Log each change of drawing mode.

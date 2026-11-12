@@ -64,7 +64,14 @@ double view_scale();
 // with extended_detail_ring extra cells on every side.
 enum class Detail { Original, Extended };
 constexpr int extended_detail_ring = 2;
+// The most extra cells drawn on every side (BLOCKPLANET_SPHERE_RING's limit;
+// Minefield on the sphere uses it, so its cubes all round the ball are drawn).
+constexpr int largest_ring = 4;
 void set_detail(Detail detail);
+// While set, BlockPlanet draws the sphere itself whatever the detail setting
+// (Minefield on the sphere: its colours and cursor exist only in BlockPlanet's
+// drawing), with the largest ring of cells.
+void set_force_replace(bool on);
 
 // Which code draws the sphere this frame. Hook entry points are called from
 // the generated game code (see config/recomp/tetrisphere.us.rev0.toml).

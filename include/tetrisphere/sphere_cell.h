@@ -12,6 +12,7 @@
 // base + (n - 1) * step, so every layer is the same thickness along its ray
 // and neighbouring columns meet exactly because they share the corner rays.
 
+#include <atomic>
 #include <cstdint>
 
 namespace tetrisphere::sphere {
@@ -30,5 +31,13 @@ public:
 
 // Does exactly what func_8009D90C does to guest memory, in the same order.
 void prepare_cell(GuestMemory& memory);
+
+// Training's gap filling in the cell setup (see sphere_cell.cpp): on unless
+// a mode turns it off (Minefield on the sphere, whose single uncovered cells
+// between cubes are real holes).
+inline std::atomic<bool>& fill_training_gaps() {
+    static std::atomic<bool> on{true};
+    return on;
+}
 
 } // namespace tetrisphere::sphere

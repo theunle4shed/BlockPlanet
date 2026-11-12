@@ -1,3 +1,4 @@
+#include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/sphere_quadrants.h"
 
 #include "tetrisphere/guest_memory.h"
@@ -109,7 +110,16 @@ void draw_block(std::uint8_t* rdram, recomp_context* ctx, const QuadrantShape& s
     if ((faces & shape.visible_mask) == 0) return;
     const std::int16_t value = load16(rdram, load32(rdram, block_value_pointer));
     if (value == 0) return;
-    store16(rdram, block_type, static_cast<std::int16_t>(value / 9));
+    // Minefield on the sphere: its inert cells (value 423, the purple wall's
+    // type 47) are drawn as blue cubes (type 33).
+    // (Only inside the field; the wall round a smaller field stays purple.)
+    // Flagged cells and, at the end, mines are drawn in their own colours.
+    const int board_cell = int((load32(rdram, block_value_pointer) - load32(rdram, 0x800E44D0u)) / 2u % 1024u);
+    const bool mine_cube = value == 423 && tetrisphere::minefield_sphere::blue_field().load(std::memory_order_relaxed) &&
+        tetrisphere::minefield_sphere::in_field(board_cell);
+    const int colour = tetrisphere::minefield_sphere::cube_colour(board_cell);
+    const int cube_type = colour != 0 ? colour : 33;
+    store16(rdram, block_type, static_cast<std::int16_t>(mine_cube ? cube_type : value / 9));
     if (value == value_special_a) return func_8009E3E4(rdram, ctx);
     if (value == value_special_b) return func_80097B74(rdram, ctx);
     if (value == value_special_c) return func_80097848(rdram, ctx);

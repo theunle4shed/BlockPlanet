@@ -25,6 +25,7 @@
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/minefield.h"
+#include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
@@ -1056,6 +1057,29 @@ void update_hud() {
         popup.y = -view.sphere_radius * std::sin(b);  // the board's rows run upwards on screen
         view.popups.push_back(popup);
     }
+    // Minefield on the sphere: the panel counts the mines left instead of
+    // the time and progress, and each cell's mark is placed as above.
+    if (const auto mines = tetrisphere::minefield_sphere::counter(); !mines.empty()) {
+        view.time_label = "Mines";
+        view.time = mines;
+        view.time_delta.clear();
+        view.best.clear();
+        view.splits.clear();
+        view.progress = -1.0f;
+        view.story_score.clear();
+        view.story_gains.clear();
+        view.combo = 0;
+    }
+    for (const auto& m : tetrisphere::minefield_sphere::marks(guest_rdram)) {
+        constexpr float step = 6.2831853f / 32.0f;
+        blockplanet::ui::HudView::Mark mark;
+        mark.text = m.text;
+        mark.kind = m.kind;
+        // On the ball: longitude dx, latitude dy (a cell is 1/32 of a turn).
+        mark.x = view.sphere_radius * std::cos(m.dy * step) * std::sin(m.dx * step);
+        mark.y = -view.sphere_radius * std::sin(m.dy * step);
+        view.marks.push_back(std::move(mark));
+    }
     show_hud(std::move(view));
 }
 
@@ -1160,6 +1184,7 @@ void poll_game_events() {
     poll_pokes();
     poll_type47_experiment();
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
+    tetrisphere::minefield_sphere::poll(const_cast<std::uint8_t*>(guest_rdram));
     const auto state = read_game_state(guest_rdram);
     const auto now = std::chrono::steady_clock::now();
     if (profile_recording && state.scene == -1 && last_play_poll != std::chrono::steady_clock::time_point{}) {
@@ -2280,10 +2305,11 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (port == 1 && !controller.connected) return false;
     const auto mapped = map_port_input(port, controller, keys,
                                        controller_bindings(), magic_control());
-    *buttons = mapped.buttons;
+    *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons) : mapped.buttons;
     note_start(mapped.buttons);
     *x = mapped.x;
     *y = mapped.y;
+    if (port == 0) tetrisphere::minefield_sphere::filter_stick(*x, *y);
     static std::array<std::uint16_t, 2> previous{};
     if (mapped.buttons != previous[port]) {
         const auto family = port == 0 ? active_family.load() : active_p2_family.load();
@@ -2414,6 +2440,7 @@ void show_error(const char* message) {
 } // namespace
 
 void publish_menu_settings(const Settings& settings);
+void update_build_label();
 
 extern "C" void tetrisphere_rt64_clear_keyboard_input() {
     SDL_Event focus_lost{};
@@ -2525,9 +2552,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // the command line said (as it does when the game restarts as a profile).
     profile_picked = run_options.profile.has_value() || run_options.guest;
     credits_pending = run_options.credits;
-#ifdef BLOCKPLANET_BUILD_LABEL
-    if (std::getenv("BLOCKPLANET_HIDE_BUILD_LABEL") == nullptr) blockplanet::ui::set_build_label(BLOCKPLANET_BUILD_LABEL);
-#endif
+    update_build_label();
     // The menus' button hints before any input (menu_input.cpp then follows the device).
     blockplanet::ui::set_button_text("new_profile_hint", "[k:T] New profile\u00A0\u00A0\u00A0[k:G] Play as guest");
     blockplanet::ui::set_button_text("move_back", "[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back");
@@ -2752,7 +2777,26 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 }
 
 // Current values for the menus' setting rows (assets/ui/screens/options.rml).
+// The build label (bottom right): the branch and version, then the graphics
+// settings in effect, so a screenshot says how the game was set up (the
+// owner's idea, 2026-11-12). Updated whenever the settings change.
+void update_build_label() {
+#ifdef BLOCKPLANET_BUILD_LABEL
+    if (std::getenv("BLOCKPLANET_HIDE_BUILD_LABEL") != nullptr) return;
+    const auto& g = active_settings.graphics;
+    std::string text = BLOCKPLANET_BUILD_LABEL;
+    text += std::string(" \u00B7 sphere ") + graphics_sphere_name(g.sphere);
+    text += std::string(" \u00B7 resolution ") + graphics_resolution_name(g.resolution);
+    text += std::string(" \u00B7 picture ") + graphics_aspect_name(g.aspect);
+    text += std::string(" \u00B7 refresh ") + graphics_refresh_name(g.refresh);
+    if (const char* msaa = graphics_msaa_name(g.msaa_samples); g.msaa_samples > 0 && msaa) text += std::string(" \u00B7 MSAA ") + msaa;
+    text += std::string(" \u00B7 filter ") + graphics_presentation_filter_name(g.presentation_filter);
+    blockplanet::ui::set_build_label(text);
+#endif
+}
+
 void publish_menu_settings(const Settings& settings) {
+    update_build_label();
     blockplanet::ui::set_setting("sphere", graphics_sphere_name(settings.graphics.sphere));
     blockplanet::ui::set_setting("aspect", settings.graphics.aspect == GraphicsAspect::Fill ? "fill"
                                            : settings.graphics.aspect == GraphicsAspect::Expand16x9 ? "16x9" : "4x3");
@@ -3025,6 +3069,18 @@ bool handle_profile_command(const std::string& command) {
         show_minefield((size.height / 2) * size.width + size.width / 2);
         if (open_screen) blockplanet::ui::request_show("minefield_" + std::to_string(size.width));
     };
+    // On the sphere (test): the next Casual 1:1 becomes the minefield.
+    if (const auto size = argument("minefield_sphere:")) {
+        // Small 12 x 12, Medium 20 x 20, Full 32 x 32 (the whole sphere).
+        // Research: BLOCKPLANET_MINEFIELD_MINES sets the count (for testing a loss).
+        static const int sides[] = {12, 20, 32}, counts[] = {20, 60, 130};
+        const int i = std::clamp(std::atoi(size->c_str()), 0, 2);
+        const char* mines = std::getenv("BLOCKPLANET_MINEFIELD_MINES");
+        tetrisphere::minefield_sphere::arm(sides[i], sides[i], mines ? std::atoi(mines) : counts[i]);
+        blockplanet::ui::send_command("casual");
+        blockplanet::ui::send_command("chapter:1:1");  // always stage 1:1, whatever Casual's progress
+        return true;
+    }
     if (command == "minefield") {
         blockplanet::ui::set_list("minefield_sizes", minefield_size_choices());
         blockplanet::ui::request_show("minefield");

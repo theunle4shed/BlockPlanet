@@ -639,6 +639,11 @@ void place_popups(const HudView& hud) {
                "; opacity: " + std::to_string(alpha) + "; transform: scale(" + std::to_string(scale) + ");'><div class='points'>" +
                escape(p.text) + "</div>" + (p.note.empty() ? "" : "<div class='note'>" + escape(p.note) + "</div>") + "</div>";
     }
+    for (const auto& m : hud.marks) {
+        const float x = cx + m.x * ph, y = cy + m.y * ph;
+        rml += "<div class='mark " + escape(m.kind) + "' style='left: " + px_text(x - 40.0f * dp) + "; top: " +
+               px_text(y - 30.0f * dp) + ";'>" + escape(m.text) + "</div>";
+    }
     if (rml != shown) {
         layer->SetInnerRML(rml);
         shown = rml;
@@ -755,6 +760,11 @@ bool update_label_document() {
     if (label_document == nullptr) {
         label_document = context->LoadDocument(asset("build_label.rml"));
         if (label_document == nullptr) return false;
+    }
+    // The text changes with the settings (linux_main's update_build_label).
+    static std::string shown;
+    if (text != shown) {
+        shown = text;
         if (auto* e = label_document->GetElementById("label")) e->SetInnerRML(escape(text));
     }
     label_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);

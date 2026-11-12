@@ -352,6 +352,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/profile_menu.cpp
     src/platform/minefield.cpp
     src/platform/window_placement.cpp
+    src/platform/minefield_sphere.cpp
     src/platform/pause_bridge.cpp
     src/platform/story_hud.cpp
     src/platform/developer_records.cpp
@@ -1085,6 +1086,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/profile_menu.cpp
         src/platform/minefield.cpp
         src/platform/window_placement.cpp
+        src/platform/minefield_sphere.cpp
         src/platform/pause_bridge.cpp
         src/platform/story_hud.cpp
         src/platform/developer_records.cpp
