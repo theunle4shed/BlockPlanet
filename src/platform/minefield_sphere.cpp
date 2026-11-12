@@ -205,6 +205,14 @@ void poll(std::uint8_t* rdram) {
         std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ready\",\"mines\":%d}\n", field->mines());
         std::fflush(stdout);
     }
+    // Research: BLOCKPLANET_MINEFIELD_PIECE=n holds shape-table entry n in
+    // hand and in the queue (+0x2386, +0x2374 x 9), to find the 1 x 1 wild
+    // card for the cursor's shadow.
+    static const int piece = [] { const char* v = std::getenv("BLOCKPLANET_MINEFIELD_PIECE"); return v ? std::atoi(v) : -1; }();
+    if (piece >= 0) {
+        guest::store16(rdram, player1 + 0x2386, static_cast<std::int16_t>(piece));
+        for (int i = 0; i < 9; ++i) guest::store16(rdram, player1 + 0x2374 + 2u * std::uint32_t(i), static_cast<std::int16_t>(piece));
+    }
     // The drop timer never runs out (+0x2B10 counts up to 600), and the
     // stage is never won: it ends when an S x S square of the core is
     // uncovered (S at +0x23E4, 4 to 8 in Rescue), so S is the whole board,
