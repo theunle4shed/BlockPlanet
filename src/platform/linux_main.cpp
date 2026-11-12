@@ -3015,7 +3015,7 @@ bool handle_profile_command(const std::string& command) {
         const char* mines = std::getenv("BLOCKPLANET_MINEFIELD_MINES");
         tetrisphere::minefield_sphere::arm(sides[i], sides[i], mines ? std::atoi(mines) : counts[i]);
         blockplanet::ui::send_command("casual");
-        blockplanet::ui::send_command("chapter:1");
+        blockplanet::ui::send_command("chapter:1:1");  // always stage 1:1, whatever Casual's progress
         return true;
     }
     if (command == "minefield") {

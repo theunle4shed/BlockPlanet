@@ -284,6 +284,24 @@ void poll(std::uint8_t* rdram) {
         std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ready\",\"mines\":%d}\n", field->mines());
         std::fflush(stdout);
     }
+    // The stage may lay its own board after the field was built (seen on a
+    // later stage, 2026-11-12): any cell above layer 1, or a layer-1 cell that
+    // is neither inert nor empty, means the board is the game's again, so the
+    // field is laid once more and its uncovered cells cleared again.
+    {
+        const std::uint32_t values = guest::load32(rdram, values_pointer);
+        bool replaced = false;
+        for (int c = 0; c < layer_cells && !replaced; ++c) {
+            const std::int16_t v = guest::load16(rdram, values + 2u * std::uint32_t(layer_cells + c));
+            replaced = (v != 0 && v != inert) || guest::load16(rdram, values + 2u * std::uint32_t(2 * layer_cells + c)) != 0;
+        }
+        if (replaced) {
+            build_board(rdram);
+            shown_open.assign(layer_cells, false);
+            std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"rebuilt\"}\n");
+            std::fflush(stdout);
+        }
+    }
     // Research: BLOCKPLANET_MINEFIELD_CORE_VALUES steps the core's tile values
     // through 0 to 71, a 3 x 3 set of nine every 2 seconds (logged), to find
     // the game's core looks (81 to 89 plain, 90 to 93 Story 1:1's, 72 to 80
