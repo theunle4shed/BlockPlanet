@@ -5,9 +5,11 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #include <optional>
 #include <random>
+#include <utility>
 
 namespace tetrisphere::minefield_sphere {
 namespace {
@@ -54,6 +56,22 @@ void build_board(std::uint8_t* rdram) {
         guest::store16(rdram, values + 2u * std::uint32_t(layer_cells + c), inert);
         guest::store8(rdram, masks + std::uint32_t(layer_cells + c), top_face);
         guest::store8(rdram, masks + std::uint32_t(c), 0);  // the core, covered
+        // The core: the game's plain core tiles (81 to 89, a 3 x 3 set, as
+        // round Hide & Seek's pictures), not Story 1:1's glowing ones (90 to
+        // 93). Its tiles set the core's look (the owner's hint, 2026-11-12:
+        // Hide & Seek's core differs). Research: BLOCKPLANET_MINEFIELD_CORE=
+        // base,width tries another set (72,3: the picture tiles; 90,2).
+        static const auto core_set = [] {
+            std::pair<int, int> set{81, 3};
+            if (const char* v = std::getenv("BLOCKPLANET_MINEFIELD_CORE")) std::sscanf(v, "%d,%d", &set.first, &set.second);
+            if (set.second < 1) set.second = 1;
+            return set;
+        }();
+        {
+            const int x = c % board, y = c / board, width = core_set.second;
+            guest::store16(rdram, values + 2u * std::uint32_t(c),
+                           static_cast<std::int16_t>(core_set.first + x % width + width * (y % width)));
+        }
         guest::store8(rdram, columns + std::uint32_t(c), 0x11);
         for (int layer = 2; layer < 9; ++layer) {
             guest::store16(rdram, values + 2u * std::uint32_t(layer * layer_cells + c), 0);
