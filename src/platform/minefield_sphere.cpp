@@ -58,11 +58,39 @@ int field_at(int bx, int by) {
 int cursor_x(const std::uint8_t* rdram) { return 8 + guest::load16(rdram, player1 + 0x2B2A); }
 int cursor_y(const std::uint8_t* rdram) { return 8 + guest::load16(rdram, player1 + 0x2B2E); }
 
+// Every cube's appearance: a cell's entry (0x800E44D8) points at a table of
+// texture coordinates on its type's texture sheet, face by face. The game's
+// piece cells cut theirs from a piece's end, middle or filler, so they read as
+// 1 x 3s; the smooth single block (as the Puzzle and Training walls) cuts
+// every face from the sheet's first tile (texels 1 to 14). BlockPlanet keeps
+// such a table of its own in the free upper 4 MB and points every cube at it.
+// The sheet holds 16 such 16-texel tiles: the first is flat (no outline);
+// others are stripes, outlined cubes or bricks (a choice still to make); 113 and 225
+// sink each cube's centre (2026-11-12, stepping through them in play).
+// Research: BLOCKPLANET_MINEFIELD_TILE=x picks another tile's left texel.
+constexpr std::uint32_t smooth_table = 0x807F8000u;
+constexpr int smooth_table_halves = 48;  // 0x60 bytes, like the game's
+
+void write_smooth_table(std::uint8_t* rdram) {
+    static const int left = [] {
+        const char* v = std::getenv("BLOCKPLANET_MINEFIELD_TILE");
+        const int x = v ? std::atoi(v) : 1;
+        return x >= 0 && x <= 241 ? x : 1;
+    }();
+    const std::int16_t a = std::int16_t(left), b = std::int16_t(left + 13);
+    const std::int16_t corners[8] = {a, 14, b, 14, a, 1, b, 1};
+    for (int i = 0; i < smooth_table_halves; ++i)
+        guest::store16(rdram, smooth_table + 2u * std::uint32_t(i), corners[i % 8]);
+}
+
 void build_board(std::uint8_t* rdram) {
     const std::uint32_t values = guest::load32(rdram, values_pointer);
     const std::uint32_t masks = guest::load32(rdram, masks_pointer);
+    const std::uint32_t entries = guest::load32(rdram, entries_pointer);
     const std::uint32_t columns = guest::load32(rdram, columns_pointer);
+    write_smooth_table(rdram);
     for (int c = 0; c < layer_cells; ++c) {
+        guest::store32(rdram, entries + 4u * std::uint32_t(layer_cells + c), smooth_table);
         field_cells()[c].store(field_at(c % board, c / board) >= 0, std::memory_order_relaxed);
         guest::store16(rdram, values + 2u * std::uint32_t(layer_cells + c), inert);
         guest::store8(rdram, masks + std::uint32_t(layer_cells + c), top_face);
