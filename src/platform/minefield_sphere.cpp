@@ -205,24 +205,21 @@ void poll(std::uint8_t* rdram) {
         std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ready\",\"mines\":%d}\n", field->mines());
         std::fflush(stdout);
     }
-    // Research: BLOCKPLANET_MINEFIELD_CORE_TILES steps the core cells through
-    // their texture sheet's 16-texel tiles (their own table at core_table),
-    // one every 2 seconds (logged).
-    static const bool core_tiles = std::getenv("BLOCKPLANET_MINEFIELD_CORE_TILES") != nullptr;
-    if (core_tiles) {
-        constexpr std::uint32_t core_table = 0x807F8100u;
+    // Research: BLOCKPLANET_MINEFIELD_CORE_VALUES steps the core's tile values
+    // through 0 to 71, a 3 x 3 set of nine every 2 seconds (logged), to find
+    // the game's core looks (81 to 89 plain, 90 to 93 Story 1:1's, 72 to 80
+    // the picture tiles).
+    static const bool core_values = std::getenv("BLOCKPLANET_MINEFIELD_CORE_VALUES") != nullptr;
+    if (core_values) {
         static int frame = 0, shown = -1;
-        const int tile = (frame++ / 120) % 32;
-        if (tile != shown) {
-            shown = tile;
-            const int a = (tile % 16) * 16 + 1, b = a + 13, top = (tile / 16) * 16 + 1;
-            const std::int16_t corners[8] = {std::int16_t(a), std::int16_t(top + 13), std::int16_t(b), std::int16_t(top + 13),
-                                             std::int16_t(a), std::int16_t(top), std::int16_t(b), std::int16_t(top)};
-            for (int i = 0; i < smooth_table_halves; ++i)
-                guest::store16(rdram, core_table + 2u * std::uint32_t(i), corners[i % 8]);
-            const std::uint32_t entries = guest::load32(rdram, entries_pointer);
-            for (int c = 0; c < layer_cells; ++c) guest::store32(rdram, entries + 4u * std::uint32_t(c), core_table);
-            std::fprintf(stdout, "{\"event\":\"core_tile\",\"x\":%d,\"y\":%d}\n", a, top);
+        const int set = (frame++ / 120) % 8;
+        if (set != shown) {
+            shown = set;
+            const std::uint32_t values = guest::load32(rdram, values_pointer);
+            for (int c = 0; c < layer_cells; ++c)
+                guest::store16(rdram, values + 2u * std::uint32_t(c),
+                               static_cast<std::int16_t>(set * 9 + (c % board) % 3 + 3 * ((c / board) % 3)));
+            std::fprintf(stdout, "{\"event\":\"core_values\",\"base\":%d}\n", set * 9);
             std::fflush(stdout);
         }
     }
