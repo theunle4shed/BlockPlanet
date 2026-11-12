@@ -244,11 +244,19 @@ int main(){return RT64::run();}
                b'    void PresentQueue::threadPresent(const Present &present, bool &swapChainValid) {\n'
                b'            uint32_t frameCountersNextPresented = 0;\n'
                b'                commandList->setFramebuffer(swapChainFramebuffer);\n'
+               b'                if (renderParams.texture != nullptr) {\n'
+               b'                    commandList->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(renderParams.texture, RenderTextureLayout::SHADER_READ));\n'
+               b'                    viRenderer->render(renderParams);\n'
+               b'                }\n'
                b'                swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);\n')
         digest = hashlib.sha256(raw).hexdigest()
         patched = patch_source("rt64_present_queue.cpp", raw, digest)
         self.assertIn(b'rt64_probe_present', patched)
         self.assertIn(b'TETRISPHERE_RT64_PROBE', patched)
+        # The under layer (tetrisphere/under_layer.h) is in both builds.
+        for build in (patched, patch_source("rt64_present_queue.cpp", raw, digest, probe=False)):
+            self.assertIn(b'tetrisphere::under_layer::wanted()', build)
+            self.assertEqual(build.count(b'viRenderer->render(renderParams);'), 2)
         with self.assertRaisesRegex(ValueError, "SHA256 mismatch"):
             patch_source("rt64_present_queue.cpp", raw, "0" * 64)
         duplicate = raw + b'                swapChainValid = ext.swapChain->present(swapChainIndex, &waitSemaphore, 1);\n'

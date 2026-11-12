@@ -34,8 +34,16 @@ struct PushConstants {
 };
 static_assert(sizeof(PushConstants) == 96);
 
-// Frames a released resource is kept for (RT64 renders up to three ahead).
-constexpr std::uint64_t retire_frames = 16;  // frames a released texture or buffer is kept, for frames still in flight (4 was too few on slow drivers)
+// How long a released resource (a texture, its upload buffer, geometry) is
+// kept for frames still in flight (RT64 renders up to three ahead): 16
+// frames and at least a second. Counted in frames alone it was too short on
+// a slow driver (4 frames), and with the box art on, the frame count runs
+// twice a present (the grid's under layer and the menus each begin one),
+// which halved it; an upload buffer freed while its copy was still queued
+// is the likely cause of a renderer crash or hang as the box art started
+// (2026-11-11, llvmpipe).
+constexpr std::uint64_t retire_frames = 16;
+constexpr std::chrono::milliseconds retire_time{1000};
 // Row pitch alignment for texture uploads (Direct3D needs 256 bytes).
 constexpr std::uint32_t row_alignment_pixels = 64;
 
@@ -186,7 +194,7 @@ void Renderer::RenderGeometry(Rml::CompiledGeometryHandle handle, Rml::Vector2f 
 
 void Renderer::ReleaseGeometry(Rml::CompiledGeometryHandle handle) {
     if (handle == 0) return;
-    retired_.push_back({frame_, std::unique_ptr<Geometry>(reinterpret_cast<Geometry*>(handle)), nullptr, nullptr});
+    retired_.push_back({frame_, std::chrono::steady_clock::now(), std::unique_ptr<Geometry>(reinterpret_cast<Geometry*>(handle)), nullptr, nullptr});
 }
 
 std::filesystem::path& ui_asset_root() {
@@ -245,7 +253,7 @@ Rml::TextureHandle Renderer::GenerateTexture(Rml::Span<const Rml::byte> source, 
 
 void Renderer::ReleaseTexture(Rml::TextureHandle handle) {
     if (handle == 0) return;
-    retired_.push_back({frame_, nullptr, std::unique_ptr<Texture>(reinterpret_cast<Texture*>(handle)), nullptr});
+    retired_.push_back({frame_, std::chrono::steady_clock::now(), nullptr, std::unique_ptr<Texture>(reinterpret_cast<Texture*>(handle)), nullptr});
 }
 
 Rml::TextureHandle Renderer::create_texture(const std::uint8_t* rgba, int width, int height) {
@@ -278,7 +286,7 @@ Rml::TextureHandle Renderer::create_texture(const std::uint8_t* rgba, int width,
     texture->descriptors->setTexture(0, texture->texture.get(), RenderTextureLayout::SHADER_READ);
     texture->descriptors->setSampler(1, sampler_.get());
     // The staging buffer must outlive the copy.
-    retired_.push_back({frame_, nullptr, nullptr, std::move(staging)});
+    retired_.push_back({frame_, std::chrono::steady_clock::now(), nullptr, nullptr, std::move(staging)});
     return reinterpret_cast<Rml::TextureHandle>(texture.release());
 }
 
@@ -307,7 +315,9 @@ void Renderer::apply_scissor() {
 }
 
 void Renderer::collect_retired() {
-    while (!retired_.empty() && retired_.front().frame + retire_frames <= frame_) retired_.pop_front();
+    const auto now = std::chrono::steady_clock::now();
+    while (!retired_.empty() && retired_.front().frame + retire_frames <= frame_ && now - retired_.front().at >= retire_time)
+        retired_.pop_front();
 }
 
 } // namespace blockplanet::ui

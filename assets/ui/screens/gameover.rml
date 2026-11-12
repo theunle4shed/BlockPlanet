@@ -1,0 +1,18 @@
+<rml>
+<head>
+    <title>Game Over</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- BlockPlanet's panel over the game's end menus (game over: Try again,
+     Training, Exit; Versus: Continue, Exit), the owner's request
+     (2026-11-10). The items are the game's own, chosen through its row
+     (EndMenuBridge, include/tetrisphere/pause_bridge.h); the red grid flies
+     in once the GAME OVER animation has shown. -->
+<body data-grid="red" class="over-pause">
+    <div id="panel">
+        <div class="header" data-text="end_title">Game Over</div>
+        <div class="subtitle" data-text="end_where"></div>
+        <div class="list" data-list="end"></div>
+    </div>
+</body>
+</rml>

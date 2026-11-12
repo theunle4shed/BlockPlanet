@@ -90,6 +90,8 @@ Replace the original menus (title, mode select, options, controls, graphics) wit
 
 Direction: a modern, simple, TV-like menu (large focus states, few items per screen, quick transitions), with no option to keep the original menus.
 
+**Idea: toasts (2026-11-10, not built).** A short note over the menus that fades in and out by itself after a few seconds, with nothing to dismiss, in the menus' note colour, for passing information such as "Playing as Guest. Progress isn't saved." A version was built and withdrawn the same day (the owner left guest play as it was); it could return when a screen needs one.
+
 **Language, starting with English (UK) and English (US) (idea, the owner's, 2026-11-11).** BlockPlanet's text is written in British English (Colour, Centred, Grey). A Language option would offer English (UK) and English (US) first (Colour/Color, Centre/Center, Grey/Gray, Favourite/Favorite, Customise/Customize, Licence/License), defaulting to the system's region, and make room for other languages later. Needs: every menu, card and HUD string moved out of the screens (`assets/ui/screens/*.rml`) and the C++ lists into a string table per language, with English (UK) as the source; the text rewrites for the game's own lines (`proper_case`, `fix_wording`) run per language too; the on-screen keyboard gets a layout per language. Nothing from the game's text is stored (it stays read from the player's copy); only BlockPlanet's own text is translated.
 
 ## Phase 3: audio and visuals
@@ -100,6 +102,8 @@ Gameplay frames render an off-screen background layer at RDRAM `0x000400` with t
 - Which code generates each background and its animation parameters (speed, color, geometry)?
 - Are the backgrounds procedural, or stored animations?
 - How much of each frame's GPU time do they cost?
+
+**Found so far (2026-11-10, [research](research/blockplanet-play-backgrounds.md)):** each is a stored animation: a LightWave scene with one object, keyframed, played and looped in real time by the game's general model player. There are 25, picked per level by the mode's rule. They are not linked to the music. Only the mesh moves: one small textured mesh (one 32 × 32 texture), turned by its keyframes and shaded by the game's lights, which give the colour shifts. No textures scroll and no palettes cycle (`BLOCKPLANET_BG_DL_LOG`). Still open: the GPU cost.
 
 ### Music-reactive backgrounds, like a Winamp visualizer (M to L, after research)
 
@@ -115,6 +119,38 @@ The owner's idea: if the player owns another N64 game as well, use its stages as
 - **Run the other game alongside, unseen,** and use its live picture as the backdrop. The most striking, the heaviest and the most fragile.
 
 Depends on which game; starts with that choice.
+
+### Pinch mode: a background that reacts near game over (idea, research first, 2026-11-10)
+
+The owner's idea: when the player is close to losing, the background behaves differently or reacts.
+- **Triggers to consider:**
+  - the last heart (player context `0x80110220` + `0x2D7E`);
+  - the drop timer or shot time limit nearly run out (candidates `+0x3254` and `+0x3250`, from the direct-launch session's catalogue);
+  - the board close to its limit;
+  - any danger signal the original already gives (a music change, warning sound or HUD flash near game over), still to check.
+- **Reactions to consider:**
+  - a faster or slower background;
+  - a tint or pulse;
+  - a switch to another of the 25 backgrounds;
+  - a BlockPlanet overlay effect.
+
+See [the feasibility notes](research/blockplanet-play-backgrounds.md#pinch-mode-the-owners-idea-2026-11-10). Nothing is built until the owner decides.
+
+### Counter-motion backgrounds (idea, research first, 2026-11-10)
+
+The owner's idea: the background turns against the sphere's spin, or with it. Today it does not react at all: measured in Story 1:1, it changes no more while the sphere spins than when idle. The background would follow the sphere's rotation (the board's view position plus the sub-cell rotation used by `func_800ADD6C`, addresses still to name), applied as a rotation of the background's matrices at its draw (`0x80071BA0`), extra animation speed, or a shift of the background layer. See [the notes](research/blockplanet-play-backgrounds.md#counter-motion-the-owners-second-idea-2026-11-10). Nothing is built until the owner decides.
+
+### Brick skybox background (design idea, research first, 2026-11-10)
+
+The owner's design: "inside a sphere (just a skybox) and high spins counter to the play sphere. Bricks would need to be different colours to the current stage." The camera sits inside a huge sphere of bricks that spins fast against the play sphere's rotation, in the colours the stage does not use (darkened), so the board stays readable.
+
+The sketch:
+- BlockPlanet generates the brick sphere and draws it in the game's background slot (`0x80071BA0`), with the game's brick texture read at run time.
+- It is driven by the sphere's rotation, as in counter-motion.
+- It comes with a strength setting (off, gentle, normal, wild) and a reduced-motion option.
+- Medium effort.
+
+See [the sketch](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10). **Experiment built (2026-11-10, the owner's go), and parked there by the owner's choice:** it stays a research experiment behind its switch (Options > Sky test, Play backgrounds defaulting to Original). It is not for the original modes' pool, and it isn't offered to players. It is kept for new game modes (see Custom backgrounds for new modes). No more work on it for now; the play sphere's texture, for one, is not started.
 
 ### Your own music: MP3, OGG and FLAC (M)
 
@@ -203,6 +239,8 @@ First technical notes (not yet researched):
 
 - **Escape:** the camera inside the sphere means the renderer drawing the inner faces and culling differently (BlockPlanet now draws the sphere itself, `docs/research/blockplanet-game-state.md`). Dropping onto the underside reverses the drop direction and gravity, which is game logic spread over many functions (the board limits table in the same document); likely the largest change of the two.
 - **Multiphasic:** the transition fits what is already known: the core can be resized in the mesh builder (the `BLOCKPLANET_SPHERE_CORE_SCALE` experiment), BlockPlanet draws the sphere, and an indestructible block type exists (type 47, Puzzle's border). The "core picture" stage would need art for the next stage drawn on the core, and a way to load the next level without leaving play (the game builds a level between levels today). Earning lives needs a rule (for example a score or combo threshold) and a HUD element.
+
+**Custom backgrounds for new modes** (the owner, 2026-11-10: "Don't incorporate the brick sky yet.. I'm thinking we can use some custom ones for new game modes"). BlockPlanet's own play backgrounds, such as the brick sky (below and in [the research](research/blockplanet-play-backgrounds.md#brick-skybox-the-owners-design-idea-2026-11-10)), belong to new game modes: the modes above, any later ones such as the Phear-inspired mode, and the rulesets per stage, where the background is one of a stage's variables. They don't belong in the original modes' pool, which keeps the game's own 25.
 
 ### Custom characters you can save (M to L, plus art)
 
@@ -314,7 +352,7 @@ Each needs its text found (much of it is pictures in the main archive; the asset
 
 Already done or planned and confirmed by the research: Training, How to Play and the glossary (the learning curve); BlockPlanet's HUD and combo counter; the peek camera, Full sphere detail and see-through core (hidden pieces, the point the Tetris Company's Henk Rogers singles out); Endless Score Attack, seeds, daily stages and trophies (repetition); local two-player VS (should not slip far). Keep as they are: the core rules, the fixed-camera sphere feel, the big chain reactions, the soundtrack as default music, and a gentle start with Training.
 
-**Priority: launch modes directly, without the original menus (the owner, 2026-11-09).** BlockPlanet's menus are its own, but a game is still started by pressing through the original menus hidden behind (`ModeLauncher`: Single, the player page, the mode page), so their grids, models, sounds, attract demo and timing leak through. Instead, for each mode, set what the original menus would (mode, chapter, stage, difficulty, save slot) and call the game's own start routine, so the old menus never run. Steps: (1) Story: record every value the menus set before play (a memory watch from the main menu to play, compared with a direct start), reproduce it, and compare play started both ways; (2) switch Story to the direct start, keeping `ModeLauncher` as a fallback; (3) the same for Training, Puzzle, Hide & Seek, Lines, Versus and Time Trial; (4) boot straight into BlockPlanet (intro, title, Who is playing?, its menus) so the original menu code is never reached. The menus stay as they are; only the start changes. The loading cover and the grid's fly-out then become presentation only. Related: holding the GAME OVER scene (the same kind of research).
+**Priority: launch modes directly, without the original menus (the owner, 2026-11-09).** BlockPlanet's menus are its own, but a game is still started by pressing through the original menus hidden behind (`ModeLauncher`: Single, the player page, the mode page), so their grids, models, sounds, attract demo and timing leak through. Instead, for each mode, set what the original menus would (mode, chapter, stage, difficulty, save slot) and call the game's own start routine, so the old menus never run. Steps: (1) Story: record every value the menus set before play (a memory watch from the main menu to play, compared with a direct start), reproduce it, and compare play started both ways; (2) switch Story to the direct start, keeping `ModeLauncher` as a fallback; (3) the same for Training, Puzzle, Hide & Seek, Lines, Versus and Time Trial; (4) boot straight into BlockPlanet (intro, title, Who is playing?, its menus) so the original menu code is never reached. The menus stay as they are; only the start changes. The loading cover and the grid's fly-out then become presentation only. Related: holding the GAME OVER scene (the same kind of research). Step 4 also covers going back (the owner's note, 2026-11-09): Back from "Who is playing?" to the title now restarts the game, because the original menu has no way back to the title; once the game boots straight into BlockPlanet it is a normal screen change, with no restart and no intro replay. **Progress (2026-11-09):** steps 1 and 2 done for Story, and Training, Puzzle, Lines, Hide & Seek and Versus (2026-11-10), so every mode the menus offer: they start directly, with `ModeLauncher` kept as the fallback and behind `BLOCKPLANET_LAUNCH=menus`.
 
 **One game, many rulesets (the owner's idea, 2026-11-09; long term).** Instead of each mode being its own path, one game whose rules come from a ruleset chosen in the menus; Story, Hide & Seek, Puzzle, Lines, Versus and Time Trial become presets, and new modes (Custom, Multiphasic, a fast flat-shaded mode, new versus modes) new combinations. Every variable of every mode: layers, block types, the objective, a single stage or an episode, the background effect, the default music, hidden pictures, whether the core breaks and how much of it must be uncovered, lives, the drop timer's speed, a shot time limit, score and speed goals, a friend inside, the playfield's size and shape, and the computer opponent's intelligence level. Variables are set per stage, not only per mode (the owner's note): an episode is a list of stages, each with its own values, so for example the opponent can get smarter stage by stage. Stages: (1) a catalogue of what each mode has and does, and has not and does not, with where the game keeps each variable and each mode's values (starting from docs/research/modes-matrix.md; the direct-launch work finds most of them); (2) a ruleset format, read from data files, with the built-in modes written out to reproduce the original exactly; (3) apply rulesets to the game's own engine wherever a variable maps to something it supports; (4) playfield shape and size need BlockPlanet's own game engine (the original's board is a fixed 32 × 32 grid per layer round a sphere), the same engine network play and the fast mode need. Order: direct launch first, then 1 to 3, with 4 as the long-term goal.
 

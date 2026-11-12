@@ -34,6 +34,7 @@
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_extended.h"
 #include "tetrisphere/sphere_faces.h"
+#include "tetrisphere/game_over_shell.h"
 #include "tetrisphere/sphere_grid.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/sphere_quadrants.h"
@@ -440,6 +441,11 @@ std::array<SnapshotCheck, 4> quadrant_checks{SnapshotCheck{"sphere_quadrant0_ver
 
 ExtendedSphere extended_sphere;
 bool extended_ready = false;  // built this frame, single player
+// With the sphere drawn as the original (or without its extended patch),
+// the game over shell still needs the patch's points: they are built for it
+// alone, only while the game is over.
+ExtendedSphere shell_sphere;
+bool shell_ready = false;
 
 bool extended_test() {
     static const bool on = std::getenv("BLOCKPLANET_SPHERE_EXTENDED_TEST") != nullptr;
@@ -493,6 +499,12 @@ extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_contex
         static const ExtendedBaseGrid grid(base_table(rdram), largest_ring);
         extended_sphere.build(ring, gather(rdram, ctx, false), grid);
         extended_ready = true;
+    }
+    shell_ready = false;
+    if (!extended_ready && load16(rdram, player_count) < 2 && game_over_shell_wanted(rdram)) {
+        static const ExtendedBaseGrid grid(base_table(rdram), extended_detail_ring);
+        shell_sphere.build(extended_detail_ring, gather(rdram, ctx, false), grid);
+        shell_ready = true;
     }
     // BLOCKPLANET_SPHERE_EXTENDED_TEST=1 in verify mode checks the extended
     // path with no extra cells against the game's quadrant passes.
@@ -702,8 +714,21 @@ namespace {
 bool replaying_original = false;
 } // namespace
 
+// The shell over a sphere drawn without its extended patch, in the patch's
+// vertex buffers like the patch itself.
+static void draw_shell_alone(std::uint8_t* rdram) {
+    if (!shell_ready) return;
+    begin_extended_vertices(rdram);
+    draw_game_over_shell(rdram, shell_sphere);
+    end_extended_vertices(rdram);
+}
+
 extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
     if (replaying_original) return false;
+    // Research: BLOCKPLANET_HIDE_SPHERE=1 draws no sphere at all (its
+    // quarters are skipped), for stills of the background alone.
+    static const bool hide = std::getenv("BLOCKPLANET_HIDE_SPHERE") != nullptr;
+    if (hide) return true;
     if (quadrant == 0) stats_sphere_begin(rdram);
     const Mode m = mode_for("quadrants");
     if (m == Mode::Original) return false;
@@ -715,20 +740,27 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
         if (quadrant == 0) begin_extended_vertices(rdram);
         draw_extended_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant), extended_sphere);
         if (quadrant == 3) {
+            draw_game_over_shell(rdram, extended_sphere);  // game_over_shell.cpp
             stats_sphere_end(rdram);
             end_extended_vertices(rdram);
         }
         return true;
     }
     draw_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant));
-    if (quadrant == 3) stats_sphere_end(rdram);  // the end hook does not run when replaced
+    if (quadrant == 3) {
+        draw_shell_alone(rdram);
+        stats_sphere_end(rdram);  // the end hook does not run when replaced
+    }
     return true;
 }
 
 extern "C" void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant) {
     (void)ctx;
     if (replaying_original) return;
-    if (quadrant == 3) stats_sphere_end(rdram);
+    if (quadrant == 3) {
+        if (mode_for("quadrants") == Mode::Original) draw_shell_alone(rdram);
+        stats_sphere_end(rdram);
+    }
     if (mode_for("quadrants") != Mode::Verify) return;
     // BLOCKPLANET_SPHERE_SELFTEST=1 replays the original instead of
     // BlockPlanet's version, to measure how often the check itself differs

@@ -87,6 +87,10 @@ private:
 
 bool valid_profile_name(std::string_view name);
 
+// "Guest" is for guest play (the owner's rule, 2026-11-10): not a name for a
+// new or renamed profile. Ignores case and spaces at either end.
+bool reserved_profile_name(std::string_view name);
+
 // Copies `file` into `backups` as <stem>.1<ext>, moving older copies up and
 // keeping `keep` of them. Does nothing if the file does not exist.
 bool rotate_backup(const std::filesystem::path& file, const std::filesystem::path& backups, int keep,

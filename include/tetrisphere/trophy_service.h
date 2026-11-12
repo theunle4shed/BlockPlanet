@@ -18,6 +18,9 @@ TrophyEngine& trophy_engine();
 void post_game_event(const GameEvent& event);
 // Save progress if it changed since the last save.
 void save_trophies();
+// Changes profile without restarting: saves the current progress, then loads
+// `progress_path` (none: a guest, who earns no trophies).
+void switch_trophies(const std::filesystem::path& definitions, const std::filesystem::path* progress_path);
 // Register an extra sink, for example a launcher integration.
 void add_trophy_sink(TrophySink* sink);
 

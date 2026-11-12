@@ -401,6 +401,26 @@ int main(int argc, char** argv) {
             navigator.open("grid_lab");
             advance(now + 2.0);
             frame("grid_lab");
+            navigator.set_setting("sky_backgrounds", "mixed");
+            navigator.set_setting("sky_layout", "sphere");
+            navigator.set_setting("sky_spin", "gentle");
+            navigator.set_setting("sky_direction", "against");
+            navigator.set_setting("sky_fov", "70");
+            navigator.set_setting("sky_comfort", "frame");
+            navigator.set_setting("sky_colours", "stage");
+            navigator.set_setting("sky_brightness", "55");
+            navigator.open("sky_lab");
+            advance(now + 2.0);
+            frame("sky_lab");
+            // The end screen over a game over (items as EndMenuBridge gives them).
+            navigator.set_text("end_title", "Game Over");
+            navigator.set_text("end_where", "Story \u00B7 2:3");
+            navigator.set_list("end", {{"try_again", "Try Again", "", "command:end_choose:0", true, 1, true, "", "", "\uE14C"},
+                                       {"training", "Training", "", "command:end_choose:2", true, 1, false, "", "", "\uE082"},
+                                       {"exit", "Exit", "", "command:end_choose:1", true, 1, false, "", "", "\uE112"}});
+            navigator.open("gameover");
+            advance(now + 2.0);
+            frame("gameover");
             // Closing the menus: the grid flies out, revealing the game.
             navigator.close();
             {

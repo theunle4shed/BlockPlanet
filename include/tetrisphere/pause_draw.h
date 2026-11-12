@@ -11,6 +11,10 @@ namespace blockplanet {
 // While true and the game is paused, the game draws only its pause
 // background (no line, menu text, hints or instructor).
 void set_pause_menu_shown(bool shown);
+// While true and the game is still paused (after Resume, while its own pause
+// tiles fly out), the pause background is skipped too, so the game shows
+// under BlockPlanet's grid as it leaves (docs/UI.md, Menu grid).
+void set_pause_exit_hidden(bool hidden);
 
 // While true, the game's single-player HUD routine (func_80075CD8) skips its
 // 2D draws and the 3D piece queue is not drawn, so BlockPlanet's own HUD can

@@ -52,6 +52,16 @@ bool valid_profile_name(std::string_view name) {
     });
 }
 
+bool reserved_profile_name(std::string_view name) {
+    while (!name.empty() && name.front() == ' ') name.remove_prefix(1);
+    while (!name.empty() && name.back() == ' ') name.remove_suffix(1);
+    constexpr std::string_view guest = "guest";
+    if (name.size() != guest.size()) return false;
+    for (std::size_t i = 0; i < guest.size(); ++i)
+        if (std::tolower(static_cast<unsigned char>(name[i])) != guest[i]) return false;
+    return true;
+}
+
 ProfileStore::ProfileStore(std::filesystem::path data_directory) : data_directory_(std::move(data_directory)) {}
 
 bool ProfileStore::load(std::string& error) {

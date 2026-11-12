@@ -27,6 +27,7 @@
 #include "tetrisphere/minefield.h"
 #include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/pause_bridge.h"
+#include "tetrisphere/brick_sky.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
 #include "tetrisphere/developer_records.h"
@@ -35,7 +36,9 @@
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
 #include "tetrisphere/mode_launcher.h"
+#include "tetrisphere/direct_start.h"
 #include "ui_system.h"
+#include "tetrisphere/box_art.h"
 #include "tetrisphere/profile_save.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/wav_capture.h"
@@ -73,6 +76,7 @@
 #include <mutex>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -124,6 +128,8 @@ bool loading_active = false;
 // way out of it (finished, game over, Quit to menu) goes back there.
 std::vector<std::pair<std::string, std::size_t>> launch_path;
 int launch_stages_chapter = 0;  // the stage list's chapter in that path, to refresh its bests
+std::string stages_title_now;     // the stage list's heading as last set ("Chapter 2", "Puzzles")
+std::string launch_place;         // that heading when a game started from the stage list, for "Exit to ..."
 // Opens the launch path again (once a second at most: the request takes a
 // frame or two), refreshing the stage list's bests first. The path is kept:
 // the menus may close once more as play ends.
@@ -141,6 +147,10 @@ std::string loading_title;
 // Quit to menu was chosen from the pause: the menu grid stays up until the
 // menus open again (docs/UI.md, Menu grid).
 std::optional<std::chrono::steady_clock::time_point> grid_quit_at;
+// The game's end menus under BlockPlanet's panel (EndMenuBridge): while they
+// (or their fade) are up the grid shows in red, and after Exit too.
+bool end_menu_active = false;
+bool grid_quit_red = false;
 std::chrono::steady_clock::time_point loading_since;
 bool credits_pending = false; // --credits: play them when the title shows
 
@@ -159,6 +169,12 @@ int minefield_size = 0;
 // The coin screen's colours (random each time it opens, the owner's choice).
 std::vector<int> coin_screen_colours;
 ProfileSaveData profile_data;
+// The Sky test's "Play test stage" (brick sky research): the profile as it
+// was before, put back afterwards, and nothing saved meanwhile, so the run
+// leaves no progress, records or Continue checkpoint.
+std::optional<ProfileSaveData> sky_test_profile;
+bool sky_test_seen_play = false;
+int sky_test_variants[2] = {0, 0};  // play_variant and menu_variant before the run, put back after
 bool profile_recording = false;
 bool profile_dirty = false;
 // A Chapter 0 (a Training lesson) started from a chapter list: when it is
@@ -217,7 +233,7 @@ void apply_controls(Settings& settings, const ControlPreferences& controls) {
 }
 
 void save_profile() {
-    if (!profile_save || !profile_dirty) return;
+    if (!profile_save || !profile_dirty || sky_test_profile) return;
     std::string error;
     if (profile_save->save(profile_data, error)) profile_dirty = false;
     else std::fprintf(stderr, "Could not save the profile: %s\n", error.c_str());
@@ -455,6 +471,7 @@ void update_puzzle_hud() {
 
 bool update_title_overlay();
 extern "C" bool blockplanet_title_recent(std::uint32_t* image);
+extern "C" float blockplanet_title_notice_opacity();
 
 // Training (mode 3, docs/TRAINING_REDESIGN.md): Story's HUD as one row along
 // the bottom, each part shown once Wheels has introduced it, found from the
@@ -2014,6 +2031,7 @@ bool update_title_overlay() {
     blockplanet::ui::HudView view;
     for (const char* line : title_notice_lines) view.title_notice.emplace_back(line);
     view.title_disclaimer = title_disclaimer;
+    view.title_opacity = blockplanet_title_notice_opacity();
     view.title_x = (area_x + area_w * 0.04f) / frame->window_w;
     view.title_w = area_w * 0.92f / frame->window_w;
     view.title_y = (frame->y + frame->h * 0.84f) / frame->window_h;
@@ -2253,9 +2271,28 @@ std::atomic<bool> menus_block_game{false};
 // Buttons the mode launcher presses on port 1 (bit 16 set while active).
 std::atomic<std::uint32_t> launcher_buttons{0};
 ModeLauncher mode_launcher;
+// A direct start (without the original menus) waiting for the game's thread;
+// if it is refused the launch falls back to mode_launcher.
+struct DirectWait {
+    LaunchMode mode;
+    std::chrono::steady_clock::time_point since;
+};
+std::optional<DirectWait> direct_wait;
+bool launching() { return mode_launcher.active() || direct_wait.has_value(); }
+// Back from "Who is playing?" plays the game's intro again (no relaunch); the
+// menus then wait for the title as at boot: first for the old title to go,
+// then for it to be shown again.
+bool title_seen = false;
+bool title_restart_pending = false;
+// Profile changes in place (no relaunch, the owner's request 2026-11-10).
+std::filesystem::path trophy_definitions_path;
+std::optional<std::chrono::steady_clock::time_point> box_art_returning_since;  // Back from "Who is playing?" to the box art
+std::string profile_to_remove;  // removed once the game has let go of its save
+bool start_chapter_given = false;  // --start-chapter: progress is not recorded
 
 // BlockPlanet's pause menu over the game's pause.
 PauseBridge pause_bridge;
+EndMenuBridge end_menu;
 
 // Settings changed in BlockPlanet's menus, applied like the PC settings menu.
 std::deque<PCSettingsRequest> menu_settings_requests;
@@ -2524,6 +2561,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // folder: the save stays in memory and no trophies are earned.
     profile_store = std::make_unique<ProfileStore>(user_path);
     guest_session = run_options.guest;
+    tetrisphere::direct_start::set_guest(guest_session);
     unlock_all_testing = run_options.unlock_all || std::getenv("BLOCKPLANET_UNLOCK_ALL") != nullptr;
     auto& profiles = *profile_store;
     std::string profile_error;
@@ -2576,6 +2614,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // which a profile without controls of its own starts from; a guest uses
     // them for the session.
     pc_controls = controls_of(active_settings);
+    start_chapter_given = run_options.start_chapter.has_value();
     if (!run_options.guest) {
         profile_save = std::make_unique<ProfileSave>(profile_path / "save.json");
         std::string save_error;
@@ -2628,6 +2667,8 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
                                     "\n\nPlease send it with a short note of what you were doing.";
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "BlockPlanet", message.c_str(), nullptr);
     }
+    // The box art's flow events also go to the diagnostics file.
+    tetrisphere::direct_start::set_event_sink([](const std::string& line) { diagnostic_log().perf(line); });
     std::fprintf(stdout, "{\"event\":\"diagnostic_file_ready\",\"run_id\":\"%s\"}\n",
                  run_id());
     std::fflush(stdout);
@@ -2636,6 +2677,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         const auto definitions = base != nullptr
             ? std::filesystem::u8path(base) / "trophies.json" : std::filesystem::path("trophies.json");
         if (base != nullptr) SDL_free(base);
+        trophy_definitions_path = definitions;
         if (!run_options.guest) initialize_trophies(definitions, profile_path / "trophies.json");
         load_developer_records_at_start(definitions.parent_path() / "developer_records.json");
     }
@@ -2904,6 +2946,30 @@ bool handle_text_setting(const std::string& command) {
     return true;
 }
 
+// Options > Sky test: the brick sky experiment's settings (not saved; each
+// change is logged as "brick_sky_settings" so the values can be reported).
+bool handle_sky_setting(const std::string& command) {
+    const auto equals = command.find('=');
+    if (command.rfind("setting:sky_", 0) != 0 || equals == std::string::npos) return false;
+    const auto name = command.substr(8, equals - 8);
+    if (!tetrisphere::brick_sky::set(name, command.substr(equals + 1))) return true;
+    std::string all;
+    for (const auto& [setting, value] : tetrisphere::brick_sky::values()) {
+        blockplanet::ui::set_setting(setting, value);
+        all += std::string(all.empty() ? "" : ",") + "\"" + setting + "\":\"" + value + "\"";
+    }
+    std::fprintf(stdout, "{\"event\":\"brick_sky_settings\",%s}\n", all.c_str());
+    std::fflush(stdout);
+    return true;
+}
+
+void publish_sky_settings() {
+    static bool published = false;
+    if (published) return;
+    published = true;
+    for (const auto& [setting, value] : tetrisphere::brick_sky::values()) blockplanet::ui::set_setting(setting, value);
+}
+
 // "setting:NAME=VALUE" from the menus, as a settings change (field numbers
 // as in the PC settings menu). False if the command is not a known setting.
 bool queue_menu_setting(const std::string& command) {
@@ -2943,6 +3009,25 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
     return story_chapters(completed, rescue_chapters, unlock_all_testing);
 }
 
+// A start has been accepted: close BlockPlanet's menus, remember where the
+// player came from, and show the loading cover until play has started.
+void begin_launch_presentation(LaunchMode mode) {
+    blockplanet::ui::request_close();
+    // The loading cover (the owner's request): over the game's own menus
+    // while they are pressed through, or the stage's first frames after a
+    // direct start, until play has started.
+    static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
+                                  "Training", "Training", "Puzzle Training"};
+    loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
+    // A restart from the pause keeps the menus the game was first started
+    // from: the pause screen is not a place to come back to.
+    if (const auto path = blockplanet::ui::menu_path();
+        !path.empty() && std::none_of(path.begin(), path.end(), [](const auto& s) { return s.first == "pause"; }))
+        launch_path = path, launch_place = path.back().first == "stages" ? stages_title_now : std::string();
+    loading_since = std::chrono::steady_clock::now();
+    loading_active = true;
+}
+
 void launch_mode(LaunchMode mode, bool keep_music = false) {
     if (guest_rdram == nullptr) return;
     if (game_option_applier) {
@@ -2953,23 +3038,42 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
         game_option_applier->set_menu_casual(casual);
         trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());
     }
+    if (direct_wait) return;  // a direct start is already on its way
     if (!keep_music) end_track_override();
-    const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
-    if (accepted) {
-        blockplanet::ui::request_close();
-        // The loading cover (the owner's request): over the game's own menus
-        // while they are pressed through, until play has started.
-        static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
-                                      "Training", "Training", "Puzzle Training"};
-        loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
-        // A restart from the pause keeps the menus the game was first
-        // started from: the pause screen is not a place to come back to.
-        if (const auto path = blockplanet::ui::menu_path();
-            !path.empty() && std::none_of(path.begin(), path.end(), [](const auto& s) { return s.first == "pause"; }))
-            launch_path = path;
-        loading_since = std::chrono::steady_clock::now();
-        loading_active = true;
+    // Story, Training, Puzzle, Lines, Hide & Seek and Versus start directly, without the original menus, from the game's main
+    // menu (docs/research/blockplanet-game-state.md, "Starting modes
+    // directly"); BLOCKPLANET_LAUNCH=menus keeps the menu route.
+    const bool training = mode == LaunchMode::TrainingBasics || mode == LaunchMode::TrainingAdvanced ||
+                          mode == LaunchMode::TrainingPuzzle;
+    if ((mode == LaunchMode::Rescue || mode == LaunchMode::Puzzle || mode == LaunchMode::Lines ||
+         mode == LaunchMode::HideAndSeek || mode == LaunchMode::VsCpu || training) &&
+        direct_start::enabled() && game_option_applier && !launching() &&
+        guest::load16(guest_rdram, 0x800E121C) >= 0) {
+        DirectStartRequest request;
+        if (training) {
+            request.mode = DirectMode::Training;
+            request.training_type = mode == LaunchMode::TrainingBasics ? 1 : mode == LaunchMode::TrainingAdvanced ? 2 : 3;
+        } else {
+            if (mode == LaunchMode::Puzzle) request.mode = DirectMode::Puzzle;
+            if (mode == LaunchMode::Lines) request.mode = DirectMode::Lines;
+            if (mode == LaunchMode::HideAndSeek) request.mode = DirectMode::HideAndSeek;
+            if (mode == LaunchMode::VsCpu) request.mode = DirectMode::Versus;
+            request.chapter = game_option_applier->rescue_start_chapter() - 1;
+            request.level = game_option_applier->rescue_start_level() - 1;
+            if (mode != LaunchMode::Rescue) request.chapter = 0;  // the menus clear it (Puzzle: the puzzle is the level)
+            if (mode == LaunchMode::Lines || mode == LaunchMode::VsCpu) request.level = 0;
+        }
+        if (direct_start::request(request)) {
+            direct_wait = DirectWait{mode, std::chrono::steady_clock::now()};
+            begin_launch_presentation(mode);
+            std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"started\",\"route\":\"direct\"}\n",
+                         launch_mode_name(mode));
+            std::fflush(stdout);
+            return;
+        }
     }
+    const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
+    if (accepted) begin_launch_presentation(mode);
     std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\"}\n",
                  launch_mode_name(mode), accepted ? "started" : "refused");
     std::fflush(stdout);
@@ -3034,6 +3138,85 @@ void shut_down() {
     std::exit(0);  // Windows: the new process is running
 }
 
+// Changes the playing profile without restarting the game (the owner's
+// request, 2026-11-10: no menu item relaunches): everything start-up loads
+// for a profile is loaded again, and the game's cartridge save is changed on
+// its own thread (direct_start::request_save_switch). `remove_id`: a profile
+// to delete once its save is no longer in use (deleting the playing one).
+void switch_profile(std::optional<std::string> name, bool guest, const std::string& remove_id = {}) {
+    auto& profiles = *profile_store;
+    save_profile();
+    save_trophies();
+    std::string error;
+    if (!guest && name && !profiles.use(*name, error)) {
+        show_error(error.c_str());
+        return;
+    }
+    if (!guest && !name) name = profiles.active().name;
+    guest_session = guest;
+    tetrisphere::direct_start::set_guest(guest);
+    std::filesystem::path profile_path, eeprom_path;
+    if (!guest) {
+        profile_path = profiles.directory(profiles.active());
+        std::error_code ignored;
+        std::filesystem::create_directories(profile_path, ignored);
+        eeprom_path = profile_path / "cartridge.eep";
+        if (!rotate_backup(eeprom_path, profile_path / "backups", 3, error))
+            std::fprintf(stderr, "Could not back up the save: %s\n", error.c_str());
+    }
+    tetrisphere::direct_start::request_save_switch(eeprom_path);
+    profile_to_remove = remove_id;
+    // BlockPlanet's records and preferences for the profile.
+    profile_save.reset();
+    profile_data = ProfileSaveData{};
+    profile_dirty = false;
+    continue_mode.reset();
+    pending_restore.reset();
+    return_to_menu_chapter.reset();
+    single_stage.reset();
+    if (!guest) {
+        profile_save = std::make_unique<ProfileSave>(profile_path / "save.json");
+        if (!profile_save->load(profile_data, error)) {
+            std::fprintf(stderr, "Could not load the profile: %s\n", error.c_str());
+            profile_data = ProfileSaveData{};
+        }
+    }
+    refresh_continue();
+    if (profile_data.preferences.controls) {
+        apply_controls(active_settings, *profile_data.preferences.controls);
+    } else {
+        apply_controls(active_settings, pc_controls);
+        if (!guest) {
+            profile_data.preferences.controls = pc_controls;
+            profile_dirty = true;
+            save_profile();
+        }
+    }
+    set_controller_bindings(active_settings.bindings);
+    set_magic_control(active_settings.magic);
+    profile_recording = !guest && !start_chapter_given;
+    if (profile_data.preferences.audio) {
+        blockplanet::set_audio_levels(profile_data.preferences.audio->music, profile_data.preferences.audio->effects);
+        blockplanet::set_music_random(profile_data.preferences.audio->random_music);
+    } else {
+        blockplanet::set_audio_levels(100, 100);
+        blockplanet::set_music_random(false);
+    }
+    const auto trophies = profile_path / "trophies.json";
+    switch_trophies(trophy_definitions_path, guest ? nullptr : &trophies);
+    // A new or changed profile starts at the main menu, not where the last
+    // game was started from (it opened Solo after New profile, the owner's
+    // report, 2026-11-11).
+    launch_path.clear();
+    launch_place.clear();
+    profile_picked = true;
+    std::fprintf(stdout, "{\"event\":\"profile_switch\",\"id\":\"%s\",\"guest\":%s}\n",
+                 guest ? "" : profiles.active().id.c_str(), guest ? "true" : "false");
+    std::fflush(stdout);
+    // The main menu opens for the profile (the game's menu check opens it).
+    blockplanet::ui::request_close();
+}
+
 // The profile screens' commands (profile_menu.h). True if `command` was one.
 bool handle_profile_command(const std::string& command) {
     if (!profile_store) return false;
@@ -3054,9 +3237,23 @@ bool handle_profile_command(const std::string& command) {
         blockplanet::ui::request_close();  // the picker opens in its place
         return true;
     }
-    // The original menu has no way back to the title, so the game restarts
-    // (the intro plays again; Start skips it) as the same profile.
-    if (command == "back_to_title") restart_as(std::nullopt, guest_session);
+    // Back from "Who is playing?" (the owner's design, 2026-11-10): to the box
+    // art, over the grid that stays up (Back there plays the launch animation
+    // again); without the box art, to the intro, as at boot. Neither restarts
+    // the game; "Who is playing?" opens again after the title.
+    if (command == "back_to_title") {
+        profile_picked = false;
+        title_seen = false;
+        title_restart_pending = true;
+        blockplanet::ui::request_close();
+        if (tetrisphere::box_art::enabled()) {
+            box_art_returning_since = std::chrono::steady_clock::now();
+            tetrisphere::direct_start::request_title_restart();
+        } else {
+            tetrisphere::direct_start::request_intro_restart();
+        }
+        return true;
+    }
     // Minefield: a size, then the field (one screen per width).
     const auto show_minefield = [&](int focus) {
         blockplanet::ui::set_text("minefield_status", minefield_status(*minefield));
@@ -3150,10 +3347,16 @@ bool handle_profile_command(const std::string& command) {
     if (command == "name_done") {
         std::string name = name_editor.text();
         while (!name.empty() && name.back() == ' ') name.pop_back();
+        // "Guest" is for guest play; a profile already called that keeps it.
+        const auto* renamed = name_editor.target() == "new" ? nullptr : profile_by_id(store, name_editor.target());
+        if (tetrisphere::reserved_profile_name(name) && !(renamed != nullptr && renamed->name == name)) {
+            show_name("That name is for guest play");
+            return true;
+        }
         if (name_editor.target() == "new") {
             if (name.empty()) name = next_profile_name(store);
             if (store.find(name) != nullptr) show_name("That name is taken");
-            else restart_as(name, false);  // --profile creates it
+            else switch_profile(name, false);  // use() creates it
             return true;
         }
         const auto* profile = profile_by_id(store, name_editor.target());
@@ -3258,7 +3461,11 @@ bool handle_profile_command(const std::string& command) {
         return true;
     }
     if (const auto id = argument("profile_play:")) {
-        if (const auto* profile = profile_by_id(store, *id)) restart_as(profile->name, false);
+        if (const auto* profile = profile_by_id(store, *id)) switch_profile(profile->name, false);
+        return true;
+    }
+    if (command == "profile_guest") {
+        switch_profile(std::nullopt, true);
         return true;
     }
     if (command == "profile_guest_button") {
@@ -3267,12 +3474,19 @@ bool handle_profile_command(const std::string& command) {
         else blockplanet::ui::send_command(action);
         return true;
     }
-    if (command == "profile_guest") restart_as(std::nullopt, true);
     if (const auto id = argument("profile_delete_confirmed:")) {
         const auto* profile = profile_by_id(store, *id);
         if (profile == nullptr) return true;
-        // The playing profile's folder is in use until the game stops.
-        if (!guest_session && profile->id == store.active().id) restart_as(std::nullopt, false, *id);
+        // The playing profile: change to another (the next in the list, or
+        // a guest) first; it is removed once its save is no longer in use.
+        if (!guest_session && profile->id == store.active().id) {
+            const Profile* other = nullptr;
+            for (const auto& candidate : store.profiles())
+                if (candidate.id != profile->id) { other = &candidate; break; }
+            if (other != nullptr) switch_profile(other->name, false, *id);
+            else switch_profile(std::nullopt, true, *id);
+            return true;
+        }
         std::string error;
         const std::string name = profile->name;
         if (!store.remove(name, error)) std::fprintf(stderr, "Could not delete the profile: %s\n", error.c_str());
@@ -3574,6 +3788,7 @@ bool handle_profile_command(const std::string& command) {
             if (handle_audio_setting(*command)) continue;
             if (handle_hud_setting(*command)) continue;
             if (handle_text_setting(*command)) continue;
+            if (handle_sky_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
             if (*command == "audio_screen") {
@@ -3629,6 +3844,15 @@ bool handle_profile_command(const std::string& command) {
                                                          : mode == 5 ? "Hide & Seek" : mode == 6 ? "VS" : "Lines");
                 blockplanet::ui::set_text("howto_body", how_to_play(mode));
                 blockplanet::ui::request_show("howto");
+                continue;
+            }
+            if (command->rfind("end_choose:", 0) == 0) {
+                // The end screen: the game's row for that item. Exit goes back
+                // to the menus the game was started from, as Quit to menu does.
+                const int row = std::atoi(command->c_str() + 11);
+                if (row == end_menu.exit_row())
+                    end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = true;
+                end_menu.choose(row, std::chrono::steady_clock::now());
                 continue;
             }
             if (*command == "pause_resume" || *command == "pause_skip" || *command == "pause_quit") {
@@ -3705,7 +3929,7 @@ bool handle_profile_command(const std::string& command) {
                 auto& records = profile_data.progress.episode_records;
                 const auto& times = records["puzzle"][0].best_levels;
                 const auto& moves = records["puzzle_moves"][0].best_levels;
-                blockplanet::ui::set_text("stages_title", "Puzzles");
+                blockplanet::ui::set_text("stages_title", stages_title_now = "Puzzles");
                 blockplanet::ui::set_text("stages_subtitle", "Choose a puzzle");
                 blockplanet::ui::set_list("stages", puzzle_list(profile_data.progress.puzzles_solved, times, moves));
                 blockplanet::ui::request_show("stages");
@@ -3752,11 +3976,46 @@ bool handle_profile_command(const std::string& command) {
                 if (const auto m = profile_data.progress.episode_records.find(variant_records(menu_variant)); m != profile_data.progress.episode_records.end())
                     if (const auto c = m->second.find(chapter); c != m->second.end()) best = c->second.best_levels;
                 if (menu_variant == PlayVariant::ScoreAttack) best.clear();  // points, not times: not shown as times
-                blockplanet::ui::set_text("stages_title", "Chapter " + std::to_string(chapter));
+                blockplanet::ui::set_text("stages_title", stages_title_now = "Chapter " + std::to_string(chapter));
                 blockplanet::ui::set_text("stages_subtitle", "The whole episode, or one stage");
                 blockplanet::ui::set_list("stages", story_stages(chapter, done, best, 10, unlock_all_testing));
                 launch_stages_chapter = chapter;
                 if (!command->ends_with(":refresh")) blockplanet::ui::request_show("stages");
+                continue;
+            }
+            if (*command == "sky_test_stage") {
+                // Options > Sky test > Play test stage: Story 1:1 on its own,
+                // as Casual (no game over, no trophies), with the brick sky
+                // on for this run only; the profile is put back afterwards
+                // and nothing is saved meanwhile. Quit (or the stage's end)
+                // returns to the Sky test.
+                if (game_option_applier && !sky_test_profile) {
+                    // Trophy stats from earlier play are written now, so
+                    // nothing from before is saved during the run (the
+                    // periodic save would otherwise write them then).
+                    save_trophies();
+                    sky_test_profile = profile_data;
+                    sky_test_seen_play = false;
+                    sky_test_variants[0] = int(play_variant);
+                    sky_test_variants[1] = int(menu_variant);
+                    tetrisphere::brick_sky::set_test_run(true);
+                    continue_mode.reset();
+                    single_stage = std::pair{1, 1};
+                    menu_variant = play_variant = PlayVariant::Casual;
+                    single_stage_quit_at.reset();
+                    single_stage_result.reset();
+                    chapter_zero_lesson.clear();
+                    game_option_applier->choose_start(1, 1);
+                    launch_mode(LaunchMode::Rescue);
+                    if (!mode_launcher.active()) {  // refused: nothing started
+                        profile_data = *sky_test_profile;
+                        sky_test_profile.reset();
+                        play_variant = PlayVariant(sky_test_variants[0]);
+                        menu_variant = PlayVariant(sky_test_variants[1]);
+                        tetrisphere::brick_sky::set_test_run(false);
+                        single_stage.reset();
+                    }
+                }
                 continue;
             }
             if (command->rfind("stage:", 0) == 0) {
@@ -3796,6 +4055,41 @@ bool handle_profile_command(const std::string& command) {
             }
             if (const auto mode = launch_mode_for_command(*command)) launch_mode(*mode);
         }
+        // A profile change's cartridge save has been swapped: a profile
+        // deleted while it was playing can go now.
+        if (const auto switched = tetrisphere::direct_start::take_save_switch_result()) {
+            if (!*switched) show_error("Could not load the profile's save.");
+            if (!profile_to_remove.empty() && profile_store) {
+                std::string error;
+                if (const auto* removed = profile_by_id(*profile_store, profile_to_remove)) {
+                    const std::string name = removed->name;
+                    if (!profile_store->remove(name, error))
+                        std::fprintf(stderr, "Could not delete the profile: %s\n", error.c_str());
+                }
+                profile_to_remove.clear();
+            }
+        }
+        if (direct_wait && guest_rdram != nullptr) {
+            if (const auto result = direct_start::take_result()) {
+                const auto mode = direct_wait->mode;
+                direct_wait.reset();
+                if (*result == direct_start::Result::Started) {
+                    std::fprintf(stdout, "{\"event\":\"mode_launch\",\"status\":\"playing\",\"route\":\"direct\"}\n");
+                    std::fflush(stdout);
+                } else {
+                    // Not possible from here: start through the original menus.
+                    const bool accepted = mode_launcher.request(mode, guest_rdram, std::chrono::steady_clock::now());
+                    if (!accepted) loading_active = false;
+                    std::fprintf(stdout, "{\"event\":\"mode_launch\",\"mode\":\"%s\",\"status\":\"%s\",\"route\":\"menus\"}\n",
+                                 launch_mode_name(mode), accepted ? "started" : "refused");
+                    std::fflush(stdout);
+                }
+            } else if (std::chrono::steady_clock::now() - direct_wait->since > std::chrono::seconds(2)) {
+                // The game has not reached its menu loop (the title, the
+                // intro): give up; the result arrives on the next pass.
+                direct_start::cancel();
+            }
+        }
         if (mode_launcher.active() && guest_rdram != nullptr) {
             std::uint16_t press = 0;
             const auto result = mode_launcher.update(const_cast<std::uint8_t*>(guest_rdram),
@@ -3807,12 +4101,12 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
             }
         }
-        if (!mode_launcher.active() && guest_rdram != nullptr) {
+        if (!launching() && guest_rdram != nullptr) {
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
                                                    start_pressed_recently());
-            if (pause.open_menu) {
-                // Where the player is, for the pause screen's subtitle.
+            // Where the player is, for the pause and end screens' subtitles.
+            const auto where_now = [&] {
                 const auto state = read_game_state(guest_rdram);
                 std::string where;
                 switch (state.mode) {
@@ -3825,14 +4119,49 @@ bool handle_profile_command(const std::string& command) {
                 case 9: where = "Lines"; break;
                 default: break;
                 }
-                blockplanet::ui::set_text("pause_where", where);
-                blockplanet::ui::set_list("pause", pause.items);
+                return where;
+            };
+            // "Exit to <place>": where the way out of play goes (the launch
+            // path's last screen; docs/STYLE.md).
+            // From the stage list, its heading, which is what the player sees
+            // there ("Exit to Chapter 2", "Exit to Puzzles"), rather than the
+            // screen's name, Stages.
+            const auto exit_label = [&] {
+                if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + launch_place;
+                return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
+            };
+            if (pause.open_menu) {
+                blockplanet::ui::set_text("pause_where", where_now());
+                auto pause_items = pause.items;
+                for (auto& item : pause_items)
+                    if (item.id == "quit") item.label = exit_label();
+                blockplanet::ui::set_list("pause", pause_items);
                 blockplanet::ui::request_open("pause");
             }
+            // The game's end menus (game over, Versus' end) under BlockPlanet's
+            // panel (the owner's request, 2026-11-10): its items as the game
+            // draws them (its menu text, kept rather than drawn).
+            std::vector<EndMenuBridge::Label> end_labels;
+            for (const auto& t : blockplanet::recent_game_text())
+                if (t.font == 0) end_labels.push_back({t.text, t.y});
+            const auto end = end_menu.update(const_cast<std::uint8_t*>(guest_rdram), end_labels, blockplanet::ui::menus_open(),
+                                             std::chrono::steady_clock::now(), pause_bridge.hide_original());
+            end_menu_active = end.active;
+            if (end.open_menu) {
+                blockplanet::ui::set_text("end_title", end.title);
+                blockplanet::ui::set_text("end_where", where_now());
+                auto end_items = end.items;
+                for (auto& item : end_items)
+                    if (item.id == "exit") item.label = exit_label();
+                blockplanet::ui::set_list("end", end_items);
+                blockplanet::ui::request_open("gameover");
+            }
             // Only in play: back at the game's menu (after Quit), the menus shown are the launch path's.
-            if (pause.close_menu && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
-            launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons) : training_inject.load());
-            blockplanet::set_pause_menu_shown(pause_bridge.hide_original());
+            if ((pause.close_menu || end.close_menu) && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
+            launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons)
+                                   : end.inject ? (0x10000u | end.buttons)
+                                                : training_inject.load());
+            blockplanet::set_pause_menu_shown(pause_bridge.hide_original() || end_menu.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
             update_hud();
             {
@@ -3871,9 +4200,39 @@ bool handle_profile_command(const std::string& command) {
         poll_game_events();
         publish_audio_settings();
         publish_hud_settings();
+        publish_sky_settings();
+        if (const auto frame = picture_frame()) tetrisphere::brick_sky::set_picture_aspect(frame->aspect);
+        // The Sky test's test stage ends once play has been left (Quit, or
+        // the stage's end) and the game is back at its menus: the sky goes
+        // off and the profile is put back as it was.
+        // During the run no trophy stats are counted (Casual turns awards
+        // off at launch; held off here throughout, whatever else changes).
+        if (sky_test_profile) trophy_engine().set_awards_enabled(false);
+        if (sky_test_profile && guest_rdram != nullptr && !mode_launcher.active()) {
+            const bool playing = guest::load16(guest_rdram, 0x800E121C) == -1;
+            sky_test_seen_play = sky_test_seen_play || playing;
+            if (sky_test_seen_play && !playing) {
+                tetrisphere::brick_sky::set_test_run(false);
+                profile_data = *sky_test_profile;
+                sky_test_profile.reset();
+                profile_dirty = false;
+                // Back to the variant the menus had (the run was Casual), and
+                // Casual's no-game-over and trophies as they are for that.
+                play_variant = PlayVariant(sky_test_variants[0]);
+                menu_variant = PlayVariant(sky_test_variants[1]);
+                single_stage.reset();
+                if (game_option_applier) {
+                    const bool casual = play_variant == PlayVariant::Casual;
+                    game_option_applier->set_menu_casual(casual);
+                    trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());
+                }
+                std::fprintf(stdout, "{\"event\":\"sky_test_stage_end\"}\n");
+                std::fflush(stdout);
+            }
+        }
         // Back at the game's menu after leaving play from BlockPlanet: open
         // BlockPlanet's menus (the stage list after a single stage).
-        if (return_to_menu_chapter && !continue_mode && !mode_launcher.active() && guest_rdram != nullptr &&
+        if (return_to_menu_chapter && !continue_mode && !launching() && guest_rdram != nullptr &&
             read_game_state(guest_rdram).scene >= 0) {
             const int chapter = *return_to_menu_chapter;
             return_to_menu_chapter.reset();
@@ -3897,14 +4256,14 @@ bool handle_profile_command(const std::string& command) {
         // A pending launch (after a Chapter 0, or Restart level) starts once
         // the game is back at its menu.
         static auto last_continue_try = std::chrono::steady_clock::time_point{};
-        if (continue_mode && !mode_launcher.active() && guest_rdram != nullptr && game_option_applier &&
+        if (continue_mode && !launching() && guest_rdram != nullptr && game_option_applier &&
             read_game_state(guest_rdram).scene >= 0 &&
             std::chrono::steady_clock::now() - last_continue_try > std::chrono::seconds(1)) {
             last_continue_try = std::chrono::steady_clock::now();
             if (continue_mode->start)
                 game_option_applier->choose_start(continue_mode->start->first, continue_mode->start->second);
             launch_mode(continue_mode->mode, continue_mode->keep_music);
-            if (mode_launcher.active()) continue_mode.reset();
+            if (launching()) continue_mode.reset();
         }
         // BlockPlanet's menus in place of the original's (the owner's choice,
         // 2026-11-08): whenever the game is at its own menus (after the title,
@@ -3915,9 +4274,12 @@ bool handle_profile_command(const std::string& command) {
             static const bool original_menus = std::getenv("BLOCKPLANET_ORIGINAL_MENUS") != nullptr;
             // Only once the title has been shown: before it (the logo
             // animation) the menu row already reads as a menu.
-            static bool title_seen = false;
             const bool title_now = blockplanet_title_recent(nullptr);
-            title_seen = title_seen || title_now;
+            if (title_restart_pending) {
+                if (!title_now) title_restart_pending = false;  // the old title has gone
+            } else {
+                title_seen = title_seen || title_now;
+            }
             if (credits_pending && title_now && guest_rdram != nullptr) {
                 credits_pending = false;
                 guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x800E122E, 0);
@@ -3925,7 +4287,12 @@ bool handle_profile_command(const std::string& command) {
             const bool at_game_menu = guest_rdram != nullptr && title_seen && !title_now &&
                                       guest::load16(guest_rdram, 0x800E121C) >= 0 &&
                                       guest::load16(guest_rdram, 0x800E122E) < 0;  // not in the credits
-            if (!original_menus && at_game_menu && !blockplanet::ui::menus_open() && !mode_launcher.active() &&
+            // Not on the way to the box art's demo, nor during it.
+            // The box art (the game's title) holds for a press: the menus
+            // open only once the game has left its intro and title.
+            const bool box_art_demo = tetrisphere::box_art::phase().load() != tetrisphere::box_art::Phase::None ||
+                                      (tetrisphere::box_art::enabled() && guest::load16(guest_rdram, 0x800E1646) == 0);
+            if (!original_menus && at_game_menu && !box_art_demo && !blockplanet::ui::menus_open() && !launching() &&
                 !continue_mode && !return_to_menu_chapter && guest::load16(guest_rdram, 0x800E1220) < 0) {
                 if (profile_picked && !launch_path.empty()) {
                     // Back from a game (game over, Exit, an episode's end): the menus it started from.
@@ -3938,14 +4305,14 @@ bool handle_profile_command(const std::string& command) {
                 }
             }
             blockplanet::set_game_menu_hidden(!original_menus && at_game_menu &&
-                                              (blockplanet::ui::menus_open() || mode_launcher.active()));
+                                              (blockplanet::ui::menus_open() || launching()));
         }
         // The game's attract demo starts after its menu sits idle; behind
         // BlockPlanet's menus it counts as play and launches were refused
         // (the owner's report). While BlockPlanet's menus are open over the
         // game's menu, its idle counters (frames on the page) are held at 10
         // seconds, past every page's own entrance timing.
-        if (guest_rdram != nullptr && blockplanet::ui::menus_open() && !mode_launcher.active() &&
+        if (guest_rdram != nullptr && blockplanet::ui::menus_open() && !launching() &&
             guest::load16(guest_rdram, 0x800E121C) >= 0) {
             auto* rd = const_cast<std::uint8_t*>(guest_rdram);
             for (const std::uint32_t counter : {0x800E1208u, 0x800E120Cu})
@@ -3953,8 +4320,12 @@ bool handle_profile_command(const std::string& command) {
         }
         // The loading cover: fades in over 0.15 s when a mode starts, stays
         // while the game's menus are pressed through and the stage loads,
-        // and fades out over 0.5 s once play has run for 0.4 s (a pending
-        // Continue or restart keeps it up too). At most 20 seconds.
+        // and fades out over 0.5 s once play has run 0.4 s with the game's
+        // own fade clear (3 s of play at the latest; a pending Continue or
+        // restart keeps it up too). At most 20 seconds. When the menu grid is
+        // up as the mode starts, the grid is the loading screen instead (the
+        // cover's text over it, no dark cover) and flies out once the load is
+        // done (ui_system.h, set_loading).
         {
             static float opacity = 0.0f;
             static std::optional<std::chrono::steady_clock::time_point> playing_since;
@@ -3963,10 +4334,30 @@ bool handle_profile_command(const std::string& command) {
             const float dt = std::min(0.1f, std::chrono::duration<float>(now_l - last).count());
             last = now_l;
             const bool in_play_now = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E121C) == -1;
+            // The game's own fade (0x800E1202: 0 clear, 255 dark) has brought
+            // the stage in: the load is only done once it is clear (the menu
+            // grid, as the loading screen, then reveals the stage itself
+            // rather than a black screen fading in).
+            const bool faded_in = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E1202) == 0;
+            static std::optional<std::chrono::steady_clock::time_point> clear_since;
+            // How long after the fade reads clear the load is done: Story's
+            // stage still fades in for about 1 s after 0x800E1202 reads 0
+            // (recorded 2026-11-09), so the grid holds over it
+            // (BLOCKPLANET_GRID_LOAD_MS, default 1200).
+            static const int settle_ms = [] {
+                const char* text = std::getenv("BLOCKPLANET_GRID_LOAD_MS");
+                return text != nullptr ? std::max(0, std::atoi(text)) : 1200;
+            }();
             if (loading_active) {
-                if (mode_launcher.active() || continue_mode || !in_play_now) playing_since.reset();
+                if (launching() || continue_mode || !in_play_now) playing_since.reset();
                 else if (!playing_since) playing_since = now_l;
-                if ((playing_since && now_l - *playing_since > std::chrono::milliseconds(400)) ||
+                if (!playing_since || !faded_in) clear_since.reset();
+                else if (!clear_since) clear_since = now_l;
+                // Done settle_ms after the fade is clear in play; 4 s into
+                // play in any case (a mode whose fade reads otherwise); 20 s
+                // at most.
+                if ((clear_since && now_l - *clear_since > std::chrono::milliseconds(settle_ms)) ||
+                    (playing_since && now_l - *playing_since > std::chrono::seconds(4)) ||
                     now_l - loading_since > std::chrono::seconds(20))
                     loading_active = false;
             }
@@ -3982,29 +4373,41 @@ bool handle_profile_command(const std::string& command) {
                 muted = false;
                 blockplanet::set_audio_levels(current_audio().music, current_audio().effects);
             }
-            blockplanet::ui::set_loading(loading_title, opacity);
+            blockplanet::ui::set_loading(loading_title, opacity, loading_active);
         }
         // The menu grid (docs/UI.md, Menu grid) over the game's own pause
         // animations, in the pause's colours: from the Start press that
         // pauses (before the game's own fade and tiles show), while paused,
         // and after Resume until the pause row 0x800E1228 clears and a moment
-        // more (BLOCKPLANET_GRID_RESUME_MS, default 450: the game draws dark
-        // for about 0.3 s just after the row clears); and after Quit
-        // until BlockPlanet's menus open again. Measured on the test machine
+        // more (BLOCKPLANET_GRID_RESUME_MS, default 450); and after Quit until
+        // BlockPlanet's menus open again. Measured on the test machine
         // (2026-11-09): after Resume the game's screen fade (0x800E1202, 255
-        // while paused) is clear within about 0.4 s, then its own pause tiles
-        // fly out over the game (0x800DFF08 = 5) for about 1.3 s, and the row
-        // clears when they have gone. BLOCKPLANET_GRID_RESUME=fade leaves
-        // once the fade is clear instead (then 200 ms), for comparison.
+        // while paused) is clear within about 0.4 s, then the game flies its
+        // own pause tiles out over the play field for about 1.3 s before the
+        // row clears, so Resume takes about 2 s (the owner finds it slow).
+        // Research: BLOCKPLANET_GRID_RESUME=fade leaves once the fade is clear
+        // and skips the pause background helper after Resume
+        // (set_pause_exit_hidden); that helper is not where the game's pause
+        // tiles are drawn (recorded 2026-11-10: they still fly out after our
+        // grid), so it waits for the row until they are found.
         {
             static const bool after_row = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME");
                 return text == nullptr || std::string(text) != "fade";
             }();
+            // After Resume, end the game's own pause exit as soon as its
+            // picture has faded in (PauseBridge::finish_resume), so the row
+            // clears about 1.3 s sooner; the grid then leaves 150 ms after.
+            // BLOCKPLANET_RESUME_SKIP=0 lets the exit run its full length.
+            static const bool resume_skip = [] {
+                const char* text = std::getenv("BLOCKPLANET_RESUME_SKIP");
+                return text == nullptr || std::string_view(text) != "0";
+            }();
             static const int resume_ms = [] {
                 const char* text = std::getenv("BLOCKPLANET_GRID_RESUME_MS");
-                return text != nullptr ? std::max(0, std::atoi(text)) : (after_row ? 450 : 200);
+                return text != nullptr ? std::max(0, std::atoi(text)) : resume_skip ? 150 : (after_row ? 450 : 200);
             }();
+            if (resume_skip && guest_rdram != nullptr) pause_bridge.finish_resume(const_cast<std::uint8_t*>(guest_rdram));
             static bool was_paused = false;
             static std::optional<std::chrono::steady_clock::time_point> unpaused_at, start_at;
             static std::int64_t start_seen = last_start_ms.load();
@@ -4021,6 +4424,8 @@ bool handle_profile_command(const std::string& command) {
                 static bool menu_seen = false;
                 if (!paused) menu_seen = false;
                 else if (blockplanet::ui::menus_open()) menu_seen = true;
+                // Resumed: the game's own pause tiles are not drawn as they leave.
+                blockplanet::set_pause_exit_hidden(!after_row && paused && menu_seen && !blockplanet::ui::menus_open());
                 if (paused && menu_seen && !after_row && !blockplanet::ui::menus_open() &&
                     guest::load16(guest_rdram, 0x800E1202) == 0)
                     paused = false;
@@ -4028,7 +4433,7 @@ bool handle_profile_command(const std::string& command) {
                 const auto start_ms = last_start_ms.load();
                 if (start_ms != start_seen) {
                     start_seen = start_ms;
-                    if (playing && !paused && !game_over && !blockplanet::ui::menus_open() && !mode_launcher.active()) start_at = now_g;
+                    if (playing && !paused && !game_over && !blockplanet::ui::menus_open() && !launching()) start_at = now_g;
                 }
             }
             if (paused || (start_at && now_g - *start_at > std::chrono::milliseconds(1200))) start_at.reset();  // paused, or it did not
@@ -4036,11 +4441,28 @@ bool handle_profile_command(const std::string& command) {
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             const auto screen = blockplanet::ui::current_screen();
-            if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm") ||
+            if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm" &&
+                                  screen != "gameover") ||
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
-                grid_quit_at.reset();
-            const bool over_pause = start_at || paused || unpaused_at || grid_quit_at;
-            blockplanet::ui::set_grid_override(over_pause && !mode_launcher.active() ? "pause" : "");
+                grid_quit_at.reset(), grid_quit_red = false;
+            const bool over_pause = start_at || paused || unpaused_at || (grid_quit_at && !grid_quit_red);
+            // The end menus (and Exit from them): red, as the game over screen.
+            const bool over_end = end_menu_active || (grid_quit_at && grid_quit_red);
+            // The box art shows over BlockPlanet's grid (tetrisphere/box_art.h),
+            // which stays up as the title hands over to the menus (half a
+            // second, until they open), on the way back to it from them, and
+            // on the way to the demo, over the game's own menu.
+            const bool box_art = tetrisphere::box_art::showing().load(std::memory_order_relaxed);
+            static std::optional<std::chrono::steady_clock::time_point> box_art_left;
+            if (box_art) box_art_left = now_g, box_art_returning_since.reset();
+            const bool box_art_handover = box_art_left && now_g - *box_art_left < std::chrono::milliseconds(500);
+            const bool box_art_returning = box_art_returning_since && now_g - *box_art_returning_since < std::chrono::seconds(3);
+            const bool to_demo = tetrisphere::box_art::phase().load() == tetrisphere::box_art::Phase::ToDemo;
+            const bool box_art_grid = box_art || box_art_handover || box_art_returning || to_demo;
+            blockplanet::ui::set_grid_override(over_pause && !launching()            ? "pause"
+                                               : over_end && !mode_launcher.active() ? "red"
+                                               : box_art_grid                        ? "blue"
+                                                                                     : "");
         }
         // Research: BLOCKPLANET_HOLD_GAMEOVER=1 holds the fade after a game
         // over (0x800E1202 back to 0 while the end menu fades in), to see

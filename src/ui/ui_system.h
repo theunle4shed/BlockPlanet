@@ -48,7 +48,11 @@ void set_text(const std::string& name, const std::string& text);
 // A full-screen loading cover over everything (0: none, 1: opaque), with the
 // mode being started ("Story · Stage 1:1"), while a mode is started through
 // the game's own menus behind it.
-void set_loading(const std::string& text, float opacity);
+// `wanted`: the load is still under way (the opacity may be fading out). While
+// it is wanted and the menu grid is up, the grid stays as the loading screen
+// (in the colour it had, the cover's text over it, no dark cover), and flies
+// out to reveal the game once it is no longer wanted.
+void set_loading(const std::string& text, float opacity, bool wanted);
 // A small label in the screen's bottom-right corner, always shown (the
 // build's branch and commit); empty hides it.
 void set_build_label(const std::string& text);
@@ -70,6 +74,12 @@ void set_alt_button(const std::string& spec);
 void send_command(const std::string& command);
 // The screen on top, as of the last frame; empty when the menus are closed.
 std::string current_screen();
+// A screen's title (its rml's <title>, in Title Case for item labels: "Main
+// Menu", "Story for Two"); empty when the screen is not known.
+std::string screen_title(const std::string& screen);
+// "Exit to <place>" for the screen a way out returns to ("Exit to Main Menu"
+// when none), or plain "Exit" when its title is not known (docs/STYLE.md).
+std::string exit_to_label(const std::string& screen);
 
 // BlockPlanet's in-game HUD (docs/HUD_DESIGN.md), drawn over the game while
 // no menu is open. Placeholder art until the owner's designs are in.
@@ -166,6 +176,7 @@ struct HudView {
     std::vector<std::string> title_notice;
     std::string title_disclaimer;
     float title_x = 0, title_y = 0, title_w = 0;
+    float title_opacity = 1;  // the copyright lines fading in with the box art's build-up
     // The game's own text, in BlockPlanet's font (the game's strings, placed
     // as the game placed them; fractions of the window, size in window
     // heights). With nothing else set, only these are shown.

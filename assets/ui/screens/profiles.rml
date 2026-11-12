@@ -3,9 +3,10 @@
     <title>Profiles</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body data-grid="blue" class="centred" data-back="command:back_to_title" data-alt2="command:profile_guest_button">
+<body data-grid="blue" class="compact shared" data-back="command:back_to_title" data-alt2="command:profile_guest_button">
     <div id="panel">
-        <div class="title">Profiles</div>
+        <div class="title">Tetrisphere™</div>
+        <div class="version" id="version"></div>
         <div class="subtitle">Who is playing?</div>
         <div class="list" data-list="profiles"></div>
         <div class="hint" data-buttons="new_profile_hint"></div>

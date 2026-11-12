@@ -422,6 +422,15 @@ func = "func_80029938"
 before_vram = 0x800299A0
 text = "blockplanet_audio_frame(rdram, ctx);"
 
+# Direct starts (src/graphics/direct_start_hooks.cpp): where the top-level
+# loop checks whether the title is over (0x800E1646), once a frame outside
+# the attract demo and endings (on the title and in the menus), BlockPlanet
+# starts the mode it asked for without the original menus.
+[[patches.hook]]
+func = "func_80070118"
+before_vram = 0x8007025C
+text = "blockplanet_direct_start(rdram, ctx);"
+
 # Music and effects levels (Options): every call that sets a music player's
 # volume (background music, fades, jingles) or the effects volume is scaled
 # by the player's setting (src/graphics/audio_hooks.cpp).
@@ -478,12 +487,34 @@ func = "func_8002D93C"
 before_vram = 0x8002DEA0
 text = "blockplanet_model_draw_end(rdram, ctx);"
 
+# Research (src/graphics/intro_logo_hooks.cpp): each track the game starts
+# (func_8007F720: a0 track, a1 player), with the logo's and intro's frames
+# (BLOCKPLANET_MUSIC_LOG=1).
+[[patches.hook]]
+func = "func_8007F720"
+text = "blockplanet_music_log(rdram, ctx);"
+
+# The N64 logo opens with "NINTENDO64" already in place: after the scene's
+# keyframe step, before its matrices are built (src/graphics/intro_logo_hooks.cpp).
+[[patches.hook]]
+func = "func_8002D93C"
+before_vram = 0x8002DD80
+text = "blockplanet_logo_scene_stepped(rdram, ctx);"
+
 # Research (src/graphics/pause_draw_hooks.cpp): each object of a LightWave
 # scene (func_800321D4: scene, ?, geometry, object index) can be logged or
 # filtered, to find the models inside a scene (BLOCKPLANET_OBJECT_*).
 [[patches.hook]]
 func = "func_800321D4"
 text = "if (blockplanet_scene_object(rdram, ctx)) return;"
+
+# The scenes' object pass (func_80031A98, a0 the scene): it draws only the
+# objects whose opacity byte (record +0x80) is not 0. The intro's sphere hides
+# bricks a 4:3 camera would not see that way; BlockPlanet can keep them
+# (intro_logo_hooks.cpp, blockplanet_intro_bricks).
+[[patches.hook]]
+func = "func_80031A98"
+text = "blockplanet_intro_bricks(rdram, ctx);"
 
 # Research: first call of candidate scene routines (BLOCKPLANET_FN_PROBE=1).
 [[patches.hook]]
@@ -557,6 +588,15 @@ text = "blockplanet_fn_probe(rdram, ctx, 0x800685FCu);"
 [[patches.hook]]
 func = "func_80070118"
 text = "blockplanet_fn_probe(rdram, ctx, 0x80070118u);"
+
+# The top loop's other attract path (0x800E11F8, func_8005C410), started when
+# 0x800DF728 is set (a scheduler message 4 in func_8002A140, or a callback):
+# with the box art on it is kept from interrupting the box art's own loop
+# (direct_start_hooks.cpp).
+[[patches.hook]]
+func = "func_80070118"
+before_vram = 0x80070180
+text = "blockplanet_attract_guard(rdram, ctx);"
 
 
 # The title (func_800685FC) draws the letters scene (0x800E1670) until its

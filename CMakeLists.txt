@@ -35,6 +35,10 @@ set(N64MODERN_RUNTIME_ROOT "${CMAKE_SOURCE_DIR}/.local/deps/N64ModernRuntime"
 if(MSVC)
     add_compile_options(
         "/experimental:deterministic"
+        # Debug information in every object file (no shared .pdb to lock while
+        # building in parallel), for a .pdb beside the executable so a crash
+        # report's offsets can be named. Code and speed are unchanged.
+        "$<$<COMPILE_LANGUAGE:C,CXX>:/Z7>"
         # Source files are UTF-8: without this, MSVC read BlockPlanet's
         # "\u..." text (icons, the middle dot) in the old code page and the
         # menus showed boxes and gaps on Windows (the owner's report).
@@ -305,14 +309,19 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/sphere_mesh.cpp
     src/graphics/sphere_cell.cpp
     src/graphics/sphere_quadrants.cpp
+    src/graphics/game_over_shell.cpp
     src/graphics/sphere_faces.cpp
     src/graphics/sphere_grid.cpp
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/graphics/pause_draw_hooks.cpp
+    src/graphics/brick_sky.cpp
     src/graphics/magic_hooks.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
+    src/graphics/direct_start_hooks.cpp
+    src/graphics/intro_logo_hooks.cpp
+    src/graphics/box_art_hooks.cpp
     src/platform/game_options.cpp
     assets/trophies/trophies.json
     assets/trophies/developer_records.json
@@ -321,6 +330,9 @@ set(TETRISPHERE_BUILD_INPUTS
     include/tetrisphere/f3d_flat_shade.h
     include/tetrisphere/menu_medal_trace.h
     include/tetrisphere/full_frame_target_height.h
+    include/tetrisphere/intro_cover.h
+    include/tetrisphere/under_layer.h
+    include/tetrisphere/box_art.h
     include/tetrisphere/pause_capture_scene.h
     include/tetrisphere/prompt_atlas.h
     include/tetrisphere/training_prompts.h
@@ -453,14 +465,19 @@ add_executable(tetrisphere_diag
     src/graphics/sphere_mesh.cpp
     src/graphics/sphere_cell.cpp
     src/graphics/sphere_quadrants.cpp
+    src/graphics/game_over_shell.cpp
     src/graphics/sphere_faces.cpp
     src/graphics/sphere_grid.cpp
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
     src/graphics/pause_draw_hooks.cpp
+    src/graphics/brick_sky.cpp
     src/graphics/magic_hooks.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
+    src/graphics/direct_start_hooks.cpp
+    src/graphics/intro_logo_hooks.cpp
+    src/graphics/box_art_hooks.cpp
     src/platform/input_mapping.cpp
     src/platform/close_game_menu.cpp
     src/platform/pc_settings_menu.cpp
@@ -556,6 +573,9 @@ add_executable(run_options_test tests/run_options_test.cpp src/platform/run_opti
 target_include_directories(run_options_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
     "${N64MODERN_RUNTIME}/thirdparty/json")
 add_test(NAME run_options COMMAND run_options_test)
+add_executable(intro_cover_test tests/intro_cover_test.cpp)
+target_include_directories(intro_cover_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+add_test(NAME intro_cover COMMAND intro_cover_test)
 add_executable(mode_launcher_test tests/mode_launcher_test.cpp src/platform/mode_launcher.cpp)
 target_include_directories(mode_launcher_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)
@@ -592,6 +612,14 @@ else()
     target_compile_options(pause_bridge_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME pause_bridge COMMAND pause_bridge_test)
+add_executable(brick_sky_test tests/brick_sky_test.cpp src/graphics/brick_sky.cpp)
+target_include_directories(brick_sky_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(brick_sky_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(brick_sky_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME brick_sky COMMAND brick_sky_test)
 
 add_executable(story_hud_test tests/story_hud_test.cpp src/platform/story_hud.cpp)
 target_include_directories(story_hud_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
@@ -967,10 +995,10 @@ if(TETRISPHERE_GAME_ENABLED)
     set(RT64_COPY_NAMES rt64_application.cpp rt64_state.cpp
         rt64_projection_processor.cpp rt64_framebuffer_renderer.cpp
         rt64_framebuffer_manager.cpp rt64_workload_queue.cpp
-        rt64_interpreter.cpp rt64_rdp.cpp rt64_rsp.cpp rt64_dynamic_libraries.cpp)
+        rt64_interpreter.cpp rt64_rdp.cpp rt64_rsp.cpp rt64_dynamic_libraries.cpp
+        rt64_present_queue.cpp rt64_vi_renderer.cpp)
     if(TETRISPHERE_RT64_PROBE)
         list(APPEND RT64_COPY_ARGS --probe)
-        list(APPEND RT64_COPY_NAMES rt64_present_queue.cpp)
     endif()
     execute_process(
         COMMAND "${Python3_EXECUTABLE}"
@@ -986,7 +1014,8 @@ if(TETRISPHERE_GAME_ENABLED)
     set(RT64_COPY_REPLACED_SOURCES "")
     foreach(RT64_COPY_NAME IN LISTS RT64_COPY_NAMES)
         if(RT64_COPY_NAME STREQUAL "rt64_projection_processor.cpp" OR
-           RT64_COPY_NAME STREQUAL "rt64_framebuffer_renderer.cpp")
+           RT64_COPY_NAME STREQUAL "rt64_framebuffer_renderer.cpp" OR
+           RT64_COPY_NAME STREQUAL "rt64_vi_renderer.cpp")
             set(RT64_COPY_DIRECTORY "render")
         elseif(RT64_COPY_NAME STREQUAL "rt64_dynamic_libraries.cpp")
             set(RT64_COPY_DIRECTORY "common")
@@ -1134,6 +1163,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/sphere_mesh.cpp
         src/graphics/sphere_cell.cpp
         src/graphics/sphere_quadrants.cpp
+        src/graphics/game_over_shell.cpp
         src/graphics/sphere_faces.cpp
         src/graphics/sphere_grid.cpp
         src/graphics/sphere_extended.cpp
@@ -1145,9 +1175,13 @@ if(TETRISPHERE_GAME_ENABLED)
     src/graphics/sphere_extended.cpp
         src/graphics/sphere_hooks.cpp
         src/graphics/pause_draw_hooks.cpp
+        src/graphics/brick_sky.cpp
         src/graphics/magic_hooks.cpp
         src/graphics/title_hooks.cpp
         src/graphics/audio_hooks.cpp
+        src/graphics/direct_start_hooks.cpp
+        src/graphics/intro_logo_hooks.cpp
+        src/graphics/box_art_hooks.cpp
             src/graphics/f3d_flat_shade.cpp
         src/runtime/runtime.cpp
         src/runtime/unsupported.cpp
@@ -1198,6 +1232,43 @@ if(TETRISPHERE_GAME_ENABLED)
                           ${TETRISPHERE_SDL_LIBRARIES})
     # BlockPlanet's menu layer (docs/UI.md).
     include(cmake/BlockPlanetUI.cmake)
+    # The under layer's VI shader (tetrisphere/under_layer.h): a patched copy
+    # of RT64's, written by patch_rt64_probe.py, compiled like RT64's own
+    # (regular and pixel-antialiased) into the RT64 library.
+    function(blockplanet_cover_shader NAME)
+        set(SOURCE "${RT64_COPY_OUTPUT}/VideoInterfaceCoverPS.hlsl")
+        set(OUT "${BLOCKPLANET_UI_SHADER_DIR}/${NAME}.hlsl")
+        add_custom_command(OUTPUT "${OUT}.spv"
+            COMMAND ${BLOCKPLANET_DXC} -spirv -fspv-target-env=vulkan1.0 -fvk-use-dx-layout
+                    "-I${RT64_ROOT}/src" -E PSMain -T ps_6_3 ${ARGN} "${SOURCE}" /Fo "${OUT}.spv"
+            DEPENDS "${SOURCE}")
+        add_custom_command(OUTPUT "${OUT}.spirv.c" "${OUT}.spirv.h"
+            COMMAND file_to_c "${OUT}.spv" ${NAME}BlobSPIRV "${OUT}.spirv.c" "${OUT}.spirv.h"
+            DEPENDS "${OUT}.spv" file_to_c)
+        set(BLOCKPLANET_COVER_OUTPUTS ${BLOCKPLANET_COVER_OUTPUTS} "${OUT}.spirv.c" "${OUT}.spirv.h" PARENT_SCOPE)
+        if(WIN32)
+            add_custom_command(OUTPUT "${OUT}.dxil"
+                COMMAND ${BLOCKPLANET_DXC} -Wno-ignored-attributes "-I${RT64_ROOT}/src" -E PSMain -T ps_6_3 ${ARGN}
+                        "${SOURCE}" /Fo "${OUT}.dxil"
+                DEPENDS "${SOURCE}")
+            add_custom_command(OUTPUT "${OUT}.dxil.c" "${OUT}.dxil.h"
+                COMMAND file_to_c "${OUT}.dxil" ${NAME}BlobDXIL "${OUT}.dxil.c" "${OUT}.dxil.h"
+                DEPENDS "${OUT}.dxil" file_to_c)
+            set(BLOCKPLANET_COVER_OUTPUTS ${BLOCKPLANET_COVER_OUTPUTS} "${OUT}.spirv.c" "${OUT}.spirv.h"
+                "${OUT}.dxil.c" "${OUT}.dxil.h" PARENT_SCOPE)
+        endif()
+    endfunction()
+    set(BLOCKPLANET_COVER_OUTPUTS "")
+    blockplanet_cover_shader(VideoInterfaceCoverPSRegular)
+    blockplanet_cover_shader(VideoInterfaceCoverPSPixel -D PIXEL_ANTIALIASING)
+    # The commands are in this directory and RT64 in its own: a target here
+    # makes them, and RT64 compiles their C arrays once made.
+    add_custom_target(blockplanet_cover_shaders DEPENDS ${BLOCKPLANET_COVER_OUTPUTS})
+    add_dependencies(rt64 blockplanet_cover_shaders)
+    list(FILTER BLOCKPLANET_COVER_OUTPUTS INCLUDE REGEX "\\.c$")
+    set_source_files_properties(${BLOCKPLANET_COVER_OUTPUTS} TARGET_DIRECTORY rt64 PROPERTIES GENERATED TRUE)
+    target_sources(rt64 PRIVATE ${BLOCKPLANET_COVER_OUTPUTS})
+    target_include_directories(rt64 PRIVATE "${BLOCKPLANET_UI_SHADER_DIR}")
     blockplanet_add_ui(tetrisphere-m1)
     add_executable(audio_output_test tests/audio_output_test.cpp
         src/platform/audio_output.cpp)
@@ -1376,6 +1447,9 @@ if(TETRISPHERE_GAME_ENABLED)
                 VERBATIM)
         endforeach()
         target_link_options(tetrisphere-m1 PRIVATE "/DELAYLOAD:dxcompiler.dll")
+        # tetrisphere-m1.pdb beside the executable (crash reports give offsets
+        # into it); the linker keeps its usual Release optimisations.
+        target_link_options(tetrisphere-m1 PRIVATE "/DEBUG:FULL" "/OPT:REF" "/OPT:ICF")
         add_custom_command(TARGET tetrisphere-m1 POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
                 "${RT64_ROOT}/src/contrib/dxc/bin/x64/dxcompiler.dll"

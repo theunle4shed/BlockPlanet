@@ -18,6 +18,7 @@ std::unique_ptr<TrophyStore> store;
 std::mutex save_mutex;
 std::atomic<bool> ready{false};
 std::atomic<bool> dirty{false};
+bool sink_added = false;
 
 // Reports unlocks on stdout and in the diagnostics file. The future on-screen
 // notification and launcher integrations are further sinks.
@@ -63,7 +64,8 @@ void initialize_trophies(const std::filesystem::path& definitions,
         return;
     }
     engine.set_progress(std::move(progress));
-    engine.add_sink(&log_sink);
+    if (!sink_added) engine.add_sink(&log_sink);
+    sink_added = true;
     ready = true;
     std::fprintf(stdout, "{\"event\":\"trophies_ready\",\"trophies\":%zu,\"unlocked\":%zu}\n",
                  engine.definitions().size(), engine.progress().unlocked.size());
@@ -90,5 +92,18 @@ void save_trophies() {
 }
 
 void add_trophy_sink(TrophySink* sink) { engine.add_sink(sink); }
+
+void switch_trophies(const std::filesystem::path& definitions, const std::filesystem::path* progress_path) {
+    save_trophies();
+    {
+        const std::lock_guard lock(save_mutex);
+        ready = false;
+        dirty = false;
+        store.reset();
+        engine.set_progress(TrophyProgress{});
+    }
+    if (progress_path == nullptr) return;  // a guest
+    initialize_trophies(definitions, *progress_path);
+}
 
 } // namespace tetrisphere

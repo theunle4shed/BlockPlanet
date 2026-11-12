@@ -2,6 +2,8 @@
 
 #include "tetrisphere/guest_memory.h"
 
+#include <algorithm>
+
 namespace tetrisphere {
 namespace {
 
@@ -45,18 +47,18 @@ std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_t
     std::vector<blockplanet::ui::ListItem> items{{"resume", "Resume", "", "command:pause_resume", true, 1, true}};
     if (can_restart(game_mode, training_type))
         items.push_back(restarts_chapter(game_mode)
-            ? blockplanet::ui::ListItem{"restart", "Restart chapter", "", "command:pause_restart_chapter", true}
-            : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart lesson" : "Restart level", "",
+            ? blockplanet::ui::ListItem{"restart", "Restart Chapter", "", "command:pause_restart_chapter", true}
+            : blockplanet::ui::ListItem{"restart", game_mode == 3 ? "Restart Lesson" : "Restart Level", "",
                                         "command:pause_restart", true});
     // The game's SKIP jumps to the lesson's "skip to" text (0x8013D25C, from
     // the lesson record); a lesson without one (Basics) has nowhere to go and
     // play stops, so Skip is only offered when there is somewhere to skip to.
-    if (game_mode == training && can_skip) items.push_back({"skip", "Skip lesson", "", "command:pause_skip", true});
+    if (game_mode == training && can_skip) items.push_back({"skip", "Skip Lesson", "", "command:pause_skip", true});
     // A short guide to the mode (BlockPlanet's own words), to read.
     if (game_mode == 1 || game_mode == 4 || game_mode == 5 || game_mode == 6 || game_mode == 9)
         items.push_back({"howto", "How to Play", "", "command:pause_howto", true});
     items.push_back({"options", "Options", "", "open:options", true});
-    items.push_back({"quit", "Quit to menu", "", "command:pause_quit", true});
+    items.push_back({"quit", "Exit", "", "command:pause_quit", true});  // "Exit to <place>" (linux_main)
     // Icons (Lucide, the menus' icon font): play, restart, skip, help, settings, leave.
     for (auto& item : items)
         item.icon = item.id == "resume" ? "\uE140" : item.id == "restart" ? "\uE14C" : item.id == "skip" ? "\uE164"
@@ -67,6 +69,21 @@ std::vector<blockplanet::ui::ListItem> pause_items(int game_mode, int training_t
 void PauseBridge::choose(Choice choice, Clock::time_point now) {
     choice_ = choice;
     since_ = now;
+}
+
+bool PauseBridge::finish_resume(std::uint8_t* rdram) {
+    if (!choice_ || *choice_ != Choice::Resume) return false;
+    if (load16(rdram, scene) != -1 || load16(rdram, pause_row) < 0) return false;
+    if (load16(rdram, 0x800DFF08u) != 5 || load16(rdram, 0x800E1202u) != 0) return false;
+    // The game's pause request flag: while it is set and the row is -1, its
+    // main loop (func_80070118) starts a pause again (found by the parent
+    // session with a write watch, 2026-11-10).
+    store16(rdram, 0x8013FAD0u, 0);
+    store16(rdram, 0x800DFF08u, 0);
+    store16(rdram, pause_row, -1);
+    choice_.reset();
+    showing_ = false;
+    return true;
 }
 
 void PauseBridge::request_pause(Clock::time_point now) {
@@ -127,6 +144,91 @@ PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Cl
         out.buttons = pressing(now - since_) ? button_a : 0;
     }
     return out;
+}
+
+std::vector<blockplanet::ui::ListItem> end_menu_items(const std::vector<EndMenuBridge::Label>& labels, int* exit_row) {
+    // The game's items, top first (its rows), each once.
+    std::vector<EndMenuBridge::Label> seen;
+    for (const auto& l : labels)
+        if ((l.text == "TRY AGAIN" || l.text == "CONTINUE" || l.text == "TRAINING" || l.text == "EXIT") &&
+            std::none_of(seen.begin(), seen.end(), [&](const auto& s) { return s.text == l.text; }))
+            seen.push_back(l);
+    std::stable_sort(seen.begin(), seen.end(), [](const auto& a, const auto& b) { return a.y < b.y; });
+    const auto has = [&](const char* t) { return std::any_of(seen.begin(), seen.end(), [&](const auto& s) { return s.text == t; }); };
+    if (exit_row) *exit_row = -1;
+    if (!has("EXIT") || !(has("TRY AGAIN") || has("CONTINUE"))) return {};
+    std::vector<blockplanet::ui::ListItem> items;
+    for (const char* name : {"TRY AGAIN", "CONTINUE", "TRAINING", "EXIT"}) {
+        const auto it = std::find_if(seen.begin(), seen.end(), [&](const auto& s) { return s.text == name; });
+        if (it == seen.end()) continue;
+        const int row = int(it - seen.begin());
+        const std::string text = name;
+        blockplanet::ui::ListItem item{text == "TRY AGAIN" ? "try_again" : text == "CONTINUE" ? "continue" : text == "TRAINING" ? "training" : "exit",
+                                       text == "TRY AGAIN" ? "Try Again" : text == "CONTINUE" ? "Continue" : text == "TRAINING" ? "Training" : "Exit",
+                                       "", "command:end_choose:" + std::to_string(row), true};
+        // Icons (Lucide, as the pause's): restart, play, help, leave.
+        item.icon = text == "TRY AGAIN" ? "" : text == "CONTINUE" ? "" : text == "TRAINING" ? "" : "";
+        if (text == "EXIT" && exit_row) *exit_row = row;
+        items.push_back(item);
+    }
+    items.front().focus = true;
+    return items;
+}
+
+EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vector<Label>& labels, bool menus_open,
+                                            Clock::time_point now, bool pause_showing) {
+    Output out;
+    const bool playing = load16(rdram, scene) == -1;
+    const std::int16_t row = load16(rdram, pause_row);
+    const bool game_over = load16(rdram, p1_hearts) == -1;
+    const bool versus = load16(rdram, mode) == 6;
+    const bool ended = playing && row >= 0 && (game_over || versus) && !pause_showing;
+    if (!ended) {
+        if (showing_ || choice_) out.close_menu = menus_open && playing;
+        showing_ = false;
+        choice_.reset();
+        items_.clear();
+        return out;
+    }
+    out.active = game_over || showing_ || choice_;
+    if (choice_) {
+        if (now - since_ > std::chrono::seconds(4)) {  // give up; show the panel again
+            choice_.reset();
+            showing_ = false;
+            return out;
+        }
+        out.close_menu = menus_open;
+        store16(rdram, pause_row, static_cast<std::int16_t>(*choice_));
+        out.inject = true;
+        out.buttons = pressing(now - since_) ? button_a : 0;
+        return out;
+    }
+    if (!showing_) {
+        opened_at_ = Clock::time_point{};
+        // Once the game's menu has faded in and its items are drawn.
+        if (load16(rdram, 0x800DFF08u) != 1) return out;
+        auto items = end_menu_items(labels, &exit_row_);
+        if (items.empty()) return out;
+        items_ = std::move(items);
+        title_ = game_over ? "Game Over" : "Match Over";
+        showing_ = true;
+        out.active = true;
+    }
+    // Opening, or closed with Back: the panel stays until a choice (asked
+    // again only after a moment, as the menus take a frame or two to open).
+    if (!menus_open && now - opened_at_ > std::chrono::milliseconds(500)) {
+        opened_at_ = now;
+        out.open_menu = true;
+        out.items = items_;
+        out.title = title_;
+    }
+    return out;
+}
+
+void EndMenuBridge::choose(int row, Clock::time_point now) {
+    if (!showing_) return;
+    choice_ = row;
+    since_ = now;
 }
 
 } // namespace tetrisphere

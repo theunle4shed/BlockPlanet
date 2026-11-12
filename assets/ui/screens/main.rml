@@ -3,7 +3,7 @@
     <title>Main menu</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<body data-grid="blue" class="compact" data-back="command:back_to_profiles">
+<body data-grid="blue" class="compact shared" data-back="command:back_to_profiles">
     <div id="panel">
         <div class="title">Tetrisphere™</div>
         <div class="version" id="version"></div>
@@ -17,7 +17,7 @@
         <div class="item" id="trophies" data-action="command:trophies"><span class="icon"></span>Trophies<span class="note">coming later</span></div>
         <div class="item" id="options" data-action="open:options" data-description="Graphics, sound, controls and more."><span class="icon"></span>Options</div>
         <div class="item" id="credits" data-action="command:credits" data-description="The people who made Tetrisphere."><span class="icon"></span>Credits</div>
-        <div class="item" id="exit" data-action="command:exit"><span class="icon"></span>Exit</div>
+        <div class="item" id="exit" data-action="command:exit"><span class="icon"></span>Exit to Desktop</div>
         <div id="description" class="description"></div>
     </div>
 </body>
