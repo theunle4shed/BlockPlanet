@@ -760,6 +760,11 @@ bool update_label_document() {
     if (label_document == nullptr) {
         label_document = context->LoadDocument(asset("build_label.rml"));
         if (label_document == nullptr) return false;
+    }
+    // The text changes with the settings (linux_main's update_build_label).
+    static std::string shown;
+    if (text != shown) {
+        shown = text;
         if (auto* e = label_document->GetElementById("label")) e->SetInnerRML(escape(text));
     }
     label_document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);

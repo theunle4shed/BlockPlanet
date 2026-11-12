@@ -2404,6 +2404,7 @@ void show_error(const char* message) {
 } // namespace
 
 void publish_menu_settings(const Settings& settings);
+void update_build_label();
 
 extern "C" void tetrisphere_rt64_clear_keyboard_input() {
     SDL_Event focus_lost{};
@@ -2515,9 +2516,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     // the command line said (as it does when the game restarts as a profile).
     profile_picked = run_options.profile.has_value() || run_options.guest;
     credits_pending = run_options.credits;
-#ifdef BLOCKPLANET_BUILD_LABEL
-    if (std::getenv("BLOCKPLANET_HIDE_BUILD_LABEL") == nullptr) blockplanet::ui::set_build_label(BLOCKPLANET_BUILD_LABEL);
-#endif
+    update_build_label();
     // The menus' button hints before any input (menu_input.cpp then follows the device).
     blockplanet::ui::set_button_text("new_profile_hint", "[k:T] New profile\u00A0\u00A0\u00A0[k:G] Play as guest");
     blockplanet::ui::set_button_text("move_back", "[k:Up] [k:Down] Move\u00A0\u00A0\u00A0[k:Esc] Back");
@@ -2735,7 +2734,26 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 }
 
 // Current values for the menus' setting rows (assets/ui/screens/options.rml).
+// The build label (bottom right): the branch and version, then the graphics
+// settings in effect, so a screenshot says how the game was set up (the
+// owner's idea, 2026-11-12). Updated whenever the settings change.
+void update_build_label() {
+#ifdef BLOCKPLANET_BUILD_LABEL
+    if (std::getenv("BLOCKPLANET_HIDE_BUILD_LABEL") != nullptr) return;
+    const auto& g = active_settings.graphics;
+    std::string text = BLOCKPLANET_BUILD_LABEL;
+    text += std::string(" \u00B7 sphere ") + graphics_sphere_name(g.sphere);
+    text += std::string(" \u00B7 resolution ") + graphics_resolution_name(g.resolution);
+    text += std::string(" \u00B7 picture ") + graphics_aspect_name(g.aspect);
+    text += std::string(" \u00B7 refresh ") + graphics_refresh_name(g.refresh);
+    if (const char* msaa = graphics_msaa_name(g.msaa_samples); g.msaa_samples > 0 && msaa) text += std::string(" \u00B7 MSAA ") + msaa;
+    text += std::string(" \u00B7 filter ") + graphics_presentation_filter_name(g.presentation_filter);
+    blockplanet::ui::set_build_label(text);
+#endif
+}
+
 void publish_menu_settings(const Settings& settings) {
+    update_build_label();
     blockplanet::ui::set_setting("sphere", graphics_sphere_name(settings.graphics.sphere));
     blockplanet::ui::set_setting("aspect", settings.graphics.aspect == GraphicsAspect::Fill ? "fill"
                                            : settings.graphics.aspect == GraphicsAspect::Expand16x9 ? "16x9" : "4x3");
