@@ -7,7 +7,9 @@ if not "%~1"=="--from-temp" (
   exit /b
 )
 cd /d "%~2"
-set MAIN=claude/teyrisphere-performance-hqetcp
+set MAIN=main
+rem The old name of main, kept on GitHub for a while: not offered as a branch to try.
+set OLDMAIN=claude/teyrisphere-performance-hqetcp
 :menu
 cls
 for /f "delims=" %%b in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set CURRENT=%%b
@@ -67,7 +69,7 @@ git fetch --prune origin >nul 2>&1
 setlocal enabledelayedexpansion
 set N=0
 for /f "tokens=1-3 delims=|" %%a in ('git for-each-ref --sort^=-committerdate "--format=%%(refname:lstrip=3)|%%(committerdate:relative)|%%(contents:subject)" refs/remotes/origin') do (
-  if not "%%a"=="HEAD" if not "%%a"=="%MAIN%" (
+  if not "%%a"=="HEAD" if not "%%a"=="%MAIN%" if not "%%a"=="%OLDMAIN%" (
     set /a N+=1
     set "B!N!=%%a"
     echo   !N!  %%a   ^(updated %%b^)

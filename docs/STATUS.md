@@ -4,7 +4,7 @@ Where the project stands, for picking up in a new session. Updated 2026-11-06. R
 
 ## Working setup
 
-- Branch `claude/teyrisphere-performance-hqetcp` (repository `theunle4shed/BlockPlanet`, formerly `blockplanet`).
+- Branch `main` (repository `theunle4shed/BlockPlanet`, formerly `blockplanet`; until 2026-11-12 the main work was on `claude/teyrisphere-performance-hqetcp`).
 - Private, not in Git: the ROM (`.local/m0/tetrisphere-us.z64`), the generated code (`.local/m1/linux-generated`) and the build (`.local/m1/build-gcc`). Regenerate after changing hooks in `config/recomp/tetrisphere.us.rev0.toml` (the output directory must not exist yet):
 
   ```

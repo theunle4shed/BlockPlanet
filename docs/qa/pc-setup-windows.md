@@ -17,7 +17,7 @@ Open a **new** PowerShell window afterwards, so the new tools are on PATH.
 cd $HOME
 git clone https://github.com/theunle4shed/BlockPlanet.git
 cd BlockPlanet
-git checkout claude/teyrisphere-performance-hqetcp
+git checkout main
 ```
 
 ## 3. Build from your ROM

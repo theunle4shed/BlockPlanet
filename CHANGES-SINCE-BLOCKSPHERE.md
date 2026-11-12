@@ -405,3 +405,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-10: Game over screen
 
 - The game over menu now matches BlockPlanet's menus (the owner's request). After the 3D GAME OVER animation, red tiles fly in as the game's end menu fades in. BlockPlanet's panel, on the side as the pause's, then shows "Game over" with the stage, and the game's own choices in sentence case with icons: Try again, Training (when offered) and Exit. Versus' end shows Continue and Exit. Choices drive the game's own menu, as the pause does. Exit returns to the menus the game was started from. The game's Wheels and menu text are no longer drawn behind it.
+- Branches tidied (the owner's call): `main` is the main build again (moved up to the work that was on `claude/teyrisphere-performance-hqetcp`), and BlockPlanet.bat builds `main`; the merged branches (minefield-sphere, fan-research, direct-launch) are removed.
