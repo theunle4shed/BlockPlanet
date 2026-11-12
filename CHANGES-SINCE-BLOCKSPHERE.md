@@ -303,4 +303,3 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Minefield on the sphere (test): every cube is a smooth single block (its own texture table, cut from the first tile of its type's sheet) instead of showing the old pieces' 1 × 3 ends, middles and fillers; the purple wall is smooth too. BLOCKPLANET_MINEFIELD_TILE tries the sheet's other tiles.
 - Minefield on the sphere (test): the cubes are single blocks with dark outlines (sheet tile 81), and the cursor's shadow is a single cell (a fixed 1 × 1 piece, shape-table entry 24, held in hand), the owner's idea.
 - Roadmap: modes found in Adventure, Minefield first (a hidden stage on the map unlocks it in Solo).
-- Minefield on the sphere (test): the core is gold (the game's core tiles 18 to 26), the owner's choice.
