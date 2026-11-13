@@ -180,6 +180,8 @@ div { display: block; }
 @keyframes pulse { from { opacity: 1; } to { opacity: 0.55; } }
 #score { display: block; font-size: 40dp; font-weight: bold; }
 #score-best { display: block; font-size: 20dp; color: #c8d0e8; margin-top: 4dp; }
+/* Minefield's end: the way back, in the hints' yellow and larger. */
+#score-best.prompt { font-size: 26dp; color: #e8b818; margin-top: 8dp; }
 .clock-inline { display: none; }
 
 /* Differences against best times: green ahead, red behind. */

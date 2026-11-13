@@ -104,5 +104,10 @@ struct Progress {
 std::optional<Progress> progress();
 // After a win or loss, drop asks to go back to the menu: true once per ask.
 bool take_exit_request();
+// New Field (the pause menu): the field stays armed through the restart that
+// follows, so the same arena starts again with a new field.
+void again();
+// The arena being played (when armed), for the pause menu; empty otherwise.
+std::string arena_name();
 
 } // namespace tetrisphere::minefield_sphere

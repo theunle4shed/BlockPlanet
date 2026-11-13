@@ -1234,6 +1234,60 @@ void poll_pokes() {
     std::fflush(stdout);
 }
 
+// Research: BLOCKPLANET_RESEARCH_HOLE=n, n seconds into a Story stage,
+// uncovers an 8 x 8 square of the core round the cursor (every layer of the
+// cells cleared, the core's face shown), as digging down does, to see what
+// the game draws in the core when the friend is reached.
+void research_hole(std::uint8_t* rdram) {
+    static const char* setting = std::getenv("BLOCKPLANET_RESEARCH_HOLE");
+    if (setting == nullptr || rdram == nullptr) return;
+    static auto since = std::chrono::steady_clock::time_point{};
+    static bool done = false;
+    const bool playing = guest::load16(rdram, 0x800E121C) == -1 && guest::load16(rdram, 0x800E44A8) == 1;
+    if (!playing) {
+        since = {};
+        return;
+    }
+    if (since == std::chrono::steady_clock::time_point{}) since = std::chrono::steady_clock::now();
+    // After the hole: the core values round it, every second for 15 seconds.
+    static int logged = 0;
+    static auto last_log = std::chrono::steady_clock::time_point{};
+    static int hx = 0, hy = 0;
+    if (done && logged < 15 && std::chrono::steady_clock::now() - last_log > std::chrono::seconds(1)) {
+        last_log = std::chrono::steady_clock::now();
+        ++logged;
+        const std::uint32_t v = guest::load32(rdram, 0x800E44D0u);
+        std::string rows;
+        for (int dy = -6; dy < 6; ++dy) {
+            for (int dx = -6; dx < 6; ++dx)
+                rows += std::to_string(guest::load16(rdram, v + 2u * std::uint32_t(((hy + dy) & 31) * 32 + ((hx + dx) & 31)))) + ",";
+            rows += "|";
+        }
+        std::fprintf(stdout, "{\"event\":\"research_core\",\"n\":%d,\"level\":%d,\"values\":\"%s\"}\n", logged,
+                     guest::load16(rdram, 0x800E4498), rows.c_str());
+        std::fflush(stdout);
+    }
+    if (done || std::chrono::steady_clock::now() - since < std::chrono::seconds(std::atoi(setting))) return;
+    done = true;
+    hx = 8 + guest::load16(rdram, 0x80110220u + 0x2B2A), hy = 8 + guest::load16(rdram, 0x80110220u + 0x2B2E);
+    const std::uint32_t values = guest::load32(rdram, 0x800E44D0u), masks = guest::load32(rdram, 0x800E44D4u),
+                        entries = guest::load32(rdram, 0x800E44D8u), columns = guest::load32(rdram, 0x800E44DCu);
+    const int cx = 8 + guest::load16(rdram, 0x80110220u + 0x2B2A), cy = 8 + guest::load16(rdram, 0x80110220u + 0x2B2E);
+    for (int dy = -8; dy < 8; ++dy)
+        for (int dx = -8; dx < 8; ++dx) {
+            const int c = ((cy + dy) & 31) * 32 + ((cx + dx) & 31);
+            for (int layer = 1; layer < 9; ++layer) {
+                guest::store16(rdram, values + 2u * std::uint32_t(layer * 1024 + c), 0);
+                guest::store8(rdram, masks + std::uint32_t(layer * 1024 + c), 0);
+                guest::store32(rdram, entries + 4u * std::uint32_t(layer * 1024 + c), 0);
+            }
+            guest::store8(rdram, masks + std::uint32_t(c), 80);
+            guest::store8(rdram, columns + std::uint32_t(c), 0);
+        }
+    std::fprintf(stdout, "{\"event\":\"research_hole\",\"at\":[%d,%d]}\n", cx, cy);
+    std::fflush(stdout);
+}
+
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
     poll_watches();
@@ -1241,6 +1295,7 @@ void poll_game_events() {
     poll_type47_experiment();
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
     tetrisphere::minefield_sphere::poll(const_cast<std::uint8_t*>(guest_rdram));
+    research_hole(const_cast<std::uint8_t*>(guest_rdram));
     const auto state = read_game_state(guest_rdram);
     const auto now = std::chrono::steady_clock::now();
     if (profile_recording && state.scene == -1 && last_play_poll != std::chrono::steady_clock::time_point{}) {
@@ -3839,6 +3894,13 @@ bool handle_profile_command(const std::string& command) {
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
                 continue;
             }
+            if (*command == "minefield_again") {
+                // A new field in the same arena: Casual 1:1 again, kept armed.
+                tetrisphere::minefield_sphere::again();
+                continue_mode = PendingLaunch{LaunchMode::Rescue, std::pair{1, 1}, true};
+                pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
+                continue;
+            }
             if (*command == "pause_restart_chapter") {
                 // Story and Hide & Seek: ask first; Yes restarts the chapter from its first level.
                 blockplanet::ui::set_text("confirm_title", "Restart chapter?");
@@ -4172,6 +4234,17 @@ bool handle_profile_command(const std::string& command) {
                 auto pause_items = pause.items;
                 for (auto& item : pause_items)
                     if (item.id == "quit") item.label = exit_label();
+                // Minefield on the sphere (played in Story's mode): its own
+                // name, New Field in place of Restart Chapter, and no Story
+                // how-to (the owner's report).
+                if (const auto arena = tetrisphere::minefield_sphere::arena_name(); !arena.empty()) {
+                    blockplanet::ui::set_text("pause_where", "Minefield \u00B7 " + arena);
+                    pause_items.erase(std::remove_if(pause_items.begin(), pause_items.end(),
+                                                     [](const auto& item) { return item.id == "howto"; }),
+                                      pause_items.end());
+                    for (auto& item : pause_items)
+                        if (item.id == "restart") item.label = "New Field", item.action = "command:minefield_again";
+                }
                 blockplanet::ui::set_list("pause", pause_items);
                 blockplanet::ui::request_open("pause");
             }

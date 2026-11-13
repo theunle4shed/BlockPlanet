@@ -42,6 +42,7 @@ int field_width = 32, field_height = 32;
 std::vector<bool> field_walls;  // the arena's walls inside the field (Arena::walls)
 int field_arena = 0;
 std::atomic<bool> exit_requested{false};
+std::atomic<bool> again_pending{false};
 // The play time: from the first uncover to the end.
 std::optional<std::chrono::steady_clock::time_point> play_started, play_ended;
 int origin_x = 0, origin_y = 0;  // the board cell of the field's (0, 0)
@@ -379,7 +380,8 @@ void poll(std::uint8_t* rdram) {
         // Left play (Exit, or the game's own screens): the test ends.
         if (active_flag.load()) {
             stop_locked();
-            armed_flag = false;
+            // New Field (the pause menu) keeps it armed for the restart.
+            if (!again_pending.exchange(false)) armed_flag = false;
         }
         return;
     }
@@ -616,6 +618,14 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
 }
 
 bool take_exit_request() { return exit_requested.exchange(false); }
+
+void again() { again_pending = true; }
+
+std::string arena_name() {
+    if (!armed_flag.load()) return {};
+    std::lock_guard lock(mutex);
+    return arenas()[std::size_t(field_arena)].name;
+}
 
 std::optional<Progress> progress() {
     if (!active_flag.load()) return std::nullopt;
