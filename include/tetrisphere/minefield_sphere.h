@@ -102,5 +102,7 @@ struct Progress {
     bool started = false, won = false, lost = false;
 };
 std::optional<Progress> progress();
+// After a win or loss, drop asks to go back to the menu: true once per ask.
+bool take_exit_request();
 
 } // namespace tetrisphere::minefield_sphere

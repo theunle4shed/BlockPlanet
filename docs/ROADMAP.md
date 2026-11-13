@@ -4,6 +4,22 @@ A living plan. Each item lists what it involves, what it depends on, and how big
 
 The longer-term design direction (visual identity, camera, story, modes, junk rules, media player, accessibility) is in [REDESIGN.md](REDESIGN.md). This roadmap covers what to build and in what order.
 
+## Current priorities (the owner's call, 2026-11-13)
+
+**First: the core game.**
+1. **Story**, made right.
+2. **Two players on one PC** (Local).
+3. **The jukebox** (Media Player).
+
+**Alongside Story, as a shared priority:** colour-blind options, themes, accessibility and languages (localisation).
+
+**Back in the queue, together, for later: Bonus modes & Adventure.** Lines, Puzzle and Hide & Seek, Escape, Minefield on the sphere and the owner's other custom modes are to be grouped in one place in the menus, under bonus modes and Adventure (where some are found rather than offered from the start). Until then each stays as it is; fixes only.
+
+**Known items held back:**
+- **The game over shell:** still wrong on the owner's PC (black blocks shown in the sphere's colours); to be replaced with a fresh design, not patched.
+- **Minefield's cosmetics** (lower cubes, the endings' animations): towards the end. For now a win or loss lets the player turn the sphere to see the result, and drop goes back to the menu.
+- **The flat cubes on the owner's PC:** the same graphics difference as the game over shell, probably; looked at with it.
+
 ## How the game is built, and why it matters for these plans
 
 BlockPlanet runs the original game code, recompiled to PC code, inside N64ModernRuntime, with RT64 drawing the graphics. That shapes every item below:
@@ -404,6 +420,8 @@ Decided 2026-11-02. Every mode runs on the same engine (sphere, board, pieces, m
 - One sphere with several cursors (Cooperative): outlines, highlights, the see-through core and the peek camera must allow more than one player.
 
 ## Suggested order
+
+(See "Current priorities" at the top for the order as it stands; this list is the original plan.)
 
 1. Phase 0 measurements, then deferred readback.
 2. Quality/performance modes, the sphere pop-in fix and the jukebox. Visible results early.

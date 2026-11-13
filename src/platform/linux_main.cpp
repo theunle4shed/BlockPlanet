@@ -639,7 +639,9 @@ void update_hud() {
     {
         auto& last = profile_data.progress.last_play;
         const bool in_play = guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E44A8) == 1;
+        // (Minefield on the sphere plays in Casual 1:1 but is not Casual.)
         const bool campaign = story && state.mode == 1 && state.chapter >= 1 && !single_stage &&
+                              !tetrisphere::minefield_sphere::armed() &&
                               (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual);
         if (in_play && guest::load16(guest_rdram, 0x80110220u + 0x2D7E) < 0 && !last.submode.empty()) {
             last = {};
@@ -1104,6 +1106,7 @@ void update_hud() {
                 }
             }
             view.time = hud_time(play->seconds);
+            if (play->won || play->lost) view.score_best = "Drop: back to the menu";
             if (new_best) {
                 view.time_delta = "New best";
                 view.time_ahead = true;
@@ -1272,7 +1275,8 @@ void poll_game_events() {
             chapter_zero_lesson.clear();
         }
         post_game_event(event);
-        if (profile_recording) {
+        // Minefield's games leave no Story or Casual progress behind.
+        if (profile_recording && !tetrisphere::minefield_sphere::armed()) {
             profile_dirty = true;
             if (record_game_event(profile_data.progress, event)) save_profile();  // milestones at once
         }
@@ -4216,6 +4220,10 @@ bool handle_profile_command(const std::string& command) {
             publish_game_text();
             update_training_presses(blockplanet::recent_card_box().has_value());
             // A single stage finished: pause, then quit to the menu.
+            // Minefield's end: drop goes back to the menus, the way a single
+            // stage does.
+            if (tetrisphere::minefield_sphere::take_exit_request() && !single_stage_quitting)
+                single_stage_quit_at = std::chrono::steady_clock::now();
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();
                 single_stage_quitting = true;

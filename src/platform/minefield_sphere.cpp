@@ -41,6 +41,7 @@ std::atomic<int> requested_mines{130};
 int field_width = 32, field_height = 32;
 std::vector<bool> field_walls;  // the arena's walls inside the field (Arena::walls)
 int field_arena = 0;
+std::atomic<bool> exit_requested{false};
 // The play time: from the first uncover to the end.
 std::optional<std::chrono::steady_clock::time_point> play_started, play_ended;
 int origin_x = 0, origin_y = 0;  // the board cell of the field's (0, 0)
@@ -175,6 +176,7 @@ void stop_locked() {
     cursor_cell = cursor_field = -1;
     play_started.reset();
     play_ended.reset();
+    exit_requested = false;
     edges = 0;
     inside_known = false;
     tetrisphere::sphere::set_force_replace(false);
@@ -469,17 +471,26 @@ void poll(std::uint8_t* rdram) {
     // The cursor stays within the field's bounds (it may cross walls): if it
     // got out (the stick, or a press the filter missed), it goes back to its
     // last place inside; then the directions that would leave are blocked.
-    if (in_bounds(cursor_x(rdram), cursor_y(rdram)) < 0 && inside_known) {
+    // After the end the sphere turns freely, to look the result over (the
+    // owner's call), and drop goes back to the menu.
+    const bool ended = field->state() == Minefield::State::Won || field->state() == Minefield::State::Lost;
+    if (!ended && in_bounds(cursor_x(rdram), cursor_y(rdram)) < 0 && inside_known) {
         guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(inside_x - 8));
         guest::store16(rdram, player1 + 0x2B2E, static_cast<std::int16_t>(inside_y - 8));
     }
     const int x = cursor_x(rdram), y = cursor_y(rdram);
     if (in_bounds(x, y) >= 0) inside_x = x, inside_y = y, inside_known = true;
     // Moving right lowers x; up raises y.
-    edges = (in_bounds(x - 1, y) < 0 ? edge_right : 0) | (in_bounds(x + 1, y) < 0 ? edge_left : 0) |
-            (in_bounds(x, y + 1) < 0 ? edge_up : 0) | (in_bounds(x, y - 1) < 0 ? edge_down : 0);
+    edges = ended ? 0
+                  : (in_bounds(x - 1, y) < 0 ? edge_right : 0) | (in_bounds(x + 1, y) < 0 ? edge_left : 0) |
+                        (in_bounds(x, y + 1) < 0 ? edge_up : 0) | (in_bounds(x, y - 1) < 0 ? edge_down : 0);
     const int under_cursor = in_bounds(x, y);  // walls included, for the cursor's colour
     const int here = field_at(x, y);  // -1 on the wall: nothing happens
+    if (ended) {
+        pending_flag = 0;
+        // A second after the end, drop asks to leave (handled by the host).
+        if (pending_open.exchange(0) > 0 && over_frames > 60) exit_requested = true;
+    }
     for (int n = pending_flag.exchange(0); n > 0; --n) field->toggle_flag(here);
     for (int n = pending_open.exchange(0); n > 0; --n) {
         if (here >= 0 && field->open(here)) {
@@ -603,6 +614,8 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
         }
     return out;
 }
+
+bool take_exit_request() { return exit_requested.exchange(false); }
 
 std::optional<Progress> progress() {
     if (!active_flag.load()) return std::nullopt;
