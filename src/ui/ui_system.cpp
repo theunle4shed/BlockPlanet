@@ -969,11 +969,18 @@ bool frame_shown = false;
 bool prepare_frame(plume::RenderCommandList* list, plume::RenderFramebuffer* framebuffer, bool under) {
     if (!renderer || start_failed) return false;
     if (!started) {
-        // Start RmlUi only once a menu (or the grid under the game) is wanted.
+        // Start RmlUi only once a menu (or the grid under the game) is wanted,
+        // or the build label is to be shown (from the intro on, so a
+        // screenshot of it says which build: the owner's request).
+        bool label_wanted;
+        {
+            std::lock_guard loading_lock(loading_mutex);
+            label_wanted = !build_label.empty();
+        }
         std::lock_guard lock(requests_mutex);
         std::lock_guard hud_lock(hud_mutex);
         std::lock_guard grid_lock(grid_override_mutex);
-        if (!under && !hud_wanted && grid_override.empty() &&
+        if (!under && !hud_wanted && !label_wanted && grid_override.empty() &&
             std::none_of(requests.begin(), requests.end(),
                          [](const Request& r) { return std::holds_alternative<OpenRequest>(r) || std::holds_alternative<RestoreRequest>(r); }))
             return false;
