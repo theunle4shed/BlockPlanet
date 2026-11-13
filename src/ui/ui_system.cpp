@@ -718,14 +718,12 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
     // The left panel can be absent (Minefield on the sphere): the right one
     // is placed all the same.
     if (right == nullptr) return;
-    static Rml::Element no_left("div");
     const bool has_left = left != nullptr;
-    if (!has_left) left = &no_left;
     const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width;
     const float cy = (hud.picture_y + hud.picture_h / 2.0f) * height;
     // Sizes from the last layout (the border box).
     const auto size_of = [&](Rml::Element* e) {
-        return e == &no_left ? Rml::Vector2f{0, 0} : e->GetBox().GetSize(Rml::BoxArea::Border);
+        return e == nullptr ? Rml::Vector2f{0, 0} : e->GetBox().GetSize(Rml::BoxArea::Border);
     };
     // Right after the markup is rebuilt the new elements have no size yet:
     // keep the last measured sizes.
@@ -747,8 +745,10 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         const float lx = std::max(margin, std::min(cx - frame + margin, cx - clear - lw));
         const float rx = std::min(width - margin - rw, std::max(cx + frame - margin - rw, cx + clear));
         const float ly = std::clamp(cy - lh / 2.0f, margin, std::max(margin, height - margin - lh));
-        left->SetProperty("left", px(lx));
-        left->SetProperty("top", px(ly));
+        if (has_left) {
+            left->SetProperty("left", px(lx));
+            left->SetProperty("top", px(ly));
+        }
         left_at = {lx, ly};
         if (std::getenv("BLOCKPLANET_HUD_LAYOUT_LOG") != nullptr && logged % 120 == 1)
             std::fprintf(stdout, "{\"event\":\"hud_place\",\"lx\":%g,\"ly\":%g,\"cy\":%g,\"lh\":%g}\n", lx, ly, cy, lh);
@@ -767,12 +767,16 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         const float ly = ry - gap - lh * sl;
         const float lx = std::max(margin, (width - lfull * sl) / 2.0f);
         const float rx = std::max(margin, (width - rfull * sr) / 2.0f);
-        left->SetProperty("transform", "scale(" + std::to_string(sl) + ")");
-        left->SetProperty("transform-origin", "0% 0%");
+        if (has_left) {
+            left->SetProperty("transform", "scale(" + std::to_string(sl) + ")");
+            left->SetProperty("transform-origin", "0% 0%");
+        }
         right->SetProperty("transform", "scale(" + std::to_string(sr) + ")");
         right->SetProperty("transform-origin", "0% 0%");
-        left->SetProperty("left", px(lx));
-        left->SetProperty("top", px(ly));
+        if (has_left) {
+            left->SetProperty("left", px(lx));
+            left->SetProperty("top", px(ly));
+        }
         left_at = {lx, ly};
         hud_left_scale = sl;
         right->SetProperty("left", px(rx));
