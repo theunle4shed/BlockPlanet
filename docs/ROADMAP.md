@@ -18,6 +18,7 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 **Known items held back:**
 - **The game over shell:** still wrong on the owner's PC (black blocks shown in the sphere's colours); to be replaced with a fresh design, not patched.
 - **Minefield's cosmetics** (lower cubes, the endings' animations): towards the end. For now a win or loss shows the result for a moment, then the game's own stage end (the sphere spins away and fades) leads back to the menus; to tidy: a 3D "NICE JOB" letter flying past, the next stage's board seen for a moment.
+- **The game's own 3D Next pieces in BlockPlanet's HUD (final touches):** let the game draw its Next models again and move them onto the panel, as the held magic's model already is; check every screen shape, Training's row and two players.
 - **The flat cubes on the owner's PC:** the same graphics difference as the game over shell, probably; looked at with it.
 
 ## How the game is built, and why it matters for these plans
