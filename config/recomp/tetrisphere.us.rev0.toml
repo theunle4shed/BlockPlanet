@@ -719,3 +719,11 @@ text = "if (blockplanet_draw_filter(rdram, ctx, 0x800382B4u)) return;"
 [[patches.hook]]
 func = "func_8009AB60"
 text = "if (blockplanet_minefield_hide_marker(rdram, ctx)) return;"
+
+# Minefield on the sphere: the view's angles (the copy the drawing reads,
+# +0x2B48/+0x2B4C, set from +0x2B40/+0x2B44 just before) are moved on half a
+# cell, so the cursor's cell is centred instead of the corner where four meet.
+[[patches.hook]]
+func = "func_800CD3B8"
+before_vram = 0x800CE340
+text = "blockplanet_minefield_centre_view(rdram, ctx);"

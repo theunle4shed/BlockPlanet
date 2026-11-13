@@ -551,3 +551,20 @@ std::string counter() {
 extern "C" bool blockplanet_minefield_hide_marker(std::uint8_t*, recomp_context*) {
     return tetrisphere::minefield_sphere::hide_cursor_marker();
 }
+
+// The view centred on the cursor's cell (the owner's report, 2026-11-13): the
+// game eases its angles (+0x2B40, +0x2B44; 256 a cell) to 128 + 256 x the
+// cursor's cell, which puts the corner where four cells meet in the middle of
+// the screen. The copy the drawing reads (+0x2B48, +0x2B4C), made just before
+// this hook in func_800CD3B8, is moved on half a cell (+128: checked against
+// -128 and 0 in play, 2026-11-13). Player 1 only.
+// BLOCKPLANET_MINEFIELD_CENTRE=n tries another offset.
+extern "C" void blockplanet_minefield_centre_view(std::uint8_t* rdram, recomp_context* ctx) {
+    if (!tetrisphere::minefield_sphere::active()) return;
+    const std::uint32_t context = static_cast<std::uint32_t>(tetrisphere::guest::load32(rdram, static_cast<std::uint32_t>(ctx->r19)));
+    if (context != 0x80110220u) return;
+    static const int offset = [] { const char* v = std::getenv("BLOCKPLANET_MINEFIELD_CENTRE"); return v ? std::atoi(v) : 128; }();
+    for (std::uint32_t field : {0x2B48u, 0x2B4Cu})
+        tetrisphere::guest::store32(rdram, context + field,
+                                    tetrisphere::guest::load32(rdram, context + field) + static_cast<std::uint32_t>(offset));
+}

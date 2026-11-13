@@ -412,3 +412,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Main menu: who is playing follows "Main menu" in its yellow line, e.g. "Main menu · Ryan", or "· Guest" (the owner's request).
 - Roadmap: Minefield on the sphere's endings (win and game over animations), its cursor centred on its cell, and its HUD's next steps.
 - Fixed: Puzzle's background stopped short of the bottom of the screen, leaving a band of whatever was there before (purple, black, green) under the sphere (the owner's report). With the game's HUD pictures hidden nothing was drawn that low, and the frame was only refreshed as far down as something was drawn; an invisible rectangle is now drawn there in Puzzle.
+- Minefield on the sphere (test): the cursor's cell is in the middle of the screen; the game's view rests on the corner where four cells meet (where its 2 × 2 pieces centre), so while the field is in play the view is moved on half a cell (the owner's report).

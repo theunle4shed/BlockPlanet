@@ -14,3 +14,4 @@ extern "C" void tetrisphere_ui_span_end(std::uint8_t*, recomp_context*,
 
 // Minefield on the sphere lives in the game only.
 extern "C" bool blockplanet_minefield_hide_marker(std::uint8_t*, recomp_context*) { return false; }
+extern "C" void blockplanet_minefield_centre_view(std::uint8_t*, recomp_context*) {}
