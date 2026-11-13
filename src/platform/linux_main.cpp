@@ -1091,18 +1091,22 @@ void update_hud() {
             auto& record = profile_data.progress.episode_records["minefield"][play->arena];
             const double best = record.best_total;
             // A win that beats the record (or the first) is kept, once.
-            static bool recorded = false;
-            if (!play->won && !play->lost) recorded = false;
+            static bool recorded = false, new_best = false;
+            if (!play->won && !play->lost) recorded = new_best = false;
             if (play->won && !recorded && !guest_session) {
                 recorded = true;
                 if (best <= 0.0 || play->seconds < best) {
                     record.best_total = play->seconds;
                     profile_dirty = true;
                     save_profile();
+                    new_best = true;
                 }
             }
             view.time = hud_time(play->seconds);
-            if (best > 0.0) {
+            if (new_best) {
+                view.time_delta = "New best";
+                view.time_ahead = true;
+            } else if (best > 0.0) {
                 if (play->started) {
                     view.time_delta = hud_delta(play->seconds - best);
                     view.time_ahead = play->seconds <= best;
