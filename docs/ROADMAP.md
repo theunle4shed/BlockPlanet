@@ -17,7 +17,7 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 
 **Known items held back:**
 - **The game over shell:** still wrong on the owner's PC (black blocks shown in the sphere's colours); to be replaced with a fresh design, not patched.
-- **Minefield's cosmetics** (lower cubes, the endings' animations): towards the end. For now a win or loss lets the player turn the sphere to see the result, and drop goes back to the menu.
+- **Minefield's cosmetics** (lower cubes, the endings' animations): towards the end. For now a win or loss shows the result for a moment, then the game's own stage end (the sphere spins away and fades) leads back to the menus; to tidy: a 3D "NICE JOB" letter flying past, the next stage's board seen for a moment.
 - **The flat cubes on the owner's PC:** the same graphics difference as the game over shell, probably; looked at with it.
 
 ## How the game is built, and why it matters for these plans

@@ -1106,7 +1106,6 @@ void update_hud() {
                 }
             }
             view.time = hud_time(play->seconds);
-            if (play->won || play->lost) view.score_best = "Drop: back to the menu";
             if (new_best) {
                 view.time_delta = "New best";
                 view.time_ahead = true;
@@ -3370,7 +3369,10 @@ bool handle_profile_command(const std::string& command) {
         const char* mines = std::getenv("BLOCKPLANET_MINEFIELD_MINES");
         tetrisphere::minefield_sphere::arm(std::atoi(arena->c_str()), mines ? std::atoi(mines) : -1);
         blockplanet::ui::send_command("casual");
-        blockplanet::ui::send_command("chapter:1:1");  // always stage 1:1, whatever Casual's progress
+        // Stage 1:1 on its own: at the field's end the game's own stage end
+        // plays (the sphere pulls away and fades) and the single stage goes
+        // back to the menus (the owner's idea).
+        blockplanet::ui::send_command("stage:1:1");
         return true;
     }
     if (command == "minefield") {
@@ -4293,10 +4295,6 @@ bool handle_profile_command(const std::string& command) {
             publish_game_text();
             update_training_presses(blockplanet::recent_card_box().has_value());
             // A single stage finished: pause, then quit to the menu.
-            // Minefield's end: drop goes back to the menus, the way a single
-            // stage does.
-            if (tetrisphere::minefield_sphere::take_exit_request() && !single_stage_quitting)
-                single_stage_quit_at = std::chrono::steady_clock::now();
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();
                 single_stage_quitting = true;
@@ -4304,7 +4302,8 @@ bool handle_profile_command(const std::string& command) {
             }
             if (single_stage_quitting && pause_bridge.hide_original()) {
                 single_stage_quitting = false;
-                if (single_stage) return_to_menu_chapter = single_stage->first;
+                // (Minefield goes back to its own menu, the launch path's.)
+                if (single_stage && !tetrisphere::minefield_sphere::armed()) return_to_menu_chapter = single_stage->first;
                 single_stage.reset();
                 single_stage_result.reset();
                 pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());

@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <optional>
 #include <random>
@@ -41,7 +42,6 @@ std::atomic<int> requested_mines{130};
 int field_width = 32, field_height = 32;
 std::vector<bool> field_walls;  // the arena's walls inside the field (Arena::walls)
 int field_arena = 0;
-std::atomic<bool> exit_requested{false};
 std::atomic<bool> again_pending{false};
 // The play time: from the first uncover to the end.
 std::optional<std::chrono::steady_clock::time_point> play_started, play_ended;
@@ -177,7 +177,6 @@ void stop_locked() {
     cursor_cell = cursor_field = -1;
     play_started.reset();
     play_ended.reset();
-    exit_requested = false;
     edges = 0;
     inside_known = false;
     tetrisphere::sphere::set_force_replace(false);
@@ -417,7 +416,9 @@ void poll(std::uint8_t* rdram) {
         const std::uint32_t values = guest::load32(rdram, values_pointer);
         bool replaced = false;
         int why_cell = -1, why_value = 0, why_layer = 0;
-        for (int c = 0; c < layer_cells && !replaced; ++c) {
+        // (Not after the end: the game's own drop that ends the stage lands a piece.)
+        const bool ending = field->state() == Minefield::State::Won || field->state() == Minefield::State::Lost;
+        for (int c = 0; c < layer_cells && !replaced && !ending; ++c) {
             const std::int16_t v = guest::load16(rdram, values + 2u * std::uint32_t(layer_cells + c));
             const std::int16_t v2 = guest::load16(rdram, values + 2u * std::uint32_t(2 * layer_cells + c));
             replaced = (v != 0 && v != inert) || v2 != 0;
@@ -467,14 +468,26 @@ void poll(std::uint8_t* rdram) {
     // The drop timer is a float (+0x2408, counting up to the limit at
     // 0x800F116C, 6000) that +0x2B10 (up to 600) is worked out from: both
     // are held at 0, so the game never drops a piece on its own.
-    guest::store32(rdram, player1 + 0x2408, 0);
-    guest::store16(rdram, player1 + 0x2B10, 0);
-    guest::store16(rdram, player1 + 0x23E4, board);
+    // At the end (below), once the board is cleared, the goal drops to a
+    // 4 x 4 square and the timer to just short of its limit: the game's own
+    // drop then lands and its check finds the core uncovered.
+    if (over_frames < 90) {
+        guest::store32(rdram, player1 + 0x2408, 0);
+        guest::store16(rdram, player1 + 0x2B10, 0);
+        guest::store16(rdram, player1 + 0x23E4, board);
+    } else if (over_frames == 90) {
+        guest::store16(rdram, player1 + 0x23E4, 4);
+        float limit = 0.0f;
+        const std::uint32_t bits = guest::load32(rdram, 0x800F116Cu);
+        std::memcpy(&limit, &bits, sizeof limit);
+        const float nearly = std::max(0.0f, limit - 30.0f);
+        std::uint32_t out = 0;
+        std::memcpy(&out, &nearly, sizeof out);
+        guest::store32(rdram, player1 + 0x2408, out);
+    }
     // The cursor stays within the field's bounds (it may cross walls): if it
     // got out (the stick, or a press the filter missed), it goes back to its
     // last place inside; then the directions that would leave are blocked.
-    // After the end the sphere turns freely, to look the result over (the
-    // owner's call), and drop goes back to the menu.
     const bool ended = field->state() == Minefield::State::Won || field->state() == Minefield::State::Lost;
     if (!ended && in_bounds(cursor_x(rdram), cursor_y(rdram)) < 0 && inside_known) {
         guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(inside_x - 8));
@@ -488,11 +501,7 @@ void poll(std::uint8_t* rdram) {
                         (in_bounds(x, y + 1) < 0 ? edge_up : 0) | (in_bounds(x, y - 1) < 0 ? edge_down : 0);
     const int under_cursor = in_bounds(x, y);  // walls included, for the cursor's colour
     const int here = field_at(x, y);  // -1 on the wall: nothing happens
-    if (ended) {
-        pending_flag = 0;
-        // A second after the end, drop asks to leave (handled by the host).
-        if (pending_open.exchange(0) > 0 && over_frames > 60) exit_requested = true;
-    }
+    if (ended) pending_flag = 0, pending_open = 0;
     for (int n = pending_flag.exchange(0); n > 0; --n) field->toggle_flag(here);
     for (int n = pending_open.exchange(0); n > 0; --n) {
         if (here >= 0 && field->open(here)) {
@@ -523,6 +532,16 @@ void poll(std::uint8_t* rdram) {
                            static_cast<std::int16_t>(first_picture_value + cell.count));
             shown_open[std::size_t(c)] = true;
         }
+    }
+    // The end (the owner's idea, 2026-11-13): a second and a half to see the
+    // result, then every cube left on the board goes (mines and walls too).
+    // A board with no cube left is the core uncovered, so the game plays its
+    // own stage end (the sphere pulls away and fades) and, the field being
+    // played as a single stage, goes back to the menus.
+    if (over && over_frames == 90) {
+        for (int c = 0; c < layer_cells; ++c) clear_cell(rdram, c % board, c / board);
+        std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ending\"}\n");
+        std::fflush(stdout);
     }
     // The cursor (the owner's report, 2026-11-12: the game's shadow follows
     // the stage's pieces, so it is hidden and the cell itself shows it): an
@@ -616,8 +635,6 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
         }
     return out;
 }
-
-bool take_exit_request() { return exit_requested.exchange(false); }
 
 void again() { again_pending = true; }
 
