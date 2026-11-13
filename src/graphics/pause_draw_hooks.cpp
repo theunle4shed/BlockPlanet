@@ -27,6 +27,7 @@
 // Recompiled calls do not keep return addresses, so draws are told apart by
 // their arguments.
 
+#include "tetrisphere/guest_memory.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/brick_sky.h"
 #include "tetrisphere/magic_model.h"
@@ -627,7 +628,52 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
 }
 
 extern "C" void blockplanet_hud_begin(std::uint8_t*, recomp_context*) { in_hud = true; }
-extern "C" void blockplanet_hud_end(std::uint8_t*, recomp_context*) { in_hud = false; }
+// Puzzle's bottom band (docs/research/blockplanet-game-state.md): with the
+// original HUD's pictures skipped, Puzzle left the bottom fifth of the screen
+// unrefreshed (whatever was there before stayed: purple, black, green), as if
+// the frame were only refreshed as far down as something was drawn. At the
+// HUD's end, in Puzzle, one fully transparent rectangle is drawn over the
+// bottom of the screen in its place. BLOCKPLANET_PUZZLE_BAND=0 leaves it out.
+extern "C" void blockplanet_hud_end(std::uint8_t* rdram, recomp_context*) {
+    in_hud = false;
+    static const bool off = [] { const char* v = std::getenv("BLOCKPLANET_PUZZLE_BAND"); return v && v[0] == '0'; }();
+    if (off || !hud_hidden.load(std::memory_order_relaxed) || guest16(rdram, 0x800E121Cu) != -1 ||
+        guest16(rdram, 0x800E44A8u) != 4)
+        return;
+    constexpr std::uint32_t cursor = 0x800F22B4u;
+    std::uint32_t dl = guest32(rdram, cursor);
+    if (dl < 0x80000000u || dl >= 0x80800000u) return;
+    const auto put = [&](std::uint32_t w0, std::uint32_t w1) {
+        tetrisphere::guest::store32(rdram, dl, w0);
+        tetrisphere::guest::store32(rdram, dl + 4u, w1);
+        dl += 8u;
+    };
+    // The modes changed, to put back afterwards: the frame's last combine,
+    // render mode, primitive colour and cycle type so far.
+    const std::uint32_t frame_start = guest32(rdram, 0x800F22B8u);
+    std::uint32_t combine[2] = {0, 0}, render[2] = {0, 0}, prim[2] = {0, 0}, cycle = 0;
+    if (frame_start >= 0x80000000u && frame_start < dl && dl - frame_start < 0x20000u)
+        for (std::uint32_t a = frame_start; a < dl; a += 8u) {
+            const std::uint32_t w0 = guest32(rdram, a), w1 = guest32(rdram, a + 4u);
+            if ((w0 >> 24) == 0xFCu) combine[0] = w0, combine[1] = w1;
+            else if (w0 == 0xB900031Du) render[0] = w0, render[1] = w1;
+            else if ((w0 >> 24) == 0xFAu) prim[0] = w0, prim[1] = w1;
+            else if (w0 == 0xBA001402u) cycle = w1;
+        }
+    put(0xE7000000u, 0);                      // G_RDPPIPESYNC
+    put(0xBA001402u, 0);                      // one cycle
+    put(0xFA000000u, 0);                      // primitive colour: black, alpha 0
+    put(0xFCFFFFFFu, 0xFFFDF6FBu);            // combine: the primitive colour and alpha
+    put(0xB900031Du, 0x00504240u);            // render mode: blended by alpha (translucent surface), no depth
+    // G_FILLRECT, screen rows 192 to 239 (10.2 fixed point).
+    put(0xF6000000u | (319u << 14) | (239u << 2), (0u << 14) | (192u << 2));
+    put(0xE7000000u, 0);
+    if (combine[0]) put(combine[0], combine[1]);
+    if (render[0]) put(render[0], render[1]);
+    if (prim[0]) put(prim[0], prim[1]);
+    put(0xBA001402u, cycle);
+    tetrisphere::guest::store32(rdram, cursor, dl);
+}
 
 extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
     // With models kept (the GAME OVER scene), only the HUD routine's own
