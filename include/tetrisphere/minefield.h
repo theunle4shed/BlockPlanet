@@ -70,4 +70,19 @@ private:
     int exploded_ = -1;
 };
 
+// The arenas (the owner's choices, 2026-11-13): Full (the whole 32 x 32
+// sphere, which wraps), Half (16 x 16) and Mini (12 x 12), framed by the
+// purple wall; and shapes on the whole sphere with walls of their own:
+// Crossover, Decompartmental, Bow and Horizon. Each is centred on the cursor's
+// starting cell.
+struct MinefieldArena {
+    const char* name;
+    int width, height;          // the field (the walls inside it below)
+    int mines;
+    std::vector<bool> walls;    // width x height, row by row; empty for none
+};
+const std::vector<MinefieldArena>& minefield_arenas();
+// The board size the arenas are made for (the sphere's, which wraps).
+constexpr int minefield_board = 32;
+
 } // namespace tetrisphere

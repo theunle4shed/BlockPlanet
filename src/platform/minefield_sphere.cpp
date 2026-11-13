@@ -261,42 +261,6 @@ void write_core_digits(std::uint8_t* rdram, int cursor_count) {
 
 } // namespace
 
-const std::vector<Arena>& arenas() {
-    // A shape on the whole sphere from the owner's pictures (1-based row and
-    // column, as drawn), with mines at the Full field's density (130 of 1,024).
-    const auto shape = [](const char* name, auto playable) {
-        Arena a{name, board, board, 0, std::vector<bool>(std::size_t(board * board))};
-        int cells = 0;
-        for (int r = 1; r <= board; ++r)
-            for (int c = 1; c <= board; ++c) {
-                const bool in = playable(r, c);
-                a.walls[std::size_t((r - 1) * board + (c - 1))] = !in;
-                cells += in;
-            }
-        a.mines = (cells * 130 + 512) / 1024;
-        return a;
-    };
-    static const std::vector<Arena> list = [&] {
-        std::vector<Arena> l;
-        l.push_back({"Full", 32, 32, 130, {}});
-        l.push_back({"Half", 16, 16, 32, {}});
-        l.push_back({"Mini", 12, 12, 20, {}});
-        l.push_back(shape("Crossover", [](int r, int c) { return (c >= 12 && c <= 21) || (r >= 12 && r <= 21); }));
-        l.push_back(shape("Decompartmental", [](int r, int c) {
-            if ((r >= 1 && r <= 4) || (r >= 17 && r <= 20)) return false;
-            if (r <= 16) return !((c >= 1 && c <= 4) || (c >= 17 && c <= 20));
-            return !((c >= 9 && c <= 12) || (c >= 25 && c <= 28));
-        }));
-        l.push_back(shape("Bow", [](int r, int c) {
-            return (c >= 13 && c <= 20) || (r >= 13 && r <= 20) || (r >= 9 && r <= 24 && c >= 9 && c <= 24);
-        }));
-        // Rows 11 to 22 walled: the field is one band of 20 rows over the poles.
-        l.push_back(shape("Horizon", [](int r, int) { return r <= 10 || r >= 23; }));
-        return l;
-    }();
-    return list;
-}
-
 void arm(int arena, int mines) {
     std::lock_guard lock(mutex);
     const auto& list = arenas();

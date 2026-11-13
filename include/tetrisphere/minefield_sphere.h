@@ -60,18 +60,9 @@ inline int cube_colour(int board_cell) {
     return board_cell >= 0 && board_cell < 1024 ? cube_colours()[board_cell].load(std::memory_order_relaxed) : 0;
 }
 
-// The arenas (the owner's choices, 2026-11-13): Full (the whole 32 x 32
-// sphere, which wraps), Half (16 x 16) and Mini (12 x 12), framed by the
-// purple wall; and shapes on the whole sphere with walls of their own:
-// Crossover, Decompartmental, Bow and Horizon. Each is centred on the cursor's
-// starting cell.
-struct Arena {
-    const char* name;
-    int width, height;          // the field (the walls inside it below)
-    int mines;
-    std::vector<bool> walls;    // width x height, row by row; empty for none
-};
-const std::vector<Arena>& arenas();
+// The arenas: tetrisphere::minefield_arenas() (minefield.h).
+using Arena = tetrisphere::MinefieldArena;
+inline const std::vector<Arena>& arenas() { return tetrisphere::minefield_arenas(); }
 
 // The next game started becomes arena `arena`'s minefield (the menu's items);
 // `mines` >= 0 sets the count instead (for testing).
