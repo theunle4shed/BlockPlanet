@@ -356,13 +356,20 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
                 magic_in_use = true;
                 use_started = now;
             }
+            // Rescue's friend inside the core is drawn through the same
+            // matrix (the owner's report, 2026-11-13: no friend in the core),
+            // so only the few seconds after a heart is lost, when the skull
+            // shows, are skipped.
+            static Clock::time_point heart_lost{};
+            if (last_hearts >= 0 && hearts < last_hearts) heart_lost = now;
+            const bool skull_time = heart_lost != Clock::time_point{} && now - heart_lost < std::chrono::seconds(4);
             last_held = held;
             last_hearts = hearts;
             const bool quiet = now - last_draw > std::chrono::milliseconds(500) && now - use_started > std::chrono::milliseconds(500);
             if (magic_in_use && (quiet || now - use_started > std::chrono::seconds(20)))
                 magic_in_use = false;
             last_draw = now;
-            if (!magic_in_use && hud_hidden.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
+            if (!magic_in_use && skull_time && hud_hidden.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) == -1 &&
                 guest16(rdram, 0x800E44A8u) == 1 && held < 0)
                 return true;
         }
