@@ -700,16 +700,24 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         left_at = {lx, ly};
         return;
     }
-    if (left == nullptr || right == nullptr) return;
+    // The left panel can be absent (Minefield on the sphere): the right one
+    // is placed all the same.
+    if (right == nullptr) return;
+    static Rml::Element no_left("div");
+    const bool has_left = left != nullptr;
+    if (!has_left) left = &no_left;
     const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width;
     const float cy = (hud.picture_y + hud.picture_h / 2.0f) * height;
     // Sizes from the last layout (the border box).
-    const auto size_of = [](Rml::Element* e) { return e->GetBox().GetSize(Rml::BoxArea::Border); };
+    const auto size_of = [&](Rml::Element* e) {
+        return e == &no_left ? Rml::Vector2f{0, 0} : e->GetBox().GetSize(Rml::BoxArea::Border);
+    };
     // Right after the markup is rebuilt the new elements have no size yet:
     // keep the last measured sizes.
     static Rml::Vector2f last_left{0, 0}, last_right{0, 0};
     auto ls = size_of(left), rs = size_of(right);
-    if (ls.x > 0 && ls.y > 0) last_left = ls; else ls = last_left;
+    if (!has_left) ls = {0, 0};
+    else if (ls.x > 0 && ls.y > 0) last_left = ls; else ls = last_left;
     if (rs.x > 0 && rs.y > 0) last_right = rs; else rs = last_right;
     const float lw = ls.x, lh = ls.y, rw = rs.x, rh = rs.y;
     static int logged = 0;  // research: the measured sizes
@@ -736,7 +744,7 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         // one above the other, each on one line, shrunk to fit the width.
         const float avail = width - 2.0f * margin;
         // The rows' whole width (their box stops at the window's edge).
-        const float lfull = std::max(lw, left->GetScrollWidth()), rfull = std::max(rw, right->GetScrollWidth());
+        const float lfull = has_left ? std::max(lw, left->GetScrollWidth()) : 0.0f, rfull = std::max(rw, right->GetScrollWidth());
         const float sl = lfull > 0.0f ? std::min(1.0f, avail / lfull) : 1.0f;
         const float sr = rfull > 0.0f ? std::min(1.0f, avail / rfull) : 1.0f;
         const float gap = 10.0f * dp;
