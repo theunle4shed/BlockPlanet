@@ -542,7 +542,7 @@ std::string counter() {
     switch (field->state()) {
     case Minefield::State::Won: return "Cleared";
     case Minefield::State::Lost: return "Boom";
-    default: return std::to_string(field->mines() - field->flags());
+    default: return std::to_string(field->flags()) + " / " + std::to_string(field->mines());
     }
 }
 

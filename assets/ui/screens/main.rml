@@ -7,7 +7,7 @@
     <div id="panel">
         <div class="title">Tetrisphere™</div>
         <div class="version" id="version"></div>
-        <div class="subtitle">Main menu</div>
+        <div class="subtitle">Main menu<span data-text="player_line"></span></div>
         <div data-list="continue"></div>
         <div class="item" id="solo" data-action="open:solo" data-description="Play on your own: Story and its modes, Hide &amp; Seek, Puzzle and Lines."><span class="icon"></span>Solo</div>
         <div class="item" id="local" data-action="open:local" data-description="Play with friends on this PC."><span class="icon"></span>Local</div>

@@ -525,6 +525,9 @@ std::string hud_rml_parts(const HudView& hud) {
         for (std::size_t i = 0; i < parts.size(); ++i) rml += (i ? "<div class='rule'><div class='line'/></div>" : "") + parts[i];
         return rml + "</div>";
     }
+    if (!hud.show_left) {
+        // No left panel.
+    } else {
     rml += "<div id='left' class='side'>";
     if (hud.drops_left >= 0) {
         // Puzzle: the moves left, nothing else (no hearts, magic or queue).
@@ -567,6 +570,7 @@ std::string hud_rml_parts(const HudView& hud) {
     rml += "</div>";
     }
     rml += "</div>";
+    }
     }
     rml += "<div id='right' class='side'>";
     // Mode and stage, with the stage's progress bar beneath the stage number.

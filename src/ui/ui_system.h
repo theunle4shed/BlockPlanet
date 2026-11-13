@@ -96,6 +96,7 @@ struct HudView {
     float meter = 0.0f;        // the magic meter, 0 to 1
     std::vector<HudPieceView> next;  // next first
     bool show_next = true;     // Lines has no queue preview
+    bool show_left = true;     // the left panel at all (Minefield on the sphere has none)
     std::string mode;          // e.g. "Rescue"
     std::string stage;         // e.g. "1:3"
     // Puzzle: drops and slides left, shown on the left instead of health,

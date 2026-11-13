@@ -1077,8 +1077,11 @@ void update_hud() {
     // Minefield on the sphere: the panel counts the mines left instead of
     // the time and progress, and each cell's mark is placed as above.
     if (const auto mines = tetrisphere::minefield_sphere::counter(); !mines.empty()) {
+        // Minefield on the sphere: the mines flagged of all of them, and no
+        // left panel (no health, magic or pieces to show; the owner's call).
         view.time_label = "Mines";
         view.time = mines;
+        view.show_left = false;
         view.time_delta.clear();
         view.best.clear();
         view.splits.clear();
@@ -2478,6 +2481,7 @@ void show_error(const char* message) {
 
 void publish_menu_settings(const Settings& settings);
 void update_build_label();
+void update_player_line();
 
 extern "C" void tetrisphere_rt64_clear_keyboard_input() {
     SDL_Event focus_lost{};
@@ -2570,6 +2574,7 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
         show_error(profile_error.c_str());
         std::exit(74);
     }
+    update_player_line();
     profiles.purge_deleted(30);
     const auto profile_path = run_options.guest ? std::filesystem::path{} : profiles.directory(profiles.active());
     std::string eeprom_error;
@@ -3143,6 +3148,16 @@ void shut_down() {
 // for a profile is loaded again, and the game's cartridge save is changed on
 // its own thread (direct_start::request_save_switch). `remove_id`: a profile
 // to delete once its save is no longer in use (deleting the playing one).
+// Who is playing, after "Main menu" in its yellow subtitle (the owner's
+// request, 2026-11-13).
+void update_player_line() {
+    if (!profile_store) return;
+    blockplanet::ui::set_text("player_line", std::string(" \u00B7 ") + (guest_session ? std::string("Guest") : profile_store->active().name));
+}
+
+// A profile just made, waiting for its coin before the game restarts as it.
+std::optional<std::string> new_profile_pending;
+
 void switch_profile(std::optional<std::string> name, bool guest, const std::string& remove_id = {}) {
     auto& profiles = *profile_store;
     save_profile();
@@ -3210,6 +3225,7 @@ void switch_profile(std::optional<std::string> name, bool guest, const std::stri
     launch_path.clear();
     launch_place.clear();
     profile_picked = true;
+    update_player_line();
     std::fprintf(stdout, "{\"event\":\"profile_switch\",\"id\":\"%s\",\"guest\":%s}\n",
                  guest ? "" : profiles.active().id.c_str(), guest ? "true" : "false");
     std::fflush(stdout);
@@ -3355,8 +3371,19 @@ bool handle_profile_command(const std::string& command) {
         }
         if (name_editor.target() == "new") {
             if (name.empty()) name = next_profile_name(store);
-            if (store.find(name) != nullptr) show_name("That name is taken");
-            else switch_profile(name, false);  // use() creates it
+            if (store.find(name) != nullptr) {
+                show_name("That name is taken");
+                return true;
+            }
+            // A new profile chooses its coin before the game restarts as it
+            // (the owner's report: it went straight in without one).
+            std::string error;
+            if (!store.add(name, error)) {
+                show_name("Names are letters, digits and symbols");
+                return true;
+            }
+            new_profile_pending = name;
+            blockplanet::ui::send_command("profile_coin:" + store.find(name)->id);
             return true;
         }
         const auto* profile = profile_by_id(store, name_editor.target());
@@ -3423,6 +3450,12 @@ bool handle_profile_command(const std::string& command) {
         if (!store.set_coin(name, coin == "none" ? "" : coin, error) ||
             !store.set_character(name, character, palette, error))
             std::fprintf(stderr, "Could not set the coin: %s\n", error.c_str());
+        // A new profile: its coin chosen, the game restarts as it.
+        if (new_profile_pending && *new_profile_pending == name) {
+            new_profile_pending.reset();
+            switch_profile(name, false);
+            return true;
+        }
         refresh(id);
         // Back to the profile: from the coin screen, or from its colour step.
         blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
