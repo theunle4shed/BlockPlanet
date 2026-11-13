@@ -111,6 +111,14 @@ Analyze the audio the game outputs (BlockPlanet already receives every PCM buffe
 - **Drive the original backgrounds:** write those levels into the background's animation parameters each frame, if the research finds suitable ones. Original look, music-reactive.
 - **Add new backgrounds:** draw host-side shader backgrounds into the background layer. Fully new visuals, the most freedom, and the basis for user-made visualizers later.
 
+### A SNES version of Minefield on the sphere, with the Super FX 2 (idea, saved for later, 2026-11-13)
+
+The owner's question: could the game be scaled down for the SNES and its Super FX 2 chip? Not as a port: BlockPlanet runs the original N64 game's own code, which cannot go to a SNES, and Tetrisphere itself (name, look, levels) is not ours to remake. But BlockPlanet's own design, **Minefield on the sphere**, could be a new SNES game of its own, written from scratch as a separate project.
+- **What the hardware allows:** the Super FX 2 (21 MHz) draws flat-shaded polygons into a smaller window (as Star Fox 2 and Doom did): about 224 x 160 or less, perhaps 15 to 20 frames a second, a few hundred simple polygons a frame. The visible sphere (about 15 x 15 cells of cubes, 300 to 600 faces) is at that limit, so: flat colours, no textures, simple lighting. A cheaper alternative needs no Super FX at all: the sphere pre-drawn at each turn angle as sprites.
+- **What suits the SNES well:** the rules, the numbers on the core, the menus.
+- **First step:** a proof of concept in an emulator (bsnes, Mesen): a flat-shaded turning sphere of cubes with the Minefield rules, to see whether the frame rate feels right. Then the arenas, flags, the HUD and sound.
+- **Effort:** months, in 65816 assembly plus Super FX code with the SNES homebrew tools. On real hardware it needs a Super FX donor board or a flash cart that supports the chip (such as the FXPak Pro).
+
 ### Another game's stages as backgrounds (idea, saved for later, 2026-11-12)
 
 The owner's idea: if the player owns another N64 game as well, use its stages as backdrops behind the sphere. As now, nothing from either game is committed: BlockPlanet reads the player's own copy at install time. Running both recompiled games in one program is not practical (each expects the whole console: memory, graphics state, timing). Three ways in, best first:
