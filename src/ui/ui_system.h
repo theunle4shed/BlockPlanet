@@ -107,6 +107,8 @@ struct HudView {
     std::string clock;         // Score Attack: the time left, e.g. "4:37" (empty: none)
     bool clock_low = false;    // the last 30 seconds
     std::string score;         // e.g. "12,340" (empty: not shown)
+    std::string score_label;   // the score group's label (empty: "Score")
+    bool show_where = true;    // the mode and stage group (Minefield on the sphere has none)
     // Story: the total score under the time, with the last few points added
     // ("+2,800"), newest first (empty: not shown).
     std::string story_score;

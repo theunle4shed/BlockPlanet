@@ -574,18 +574,31 @@ std::string hud_rml_parts(const HudView& hud) {
     }
     rml += "<div id='right' class='side'>";
     // Mode and stage, with the stage's progress bar beneath the stage number.
+    bool first_group = true;
+    if (hud.show_where) {
     rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'>" +
            escape(hud.stage) + "</div>";
     if (!hud.goal.empty()) rml += "<div class='sublabel'>Goal</div><div id='goal'>" + escape(hud.goal) + "</div>";
     if (hud.progress >= 0.0f)
         rml += "<div class='sublabel'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div>";
     rml += "</div>";
+    first_group = false;
+    }
+    // A rule between groups (none before the first).
+    const auto rule = [&]() -> std::string {
+        if (first_group) {
+            first_group = false;
+            return "";
+        }
+        return "<div class='rule'><div class='line'/></div>";
+    };
     if (!hud.score.empty())
-        rml += "<div class='rule'><div class='line'/></div><div id='score-group' class='group'><div class='label'>Score</div><div id='score'>" +
+        rml += rule() + "<div id='score-group' class='group'><div class='label'>" +
+               escape(hud.score_label.empty() ? std::string("Score") : hud.score_label) + "</div><div id='score'>" +
                digits(escape(hud.score)) + "</div>" + (hud.score_best.empty() ? "" : "<div id='score-best'>" + escape(hud.score_best) + "</div>") +
                "</div>";
     if (!hud.time.empty()) {
-        rml += "<div class='rule'><div class='line'/></div><div id='time-group' class='group'><div class='label'>" +
+        rml += rule() + "<div id='time-group' class='group'><div class='label'>" +
                escape(hud.time_label.empty() ? std::string("Time") : hud.time_label) + "</div><div id='time'>" + digits(escape(hud.time)) + "</div>";
         if (!hud.time_delta.empty())
             rml += std::string("<div id='net' class='") + (hud.time_ahead ? "ahead" : "behind") + "'>" + escape(hud.time_delta) + "</div>";

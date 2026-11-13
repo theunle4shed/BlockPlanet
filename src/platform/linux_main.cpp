@@ -1075,11 +1075,43 @@ void update_hud() {
     if (const auto mines = tetrisphere::minefield_sphere::counter(); !mines.empty()) {
         // Minefield on the sphere: the mines flagged of all of them, and no
         // left panel (no health, magic or pieces to show; the owner's call).
-        view.time_label = "Mines";
-        view.time = mines;
+        // The stage's section is replaced by the mines (as the score) and the
+        // play time against the arena's best (the owner's request).
         view.show_left = false;
+        view.show_where = false;
+        view.score_label = "Mines";
+        view.score = mines;
+        view.score_best.clear();
+        view.time_label = "Time";
+        view.time = "0:00";
         view.time_delta.clear();
         view.best.clear();
+        if (const auto play = tetrisphere::minefield_sphere::progress()) {
+            const auto& arena = tetrisphere::minefield_sphere::arenas()[std::size_t(play->arena)];
+            auto& record = profile_data.progress.episode_records["minefield"][play->arena];
+            const double best = record.best_total;
+            // A win that beats the record (or the first) is kept, once.
+            static bool recorded = false;
+            if (!play->won && !play->lost) recorded = false;
+            if (play->won && !recorded && !guest_session) {
+                recorded = true;
+                if (best <= 0.0 || play->seconds < best) {
+                    record.best_total = play->seconds;
+                    profile_dirty = true;
+                    save_profile();
+                }
+            }
+            view.time = hud_time(play->seconds);
+            if (best > 0.0) {
+                if (play->started) {
+                    view.time_delta = hud_delta(play->seconds - best);
+                    view.time_ahead = play->seconds <= best;
+                }
+                view.best = "Best " + hud_time(best);
+            } else {
+                view.best = std::string(arena.name) + " \u00B7 no best yet";
+            }
+        }
         view.splits.clear();
         view.progress = -1.0f;
         view.story_score.clear();

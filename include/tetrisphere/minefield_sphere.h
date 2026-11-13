@@ -26,6 +26,7 @@
 #include "tetrisphere/minefield.h"
 
 #include <atomic>
+#include <optional>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -92,5 +93,14 @@ std::vector<Mark> marks(const std::uint8_t* rdram);
 // "Cleared" or "Boom"; empty
 // when not active.
 std::string counter();
+// The field being played, for the HUD and records (when active): its arena
+// (arenas() index), the seconds from the first uncover (stopping at the end),
+// and whether it is won or lost.
+struct Progress {
+    int arena = 0;
+    double seconds = 0.0;
+    bool started = false, won = false, lost = false;
+};
+std::optional<Progress> progress();
 
 } // namespace tetrisphere::minefield_sphere

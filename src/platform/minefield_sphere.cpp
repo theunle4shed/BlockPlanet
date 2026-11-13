@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
@@ -39,6 +40,9 @@ std::atomic<bool> active_flag{false};
 std::atomic<int> requested_mines{130};
 int field_width = 32, field_height = 32;
 std::vector<bool> field_walls;  // the arena's walls inside the field (Arena::walls)
+int field_arena = 0;
+// The play time: from the first uncover to the end.
+std::optional<std::chrono::steady_clock::time_point> play_started, play_ended;
 int origin_x = 0, origin_y = 0;  // the board cell of the field's (0, 0)
 std::atomic<int> pending_open{0}, pending_flag{0};
 std::uint16_t last_buttons = 0;
@@ -159,6 +163,8 @@ void stop_locked() {
     tetrisphere::sphere::fill_training_gaps() = true;
     over_frames = 0;
     cursor_cell = cursor_field = -1;
+    play_started.reset();
+    play_ended.reset();
     edges = 0;
     inside_known = false;
     tetrisphere::sphere::set_force_replace(false);
@@ -269,6 +275,7 @@ void arm(int arena, int mines) {
     field_width = a.width;
     field_height = a.height;
     field_walls = a.walls;
+    field_arena = std::clamp(arena, 0, int(list.size()) - 1);
     armed_flag = true;
     stop_locked();
 }
@@ -429,6 +436,7 @@ void poll(std::uint8_t* rdram) {
     for (int n = pending_flag.exchange(0); n > 0; --n) field->toggle_flag(here);
     for (int n = pending_open.exchange(0); n > 0; --n) {
         if (here >= 0 && field->open(here)) {
+            if (!play_started) play_started = std::chrono::steady_clock::now();
             std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"open\":[%d,%d],\"state\":%d}\n", x, y,
                          static_cast<int>(field->state()));
             std::fflush(stdout);
@@ -442,6 +450,7 @@ void poll(std::uint8_t* rdram) {
     // field stops the cursor at its edge; the endings are to be designed.)
     const bool over = field->state() == Minefield::State::Lost || field->state() == Minefield::State::Won;
     if (over) ++over_frames;
+    if (over && !play_ended) play_ended = std::chrono::steady_clock::now();
     const bool clear_rest = field->state() == Minefield::State::Lost && over_frames > 30;
     for (int c = 0; c < field->size(); ++c) {
         const auto& cell = field->cell(c);
@@ -545,6 +554,20 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
             out.push_back(std::move(m));
         }
     return out;
+}
+
+std::optional<Progress> progress() {
+    if (!active_flag.load()) return std::nullopt;
+    std::lock_guard lock(mutex);
+    if (!field) return std::nullopt;
+    Progress p;
+    p.arena = field_arena;
+    p.started = play_started.has_value();
+    if (play_started)
+        p.seconds = std::chrono::duration<double>(play_ended.value_or(std::chrono::steady_clock::now()) - *play_started).count();
+    p.won = field->state() == Minefield::State::Won;
+    p.lost = field->state() == Minefield::State::Lost;
+    return p;
 }
 
 std::string counter() {
