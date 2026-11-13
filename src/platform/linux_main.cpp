@@ -2929,6 +2929,9 @@ void update_build_label() {
     text += std::string(" \u00B7 refresh ") + graphics_refresh_name(g.refresh);
     if (const char* msaa = graphics_msaa_name(g.msaa_samples); g.msaa_samples > 0 && msaa) text += std::string(" \u00B7 MSAA ") + msaa;
     text += std::string(" \u00B7 filter ") + graphics_presentation_filter_name(g.presentation_filter);
+    // Started as "classic" (BlockPlanet.bat's choice 8): the game's own sphere drawing and HUD.
+    if (const char* sphere = std::getenv("BLOCKPLANET_SPHERE"); sphere && std::string(sphere) == "original") text += " \u00B7 classic sphere";
+    if (std::getenv("BLOCKPLANET_ORIGINAL_HUD")) text += " \u00B7 classic HUD";
     blockplanet::ui::set_build_label(text);
 #endif
 }
