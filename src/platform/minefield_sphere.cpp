@@ -38,6 +38,7 @@ std::atomic<bool> armed_flag{false};
 std::atomic<bool> active_flag{false};
 std::atomic<int> requested_mines{130};
 int field_width = 32, field_height = 32;
+std::vector<bool> field_walls;  // the arena's walls inside the field (Arena::walls)
 int origin_x = 0, origin_y = 0;  // the board cell of the field's (0, 0)
 std::atomic<int> pending_open{0}, pending_flag{0};
 std::uint16_t last_buttons = 0;
@@ -61,7 +62,9 @@ int cell_index(int x, int y) { return ((y % board + board) % board) * board + ((
 int field_at(int bx, int by) {
     const int fx = ((bx - origin_x) % board + board) % board, fy = ((by - origin_y) % board + board) % board;
     if (fx >= field_width || fy >= field_height) return -1;
-    return fy * field_width + fx;
+    const int index = fy * field_width + fx;
+    if (!field_walls.empty() && field_walls[std::size_t(index)]) return -1;  // a wall inside the arena
+    return index;
 }
 
 // The board cell under the cursor: the cursor's values (player 1 +0x2B2A,
@@ -258,11 +261,50 @@ void write_core_digits(std::uint8_t* rdram, int cursor_count) {
 
 } // namespace
 
-void arm(int width, int height, int mines) {
+const std::vector<Arena>& arenas() {
+    // A shape on the whole sphere from the owner's pictures (1-based row and
+    // column, as drawn), with mines at the Full field's density (130 of 1,024).
+    const auto shape = [](const char* name, auto playable) {
+        Arena a{name, board, board, 0, std::vector<bool>(std::size_t(board * board))};
+        int cells = 0;
+        for (int r = 1; r <= board; ++r)
+            for (int c = 1; c <= board; ++c) {
+                const bool in = playable(r, c);
+                a.walls[std::size_t((r - 1) * board + (c - 1))] = !in;
+                cells += in;
+            }
+        a.mines = (cells * 130 + 512) / 1024;
+        return a;
+    };
+    static const std::vector<Arena> list = [&] {
+        std::vector<Arena> l;
+        l.push_back({"Full", 32, 32, 130, {}});
+        l.push_back({"Half", 16, 16, 32, {}});
+        l.push_back({"Mini", 12, 12, 20, {}});
+        l.push_back(shape("Crossover", [](int r, int c) { return (c >= 12 && c <= 21) || (r >= 12 && r <= 21); }));
+        l.push_back(shape("Decompartmental", [](int r, int c) {
+            if ((r >= 1 && r <= 4) || (r >= 17 && r <= 20)) return false;
+            if (r <= 16) return !((c >= 1 && c <= 4) || (c >= 17 && c <= 20));
+            return !((c >= 9 && c <= 12) || (c >= 25 && c <= 28));
+        }));
+        l.push_back(shape("Bow", [](int r, int c) {
+            return (c >= 13 && c <= 20) || (r >= 13 && r <= 20) || (r >= 9 && r <= 24 && c >= 9 && c <= 24);
+        }));
+        // Rows 11 to 22 walled: the field is one band of 20 rows over the poles.
+        l.push_back(shape("Horizon", [](int r, int) { return r <= 10 || r >= 23; }));
+        return l;
+    }();
+    return list;
+}
+
+void arm(int arena, int mines) {
     std::lock_guard lock(mutex);
-    requested_mines = mines;
-    field_width = std::clamp(width, 4, board);
-    field_height = std::clamp(height, 4, board);
+    const auto& list = arenas();
+    const auto& a = list[std::size_t(std::clamp(arena, 0, int(list.size()) - 1))];
+    requested_mines = mines >= 0 ? mines : a.mines;
+    field_width = a.width;
+    field_height = a.height;
+    field_walls = a.walls;
     armed_flag = true;
     stop_locked();
 }
@@ -320,7 +362,23 @@ void poll(std::uint8_t* rdram) {
         origin_y = 8 - field_height / 2;
         build_board(rdram);
         field.emplace(field_width, field_height, requested_mines.load(), std::random_device{}(),
-                      field_width == board && field_height == board);
+                      field_width == board && field_height == board, field_walls);
+        // The cursor starts on the field: where the board's centre is a wall
+        // (Decompartmental), on the nearest cell of the field.
+        if (field_at(cursor_x(rdram), cursor_y(rdram)) < 0) {
+            int best = -1, best_distance = 1 << 30;
+            for (int c = 0; c < layer_cells; ++c) {
+                const int bx = c % board, by = c / board;
+                if (field_at(bx, by) < 0) continue;
+                const int dx = std::abs(bx - cursor_x(rdram)), dy = std::abs(by - cursor_y(rdram));
+                const int d = dx * dx + dy * dy;
+                if (d < best_distance) best = c, best_distance = d;
+            }
+            if (best >= 0) {
+                guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(best % board - 8));
+                guest::store16(rdram, player1 + 0x2B2E, static_cast<std::int16_t>(best / board - 8));
+            }
+        }
         shown_open.assign(layer_cells, false);
         built = true;
         active_flag = true;
@@ -416,13 +474,14 @@ void poll(std::uint8_t* rdram) {
     // design): won, every mine is marked green; lost, red, and half a second
     // later every other cube goes. The mines stay as cubes under their marks:
     // a board with no cube left counts as the core opened, and the stage
-    // ends. Then the sphere turns round twice to show where they all were.
+    // ends. (The two turns of the sphere that followed are gone: a smaller
+    // field stops the cursor at its edge; the endings are to be designed.)
     const bool over = field->state() == Minefield::State::Lost || field->state() == Minefield::State::Won;
     if (over) ++over_frames;
     const bool clear_rest = field->state() == Minefield::State::Lost && over_frames > 30;
     for (int c = 0; c < field->size(); ++c) {
         const auto& cell = field->cell(c);
-        const bool clear = cell.open && !cell.mine ? true : clear_rest && !cell.mine;
+        const bool clear = !field->wall(c) && (cell.open && !cell.mine ? true : clear_rest && !cell.mine);
         if (clear && !shown_open[std::size_t(c)]) {
             const int bx = origin_x + c % field_width, by = origin_y + c / field_width;
             clear_cell(rdram, bx, by);
@@ -467,11 +526,6 @@ void poll(std::uint8_t* rdram) {
             cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(colour, std::memory_order_relaxed);
         }
     }
-    // The two turns: the cursor moves a cell every third frame from a second
-    // after the end, 64 cells (two turns of the 32-cell board); the game eases
-    // the sphere after it.
-    if (over && over_frames > 60 && over_frames <= 60 + 64 * 3 && over_frames % 3 == 0)
-        guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(guest::load16(rdram, player1 + 0x2B2A) - 1));
 }
 
 bool hide_cursor_marker() { return active_flag.load(); }
@@ -527,12 +581,6 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
             out.push_back(std::move(m));
         }
     return out;
-}
-
-std::string status() {
-    if (!active_flag.load()) return {};
-    std::lock_guard lock(mutex);
-    return field ? minefield_status(*field) : std::string{};
 }
 
 std::string counter() {

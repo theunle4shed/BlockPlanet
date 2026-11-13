@@ -60,10 +60,22 @@ inline int cube_colour(int board_cell) {
     return board_cell >= 0 && board_cell < 1024 ? cube_colours()[board_cell].load(std::memory_order_relaxed) : 0;
 }
 
-// The next game started becomes the minefield (the menu's test items): a
-// width x height field (up to 32 x 32, the whole board, which wraps), centred
-// on the cursor's starting cell; smaller fields are framed by the purple wall.
-void arm(int width, int height, int mines);
+// The arenas (the owner's choices, 2026-11-13): Full (the whole 32 x 32
+// sphere, which wraps), Half (16 x 16) and Mini (12 x 12), framed by the
+// purple wall; and shapes on the whole sphere with walls of their own:
+// Crossover, Decompartmental, Bow and Horizon. Each is centred on the cursor's
+// starting cell.
+struct Arena {
+    const char* name;
+    int width, height;          // the field (the walls inside it below)
+    int mines;
+    std::vector<bool> walls;    // width x height, row by row; empty for none
+};
+const std::vector<Arena>& arenas();
+
+// The next game started becomes arena `arena`'s minefield (the menu's items);
+// `mines` >= 0 sets the count instead (for testing).
+void arm(int arena, int mines = -1);
 bool armed();
 bool active();
 // Called each frame with player 1's buttons on their way to the game: notes
@@ -85,8 +97,6 @@ struct Mark {
     std::string kind;  // "n1" .. "n8", "flag", "mine", "hit"
 };
 std::vector<Mark> marks(const std::uint8_t* rdram);
-// "N mines left", or the result; empty when not active.
-std::string status();
 // For the HUD's panel: the mines flagged of all of them ("7 / 20"),
 // "Cleared" or "Boom"; empty
 // when not active.

@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <set>
-#include <string>
 
 using namespace tetrisphere;
 
@@ -39,7 +38,6 @@ int main() {
         for (int i = 0; i < field.size(); ++i)
             if (!field.cell(i).mine) field.open(i);
         assert(field.state() == Minefield::State::Won && field.flags() == 10);
-        assert(minefield_status(field) == "Cleared! Every mine found.");
         assert(!field.open(1) && !field.toggle_flag(1));
     }
     {
@@ -50,12 +48,8 @@ int main() {
             if (field.cell(i).mine) mine = i;
         // A flag protects the cell; unflagged, it explodes.
         assert(field.toggle_flag(mine) && field.flags() == 1 && !field.open(mine));
-        assert(minefield_status(field) == "9 mines left");
         assert(field.toggle_flag(mine) && field.flags() == 0);
         assert(field.open(mine) && field.state() == Minefield::State::Lost && field.exploded() == mine);
-        const auto cells = minefield_cells(field);
-        assert(cells.size() == 81 && cells[static_cast<std::size_t>(mine)].classes == "cell mine hit" &&
-               cells[static_cast<std::size_t>(mine)].action.empty());
     }
     // Chording: a number with its mines flagged uncovers the rest around it.
     {
@@ -78,24 +72,22 @@ int main() {
             assert(field.state() != Minefield::State::Lost);
         }
     }
-    // List items: covered cells uncover with A and flag with Alt; numbers show.
-    {
-        Minefield field(9, 9, 10, 11);
-        auto cells = minefield_cells(field, 40);
-        assert(cells[40].focus && cells[0].classes == "cell covered" && cells[0].action == "command:minefield_open:0" &&
-               cells[0].alt == "command:minefield_flag:0" && cells[0].alt_label == "Flag");
-        field.toggle_flag(0);
-        cells = minefield_cells(field);
-        assert(cells[0].classes == "cell flag" && cells[0].alt_label == "Unflag" && !cells[0].icon.empty());
-        field.toggle_flag(0);
-        field.open(40);
-        cells = minefield_cells(field);
-        assert(cells[40].classes == "cell open" && cells[40].label.empty());
-        for (int i = 0; i < field.size(); ++i)
-            if (field.cell(i).open && field.cell(i).count > 0)
-                assert(cells[static_cast<std::size_t>(i)].label == std::to_string(field.cell(i).count) &&
-                       cells[static_cast<std::size_t>(i)].classes == "cell open n" + std::to_string(field.cell(i).count));
+    // Walls: a 9 x 9 field with its middle column walled off. Walls hold no
+    // mines, are nobody's neighbours, cannot be uncovered or flagged, and the
+    // field is won without them.
+    for (std::uint32_t seed = 0; seed < 50; ++seed) {
+        std::vector<bool> walls(81, false);
+        for (int y = 0; y < 9; ++y) walls[std::size_t(y * 9 + 4)] = true;
+        Minefield field(9, 9, 12, seed, false, walls);
+        assert(field.playable() == 72 && field.wall(4) && !field.wall(3));
+        assert(!field.open(4) && !field.toggle_flag(4));
+        assert(field.neighbours(3 + 9 * 4).size() == 5);  // beside the wall: no wall neighbours
+        field.open(9 * 4 + 1);
+        for (int i = 0; i < field.size(); ++i) {
+            assert(!(field.wall(i) && (field.cell(i).mine || field.cell(i).open)));
+            if (!field.wall(i) && !field.cell(i).mine) field.open(i);
+        }
+        assert(field.state() == Minefield::State::Won);
     }
-    assert(minefield_sizes().size() == 3 && minefield_size_choices()[0].action == "command:minefield_start:0");
     return 0;
 }

@@ -232,6 +232,9 @@ Puzzle limits its play area with a border of type 47 blocks (the purple "out of 
 - **Win and game-over animations:** proper endings for both, in place of today's placeholders (mines turn green or red, the other cubes clear, two spins). To design: what happens to the cubes and the core, a fade or flourish, the result shown, and the way back to the menu or a new field.
 - **Cursor centred on its cell:** the camera aims at the corner where four cells meet, so the cursor's cell sits just off centre. Done 2026-11-13: the copy of the angles the drawing reads (+0x2B48/+0x2B4C) is moved on half a cell (128) while the field is in play.
 - **HUD:** no left panel, and the mines shown as flagged / total (done 2026-11-13); the right panel placed beside the sphere on its own (done 2026-11-13).
+- **Arenas (2026-11-13):** Full, Half and Mini, and the shapes Crossover, Decompartmental, Bow and Horizon, until progression is worked out. The endings no longer spin the sphere.
+- **Lower cubes:** the field's cubes are a full layer tall; shorter ones would read better (to research: the layer step the cell setup uses, for layer 1 alone).
+- **HUD (the owner's notes):** the stage name section can go; the play time and the record's ahead/behind in its place.
 - **Flat cubes on the owner's PC:** the cubes show without their outlines there but not on the test machine; not urgent.
 **Escape.** The player and the camera start inside the sphere. No core layer is visible. The player drops blocks onto the underside of the existing blocks. Orphaned blocks can still drop to the core with gravity. Blocks that miss their target cannot stay under the core line: if the player misses, the block dissolves and they lose a life.
 

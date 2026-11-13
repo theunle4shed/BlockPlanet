@@ -1,27 +1,18 @@
 #pragma once
 
 // Minefield: BlockPlanet's own take on the classic hidden-mines puzzle (the
-// owner's idea, 2026-11-11). A grid hides mines; uncovering a cell shows how
-// many of its eight neighbours hold one (a cell with none opens its
-// neighbours too); flags mark the cells the player thinks are mines.
-// Uncovering a mine loses; uncovering every safe cell wins. The first cell
-// uncovered, and its neighbours, never hold a mine.
+// owner's idea, 2026-11-11), played on the sphere (minefield_sphere.h). A
+// grid hides mines; uncovering a cell shows how many of its eight neighbours
+// hold one (a cell with none opens its neighbours too); flags mark the cells
+// the player thinks are mines. Uncovering a mine loses; uncovering every safe
+// cell wins. The first cell uncovered, and its neighbours, never hold a mine.
 //
-// The grid can wrap at its edges (a later version on the sphere, whose board
-// wraps both ways); the flat prototype does not.
-//
-// Menu commands (handled by the game, docs/UI.md):
-//   minefield                  the size choice
-//   minefield_start:N          a new field of size N (minefield_sizes())
-//   minefield_open:I           uncover cell I (on an uncovered number with
-//                              as many flags around it: its other neighbours)
-//   minefield_flag:I           flag or unflag cell I
-//   minefield_again            a new field of the same size
-
-#include "../../src/ui/ui_actions.h"
+// The grid can wrap at its edges (the sphere's board wraps both ways), and
+// can have walls: cells that are not part of the field (they hold no mine,
+// are not anyone's neighbour and cannot be uncovered), which give the field
+// its shape (the owner's arenas: a cross, compartments and others).
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 namespace tetrisphere {
@@ -36,7 +27,8 @@ public:
         int count = 0;  // mines among the neighbours
     };
 
-    Minefield(int width, int height, int mines, std::uint32_t seed, bool wrap = false);
+    // `walls`: width x height, row by row, true for a wall; empty for none.
+    Minefield(int width, int height, int mines, std::uint32_t seed, bool wrap = false, std::vector<bool> walls = {});
 
     int width() const { return width_; }
     int height() const { return height_; }
@@ -44,6 +36,9 @@ public:
     State state() const { return state_; }
     const Cell& cell(int index) const { return cells_[static_cast<std::size_t>(index)]; }
     int size() const { return width_ * height_; }
+    bool wall(int index) const { return !walls_.empty() && walls_[static_cast<std::size_t>(index)]; }
+    // Cells that are part of the field (not walls).
+    int playable() const { return playable_; }
     int flags() const { return flags_; }
     // The mine uncovered that lost the game, or -1.
     int exploded() const { return exploded_; }
@@ -55,6 +50,7 @@ public:
     // Flags or unflags a covered cell while playing.
     bool toggle_flag(int index);
 
+    // A cell's neighbours that are part of the field.
     std::vector<int> neighbours(int index) const;
 
 private:
@@ -65,25 +61,13 @@ private:
     int width_, height_, mines_;
     bool wrap_;
     std::uint32_t seed_;
+    std::vector<bool> walls_;
+    int playable_ = 0;
     State state_ = State::Ready;
     std::vector<Cell> cells_;
     int flags_ = 0;
     int opened_ = 0;
     int exploded_ = -1;
 };
-
-// The sizes offered: name, width, height, mines.
-struct MinefieldSize {
-    const char* label;
-    int width, height, mines;
-};
-const std::vector<MinefieldSize>& minefield_sizes();
-std::vector<blockplanet::ui::ListItem> minefield_size_choices();
-
-// The grid as list items (row by row): covered cells, flags, numbers, mines.
-// `focus` is the cell to focus (when the screen opens).
-std::vector<blockplanet::ui::ListItem> minefield_cells(const Minefield& field, int focus = -1);
-// The line under the title: mines left, or the result.
-std::string minefield_status(const Minefield& field);
 
 } // namespace tetrisphere
