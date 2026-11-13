@@ -9,7 +9,7 @@
         <div class="version" id="version"></div>
         <div class="subtitle">Main menu<span data-text="player_line"></span></div>
         <div data-list="continue"></div>
-        <div class="item" id="solo" data-action="open:solo" data-description="Play on your own: Story and its modes, Hide &amp; Seek, Puzzle and Lines."><span class="icon"></span>Solo</div>
+        <div class="item" id="solo" data-action="open:solo" data-description="Play on your own: Rescue and its modes, Hide &amp; Seek, Puzzle and Lines."><span class="icon"></span>Solo</div>
         <div class="item" id="local" data-action="open:local" data-description="Play with friends on this PC."><span class="icon"></span>Local</div>
         <div class="item" id="online" data-action="open:online" data-description="Play with friends and others over the internet."><span class="icon"></span>Online<span class="note">coming later</span></div>
         <div class="item" id="profiles" data-action="command:profiles" data-description="Choose who is playing, or add a profile."><span class="icon"></span>Profiles</div>

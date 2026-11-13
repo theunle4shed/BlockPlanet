@@ -7,7 +7,7 @@
     <div id="panel">
         <div class="title">Local</div>
         <div class="subtitle">Two players on this PC: a friend or the computer</div>
-        <div class="item" id="story" data-action="open:local_story" data-description="Story's spheres for two: race each other to the core, or work together on one sphere."><span class="icon"></span>Story</div>
+        <div class="item" id="story" data-action="open:local_story" data-description="Rescue's spheres for two: race each other to the core, or work together on one sphere."><span class="icon"></span>Rescue</div>
         <div class="item" id="lines" data-action="open:local_lines" data-description="Lines for two."><span class="icon"></span>Lines<span class="note">coming later</span></div>
         <div class="item" id="custom" data-action="command:multiplayer_custom" data-description="Your own rules for a game with friends."><span class="icon"></span>Custom<span class="note">coming later</span></div>
         <div class="item" id="back" data-action="back">Back</div>

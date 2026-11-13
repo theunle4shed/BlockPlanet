@@ -201,7 +201,7 @@ const char* variant_records(PlayVariant v) {
 }
 const char* variant_title(PlayVariant v) {
     return v == PlayVariant::TimeAttack ? "Time Attack" : v == PlayVariant::ScoreAttack ? "Score Attack"
-           : v == PlayVariant::Casual ? "Casual" : "Story";
+           : v == PlayVariant::Casual ? "Casual" : "Rescue";
 }
 bool variant_competes(PlayVariant v) { return v == PlayVariant::TimeAttack || v == PlayVariant::ScoreAttack; }
 struct SingleStageResult { double time; double best_before; };
@@ -362,7 +362,7 @@ void refresh_continue() {
         blockplanet::ui::ListItem item;
         item.id = "continue";
         item.label = "Continue";
-        item.note = std::string(last.submode == "casual" ? "Casual" : "Story") + ", episode " + std::to_string(last.chapter);
+        item.note = std::string(last.submode == "casual" ? "Casual" : "Rescue") + ", episode " + std::to_string(last.chapter);
         item.action = "command:continue";
         item.description = "Carry on from the start of episode " + std::to_string(last.chapter) +
                            ", with the score and hearts you had when it began.";
@@ -3115,7 +3115,7 @@ void begin_launch_presentation(LaunchMode mode) {
     // The loading cover (the owner's request): over the game's own menus
     // while they are pressed through, or the stage's first frames after a
     // direct start, until play has started.
-    static const char* names[] = {"Story", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
+    static const char* names[] = {"Rescue", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
                                   "Training", "Training", "Puzzle Training"};
     loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
     // A restart from the pause keeps the menus the game was first started
@@ -4214,7 +4214,7 @@ bool handle_profile_command(const std::string& command) {
                 const auto state = read_game_state(guest_rdram);
                 std::string where;
                 switch (state.mode) {
-                case 1: where = "Story \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
+                case 1: where = "Rescue \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
                 case 2: where = "Score Attack"; break;
                 case 3: where = state.training_type == 3 ? "Training \u00B7 Puzzle" : state.training_type == 2 ? "Training \u00B7 Advanced" : "Training \u00B7 Basics"; break;
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;

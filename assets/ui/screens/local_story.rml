@@ -1,11 +1,11 @@
 <rml>
 <head>
-    <title>Story for two</title>
+    <title>Rescue for two</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
 <body data-grid="green">
     <div id="panel">
-        <div class="title">Story</div>
+        <div class="title">Rescue</div>
         <div class="subtitle">Two players</div>
         <div class="item" id="versus" data-action="open:versus" data-description="Race to the core against a friend or the computer; combos send trouble their way."><span class="icon"></span>Versus</div>
         <div class="item" id="cooperative" data-action="command:cooperative" data-description="Two players on one sphere, working together: one drops, one supports."><span class="icon"></span>Cooperative<span class="note">coming later</span></div>

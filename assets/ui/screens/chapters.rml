@@ -1,11 +1,11 @@
 <rml>
 <head>
-    <title>Story</title>
+    <title>Rescue</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
 <body data-grid="green" class="compact lists">
     <div id="panel">
-        <div class="title" data-text="chapters_title">Story</div>
+        <div class="title" data-text="chapters_title">Rescue</div>
         <div class="subtitle" data-text="chapters_subtitle">Choose a chapter</div>
         <div class="list" data-list="chapters"></div>
         <div class="item" id="back" data-action="back">Back</div>
