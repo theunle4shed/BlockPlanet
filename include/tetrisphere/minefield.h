@@ -70,11 +70,11 @@ private:
     int exploded_ = -1;
 };
 
-// The arenas (the owner's choices, 2026-11-13): Full (the whole 32 x 32
-// sphere, which wraps), Half (16 x 16) and Mini (12 x 12), framed by the
-// purple wall; and shapes on the whole sphere with walls of their own:
-// Crossover, Decompartmental, Bow and Horizon. Each is centred on the cursor's
-// starting cell.
+// The arenas (the owner's choices, 2026-11-13), in order of size, each a
+// little harder than the last: Mini (12 x 12) and Half (16 x 16), framed by
+// the purple wall; the shapes on the whole sphere, with walls of their own,
+// Bow, Crossover, Decompartmental and Horizon; and Full (the whole 32 x 32
+// sphere, which wraps). Each is centred on the cursor's starting cell.
 struct MinefieldArena {
     const char* name;
     int width, height;          // the field (the walls inside it below)

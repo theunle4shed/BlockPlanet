@@ -7,13 +7,13 @@
     <div id="panel">
         <div class="title">Minefield</div>
         <div class="subtitle">Find the hidden mines without setting one off</div>
-        <div class="item" id="full" data-action="command:minefield_sphere:0">Full<span class="note">32 × 32, the whole sphere · 130 mines</span></div>
-        <div class="item" id="half" data-action="command:minefield_sphere:1">Half<span class="note">16 × 16 · 32 mines</span></div>
-        <div class="item" id="mini" data-action="command:minefield_sphere:2">Mini<span class="note">12 × 12 · 20 mines</span></div>
-        <div class="item" id="crossover" data-action="command:minefield_sphere:3">Crossover<span class="note">a cross round the sphere · 69 mines</span></div>
-        <div class="item" id="decompartmental" data-action="command:minefield_sphere:4">Decompartmental<span class="note">walled compartments · 73 mines</span></div>
-        <div class="item" id="bow" data-action="command:minefield_sphere:5">Bow<span class="note">a cross with a square heart · 65 mines</span></div>
-        <div class="item" id="horizon" data-action="command:minefield_sphere:6">Horizon<span class="note">a band over the poles · 81 mines</span></div>
+        <div class="item" id="mini" data-action="command:minefield_sphere:0">Mini<span class="note">12 × 12 · 21 mines</span></div>
+        <div class="item" id="half" data-action="command:minefield_sphere:1">Half<span class="note">16 × 16 · 39 mines</span></div>
+        <div class="item" id="bow" data-action="command:minefield_sphere:2">Bow<span class="note">a cross with a square heart · 80 mines</span></div>
+        <div class="item" id="crossover" data-action="command:minefield_sphere:3">Crossover<span class="note">a cross round the sphere · 94 mines</span></div>
+        <div class="item" id="decompartmental" data-action="command:minefield_sphere:4">Decompartmental<span class="note">walled compartments · 47 mines</span></div>
+        <div class="item" id="horizon" data-action="command:minefield_sphere:5">Horizon<span class="note">a band over the poles · 124 mines</span></div>
+        <div class="item" id="full" data-action="command:minefield_sphere:6">Full<span class="note">32 × 32, the whole sphere · 231 mines</span></div>
         <div class="item" id="back" data-action="back">Back</div>
         <div class="hint">Drop uncovers a cell, slide flags it. Each number counts the mines in the eight cells around it.</div>
     </div>

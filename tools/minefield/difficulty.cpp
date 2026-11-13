@@ -15,6 +15,7 @@
 //
 //   g++ -O2 -std=c++20 -Iinclude tools/minefield/difficulty.cpp src/platform/minefield.cpp -o difficulty
 //   ./difficulty [games per arena, default 2000] [--sweep] [--hints]
+//   ./difficulty 800 --calibrate Mini=90 Half=83 ...   (the mines for each win rate)
 
 #include "tetrisphere/minefield.h"
 
@@ -151,6 +152,38 @@ int main(int argc, char** argv) {
     const int games = argc > 1 ? std::max(1, std::atoi(argv[1])) : 2000;
     for (int i = 2; i < argc; ++i) hints = hints || std::string(argv[i]) == "--hints";
     // --sweep: the win rate at several densities, arena by arena.
+    // --calibrate NAME=WIN% ...: the mine count giving each arena that win
+    // rate (a search over the count, `games` games a try).
+    for (int i = 2; i < argc; ++i) {
+        if (std::string(argv[i]) != "--calibrate") continue;
+        for (int j = i + 1; j < argc; ++j) {
+            const std::string spec = argv[j];
+            const auto eq = spec.find('=');
+            if (eq == std::string::npos) continue;
+            const std::string name = spec.substr(0, eq);
+            const double target = std::atof(spec.c_str() + eq + 1) / 100.0;
+            for (auto arena : tetrisphere::minefield_arenas()) {
+                if (name != arena.name) continue;
+                int playable = 0;
+                for (std::size_t k = 0; k < arena.walls.size(); ++k) playable += !arena.walls[k];
+                if (arena.walls.empty()) playable = arena.width * arena.height;
+                const auto rate = [&](int mines) {
+                    arena.mines = mines;
+                    int won = 0;
+                    for (int g = 0; g < games; ++g) won += play(arena, std::uint32_t(g * 2654435761u + 17)).won;
+                    return double(won) / games;
+                };
+                int lo = 1, hi = playable / 3;  // win rate falls as mines rise
+                while (lo < hi) {
+                    const int mid = (lo + hi + 1) / 2;
+                    if (rate(mid) >= target) lo = mid; else hi = mid - 1;
+                }
+                std::printf("%-16s %5d cells  %4d mines  %5.1f%%  won %5.1f%% (target %.0f%%)\n", arena.name, playable, lo,
+                            100.0 * lo / playable, 100.0 * rate(lo), target * 100);
+            }
+        }
+        return 0;
+    }
     bool sweep = false;
     for (int i = 2; i < argc; ++i) sweep = sweep || std::string(argv[i]) == "--sweep";
     if (sweep) {

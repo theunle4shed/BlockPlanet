@@ -39,3 +39,21 @@ With one empty cell uncovered in each compartment at the start, Decompartmental 
 - **The whole sphere is the easiest shape** at any density: with no edges, every cell has eight neighbours, so there are no corners to guess in. Arenas with more edge (Bow, Crossover, Half) are harder at the same density.
 - **Decompartmental is in a class of its own:** its compartments are sealed from one another, so the numbers in one say nothing about the next, and each compartment starts with a blind guess (about five a game). The owner's view (2026-11-13): that luck is part of Minefield; the tactic is to make a start in every compartment before finishing any. One uncovered cell per compartment (`--hints`) would make it about as hard as the others, if wanted later.
 - **For progression:** the same arena could come in levels by density (for example 12.5%, 15%, 17.5%, 20%), and the arenas ordered by how much edge they have.
+
+## The counts chosen (2026-11-13)
+
+The owner's call: the arenas in the menu in order of size, each a little harder than the last. Each arena's mine count was found with `--calibrate` for a win rate falling evenly from 90% (Mini) to 50% (Full), then checked over 2,000 games:
+
+| Arena | Cells | Mines | Density | Won | Won with no guess | Guesses a game |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Mini | 144 | 21 | 14.6% | 90.0% | 65.0% | 0.58 |
+| Half | 256 | 39 | 15.2% | 84.7% | 56.9% | 0.81 |
+| Bow | 512 | 80 | 15.6% | 76.2% | 48.5% | 1.06 |
+| Crossover | 540 | 94 | 17.4% | 73.5% | 46.5% | 1.30 |
+| Decompartmental | 576 | 47 | 8.2% | 61.5% | 0.0% | 4.39 |
+| Horizon | 640 | 124 | 19.4% | 58.8% | 30.6% | 2.34 |
+| Full | 1,024 | 231 | 22.6% | 50.9% | 27.1% | 3.08 |
+
+Decompartmental keeps its place in the curve with far fewer mines: its blind starts make it hard on their own.
+
+    ./difficulty 800 --calibrate Mini=90 Half=83 Bow=77 Crossover=70 Decompartmental=63 Horizon=57 Full=50

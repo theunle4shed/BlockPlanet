@@ -134,22 +134,31 @@ const std::vector<MinefieldArena>& minefield_arenas() {
         a.mines = (cells * 130 + 512) / 1024;
         return a;
     };
+    // In order of size (the owner's call, 2026-11-13), each a little harder
+    // than the one before: the mines set so that a careful player wins about
+    // 90% of Mini, falling evenly to about 50% of Full (calibrated with
+    // tools/minefield/difficulty.cpp; docs/research/minefield-difficulty.md).
+    const auto with_mines = [](MinefieldArena a, int mines) {
+        a.mines = mines;
+        return a;
+    };
     static const std::vector<MinefieldArena> list = [&] {
         std::vector<MinefieldArena> l;
-        l.push_back({"Full", 32, 32, 130, {}});
-        l.push_back({"Half", 16, 16, 32, {}});
-        l.push_back({"Mini", 12, 12, 20, {}});
-        l.push_back(shape("Crossover", [](int r, int c) { return (c >= 12 && c <= 21) || (r >= 12 && r <= 21); }));
-        l.push_back(shape("Decompartmental", [](int r, int c) {
+        l.push_back({"Mini", 12, 12, 21, {}});
+        l.push_back({"Half", 16, 16, 39, {}});
+        l.push_back(with_mines(shape("Bow", [](int r, int c) {
+            return (c >= 13 && c <= 20) || (r >= 13 && r <= 20) || (r >= 9 && r <= 24 && c >= 9 && c <= 24);
+        }), 80));
+        l.push_back(with_mines(shape("Crossover", [](int r, int c) { return (c >= 12 && c <= 21) || (r >= 12 && r <= 21); }), 94));
+        // Its compartments each start with a blind guess, so it has far fewer mines.
+        l.push_back(with_mines(shape("Decompartmental", [](int r, int c) {
             if ((r >= 1 && r <= 4) || (r >= 17 && r <= 20)) return false;
             if (r <= 16) return !((c >= 1 && c <= 4) || (c >= 17 && c <= 20));
             return !((c >= 9 && c <= 12) || (c >= 25 && c <= 28));
-        }));
-        l.push_back(shape("Bow", [](int r, int c) {
-            return (c >= 13 && c <= 20) || (r >= 13 && r <= 20) || (r >= 9 && r <= 24 && c >= 9 && c <= 24);
-        }));
+        }), 47));
         // Rows 11 to 22 walled: the field is one band of 20 rows over the poles.
-        l.push_back(shape("Horizon", [](int r, int) { return r <= 10 || r >= 23; }));
+        l.push_back(with_mines(shape("Horizon", [](int r, int) { return r <= 10 || r >= 23; }), 124));
+        l.push_back({"Full", 32, 32, 231, {}});
         return l;
     }();
     return list;
