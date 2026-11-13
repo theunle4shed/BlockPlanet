@@ -171,6 +171,8 @@ div { display: block; }
 /* Right: mode and stage, the episode's time, progress. */
 #where .label { color: #e8b818; font-size: 24dp; }
 #stage { display: block; font-size: 64dp; font-weight: bold; }
+#stage.word { font-size: 40dp; line-height: 52dp; }
+#stage.word.long { font-size: 28dp; line-height: 40dp; }
 #time { display: block; font-size: 44dp; font-weight: bold; }
 /* Time Trial: the clock (red and pulsing in the last 30 seconds) and the score. */
 #clock { display: block; font-size: 44dp; font-weight: bold; }

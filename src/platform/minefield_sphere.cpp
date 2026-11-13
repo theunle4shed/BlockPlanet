@@ -71,6 +71,16 @@ int field_at(int bx, int by) {
     return index;
 }
 
+// The field cell (index) at a board cell, walls included, or -1 outside the
+// field's bounds: where the cursor may go (the owner's call, 2026-11-13: it
+// crosses an arena's walls, to reach Decompartmental's other compartments,
+// but stops at a smaller field's edge).
+int in_bounds(int bx, int by) {
+    const int fx = ((bx - origin_x) % board + board) % board, fy = ((by - origin_y) % board + board) % board;
+    if (fx >= field_width || fy >= field_height) return -1;
+    return fy * field_width + fx;
+}
+
 // The board cell under the cursor: the cursor's values (player 1 +0x2B2A,
 // +0x2B2E) count from the cell (8, 8) (measured by dropping pieces). Moving
 // right lowers x; moving up raises y.
@@ -312,6 +322,52 @@ void filter_stick(float& x, float& y) {
     if ((blocked & edge_down) && y < 0) y = 0;
 }
 
+// The field cell the player starts on: the field's middle, or where that is a
+// wall, the middle of the open area nearest it (its cells' average, in
+// unwrapped steps from where the search starts, so an area across the board's
+// edge works too), moved to its nearest open cell.
+std::pair<int, int> starting_cell() {
+    const int w = field_width, h = field_height, mx = w / 2, my = h / 2;
+    const auto wall = [&](int x, int y) {
+        x = (x % w + w) % w, y = (y % h + h) % h;
+        return !field_walls.empty() && field_walls[std::size_t(y * w + x)];
+    };
+    if (!wall(mx, my)) return {mx, my};
+    // The open cell nearest the middle.
+    int sx = mx, sy = my;
+    for (int r = 1, found = 0; r < board && !found; ++r)
+        for (int dy = -r; dy <= r && !found; ++dy)
+            for (int dx = -r; dx <= r && !found; ++dx)
+                if (!wall(mx + dx, my + dy)) sx = mx + dx, sy = my + dy, found = 1;
+    // Its area (four-way steps), each cell with the unwrapped place it was reached at.
+    std::vector<int> seen(std::size_t(w * h), 0);
+    std::vector<std::pair<int, int>> todo{{sx, sy}}, cells;
+    seen[std::size_t(((sy % h + h) % h) * w + ((sx % w + w) % w))] = 1;
+    while (!todo.empty()) {
+        const auto [x, y] = todo.back();
+        todo.pop_back();
+        cells.push_back({x, y});
+        for (const auto [dx, dy] : {std::pair{1, 0}, std::pair{-1, 0}, std::pair{0, 1}, std::pair{0, -1}}) {
+            const int nx = x + dx, ny = y + dy;
+            const std::size_t key = std::size_t(((ny % h + h) % h) * w + ((nx % w + w) % w));
+            if (wall(nx, ny) || seen[key]) continue;
+            seen[key] = 1;
+            todo.push_back({nx, ny});
+        }
+    }
+    double ax = 0, ay = 0;
+    for (const auto& [x, y] : cells) ax += x, ay += y;
+    ax /= double(cells.size()), ay /= double(cells.size());
+    // The area's cell nearest that average.
+    auto best = cells.front();
+    double best_d = 1e18;
+    for (const auto& [x, y] : cells) {
+        const double d = (x - ax) * (x - ax) + (y - ay) * (y - ay);
+        if (d < best_d) best_d = d, best = {x, y};
+    }
+    return {(best.first % w + w) % w, (best.second % h + h) % h};
+}
+
 void poll(std::uint8_t* rdram) {
     if (rdram == nullptr || !armed_flag.load()) return;
     std::lock_guard lock(mutex);
@@ -328,28 +384,18 @@ void poll(std::uint8_t* rdram) {
     // Let the stage set itself up first (about a second in play).
     if (!built && ++frames_in_play < 60) return;
     if (!built) {
-        // Centred on the cursor's starting cell (8, 8); the whole board wraps.
-        origin_x = 8 - field_width / 2;
-        origin_y = 8 - field_height / 2;
+        // The field's middle on the cursor's starting cell (8, 8); the whole
+        // board wraps. Where an arena's middle is a wall (Decompartmental,
+        // Horizon), the middle of the area nearest it is used instead, so the
+        // player starts in the middle of a compartment (the owner's call).
+        {
+            const auto [cx, cy] = starting_cell();
+            origin_x = 8 - cx;
+            origin_y = 8 - cy;
+        }
         build_board(rdram);
         field.emplace(field_width, field_height, requested_mines.load(), std::random_device{}(),
                       field_width == board && field_height == board, field_walls);
-        // The cursor starts on the field: where the board's centre is a wall
-        // (Decompartmental), on the nearest cell of the field.
-        if (field_at(cursor_x(rdram), cursor_y(rdram)) < 0) {
-            int best = -1, best_distance = 1 << 30;
-            for (int c = 0; c < layer_cells; ++c) {
-                const int bx = c % board, by = c / board;
-                if (field_at(bx, by) < 0) continue;
-                const int dx = std::abs(bx - cursor_x(rdram)), dy = std::abs(by - cursor_y(rdram));
-                const int d = dx * dx + dy * dy;
-                if (d < best_distance) best = c, best_distance = d;
-            }
-            if (best >= 0) {
-                guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(best % board - 8));
-                guest::store16(rdram, player1 + 0x2B2E, static_cast<std::int16_t>(best / board - 8));
-            }
-        }
         shown_open.assign(layer_cells, false);
         built = true;
         active_flag = true;
@@ -420,18 +466,19 @@ void poll(std::uint8_t* rdram) {
     guest::store32(rdram, player1 + 0x2408, 0);
     guest::store16(rdram, player1 + 0x2B10, 0);
     guest::store16(rdram, player1 + 0x23E4, board);
-    // The cursor stays in the field: if it got out (the stick, or a press the
-    // filter missed), it goes back to its last place inside; then the
-    // directions that would leave the field are blocked.
-    if (field_at(cursor_x(rdram), cursor_y(rdram)) < 0 && inside_known) {
+    // The cursor stays within the field's bounds (it may cross walls): if it
+    // got out (the stick, or a press the filter missed), it goes back to its
+    // last place inside; then the directions that would leave are blocked.
+    if (in_bounds(cursor_x(rdram), cursor_y(rdram)) < 0 && inside_known) {
         guest::store16(rdram, player1 + 0x2B2A, static_cast<std::int16_t>(inside_x - 8));
         guest::store16(rdram, player1 + 0x2B2E, static_cast<std::int16_t>(inside_y - 8));
     }
     const int x = cursor_x(rdram), y = cursor_y(rdram);
-    if (field_at(x, y) >= 0) inside_x = x, inside_y = y, inside_known = true;
+    if (in_bounds(x, y) >= 0) inside_x = x, inside_y = y, inside_known = true;
     // Moving right lowers x; up raises y.
-    edges = (field_at(x - 1, y) < 0 ? edge_right : 0) | (field_at(x + 1, y) < 0 ? edge_left : 0) |
-            (field_at(x, y + 1) < 0 ? edge_up : 0) | (field_at(x, y - 1) < 0 ? edge_down : 0);
+    edges = (in_bounds(x - 1, y) < 0 ? edge_right : 0) | (in_bounds(x + 1, y) < 0 ? edge_left : 0) |
+            (in_bounds(x, y + 1) < 0 ? edge_up : 0) | (in_bounds(x, y - 1) < 0 ? edge_down : 0);
+    const int under_cursor = in_bounds(x, y);  // walls included, for the cursor's colour
     const int here = field_at(x, y);  // -1 on the wall: nothing happens
     for (int n = pending_flag.exchange(0); n > 0; --n) field->toggle_flag(here);
     for (int n = pending_open.exchange(0); n > 0; --n) {
@@ -485,17 +532,18 @@ void poll(std::uint8_t* rdram) {
                            static_cast<std::int16_t>(first_picture_value + field->cell(under).count));
     }
     // The cubes' colours: flags yellow (under the cursor too, so a flag shows
-    // at once: the owner's call), the cursor's lavender; at the end the
+    // at once: the owner's call), the cursor's lavender (red over a wall); at the end the
     // mines green (won) or red (lost).
     {
         constexpr int yellow = 32, green = 34, lavender = 36, red = 37;
         const bool won = field->state() == Minefield::State::Won;
         for (int c = 0; c < field->size(); ++c) {
             const auto& cell = field->cell(c);
-            const bool cursor = c == here && !over;
+            const bool cursor = c == under_cursor && !over;
+            // Over a wall the cursor shows red: nothing can be done there.
             const int colour = over && cell.mine ? (won ? green : red)
                                : cell.flag ? yellow
-                               : cursor ? lavender : 0;
+                               : cursor ? (field->wall(c) ? red : lavender) : 0;
             cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(colour, std::memory_order_relaxed);
         }
     }

@@ -576,7 +576,9 @@ std::string hud_rml_parts(const HudView& hud) {
     // Mode and stage, with the stage's progress bar beneath the stage number.
     bool first_group = true;
     if (hud.show_where) {
-    rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'>" +
+    // A word for a stage (Minefield's arenas) is set smaller the longer it is.
+    const char* stage_size = hud.stage.size() > 10 ? " class='word long'" : hud.stage.size() > 4 ? " class='word'" : "";
+    rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'" + stage_size + ">" +
            escape(hud.stage) + "</div>";
     if (!hud.goal.empty()) rml += "<div class='sublabel'>Goal</div><div id='goal'>" + escape(hud.goal) + "</div>";
     if (hud.progress >= 0.0f)

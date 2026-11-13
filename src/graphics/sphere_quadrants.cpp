@@ -119,7 +119,9 @@ void draw_block(std::uint8_t* rdram, recomp_context* ctx, const QuadrantShape& s
         tetrisphere::minefield_sphere::in_field(board_cell);
     const int colour = tetrisphere::minefield_sphere::cube_colour(board_cell);
     const int cube_type = colour != 0 ? colour : 33;
-    store16(rdram, block_type, static_cast<std::int16_t>(mine_cube ? cube_type : value / 9));
+    // A wall with a colour (the cursor over it) shows it too.
+    const bool coloured_wall = value == 423 && colour != 0 && tetrisphere::minefield_sphere::blue_field().load(std::memory_order_relaxed);
+    store16(rdram, block_type, static_cast<std::int16_t>(mine_cube || coloured_wall ? cube_type : value / 9));
     if (value == value_special_a) return func_8009E3E4(rdram, ctx);
     if (value == value_special_b) return func_80097B74(rdram, ctx);
     if (value == value_special_c) return func_80097848(rdram, ctx);

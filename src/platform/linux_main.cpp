@@ -1075,10 +1075,10 @@ void update_hud() {
     if (const auto mines = tetrisphere::minefield_sphere::counter(); !mines.empty()) {
         // Minefield on the sphere: the mines flagged of all of them, and no
         // left panel (no health, magic or pieces to show; the owner's call).
-        // The stage's section is replaced by the mines (as the score) and the
-        // play time against the arena's best (the owner's request).
+        // The arena's name as the stage, the mines (as the score) and the play
+        // time against the arena's best (the owner's requests).
         view.show_left = false;
-        view.show_where = false;
+        view.mode = "Minefield";
         view.score_label = "Mines";
         view.score = mines;
         view.score_best.clear();
@@ -1088,6 +1088,7 @@ void update_hud() {
         view.best.clear();
         if (const auto play = tetrisphere::minefield_sphere::progress()) {
             const auto& arena = tetrisphere::minefield_sphere::arenas()[std::size_t(play->arena)];
+            view.stage = arena.name;  // the arena in place of the stage (the owner's request)
             auto& record = profile_data.progress.episode_records["minefield"][play->arena];
             const double best = record.best_total;
             // A win that beats the record (or the first) is kept, once.
@@ -1113,7 +1114,7 @@ void update_hud() {
                 }
                 view.best = "Best " + hud_time(best);
             } else {
-                view.best = std::string(arena.name) + " \u00B7 no best yet";
+                view.best = "No best yet";
             }
         }
         view.splits.clear();
