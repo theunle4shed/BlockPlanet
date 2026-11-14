@@ -128,6 +128,14 @@ Analyze the audio the game outputs (BlockPlanet already receives every PCM buffe
 - **Drive the original backgrounds:** write those levels into the background's animation parameters each frame, if the research finds suitable ones. Original look, music-reactive.
 - **Add new backgrounds:** draw host-side shader backgrounds into the background layer. Fully new visuals, the most freedom, and the basis for user-made visualizers later.
 
+### A TV edition for Samsung smart TVs (idea, not a priority, 2026-11-14)
+
+The owner's idea: a relaxed version that runs on the TV itself (the owner's UE75TU7020, Samsung's 2020 4K range, Tizen 5.5), not streamed from a PC, played with the TV's remote or a controller paired with it, with simplified graphics and only casual modes without time limits.
+- **What it would be:** a new game of its own, as with the SNES idea: BlockPlanet runs the original game's code with a Vulkan/Direct3D renderer, which a TV app cannot have, and Tetrisphere itself is not ours to put on a TV. BlockPlanet's own designs fit: **Minefield on the sphere** first, and a casual sphere-digging mode in the spirit of Rescue without timers or lives.
+- **How:** a Tizen web app (HTML5 with WebGL), the way the owner's CurioCat is built: a simple, flat-shaded sphere of cubes, few effects, large text for a 75-inch screen across a room, and navigation by the remote's arrows and OK (a paired controller as well).
+- **What to check first:** the TV's WebGL speed with a sphere of a few hundred cubes (a small test page loaded on the TV), and how the remote's keys arrive in a Tizen app.
+- **Not:** a port of BlockPlanet, or streaming (Steam Link or Moonlight from the PC remains the way to play BlockPlanet itself on the TV).
+
 ### A SNES version of Minefield on the sphere, with the Super FX 2 (idea, saved for later, 2026-11-13)
 
 The owner's question: could the game be scaled down for the SNES and its Super FX 2 chip? Not as a port: BlockPlanet runs the original N64 game's own code, which cannot go to a SNES, and Tetrisphere itself (name, look, levels) is not ours to remake. But BlockPlanet's own design, **Minefield on the sphere**, could be a new SNES game of its own, written from scratch as a separate project.
