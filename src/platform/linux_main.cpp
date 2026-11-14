@@ -25,6 +25,7 @@
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/minefield_sphere.h"
+#include "tetrisphere/menu_unlocks.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/brick_sky.h"
 #include "tetrisphere/pause_draw.h"
@@ -237,11 +238,13 @@ void apply_controls(Settings& settings, const ControlPreferences& controls) {
     settings.magic = controls.magic;
 }
 
+void publish_menus();
 void save_profile() {
     if (!profile_save || !profile_dirty || sky_test_profile) return;
     std::string error;
     if (profile_save->save(profile_data, error)) profile_dirty = false;
     else std::fprintf(stderr, "Could not save the profile: %s\n", error.c_str());
+    publish_menus();
 }
 
 // BlockPlanet's HUD (docs/HUD_DESIGN.md): in Story play the original HUD's 2D
@@ -395,6 +398,46 @@ void attack_episode_done(const std::string& mode, int chapter) {
 
 // The main menu's Continue (docs/REDESIGN.md): offered while a Story or
 // Casual game was left unfinished (not after a game over).
+// The main menu, with the first-launch question on top for a new profile
+// (not yet asked, nothing played) or a guest's first visit this session (the
+// owner's plan, docs/MENU_STRUCTURE.md): "Do you want to go through basic
+// training?" Yes starts Training (Basics); No goes to the main menu.
+bool guest_training_asked = false;
+void open_main_menu() {
+    blockplanet::ui::request_open("main");
+    bool ask = false;
+    if (guest_session) {
+        ask = !guest_training_asked;
+        guest_training_asked = true;
+    } else if (profile_save && !profile_data.progress.training_offered) {
+        const auto found = profile_data.progress.chapters_completed.find("rescue");
+        const bool played = found != profile_data.progress.chapters_completed.end() && !found->second.empty();
+        profile_data.progress.training_offered = true;
+        profile_dirty = true;
+        save_profile();
+        ask = !played;
+    }
+    if (ask) blockplanet::ui::request_show("first_training");
+}
+
+// The main, Solo and Rescue menus as the player's progress opens them up
+// (docs/MENU_STRUCTURE.md; in the main build everything, with statuses).
+tetrisphere::MenuUnlocks menu_unlocks_now() {
+    tetrisphere::MenuUnlocks u;
+    u.everything = unlock_all_testing;
+    if (const auto found = profile_data.progress.chapters_completed.find("rescue"); found != profile_data.progress.chapters_completed.end())
+        for (int chapter : found->second)
+            if (chapter >= 1) u.episodes.insert(chapter);
+    return u;
+}
+
+void publish_menus() {
+    const auto u = menu_unlocks_now();
+    blockplanet::ui::set_list("main_items", tetrisphere::main_menu_items(u));
+    blockplanet::ui::set_list("solo_items", tetrisphere::solo_menu_items(u));
+    blockplanet::ui::set_list("rescue_items", tetrisphere::rescue_menu_items(u));
+}
+
 void refresh_continue() {
     const auto& last = profile_data.progress.last_play;
     std::vector<blockplanet::ui::ListItem> items;
@@ -410,6 +453,7 @@ void refresh_continue() {
         items.push_back(std::move(item));
     }
     blockplanet::ui::set_list("continue", std::move(items));
+    publish_menus();
 }
 
 // Hide & Seek's goal (0x800E44A4), in BlockPlanet's own words
@@ -3384,7 +3428,7 @@ bool handle_profile_command(const std::string& command) {
     // The start-up screens: who is playing, and Back through them.
     if (command == "profile_picked") {
         profile_picked = true;
-        blockplanet::ui::request_open("main");
+        open_main_menu();
         return true;
     }
     if (command == "back_to_profiles") {
@@ -4044,20 +4088,43 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "open_story") {
-                // A new player (no Story episode done) is asked once whether to
-                // start with Training; afterwards Story opens directly.
-                bool episode_done = false;
-                if (const auto found = profile_data.progress.chapters_completed.find("rescue");
-                    found != profile_data.progress.chapters_completed.end())
-                    for (int chapter : found->second) episode_done = episode_done || chapter >= 1;
-                if (profile_save && !episode_done && !profile_data.progress.training_offered) {
-                    profile_data.progress.training_offered = true;
-                    profile_dirty = true;
-                    save_profile();
-                    blockplanet::ui::request_show("first_story");
-                } else {
+                // Solo > Rescue: until Episode 1 is done it launches Episode 1
+                // straight away; afterwards its menu (docs/MENU_STRUCTURE.md).
+                if (tetrisphere::rescue_menu_open(menu_unlocks_now())) {
                     blockplanet::ui::request_show("story");
+                } else {
+                    menu_variant = PlayVariant::Story;
+                    blockplanet::ui::send_command("chapter:1");
                 }
+                continue;
+            }
+            if (*command == "campaign") {
+                // Campaign: on from the next stage not yet completed (the
+                // owner's plan; earlier stages are replayed in the attack modes).
+                menu_variant = PlayVariant::Story;
+                const auto& levels = profile_data.progress.levels_completed;
+                const auto& chapters = profile_data.progress.chapters_completed;
+                const auto episodes = chapters.find("rescue");
+                int episode = 1;
+                while (episode <= rescue_chapters && episodes != chapters.end() && episodes->second.count(episode)) ++episode;
+                if (episode > rescue_chapters) {
+                    // Every episode done: the episode list, to play any again.
+                    blockplanet::ui::send_command("story");
+                    continue;
+                }
+                int stage = 1;
+                if (const auto found = levels.find("rescue"); found != levels.end())
+                    if (const auto c = found->second.find(episode); c != found->second.end())
+                        while (stage < 10 && c->second.count(stage)) ++stage;
+                blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
+                continue;
+            }
+            if (*command == "first_training_yes") {
+                // The first-launch question's Yes: Training (Basics), then back to the menus.
+                single_stage.reset();
+                continue_mode.reset();
+                chapter_zero_lesson.clear();
+                launch_mode(LaunchMode::TrainingBasics);
                 continue;
             }
             if (*command == "training_story") {
@@ -4476,7 +4543,7 @@ bool handle_profile_command(const std::string& command) {
                     // Back from a game (game over, Exit, an episode's end): the menus it started from.
                     restore_launch_path();
                 } else if (profile_picked || !profile_store) {
-                    blockplanet::ui::request_open("main");
+                    open_main_menu();
                 } else {
                     blockplanet::ui::set_list("profiles", profile_list(*profile_store, guest_session, true));
                     blockplanet::ui::request_open("profiles");

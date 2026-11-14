@@ -1,0 +1,15 @@
+<rml>
+<head>
+    <title>Main menu</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body data-grid="green">
+    <div id="panel">
+        <div class="title">Welcome</div>
+        <div class="subtitle">Do you want to go through basic training?</div>
+        <div class="item" id="yes" data-action="command:first_training_yes" data-description="Wheels shows you how to play: moving the shadow, sliding and dropping pieces, combos and magic."><span class="icon"></span>Yes, Show Me</div>
+        <div class="item" id="no" data-action="back" data-description="Go to the main menu. Training is there whenever you want it."><span class="icon"></span>No, Go to the Menu</div>
+        <div id="description" class="description empty"></div>
+    </div>
+</body>
+</rml>

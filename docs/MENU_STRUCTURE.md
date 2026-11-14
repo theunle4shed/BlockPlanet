@@ -58,3 +58,11 @@ The owner's picture of how the menus grow as the player progresses. It replaces 
 | Online | | | Host, Join |
 
 The owner can correct any of these; they are set in each screen's file (`assets/ui/screens/*.rml`, the `rag` notes).
+
+## Built (2026-11-14)
+
+- **First launch:** a new profile (nothing played yet) or a guest's first visit in a session is asked "Do you want to go through basic training?" over the main menu: "Yes, Show Me" starts Training (Basics), "No, Go to the Menu" goes to the main menu. Asked once per profile. The question before the first Rescue game is gone.
+- **The menus by progress** (`include/tetrisphere/menu_unlocks.h`, with its own test): the main, Solo and Rescue menus are built by the game. Main: Solo, Training, Profiles, Options, Credits, Exit from the start. Solo: Rescue, which launches Episode 1 straight away until it is completed; then Rescue's menu offers Campaign, Score Attack and Casual; Time Attack after Episode 3; Solo > Adventure after Episode 5. Unlocks follow the progress already saved, so existing profiles keep theirs, and the menus update as soon as an episode is completed.
+- **Campaign** carries on from the next stage not yet completed; once every episode is done it offers the episode list.
+- **Training** is on the main menu.
+- In the main build all of it shows, with each item's status; `BLOCKPLANET_LOCKED=1` shows the menus as a player would see them.
