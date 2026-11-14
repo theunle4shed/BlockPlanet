@@ -2697,7 +2697,12 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
     profile_store = std::make_unique<ProfileStore>(user_path);
     guest_session = run_options.guest;
     tetrisphere::direct_start::set_guest(guest_session);
-    unlock_all_testing = run_options.unlock_all || std::getenv("BLOCKPLANET_UNLOCK_ALL") != nullptr;
+    // The main build shows every menu as if unlocked (the owner's call,
+    // 2026-11-14; each item carries its development status). The unlocking
+    // of docs/MENU_STRUCTURE.md applies once BLOCKPLANET_LOCKED is set (for
+    // testing it), and in release builds when they come.
+    unlock_all_testing = std::getenv("BLOCKPLANET_LOCKED") == nullptr || run_options.unlock_all ||
+                         std::getenv("BLOCKPLANET_UNLOCK_ALL") != nullptr;
     auto& profiles = *profile_store;
     std::string profile_error;
     if (!profiles.load(profile_error) ||

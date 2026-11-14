@@ -7,12 +7,14 @@
     <div id="panel">
         <div class="title">Solo</div>
         <div class="subtitle">Play on your own</div>
-        <div class="item" id="story" data-action="command:open_story" data-alt="command:training_story" data-alt-label="Training" data-description="Break through each sphere to its core, episode by episode. Play the campaign, race the clock, chase points or play without a game over."><span class="icon"></span>Rescue</div>
-        <div class="item" id="hide_and_seek" data-action="command:hide_and_seek" data-description="Dig away the blocks to find the pictures hidden in each sphere."><span class="icon"></span>Hide &amp; Seek</div>
-        <div class="item" id="puzzle" data-action="command:puzzle" data-alt="command:puzzle_chapter:0" data-alt-label="Puzzle Training" data-description="Clear set spheres with the pieces you are given. Think before you drop."><span class="icon"></span>Puzzle</div>
-        <div class="item" id="lines" data-action="command:lines" data-description="A different game on the sphere, with its own levels."><span class="icon"></span>Lines</div>
-        <div class="item" id="minefield" data-action="command:minefield" data-description="Uncover the grid without setting off a mine: each number counts the mines around it."><span class="icon"></span>Minefield<span class="note">test</span></div>
-        <div class="item" id="multiphasic" data-action="command:multiphasic" data-description="One long run: each core you open becomes the next sphere. How far can you go?"><span class="icon"></span>Multiphasic<span class="note">coming later</span></div>
+        <div class="item" id="story" data-action="command:open_story" data-alt="command:training_story" data-alt-label="Training" data-description="Break through each sphere to its core, episode by episode. Play the campaign, race the clock, chase points or play without a game over."><span class="icon"></span>Rescue<span class="rag viable">(Viable)</span></div>
+        <div class="item" id="hide_and_seek" data-action="command:hide_and_seek" data-description="Dig away the blocks to find the pictures hidden in each sphere."><span class="icon"></span>Hide &amp; Seek<span class="rag viable">(Viable)</span></div>
+        <div class="item" id="puzzle" data-action="command:puzzle" data-alt="command:puzzle_chapter:0" data-alt-label="Puzzle Training" data-description="Clear set spheres with the pieces you are given. Think before you drop."><span class="icon"></span>Puzzle<span class="rag viable">(Viable)</span></div>
+        <div class="item" id="lines" data-action="command:lines" data-description="A different game on the sphere, with its own levels."><span class="icon"></span>Lines<span class="rag viable">(Viable)</span></div>
+        <div class="item" id="minefield" data-action="command:minefield" data-description="Uncover the grid without setting off a mine: each number counts the mines around it."><span class="icon"></span>Minefield<span class="rag in-progress">(In progress)</span></div>
+        <div class="item" id="multiphasic" data-action="command:multiphasic" data-description="One long run: each core you open becomes the next sphere. How far can you go?"><span class="icon"></span>Multiphasic<span class="rag not-started">(Not started)</span></div>
+        <div class="item" id="adventure" data-action="command:adventure" data-description="A journey across the sphere that introduces new game modes one at a time."><span class="icon"></span>Adventure<span class="rag not-started">(Not started)</span></div>
+        <div class="item" id="bonus" data-action="command:bonus" data-description="The game modes Adventure has introduced, to play on their own."><span class="icon"></span>Bonus<span class="rag not-started">(Not started)</span></div>
         <div class="item" id="back" data-action="back">Back</div>
         <div id="description" class="description"></div>
     </div>

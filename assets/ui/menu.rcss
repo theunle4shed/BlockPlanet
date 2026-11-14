@@ -328,6 +328,13 @@ body.shared .hint { display: block; margin-top: 20dp; }
 .tiles.coins.named .item { width: 23%; height: 132dp; }
 .tiles.coins.named .item img.picture { margin-bottom: 4dp; }
 
+/* Development status beside each menu item (the owner's request, 2026-11-14:
+   the main build shows every menu as if unlocked, with each item's state). */
+.item .rag { font-size: 20dp; margin-left: 12dp; }
+.item .rag.not-started { color: #e85a5a; }
+.item .rag.in-progress { color: #e8b818; }
+.item .rag.viable { color: #5bd16a; }
+
 /* Results (a stage played on its own): the time or score against the best. */
 .result { font-size: 40dp; font-weight: bold; color: #f8f8f8; margin: 8dp 0dp 16dp 0dp; }
 

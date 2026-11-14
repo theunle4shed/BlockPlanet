@@ -38,11 +38,23 @@ The owner's picture of how the menus grow as the player progresses. It replaces 
 | No Adventure, no Bonus | Adventure after Episode 5; Bonus filled from it |
 | Training inside Rescue's menus (X) | Training on the main menu |
 
-## Questions for the owner
+## The owner's answers (2026-11-14)
 
-1. "Rescue and Find and Seek are not referenced": did you mean **Puzzle and Hide & Seek** are not menu items of their own, and their games (the puzzles, the Hide & Seek goal types) appear in Bonus as Adventure introduces them?
-2. **Casual** (Rescue without a game over): does it stay, and where? Earlier plan: Casual's episodes open once played in Rescue.
-3. **Lines** is not locked behind Rescue: is it in Solo from the start, or one of the modes Adventure introduces (so in Bonus)?
-4. **Replaying stages:** with Campaign going straight to the next stage, is there still a way to pick an earlier episode or stage (for better times, or for fun), for example from Campaign's own menu?
-5. **Existing profiles:** a profile that has already played past these points keeps everything unlocked?
-6. **Developer and testing:** "Play with everything unlocked" (BlockPlanet.bat's choice 2) stays, to open everything for testing?
+- **Puzzle and Hide & Seek** have no menu items of their own in the final menus: their games (the puzzles, Hide & Seek's goal types) appear in Bonus as Adventure introduces them.
+- **Casual** stays, in Rescue's menu beside Campaign; its episodes open once played in Campaign.
+- **Lines** is introduced by Adventure, then in Solo > Bonus and Multi > Bonus.
+- **Replaying stages:** Campaign only continues; earlier episodes and stages are replayed in Time Attack and Score Attack.
+- **Existing profiles** keep what they have unlocked: unlocks are worked out from the progress already saved.
+- **Testing:** no separate "everything unlocked" choice. The main build shows the whole menu as if unlocked, each item with its development status in brackets: (Not started) in red, (In progress) in amber, (Viable) in green. `BLOCKPLANET_LOCKED=1` applies the unlocking, for testing it.
+
+## Development status shown in the menus (2026-11-14)
+
+| Menu | Viable | In progress | Not started |
+|---|---|---|---|
+| Main | Solo, Profiles, Options, Credits | Local, Trophies | Online, Media Player |
+| Solo | Rescue, Hide & Seek, Puzzle, Lines | Minefield | Multiphasic, Adventure, Bonus |
+| Rescue | Campaign, Time Attack, Score Attack, Casual | | |
+| Local | | Rescue (Versus against the computer) | Lines, Custom, Cooperative, a second player |
+| Online | | | Host, Join |
+
+The owner can correct any of these; they are set in each screen's file (`assets/ui/screens/*.rml`, the `rag` notes).

@@ -27,7 +27,6 @@ if "%BEHIND%"=="0" (echo  Up to date: choose 1 to play.) else (echo  %BEHIND% ne
 if not "%CURRENT%"=="%MAIN%" echo  Finished trying it? Choose 5 to go back to main.
 echo.
 echo   1  Play
-echo   2  Play with everything unlocked
 echo   3  Get the latest changes and rebuild
 echo   4  Try a branch (pick from a list)
 echo   5  Back to the main build
@@ -38,7 +37,6 @@ echo.
 set CHOICE=
 set /p CHOICE=Choose 1-8: 
 if "%CHOICE%"=="1" goto play
-if "%CHOICE%"=="2" goto unlocked
 if "%CHOICE%"=="3" goto update
 if "%CHOICE%"=="4" goto branch
 if "%CHOICE%"=="5" goto main
@@ -49,9 +47,6 @@ goto menu
 
 :play
 call :run
-goto menu
-:unlocked
-call :run --unlock-all
 goto menu
 :developer
 call :run --developer
