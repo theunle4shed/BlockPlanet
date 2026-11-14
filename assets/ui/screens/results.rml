@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <title>Results</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body>
+    <div id="panel">
+        <div class="title" data-text="results_title">Stage Cleared</div>
+        <div class="subtitle" data-text="results_where"></div>
+        <div class="result" data-text="results_line"></div>
+        <div class="list" data-list="results"></div>
+    </div>
+</body>
+</rml>

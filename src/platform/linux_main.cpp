@@ -206,6 +206,15 @@ const char* variant_title(PlayVariant v) {
 bool variant_competes(PlayVariant v) { return v == PlayVariant::TimeAttack || v == PlayVariant::ScoreAttack; }
 struct SingleStageResult { double time; double best_before; };
 std::optional<SingleStageResult> single_stage_result;
+// A single stage just cleared, for the results screen shown once the menus
+// are back (the shared pattern, docs/MODE_MATRIX.md).
+struct StageResults {
+    int chapter = 0, level = 0;
+    bool points = false;  // Score Attack: points, not a time
+    double value = 0.0, best_before = 0.0;
+    std::string where;
+};
+std::optional<StageResults> pending_results;
 std::optional<std::chrono::steady_clock::time_point> single_stage_quit_at;
 bool single_stage_quitting = false;
 // After leaving play from BlockPlanet (a single stage done, or Quit to menu),
@@ -294,6 +303,37 @@ std::string hud_delta(double seconds) {
     else
         std::snprintf(text, sizeof text, "%s%s", sign, hud_time(a).c_str());
     return text;
+}
+
+// The results screen of a stage played on its own, over the stage list:
+// the time (or points) against the best before, then Next Stage, Try Again
+// and Back.
+void show_stage_results() {
+    if (!pending_results) return;
+    const auto r = *pending_results;
+    pending_results.reset();
+    std::string line;
+    if (r.points) {
+        line = hud_number(static_cast<long long>(r.value)) + " points";
+        if (r.best_before <= 0.0 || r.value > r.best_before) line += "  \u00B7  New best";
+        else line += "  \u00B7  Best " + hud_number(static_cast<long long>(r.best_before));
+    } else {
+        line = hud_time(r.value);
+        if (r.best_before <= 0.0 || r.value < r.best_before) line += "  \u00B7  New best";
+        else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.value - r.best_before) + ")";
+    }
+    blockplanet::ui::set_text("results_title", "Stage Cleared");
+    blockplanet::ui::set_text("results_where", r.where);
+    blockplanet::ui::set_text("results_line", line);
+    std::vector<blockplanet::ui::ListItem> items;
+    if (r.level < 10)
+        items.push_back({"next", "Next Stage", "Stage " + std::to_string(r.chapter) + ":" + std::to_string(r.level + 1),
+                         "command:stage:" + std::to_string(r.chapter) + ":" + std::to_string(r.level + 1), true, 1, true});
+    items.push_back({"again", "Try Again", "", "command:stage:" + std::to_string(r.chapter) + ":" + std::to_string(r.level), true, 1,
+                     r.level >= 10});
+    items.push_back({"back", "Back to Episode " + std::to_string(r.chapter), "", "back", true});
+    blockplanet::ui::set_list("results", items);
+    blockplanet::ui::request_show("results");
 }
 
 // The developer's records (assets/trophies/developer_records.json). With
@@ -4315,7 +4355,14 @@ bool handle_profile_command(const std::string& command) {
             if (single_stage_quitting && pause_bridge.hide_original()) {
                 single_stage_quitting = false;
                 // (Minefield goes back to its own menu, the launch path's.)
-                if (single_stage && !tetrisphere::minefield_sphere::armed()) return_to_menu_chapter = single_stage->first;
+                if (single_stage && !tetrisphere::minefield_sphere::armed()) {
+                    return_to_menu_chapter = single_stage->first;
+                    if (single_stage_result)
+                        pending_results = StageResults{single_stage->first, single_stage->second, play_variant == PlayVariant::ScoreAttack,
+                                                       single_stage_result->time, single_stage_result->best_before,
+                                                       std::string(variant_title(play_variant)) + " \u00B7 " +
+                                                           std::to_string(single_stage->first) + ":" + std::to_string(single_stage->second)};
+                }
                 single_stage.reset();
                 single_stage_result.reset();
                 pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
@@ -4365,6 +4412,7 @@ bool handle_profile_command(const std::string& command) {
                 // Back to the menus the game was started from, refreshing the
                 // stage list's bests first.
                 restore_launch_path();
+                show_stage_results();
             } else {
             blockplanet::ui::request_open("main");
             if (chapter > 0) {
