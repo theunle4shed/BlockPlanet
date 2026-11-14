@@ -127,7 +127,7 @@ bool loading_active = false;
 // way out of it (finished, game over, Quit to menu) goes back there.
 std::vector<std::pair<std::string, std::size_t>> launch_path;
 int launch_stages_chapter = 0;  // the stage list's chapter in that path, to refresh its bests
-std::string stages_title_now;     // the stage list's heading as last set ("Chapter 2", "Puzzles")
+std::string stages_title_now;     // the stage list's heading as last set ("Episode 2", "Puzzles")
 std::string launch_place;         // that heading when a game started from the stage list, for "Exit to ..."
 // Opens the launch path again (once a second at most: the request takes a
 // frame or two), refreshing the stage list's bests first. The path is kept:
@@ -3907,9 +3907,13 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "pause_restart_chapter") {
-                // Story and Hide & Seek: ask first; Yes restarts the chapter from its first level.
-                blockplanet::ui::set_text("confirm_title", "Restart chapter?");
-                blockplanet::ui::set_text("confirm_note", "Progress within the chapter will be lost.");
+                // Story and Hide & Seek: ask first; Yes restarts the episode (Rescue) or
+                // chapter from its first level, or a single stage from its start.
+                const bool rescue = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E44A8) == 1;
+                blockplanet::ui::set_text("confirm_title", single_stage ? "Restart this stage?" : rescue ? "Restart episode?" : "Restart chapter?");
+                blockplanet::ui::set_text("confirm_note", single_stage ? "The stage starts again from the beginning."
+                                                          : rescue ? "Progress within the episode will be lost."
+                                                                   : "Progress within the chapter will be lost.");
                 blockplanet::ui::set_list("confirm", {{"yes", "Yes", "", "command:pause_restart", true},
                                                       {"no", "No", "", "back", true, 1, true}});
                 blockplanet::ui::request_show("confirm");
@@ -3921,7 +3925,8 @@ bool handle_profile_command(const std::string& command) {
                 std::optional<LaunchMode> mode;
                 std::optional<std::pair<int, int>> start;
                 switch (state.mode) {
-                case 1: mode = LaunchMode::Rescue; start = std::pair{state.chapter + 1, 1}; break;  // the chapter
+                // The episode from its first stage, or a single stage itself.
+                case 1: mode = LaunchMode::Rescue; start = std::pair{state.chapter + 1, single_stage ? state.level + 1 : 1}; break;
                 case 5: mode = LaunchMode::HideAndSeek; start = std::pair{0, 1}; break;  // its own chapter, level 1
                 case 4: mode = LaunchMode::Puzzle; start = std::pair{state.chapter + 1, state.level + 1}; break;
                 case 2: mode = LaunchMode::TimeTrial; break;
@@ -3988,7 +3993,7 @@ bool handle_profile_command(const std::string& command) {
                                : *command == "time_attack" ? PlayVariant::TimeAttack : PlayVariant::ScoreAttack;
                 auto choices = chapter_choices();
                 blockplanet::ui::set_text("chapters_title", menu_variant == PlayVariant::Story ? "Campaign" : variant_title(menu_variant));
-                blockplanet::ui::set_text("chapters_subtitle", "Choose a chapter");
+                blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
                 blockplanet::ui::set_list("chapters", choices);
                 blockplanet::ui::request_show("chapters");
                 continue;
@@ -4080,7 +4085,7 @@ bool handle_profile_command(const std::string& command) {
                 if (const auto m = profile_data.progress.episode_records.find(variant_records(menu_variant)); m != profile_data.progress.episode_records.end())
                     if (const auto c = m->second.find(chapter); c != m->second.end()) best = c->second.best_levels;
                 if (menu_variant == PlayVariant::ScoreAttack) best.clear();  // points, not times: not shown as times
-                blockplanet::ui::set_text("stages_title", stages_title_now = "Chapter " + std::to_string(chapter));
+                blockplanet::ui::set_text("stages_title", stages_title_now = "Episode " + std::to_string(chapter));
                 blockplanet::ui::set_text("stages_subtitle", "The whole episode, or one stage");
                 blockplanet::ui::set_list("stages", story_stages(chapter, done, best, 10, unlock_all_testing));
                 launch_stages_chapter = chapter;
@@ -4214,7 +4219,7 @@ bool handle_profile_command(const std::string& command) {
                 const auto state = read_game_state(guest_rdram);
                 std::string where;
                 switch (state.mode) {
-                case 1: where = "Rescue \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
+                case 1: where = std::string(variant_title(play_variant)) + " \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
                 case 2: where = "Score Attack"; break;
                 case 3: where = state.training_type == 3 ? "Training \u00B7 Puzzle" : state.training_type == 2 ? "Training \u00B7 Advanced" : "Training \u00B7 Basics"; break;
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
@@ -4237,8 +4242,12 @@ bool handle_profile_command(const std::string& command) {
             if (pause.open_menu) {
                 blockplanet::ui::set_text("pause_where", where_now());
                 auto pause_items = pause.items;
-                for (auto& item : pause_items)
+                for (auto& item : pause_items) {
                     if (item.id == "quit") item.label = exit_label();
+                    // Rescue: its runs are episodes; a stage played on its own restarts itself.
+                    if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 1)
+                        item.label = single_stage ? "Restart Stage" : "Restart Episode";
+                }
                 // Minefield on the sphere (played in Story's mode): its own
                 // name, New Field in place of Restart Chapter, and no Story
                 // how-to (the owner's report).

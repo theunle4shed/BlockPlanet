@@ -49,3 +49,7 @@ Every mode, the same five moments, with Rescue's look:
 1. Is the shared pattern above the right shape?
 2. The end of an episode, a puzzle or a stage: back to the menus each time with a results panel, or carry straight on (as Rescue and Puzzle do now) with the panel offering Next?
 3. Should Time Trial (the original's timed mode) come back as a menu item, or stay replaced by Score Attack?
+
+## Progress
+
+- **Rescue, 2026-11-14:** episodes are called episodes everywhere (the game's own word; the menus said chapters); the pause and end lines name the variant ("Casual · 1:3", "Time Attack · 2:5"); the restart item is "Restart Episode" for a run and "Restart Stage" for a single stage, both asking first, and Restart Stage now restarts the stage chosen (it went back to stage 1). Still to do for Rescue: the start card, and the results panel at a stage's and an episode's end.

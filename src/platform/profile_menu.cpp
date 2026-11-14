@@ -247,7 +247,7 @@ std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& compl
     for (int chapter = 1; chapter <= last; ++chapter) {
         const bool done = completed.count(chapter) != 0;
         const bool next = !done && !focused;
-        items.push_back({"chapter" + std::to_string(chapter), "Chapter " + std::to_string(chapter),
+        items.push_back({"chapter" + std::to_string(chapter), "Episode " + std::to_string(chapter),
                          done ? "completed" : next ? "next" : "",
                          "command:stages:" + std::to_string(chapter), true, 1, next});
         focused = focused || next;

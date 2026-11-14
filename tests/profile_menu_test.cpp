@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
     story = story_chapters({0}, 15);
     assert(story.size() == 1 && story[0].focus && story[0].note == "next");
     story = story_chapters({1, 2}, 15);
-    assert(story.size() == 3 && story[2].focus && story[2].label == "Chapter 3" && story[0].note == "completed");
+    assert(story.size() == 3 && story[2].focus && story[2].label == "Episode 3" && story[0].note == "completed");
     story = story_chapters({0, 15}, 15);
     assert(story.size() == 15 && story[0].focus && story[0].note == "next" && story[1].note.empty() &&
            story[14].note == "completed");
