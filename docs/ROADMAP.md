@@ -13,6 +13,8 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 
 **Alongside Story, as a shared priority:** colour-blind options, themes, accessibility and languages (localisation).
 
+**Menus and unlocking:** the owner's plan is in [MENU_STRUCTURE.md](MENU_STRUCTURE.md) (2026-11-14): Solo > Rescue first, Campaign and Score Attack after Episode 1, Time Attack after Episode 3, Adventure after Episode 5, which introduces the other modes into Solo > Bonus and Multi > Bonus.
+
 **Back in the queue, together, for later: Bonus modes & Adventure.** Lines, Puzzle and Hide & Seek, Escape, Minefield on the sphere and the owner's other custom modes are to be grouped in one place in the menus, under bonus modes and Adventure (where some are found rather than offered from the start). Until then each stays as it is; fixes only.
 
 **Known items held back:**
