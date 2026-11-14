@@ -573,6 +573,12 @@ void poll(std::uint8_t* rdram) {
             const auto& cell = field->cell(c);
             const bool cursor = c == under_cursor && !over;
             // Over a wall the cursor shows red: nothing can be done there.
+            // Research: BLOCKPLANET_MINEFIELD_STRIPES=1 shows the six colours in stripes.
+            static const bool stripes = std::getenv("BLOCKPLANET_MINEFIELD_STRIPES") != nullptr;
+            if (stripes) {
+                cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(32 + (c % field_width) / 2 % 6, std::memory_order_relaxed);
+                continue;
+            }
             const int colour = over && cell.mine ? (won ? green : red)
                                : cell.flag ? yellow
                                : cursor ? (field->wall(c) ? red : lavender) : 0;
