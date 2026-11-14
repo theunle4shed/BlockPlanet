@@ -38,7 +38,7 @@ This is the state as the code stands, read mode by mode (not every cell is confi
 
 Every mode, the same five moments, with Rescue's look:
 
-1. **Start:** the menus, then a card in our panel with the mode's name, the stage and its goal in one line ("Hide & Seek · Level 3: Find five drills"), and A Start. The same card for every mode, Rescue's episodes included.
+1. **Start:** an intro animation of the mode's own (the owner, 2026-11-14): it plays once when a mode is started, not before every level (Hide & Seek now plays its title before each level); in Adventure it plays each time the next stage is launched; it can be skipped once the player has seen it (remembered per profile). Then a card in our panel with the mode's name, the stage and its goal in one line ("Hide & Seek · Level 3: Find five drills"), and A Start. The same card for every mode, Rescue's episodes included.
 2. **Instructions:** How to Play in every mode's pause, the same layout (goal, then controls, then the mode's special rules).
 3. **During play:** one HUD layout: on the right the mode, the stage, the goal or progress, time and the mode's score; on the left what the player holds (health, magic, next, or drops and slides). A part is left out only when the mode has nothing for it.
 4. **Pause:** Resume, Restart (one name, "Restart Stage", or "Restart Episode" where a run is several stages, always asking first), How to Play, Options, Exit to <the screen the player came from, by its shown name>.
