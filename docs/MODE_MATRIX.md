@@ -21,6 +21,23 @@ This is the state as the code stands, read mode by mode (not every cell is confi
 | **Time Trial** | No menu item | None | The original HUD | Restart Level | ? | ? | No | None | ? |
 | **Minefield** | Solo > Minefield > arena | None (removed from pause) | Right panel only: arena, mines, time, best | New Field (no question) | Result, then the game's stage end, back to the menus | Same as a win | No | Best time per arena | ? |
 
+## Intro animations today (captured 2026-11-14)
+
+Each mode started from the menus and its first 18 to 24 seconds captured.
+
+| Mode | Animated intro | Then |
+|---|---|---|
+| Rescue | None: the loading cover ("Rescue"), then play | The game's own "Episode n" text at an episode's start |
+| Casual, Time Attack, Score Attack | None (as Rescue) | |
+| Training | None: Wheels starts talking at once | Wheels' speech in our card |
+| Puzzle | None; each puzzle has its own background | Play at once |
+| Hide & Seek | **Yes, before every level**, one per goal type: MULTI (a picture sphere flies in, then the word sweeps across), DRILL (a drill and falling letters), BRICK (letters on bricks), TOWER (a block tower rises), HIDE & SEEK (eyes peep from a hole), UNIQUE (a ribbon), SHIFT (scattered letters). CONNECT and CRYSTAL TOWER not yet seen. Our HUD shows over the animation. | Our goal card, A Start |
+| Lines | None | Our rules card, A Start |
+| Versus | None: play at once | |
+| Minefield | None | Play at once |
+
+So only Hide & Seek has animations, and its play before every level, not once per mode start. Every other mode needs one made (the owner's plan: one per mode, once per start, skippable once seen).
+
 ## The clearest inconsistencies
 
 1. **Instructions:** How to Play is missing in Training, Time Trial and Minefield; Lines' is two sentences without the controls the others give. Goal and rules cards use our panel in Hide & Seek, Versus and Lines only; Rescue's "Episode n" cards and Puzzle do not.
@@ -53,3 +70,4 @@ Every mode, the same five moments, with Rescue's look:
 ## Progress
 
 - **Rescue, 2026-11-14:** episodes are called episodes everywhere (the game's own word; the menus said chapters); the pause and end lines name the variant ("Casual · 1:3", "Time Attack · 2:5"); the restart item is "Restart Episode" for a run and "Restart Stage" for a single stage, both asking first, and Restart Stage now restarts the stage chosen (it went back to stage 1). Still to do for Rescue: the start card, and the results panel at a stage's and an episode's end.
+- **Rescue, 2026-11-14 (2):** a stage played on its own ends on a results screen over the stage list: "Stage Cleared", the variant and stage, the time (or points) against the best ("New best" when beaten), then Next Stage, Try Again and Back to Episode N. Whole episodes keep flowing from stage to stage (the owner's choice); the results panel at an episode's end and the start card are still to do.
