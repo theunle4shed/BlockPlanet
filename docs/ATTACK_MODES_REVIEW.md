@@ -51,3 +51,15 @@ What the screenshots show (sent separately; not kept in the repository): in Time
 3. Score Attack: should a combo show the time it adds ("+4 s") near the clock?
 4. Pop-ups: in Rescue, which of the floating texts above should stay, go, or be replaced by BlockPlanet's own (and in what style)?
 5. The developer records ("beat the maker" trophies): will you record your own times and scores, or should those trophies go?
+
+## The owner's answers (2026-11-15)
+
+1. Time Attack keeps hearts and game over.
+2. Score Attack's clock rules stay as they are (numbers to tune later from play).
+3. Score Attack: a combo shows the time it adds ("+4 s") **over the sphere**, rising from the bricks that broke, then fading.
+4. Rescue: **combo words, no numbers** over the sphere. The game's own point numbers (the small floating points, the 1K/2K/3K bubbles, the large grey 3D number) are hidden in Rescue; BlockPlanet shows short text for notable moves instead ("Combo ×12", "Gravity combo", "Fuse combo", "+ Magic"), sharp and in the menus' style.
+5. The developer records: not answered yet.
+
+**Also from the owner (2026-11-15), the score list under Score:** a combo shows as one entry, its total with its block count ("+30,100 ×21", growing while the combo runs); points scored outside a combo (a drop) show on their own. Built: the combo is the game's own combo counter (`+0x2AE0`), and points landing within 0.6 s after it ends still count towards it.
+
+**Built so far:** the score list grouping (Rescue and Casual), and Score Attack's "+N s" rising over the sphere from a combo's bricks (not yet seen in the test setup, whose instant win clears the stage at once). **Still to do:** hiding the game's own point numbers in Rescue (their routines are still to find) and BlockPlanet's combo words over the sphere.

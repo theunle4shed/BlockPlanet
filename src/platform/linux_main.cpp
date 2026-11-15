@@ -749,6 +749,7 @@ void update_hud() {
     struct LivePopup { blockplanet::ui::HudView::Popup popup; float cell_dx, cell_dy; };
     static std::vector<LivePopup> popups;
     static tetrisphere::ComboTracker combos;
+    static float combo_dx = 0.0f, combo_dy = 0.0f;
     static int combo_blocks_pending = 0;
     // Story shows no score pop-ups (decided 2026-11-06); BLOCKPLANET_POPUPS=1
     // shows points for testing (score modes may use them later).
@@ -766,6 +767,7 @@ void update_hud() {
         };
         if (const auto combo = combos.update(state)) {
             combo_blocks_pending += combo->blocks;  // Score Attack's clock gains time
+            combo_dx = combo->dx, combo_dy = combo->dy;  // where its "+N s" rises from
             // For trophies (Story, Time Attack and Score Attack): the blocks a
             // whole combo cleared, as measured from the board.
             if (combo->blocks > 0 && state.mode == 1) {
@@ -1074,7 +1076,20 @@ void update_hud() {
         // layer, 10 s more a layer), set in its first seconds.
         if (state.layers > 0 && clock.played() < 3.0 && !cleared) clock.set_layers(state.layers);
         if (!paused && !cleared && !timed_out && !run_over && elapsed < 1.0) clock.tick(elapsed);
-        if (combo_blocks_pending > 0) clock.add_combo(combo_blocks_pending), combo_blocks_pending = 0;
+        if (combo_blocks_pending > 0) {
+            // The time a combo adds rises from its bricks over the sphere
+            // (the owner, 2026-11-15: "+4 s"), then fades.
+            const double added = tetrisphere::AttackClock::combo_seconds(combo_blocks_pending, clock.played());
+            clock.add_combo(combo_blocks_pending), combo_blocks_pending = 0;
+            const int whole = int(std::lround(added));
+            if (whole >= 1 && !cleared) {
+                LivePopup live;
+                live.popup.text = "+" + std::to_string(whole) + " s";
+                live.cell_dx = combo_dx;
+                live.cell_dy = combo_dy;
+                popups.push_back(live);
+            }
+        }
         // A trophy: two minutes past the stage's own time played in one
         // stage (it takes the time combos add).
         static bool overtime_posted = false;
@@ -1154,26 +1169,51 @@ void update_hud() {
         // Story: the episode's time, and under it the score with the last
         // five points added (the owner's choice, 2026-11-08).
         view.time = hud_time(splits.view().total);
+        // The combo counter: +0x2AE0 counts up as bricks clear, +0x2B14
+        // keeps the last combo, +0x2C78 the stage's best.
+        const int running = guest::load16(guest_rdram, 0x80110220u + 0x2AE0);
+        const int last_combo = guest::load16(guest_rdram, 0x80110220u + 0x2B14);
+        view.combo_live = running > 0;
+        view.combo = running > 0 ? running : last_combo;
+        view.combo_best = guest::load16(guest_rdram, 0x80110220u + 0x2C78);
+        // The points added, newest first (five at most). A combo is one entry,
+        // its total with its block count ("+30,100 ×21"), growing while it runs;
+        // points scored outside a combo show on their own (the owner, 2026-11-15).
+        struct Gain { long long points = 0; int blocks = 0; bool live = false; };
         static long long last_score = -1;
-        static std::deque<long long> gains;
+        static std::deque<Gain> gains;
+        static bool was_running = false;
+        static auto combo_ended = std::chrono::steady_clock::time_point{};
+        const auto now_g = std::chrono::steady_clock::now();
         const long long score = static_cast<long long>(state.score) * 10;  // the game keeps tens
-        if (last_score < 0 || score < last_score) gains.clear();  // a new game
-        else if (score > last_score) {
-            gains.push_front(score - last_score);
-            if (gains.size() > 5) gains.pop_back();
+        const long long added = last_score >= 0 && score > last_score ? score - last_score : 0;
+        if (last_score < 0 || score < last_score) gains.clear(), was_running = false;  // a new game
+        if (running > 0) {
+            if (gains.empty() || !gains.front().live) gains.push_front({0, 0, true});
+            gains.front().points += added;
+            gains.front().blocks = running;
+        } else {
+            if (was_running && !gains.empty() && gains.front().live) {
+                gains.front().live = false;
+                gains.front().blocks = std::max(gains.front().blocks, last_combo);
+                combo_ended = now_g;
+            }
+            if (added > 0) {
+                // The combo's own points can land just after it ends: still its.
+                if (!gains.empty() && gains.front().blocks > 0 && now_g - combo_ended < std::chrono::milliseconds(600))
+                    gains.front().points += added;
+                else
+                    gains.push_front({added, 0, false});
+            }
         }
+        was_running = running > 0;
+        while (gains.size() > 5) gains.pop_back();
         last_score = score;
         view.story_score = hud_number(score);
-        {
-            // The combo counter: +0x2AE0 counts up as bricks clear, +0x2B14
-            // keeps the last combo, +0x2C78 the stage's best.
-            const int running = guest::load16(guest_rdram, 0x80110220u + 0x2AE0);
-            const int last = guest::load16(guest_rdram, 0x80110220u + 0x2B14);
-            view.combo_live = running > 0;
-            view.combo = running > 0 ? running : last;
-            view.combo_best = guest::load16(guest_rdram, 0x80110220u + 0x2C78);
+        for (const auto& g : gains) {
+            if (g.points <= 0 && !g.live) continue;
+            view.story_gains.push_back("+" + hud_number(g.points) + (g.blocks >= 2 ? " \u00D7" + std::to_string(g.blocks) : ""));
         }
-        for (const long long g : gains) view.story_gains.push_back("+" + hud_number(g));
     } else if (state.mode == 9) {
         // Lines: the stage's play time against the best for it (records
         // "lines", by chapter).
