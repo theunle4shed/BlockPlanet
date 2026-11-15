@@ -10,6 +10,9 @@
 #                     north, start, back, up, down, left, right, ...);
 #                     padd / padu: hold / release
 #   size W H          resize the window
+#   mouse X Y         move the mouse to (X, Y) in the game window
+#   click X Y         move there and press the left button; rclick: the right
+#   wheel up|down     turn the mouse wheel one step
 #   shot NAME         screenshot of the whole display -> NAME.png
 #   wshot NAME        screenshot of the game window -> NAME.png
 #   rec S             record the display for S seconds -> rec.mp4 (ffmpeg)
@@ -33,6 +36,10 @@ while read -r cmd arg; do
     key) xdotool windowfocus --sync "$win" 2>/dev/null; xdotool keydown --window "$win" "$arg"; sleep 0.15; xdotool keyup --window "$win" "$arg";;
     type) xdotool windowfocus --sync "$win" 2>/dev/null; xdotool type --window "$win" --delay 120 "$arg";;
     size) xdotool windowsize "$win" $arg; sleep 1.5;;
+    mouse) xdotool mousemove --window "$win" $arg;;
+    click) xdotool mousemove --window "$win" $arg; sleep 0.2; xdotool click 1;;
+    rclick) xdotool mousemove --window "$win" $arg; sleep 0.2; xdotool click 3;;
+    wheel) [ "$arg" = up ] && xdotool click 4 || xdotool click 5;;
     pad) press "$arg" true; sleep 0.15; press "$arg" false;;
     padd) press "$arg" true;;
     padu) press "$arg" false;;

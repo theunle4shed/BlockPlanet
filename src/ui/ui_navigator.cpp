@@ -393,6 +393,26 @@ void Navigator::move(Screen& screen, Action action) {
     screen.column = column;
 }
 
+bool Navigator::point(float x, float y, bool click) {
+    if (stack_.empty()) return false;
+    Screen& screen = stack_.back();
+    const auto list = items(screen);
+    for (std::size_t i = 0; i < list.size(); ++i) {
+        Rml::Element* e = list[i];
+        if (!e->IsVisible()) continue;
+        const auto at = e->GetAbsoluteOffset(Rml::BoxArea::Border);
+        const auto size = e->GetBox().GetSize(Rml::BoxArea::Border);
+        if (x < at.x || y < at.y || x >= at.x + size.x || y >= at.y + size.y) continue;
+        if (screen.focus != i) {
+            screen.column = -1;
+            set_focus(screen, i);
+        }
+        if (click) activate(screen);
+        return true;
+    }
+    return false;
+}
+
 void Navigator::set_pad(bool pad) {
     pad_ = pad;
     for (auto& screen : stack_) screen.document->SetClass("pad", pad);

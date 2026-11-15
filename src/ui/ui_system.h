@@ -44,6 +44,9 @@ void queue_action(Action action);
 void set_setting(const std::string& name, const std::string& value);
 void set_list(const std::string& name, std::vector<ListItem> items);
 // Text for elements with data-text="NAME". Applied at the next frame.
+// The mouse over the menus: (x, y) from 0 to 1 across the window; the item
+// there takes the focus, and with `click` is chosen.
+void pointer(float x, float y, bool click);
 void set_text(const std::string& name, const std::string& text);
 // A full-screen loading cover over everything (0: none, 1: opaque), with the
 // mode being started ("Story · Stage 1:1"), while a mode is started through

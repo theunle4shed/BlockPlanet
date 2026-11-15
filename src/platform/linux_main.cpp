@@ -3909,6 +3909,31 @@ bool handle_profile_command(const std::string& command) {
                     blockplanet::ui::scroll_card(event.key.keysym.scancode == SDL_SCANCODE_PAGEUP ? -3.0f : 3.0f);
                 if (event.type == SDL_MOUSEWHEEL) blockplanet::ui::scroll_card(-2.0f * float(event.wheel.y));
             }
+            // The mouse in the menus (the owner's request, 2026-11-15): pointing
+            // focuses an item, the left button chooses it, the right button goes
+            // back, the wheel moves up and down.
+            if (blockplanet::ui::menus_open() && window != nullptr) {
+                int w = 0, h = 0;
+                SDL_GetWindowSize(window, &w, &h);
+                if (w > 0 && h > 0) {
+                    if (event.type == SDL_MOUSEMOTION) {
+                        blockplanet::ui::pointer(float(event.motion.x) / float(w), float(event.motion.y) / float(h), false);
+                        continue;
+                    }
+                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+                        blockplanet::ui::pointer(float(event.button.x) / float(w), float(event.button.y) / float(h), true);
+                        continue;
+                    }
+                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
+                        blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
+                        continue;
+                    }
+                    if (event.type == SDL_MOUSEWHEEL && event.wheel.y != 0) {
+                        blockplanet::ui::queue_action(event.wheel.y > 0 ? blockplanet::ui::Action::Up : blockplanet::ui::Action::Down);
+                        continue;
+                    }
+                }
+            }
             if (handle_menu_event(event, event_port>=0, active_settings.bindings)) continue;
             handle_controls_event(event,event_port>=0 || removed_assigned,detected);
         }

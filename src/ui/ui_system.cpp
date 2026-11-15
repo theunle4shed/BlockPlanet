@@ -77,6 +77,7 @@ struct OpenRequest {
     bool on_top = false;  // keep the open screens (Back returns to them)
 };
 struct CloseRequest {};
+struct PointerRequest { float x, y; bool click; };  // x, y from 0 to 1 across the window
 struct RestoreRequest { std::vector<std::pair<std::string, std::size_t>> path; };
 struct SettingRequest {
     std::string name;
@@ -97,7 +98,7 @@ struct AltButtonRequest {
 struct PadRequest {
     bool pad;
 };
-using Request = std::variant<OpenRequest, CloseRequest, RestoreRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest,
+using Request = std::variant<OpenRequest, CloseRequest, PointerRequest, RestoreRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest,
                              AltButtonRequest>;
 std::mutex requests_mutex;
 std::deque<Request> requests;
@@ -233,6 +234,9 @@ void apply_requests() {
                 std::fprintf(stderr, "{\"event\":\"ui_screen_missing\",\"screen\":\"%s\"}\n", open->screen.c_str());
         } else if (std::holds_alternative<CloseRequest>(request)) {
             navigator->close();
+        } else if (auto* pointer = std::get_if<PointerRequest>(&request)) {
+            const auto size = context->GetDimensions();
+            navigator->point(pointer->x * float(size.x), pointer->y * float(size.y), pointer->click);
         } else if (auto* restore = std::get_if<RestoreRequest>(&request)) {
             navigator->restore(restore->path);
         } else if (auto* setting = std::get_if<SettingRequest>(&request)) {
@@ -1227,6 +1231,11 @@ void set_loading(const std::string& text, float opacity, bool wanted) {
     loading_text = text;
     loading_opacity = opacity;
     loading_wanted = wanted;
+}
+
+void pointer(float x, float y, bool click) {
+    std::lock_guard lock(requests_mutex);
+    requests.push_back(PointerRequest{x, y, click});
 }
 
 void set_text(const std::string& name, const std::string& text) {

@@ -64,6 +64,10 @@ public:
     bool is_open() const { return !stack_.empty(); }
 
     void handle(Action action);
+    // The mouse (the owner's request, 2026-11-15): the item under (x, y), in
+    // the context's pixels, takes the focus; with `click` it is chosen.
+    // Returns whether an item was there.
+    bool point(float x, float y, bool click);
 
     // Current setting values and list contents, used when screens open
     // (and applied at once to the screen showing).
