@@ -4439,6 +4439,7 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "pause_restart" && guest_rdram != nullptr) {
+                const bool restart_single_lesson = single_lesson.has_value();
                 // Quit through the game's pause, then start the same place again.
                 const auto state = read_game_state(guest_rdram);
                 std::optional<LaunchMode> mode;
@@ -4453,6 +4454,9 @@ bool handle_profile_command(const std::string& command) {
                 // Lines: the episode from its first stage, or a single stage itself.
                 case 9: mode = LaunchMode::Lines; start = std::pair{state.chapter + 1, single_stage ? state.level + 1 : 1}; break;
                 case 3:
+                    // The same lesson (a level of its training), and, when it was
+                    // chosen on its own, still on its own.
+                    start = std::pair{0, guest::load16(guest_rdram, 0x80110220u + 0x23BA) + 1};
                     if (state.training_type == 1) mode = LaunchMode::TrainingBasics;
                     if (state.training_type == 2) mode = LaunchMode::TrainingAdvanced;
                     if (state.training_type == 3) mode = LaunchMode::TrainingPuzzle;
@@ -4460,6 +4464,7 @@ bool handle_profile_command(const std::string& command) {
                 default: break;
                 }
                 if (mode) {
+                    if (state.mode == 3 && restart_single_lesson) single_lesson = start->second - 1;
                     continue_mode = PendingLaunch{*mode, start, true};
                     pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
                     std::fprintf(stdout, "{\"event\":\"restart\",\"mode\":\"%s\"}\n", launch_mode_name(*mode));
@@ -4967,7 +4972,17 @@ bool handle_profile_command(const std::string& command) {
                 switch (state.mode) {
                 case 1: where = std::string(variant_title(play_variant)) + " \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
                 case 2: where = "Score Attack"; break;
-                case 3: where = state.training_type == 3 ? "Training \u00B7 Puzzle" : state.training_type == 2 ? "Training \u00B7 Advanced" : "Training \u00B7 Basics"; break;
+                case 3: {
+                    // The lesson by its name in Training's menu (a lesson is a level of its training).
+                    static const char* basics[] = {"The Basics", "Lives", "Combos", "Magic"};
+                    static const char* advanced[] = {"Crystal Bricks", "X Count", "Fuse Combos"};
+                    const int lesson = guest::load16(guest_rdram, 0x80110220u + 0x23BA);
+                    const char* name = state.training_type == 3 ? "Puzzle Controls"
+                                       : state.training_type == 2 ? (lesson >= 0 && lesson < 3 ? advanced[lesson] : "Advanced")
+                                                                  : (lesson >= 0 && lesson < 4 ? basics[lesson] : "Basics");
+                    where = std::string("Training \u00B7 ") + name;
+                    break;
+                }
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
                 case 5: where = "Hide & Seek \u00B7 Level " + std::to_string(state.level + 1); break;  // its chapter is not the Rescue one
                 case 6: where = "Versus"; break;
@@ -4981,7 +4996,10 @@ bool handle_profile_command(const std::string& command) {
             // From the stage list, its heading, which is what the player sees
             // there ("Exit to Chapter 2", "Exit to Puzzles"), rather than the
             // screen's name, Stages.
-            const auto exit_label = [&] {
+            const auto exit_label = [&]() -> std::string {
+                // Training's lessons go back to Training's menu (its screen's file title is another mode's).
+                if (guest::load16(guest_rdram, 0x800E44A8) == 3 && !launch_path.empty() && launch_path.back().first == "chapters")
+                    return "Exit to Training";
                 if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + launch_place;
                 return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
             };
