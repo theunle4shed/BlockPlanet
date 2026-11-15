@@ -325,7 +325,7 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
     static const Missing missing[] = {
         {"gravity", "Gravity Combos", "When bricks fall into a new match during a combo."},
         {"mystery", "Mystery Blocks", "The flickering yellow and red blocks that give magic."},
-        {"filler", "Filler Blocks", "The small purple blocks: sliding into them, and turning them into a brick."},
+        {"rubble", "Rubble", "The small purple blocks: sliding into them, and turning them into a brick."},
         {"magic_kinds", "The Six Magics", "Firecracker to Ray Gun: what each one does."},
         {"lines_rules", "Lines", "Lining up three in a row to remove bricks."},
     };

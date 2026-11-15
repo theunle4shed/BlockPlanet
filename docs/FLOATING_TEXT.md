@@ -7,7 +7,7 @@ Everything that floats over the sphere or flashes up in Rescue (and the modes bu
 | # | What | When | Look | Drawn by | Today |
 |---|---|---|---|---|---|
 | G1 | **Small floating points** ("300", "400", "500") | After a drop that scores, or a small clear | White digits rising from the drop | The game's floating score (routine not yet found) | Shown in every mode |
-| G2 | **Score bubbles** (1K, 2K, 3K, 5K…) | During a combo, over the bricks as they break; "1K" also for turning filler into a brick | A coloured bubble with the points: 1K blue, 2K purple, 3K pink, 5K red | Not yet found (one picture per value, or a bubble with digits?) | Shown in every mode |
+| G2 | **Score bubbles** (1K, 2K, 3K, 5K…) | During a combo, over the bricks as they break; "1K" also for turning rubble into a brick | A coloured bubble with the points: 1K blue, 2K purple, 3K pink, 5K red | Not yet found (one picture per value, or a bubble with digits?) | Shown in every mode |
 | G3 | **The large grey 3D number** ("19000", "30100") | A few seconds after a big combo or a stage's last clear | Large grey 3D digits across the sphere | A 3D model first drawn at the clear (candidates: `0x801BE090`, `0x801AC880`; to confirm) | Shown in every mode |
 | G4 | **"Nice Job"** | A stage's end | Large silver 3D letters | The game's stage-end scene | Shown |
 | G5 | **The light burst and flying bricks** | As the core opens | White rays, white bricks flying out | The game's stage-end scene | Shown |
