@@ -54,3 +54,13 @@ Recorded in Rescue 1:1 (hearts set to 0 and the drop timer near its limit, so th
 
 Recommendation: reuse the game's own letters (they are the original's art, drawn by the game from the ROM at run time, so nothing is copied into BlockPlanet), shown after BlockPlanet's shell has closed, centred over the sphere; hide the dark bricks and hold the camera on the sphere once their routines are found. Rebuilding the letters as new models would be BlockPlanet's own art: more work, and only needed if the owner wants a different look.
 
+## Research: holding back the game's own game over (2026-11-15, not working yet)
+
+Goal (the owner's sequence): last heart lost → the sphere freezes → BlockPlanet's shell fades in → the game's GAME OVER letters → the Game Over panel.
+
+Tried, then removed (the build is as before):
+- **Holding the hearts check.** `func_800CD3B8` checks player 1's hearts each frame (`lh $t8, 0x2D7E($s2)` at `0x800CEDE8`, branch at `0x800CEDF0`); at 0 it sets them to −1, `+0x23DE` = 60 and calls `func_800ADBC0` (`+0x5A4` = 1, `+0x2414` = `0x1838`). Making `$t8` non-zero there held the hearts at 0 for 2.4 s, but **the sphere still pulled away and the GAME OVER letters still came** after about 1 s.
+- **Holding the last heart's loss.** `func_800940F0` (a0 = the player's context) loses a heart: it calls `func_800ADC44`, resets the drop state and decrements `+0x2D7E`. Its callers: `func_800ACB94` (`0x800AD5F0`, the drop timer running out, after setting `+0x2414` = `0x429A`), `func_800CD3B8` (`0x800CDB8C` after `func_8008A6E4`, and `0x800CDE24`), `func_8009423C` (`0x80094BF4`). Skipping it for the last heart (hearts kept at 1, shown on the HUD) still let the game over begin about 1 s later.
+
+So the game over is started by something other than the hearts value and the heart-loss routine, probably in the caller's own path (the bad drop in `func_800CD3B8` or what `func_8008A6E4` sets). Next: watch which player-context fields change in the second after the last bad drop (a memory diff each frame), to find the flag the game over sequence runs from.
+
