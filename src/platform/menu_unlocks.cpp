@@ -73,6 +73,7 @@ std::vector<blockplanet::ui::ListItem> main_icon_items(const MenuUnlocks& u) {
     static const std::vector<Entry> entries{
         {"profiles", "", "\uE466", "command:profiles", "Profiles: choose who is playing, or add a profile.", Status::None, 0},
         {"trophies", "", "\uE377", "command:trophies", "Trophies (in progress).", Status::None, -1},
+        {"media", "", "\uE126", "command:media_player", "Media Player: the game's music and your own (not started).", Status::None, -1},
         {"options", "", "\uE158", "open:options", "Options: graphics, sound, controls and more.", Status::None, 0},
         {"exit", "", "\uE112", "command:exit", "Exit to the desktop.", Status::None, 0},
     };
@@ -104,7 +105,6 @@ std::vector<blockplanet::ui::ListItem> solo_bonus_items(const MenuUnlocks& u) {
         {"multiphasic", "Multiphasic", "\uE104", "command:multiphasic", "One long run: each core you open becomes the next sphere. How far can you go?",
          Status::NotStarted, -1},
         {"escape", "Escape", "\uE3DA", "command:escape", "The view from inside the sphere: break your way out through a hole.", Status::NotStarted, -1},
-        {"media", "Media Player", "\uE126", "command:media_player", "The game's music and your own.", Status::NotStarted, -1},
     };
     return build(entries, u);
 }
@@ -122,7 +122,6 @@ std::vector<blockplanet::ui::ListItem> local_bonus_items(const MenuUnlocks& u) {
     static const std::vector<Entry> entries{
         {"lines", "Lines", "\uE58F", "open:local_lines", "Lines for two.", Status::NotStarted, -1},
         {"custom", "Custom", "\uE29A", "command:multiplayer_custom", "Your own rules for a game with friends.", Status::NotStarted, -1},
-        {"media", "Media Player", "\uE126", "command:media_player", "The game's music and your own.", Status::NotStarted, -1},
     };
     return build(entries, u);
 }

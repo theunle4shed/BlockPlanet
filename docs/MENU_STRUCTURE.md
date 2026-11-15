@@ -49,17 +49,17 @@ The owner's picture of how the menus grow as the player progresses. It replaces 
 
 ## Development status shown in the menus (2026-11-14, updated)
 
-The owner's layout (2026-11-14): the main menu lists Solo, Training, Local, Online and Credits, with Profiles, Trophies, Options and Exit as a row of icons below, right-aligned (the description under the menu names the focused icon). Solo and Local each have a Bonus menu that can be entered, holding every mode that will come through Adventure, and the Media Player.
+The owner's layout (2026-11-14): the main menu lists Solo, Training, Local, Online and Credits, with Profiles, Trophies, Options and Exit as a row of icons below, right-aligned (the description under the menu names the focused icon). Solo and Local each have a Bonus menu that can be entered, holding every mode that will come through Adventure. The Media Player is an icon in the main menu's row (the owner, 2026-11-15).
 
 | Menu | Viable | In progress | Not started |
 |---|---|---|---|
 | Main | Solo, Training, Credits | Local | Online |
-| Main (icons) | Profiles, Options, Exit | Trophies | |
+| Main (icons) | Profiles, Options, Exit | Trophies | Media Player |
 | Solo | Rescue | Bonus | Adventure |
-| Solo > Bonus | Hide & Seek, Puzzle, Lines | Minefield | Multiphasic, Escape, Media Player |
+| Solo > Bonus | Hide & Seek, Puzzle, Lines | Minefield | Multiphasic, Escape |
 | Rescue | Campaign, Time Attack, Score Attack, Casual | | |
 | Local | | Rescue (Versus against the computer), Bonus | |
-| Local > Bonus | | | Lines for two, Custom, Media Player |
+| Local > Bonus | | | Lines for two, Custom |
 | Online | | | Host, Join |
 
 The owner can correct any of these; they are set in `src/platform/menu_unlocks.cpp` (and, for the screens not yet built by the game, in their files' `rag` notes).

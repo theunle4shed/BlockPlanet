@@ -42,9 +42,10 @@ int main() {
     solo = solo_menu_items(all);
     assert(has(solo, "story") && has(solo, "adventure") && has(solo, "bonus") && !has(solo, "lines"));
     auto bonus = solo_bonus_items(all);
-    assert(has(bonus, "lines") && has(bonus, "puzzle") && has(bonus, "hide_and_seek") && has(bonus, "minefield") && has(bonus, "media"));
+    assert(has(bonus, "lines") && has(bonus, "puzzle") && has(bonus, "hide_and_seek") && has(bonus, "minefield") && !has(bonus, "media"));
     for (const auto& i : bonus) assert(!i.note.empty() && i.classes.rfind("rag-", 0) == 0);
-    assert(has(local_menu_items(all), "bonus") && has(local_bonus_items(all), "media"));
+    assert(has(local_menu_items(all), "bonus") && !has(local_bonus_items(all), "media"));
+    assert(has(main_icon_items(all), "media") && !has(main_icon_items(fresh), "media"));
     assert(has(main_menu_items(all), "online") && has(main_icon_items(all), "trophies"));
     assert(rescue_menu_open(all) && has(rescue_menu_items(all), "time_attack"));
     return 0;
