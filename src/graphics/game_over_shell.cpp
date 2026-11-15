@@ -8,6 +8,7 @@
 // BLOCKPLANET_GAMEOVER_SHELL=0 leaves the game's own game over alone.
 
 #include "tetrisphere/game_over_shell.h"
+#include "tetrisphere/recomp_support.h"
 
 #include <atomic>
 
@@ -316,3 +317,52 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
 }
 
 } // namespace tetrisphere::sphere
+
+extern "C" void func_800940F0(std::uint8_t* rdram, recomp_context* ctx);
+
+namespace tetrisphere::sphere {
+namespace {
+std::atomic<bool> loss_held{false}, loss_replay{false};
+bool replaying = false;
+} // namespace
+bool game_over_held() { return loss_held.load(); }
+void release_game_over() {
+    loss_held.store(false);
+    loss_replay.store(true);
+}
+} // namespace tetrisphere::sphere
+
+// The last heart's loss (func_800940F0, a0 = player 1's context, one heart
+// left): held back, and the shell forced on. Not in Versus, Puzzle or
+// Training; BLOCKPLANET_GAMEOVER_SHELL=0 leaves it alone.
+extern "C" bool blockplanet_game_over_hold_loss(std::uint8_t* rdram, recomp_context* ctx) {
+    using namespace tetrisphere::sphere;
+    using tetrisphere::guest::load16;
+    if (replaying) return false;
+    const std::uint32_t context = static_cast<std::uint32_t>(ctx->r4);
+    if (context != 0x80110220u || load16(rdram, context + 0x2D7Eu) != 1) return false;
+    const int mode_now = load16(rdram, 0x800E44A8u);
+    if (!enabled() || mode_now == 6 || mode_now == 4 || mode_now == 3) return false;
+    if (!loss_held.exchange(true)) {
+        set_game_over_shell_forced(true);
+        std::fprintf(stdout, "{\"event\":\"game_over_held\"}\n");
+        std::fflush(stdout);
+    }
+    return true;
+}
+
+// Each frame of play, on the game's thread (func_800CD3B8 before its hearts
+// check): once released, the held loss runs here.
+extern "C" void blockplanet_game_over_replay(std::uint8_t* rdram, recomp_context* ctx) {
+    using namespace tetrisphere::sphere;
+    if (!loss_replay.exchange(false)) return;
+    set_game_over_shell_forced(false);
+    const recomp_context saved = *ctx;
+    ctx->r4 = static_cast<gpr>(static_cast<std::int64_t>(static_cast<std::int32_t>(0x80110220u)));
+    replaying = true;
+    func_800940F0(rdram, ctx);
+    replaying = false;
+    *ctx = saved;
+    std::fprintf(stdout, "{\"event\":\"game_over_released\"}\n");
+    std::fflush(stdout);
+}

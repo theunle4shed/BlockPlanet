@@ -22,4 +22,9 @@ bool game_over_shell_wanted(const std::uint8_t* rdram);
 // Game Over panel itself).
 void set_game_over_shell_forced(bool on);
 
+// The last heart's loss held back while the shell closes (since when).
+bool game_over_held();
+// Let the held loss run (on the game's next frame): its game over follows.
+void release_game_over();
+
 } // namespace tetrisphere::sphere

@@ -64,3 +64,11 @@ Tried, then removed (the build is as before):
 
 So the game over is started by something other than the hearts value and the heart-loss routine, probably in the caller's own path (the bad drop in `func_800CD3B8` or what `func_8008A6E4` sets). Next: watch which player-context fields change in the second after the last bad drop (a memory diff each frame), to find the flag the game over sequence runs from.
 
+## Found and built: holding the game over (2026-11-15)
+
+A memory diff around the last bad drop (menu commands `research_diff_start`, then `research_diff_mark`: bytes that change by themselves for 2 s are ignored, then every other byte's first change is logged for 3 s with its time) showed the game over starting in the same frame as the last heart's loss: hearts 1 → −1, `+0x5A4` = 1, `+0x23DE` = 60. **Skipping the loss of the last heart (`func_800940F0` with one heart left) holds the game over off completely** (play just goes on). The earlier attempts failed only because BlockPlanet's Minefield code switched the shell off every frame.
+
+Built: the last heart's loss is held back (`blockplanet_game_over_hold_loss`), the sphere freezes (no input) and BlockPlanet's shell closes over it with the HUD still up; after 2.4 s the held loss is run on the game's own thread (`blockplanet_game_over_replay`, before the hearts check in `func_800CD3B8`), and the game's own game over follows (its camera pull-away, its dark bricks and its GAME OVER letters), then the Game Over panel. Not in Versus, Puzzle or Training; `BLOCKPLANET_GAMEOVER_SHELL=0` leaves the game's own game over alone.
+
+Still to do: keep the camera on the covered sphere and hide the game's dark bricks during its game over, so only the letters show over the shell; the piece in hand still shows through the shell.
+

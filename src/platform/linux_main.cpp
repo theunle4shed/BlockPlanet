@@ -211,6 +211,7 @@ std::string chapter_zero_lesson;  // "basics" or "puzzle"
 std::optional<int> single_lesson;
 // A lost field under its shell: the sphere can no longer be turned (the owner's design).
 std::atomic<bool> minefield_frozen{false};
+std::atomic<bool> game_over_frozen{false};  // the shell closing before the game's game over
 float card_stick = 0.0f;  // the right stick's vertical position, scrolling the card panel
 // A mode to start once the game is back at its menu: after a Chapter 0, or
 // for Restart level. `start` is the chapter and level (1-based) to begin at.
@@ -1572,8 +1573,54 @@ void research_hole(std::uint8_t* rdram) {
     std::fflush(stdout);
 }
 
+// Research (the test harness): a memory diff around an event.
+// "research_diff_start" learns which bytes change by themselves (for 2 s);
+// "research_diff_mark" then logs, for 3 s, each other byte the first time it
+// changes (address, old, new, ms after the mark). Ranges: player 1's context
+// and the game's globals.
+std::optional<std::chrono::steady_clock::time_point> diff_start, diff_mark;
+void research_diff() {
+    if (!diff_start || guest_rdram == nullptr) return;
+    struct Range { std::uint32_t from, to; };
+    static const Range ranges[] = {{0x80110220u, 0x80113800u}, {0x800DF000u, 0x800E5000u}, {0x8013C000u, 0x80140000u}, {0x80100000u, 0x80104000u}};
+    static std::vector<std::uint8_t> last, noisy, logged;
+    std::size_t total = 0;
+    for (const auto& r : ranges) total += r.to - r.from;
+    static std::optional<std::chrono::steady_clock::time_point> seeded_for;
+    if (last.size() != total) last.assign(total, 0), noisy.assign(total, 0), logged.assign(total, 0);
+    if (seeded_for != diff_start) {
+        // A new start: take the current memory as the baseline first.
+        seeded_for = diff_start;
+        std::fill(noisy.begin(), noisy.end(), 0);
+        std::fill(logged.begin(), logged.end(), 0);
+        std::size_t k = 0;
+        for (const auto& r : ranges)
+            for (std::uint32_t a = r.from; a < r.to; ++a, ++k) last[k] = guest::load8(guest_rdram, a);
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    const bool learning = !diff_mark && now - *diff_start < std::chrono::seconds(2);
+    const bool watching = diff_mark && now - *diff_mark < std::chrono::seconds(3);
+    std::size_t i = 0;
+    for (const auto& r : ranges)
+        for (std::uint32_t a = r.from; a < r.to; ++a, ++i) {
+            const std::uint8_t v = guest::load8(guest_rdram, a);
+            if (v != last[i]) {
+                if (learning) noisy[i] = 1;
+                else if (watching && !noisy[i] && !logged[i]) {
+                    logged[i] = 1;
+                    std::fprintf(stderr, "DIFF %lld %08X %02X->%02X\n",
+                                 (long long)std::chrono::duration_cast<std::chrono::milliseconds>(now - *diff_mark).count(), a, last[i], v);
+                }
+            }
+            last[i] = v;
+        }
+    if (diff_mark && !watching) diff_start.reset(), diff_mark.reset();
+}
+
 void poll_game_events() {
     if (guest_rdram == nullptr) return;
+    research_diff();
     poll_watches();
     poll_pokes();
     poll_type47_experiment();
@@ -2886,7 +2933,7 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     const auto mapped = map_port_input(port, controller, keys,
                                        controller_bindings(), magic_control());
     const std::uint16_t mouse_bits = port == 0 ? mouse_play.next_frame() : 0;
-    if (minefield_frozen.load()) {*buttons=0;*x=0;*y=0;return true;}
+    if (minefield_frozen.load() || game_over_frozen.load()) {*buttons=0;*x=0;*y=0;return true;}
     *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons | mouse_bits) : mapped.buttons;
     note_start(mapped.buttons);
     *x = mapped.x;
@@ -4425,6 +4472,8 @@ bool handle_profile_command(const std::string& command) {
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
                 continue;
             }
+            if (*command == "research_diff_start") { diff_start = std::chrono::steady_clock::now(); diff_mark.reset(); continue; }
+            if (*command == "research_diff_mark") { diff_mark = std::chrono::steady_clock::now(); continue; }
             if (*command == "research_minefield_lose") {
                 tetrisphere::minefield_sphere::research_lose();
                 continue;
@@ -4982,6 +5031,24 @@ bool handle_profile_command(const std::string& command) {
                 if (puzzle_results_requested && now_p - *puzzle_results_requested > std::chrono::seconds(4))
                     puzzle_results_requested.reset(), puzzle_result.reset();
             }
+            // The last heart lost (the owner's game over): its loss is held while
+            // the sphere freezes and the shell closes, then released.
+            {
+                static std::optional<std::chrono::steady_clock::time_point> held_since;
+                const auto now_h = std::chrono::steady_clock::now();
+                if (tetrisphere::sphere::game_over_held()) {
+                    if (!held_since) held_since = now_h;
+                    auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                    guest::store32(rd, 0x80110220u + 0x2408, 0);  // no drop meanwhile
+                    guest::store16(rd, 0x80110220u + 0x2B10, 0);
+                    if (now_h - *held_since > std::chrono::milliseconds(2400) || guest::load16(guest_rdram, 0x800E121C) != -1) {
+                        tetrisphere::sphere::release_game_over(), held_since.reset();
+                    }
+                } else {
+                    held_since.reset();
+                }
+                game_over_frozen.store(tetrisphere::sphere::game_over_held());
+            }
             std::uint16_t hs_buttons = hide_and_seek_skips();
             if (const auto lines_buttons = lines_card_once()) hs_buttons = lines_buttons;
             track_puzzle_limits();
@@ -5038,7 +5105,7 @@ bool handle_profile_command(const std::string& command) {
                 if (shell_since && !in_play_m) shell_since.reset();
                 // Only while that field is lost and in play (a new field starts bare).
                 if (shell_since && !tetrisphere::minefield_sphere::lost()) shell_since.reset();
-                tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value());
+                tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value() || tetrisphere::sphere::game_over_held());
                 minefield_frozen.store(shell_since.has_value());
                 if (false) {
                 } else if (shell_since && now_m - *shell_since > std::chrono::milliseconds(2500) && !blockplanet::ui::menus_open()) {

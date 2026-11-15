@@ -727,3 +727,17 @@ text = "if (blockplanet_minefield_hide_marker(rdram, ctx)) return;"
 func = "func_800CD3B8"
 before_vram = 0x800CE340
 text = "blockplanet_minefield_centre_view(rdram, ctx);"
+
+# The game over sequence (the owner's design, 2026-11-15): the loss of player
+# 1's last heart (func_800940F0) is held back while the sphere freezes and
+# BlockPlanet's black shell closes over it; then it is run (from the hearts
+# check below, on the game's own thread) and the game's game over follows.
+# Skipping it alone was checked to hold the game over off entirely.
+[[patches.hook]]
+func = "func_800940F0"
+text = "if (blockplanet_game_over_hold_loss(rdram, ctx)) return;"
+
+[[patches.hook]]
+func = "func_800CD3B8"
+before_vram = 0x800CEDE8
+text = "blockplanet_game_over_replay(rdram, ctx);"
