@@ -38,5 +38,5 @@ Built (`src/graphics/game_over_shell.cpp`):
 - Minefield: turning is frozen while the shell is up; the shell is only on while that field is lost (it once carried over into a new field).
 - The loading cover says "Minefield" for a new field (it said "Rescue"), and a Rescue variant's own name.
 
-Still to do: the game's own game over sequence (dark bricks streaming past the camera, the GAME OVER letters, the camera pull-away) still plays in the modes with hearts, and the shell is drawn only while the sphere is in view; replacing that sequence needs its routines found. Blocks cannot yet start behind the sphere (only its visible side is drawn).
+Still to do: the game's own game over sequence (dark bricks streaming past the camera, the GAME OVER letters, the camera pull-away) still plays in the modes with hearts, and the shell is drawn only while the sphere is in view; replacing that sequence needs its routines found. Starting behind the sphere is not needed (the owner: the sphere is never turned to see the back under the shell).
 
