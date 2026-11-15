@@ -159,6 +159,15 @@ int episode_end_expected = 0;
 // The episode-end panel's line: the episode's time against the best (a run
 // from stage 1 only).
 std::string episode_end_line;
+// Hide & Seek's episode (30 levels): the time of the levels cleared in this
+// run of it, whether the run began at its level 1, and the level in play's
+// time, for the results panel at the episode's end.
+double hs_run_total = 0.0, hs_level_time = 0.0;
+bool hs_run_from_first = false;
+// Exit chosen on Hide & Seek's episode-end panel: close the game's card,
+// then pause the next level and quit through the pause.
+std::optional<std::chrono::steady_clock::time_point> hs_exit_since;
+bool hs_exit_paused = false;
 // The start card (the shared pattern, docs/MODE_MATRIX.md): a Rescue run
 // launched from the menus (not a restart) waits on a card with its goal.
 // Pending from the launch until play starts; then BlockPlanet opens the
@@ -1182,24 +1191,45 @@ void update_hud() {
         // progress bar (it would hint where the pictures are). Bests per
         // level in records "hide_and_seek" (chapter key 0 until its own
         // chapter is found).
-        static int level_now = -1;
-        static double level_time = 0.0;
+        static int level_now = -1, chapter_now = 0;
+        double& level_time = hs_level_time;
         // The game's own Hide & Seek clock (+0x2B0C counts up in frames), which
         // stands still while the goal card is shown.
         const double clock_now = static_cast<std::int32_t>(guest::load32(guest_rdram, 0x80110220u + 0x2B0C)) / 60.0;
-        auto& record = profile_data.progress.episode_records["hide_and_seek"][0];
-        if (state.level != level_now) {
-            if (level_now >= 1 && state.level == level_now + 1 && level_time > 0.5) {
-                if (record.best_levels.size() < std::size_t(level_now)) record.best_levels.resize(std::size_t(level_now), 0.0);
-                double& best = record.best_levels[std::size_t(level_now - 1)];
+        // Bests per episode (its chapter, 0x800E44A0, 1-based here); those
+        // kept before the chapter was known (key 0) are episode 1's.
+        auto& hs_records = profile_data.progress.episode_records["hide_and_seek"];
+        if (const auto old = hs_records.find(0); old != hs_records.end()) {
+            if (hs_records.find(1) == hs_records.end()) hs_records[1] = old->second;
+            hs_records.erase(old);
+            profile_dirty = true;
+        }
+        const int chapter = guest::load16(guest_rdram, 0x800E44A0) + 1;
+        if (state.level != level_now || chapter != chapter_now) {
+            // A level cleared: the next one, or level 1 of the next episode after 30.
+            const bool cleared = level_now >= 1 && (state.level == level_now + 1 || (level_now == 30 && state.level == 1));
+            if (cleared && level_time > 0.5) {
+                auto& done = hs_records[chapter_now];
+                if (done.best_levels.size() < std::size_t(level_now)) done.best_levels.resize(std::size_t(level_now), 0.0);
+                double& best = done.best_levels[std::size_t(level_now - 1)];
                 if (best <= 0.0 || level_time < best) {
                     best = level_time;
                     profile_dirty = true;
-                    save_profile();
                 }
+                hs_run_total += level_time;
+                if (level_now == 30 && hs_run_from_first && (done.best_total <= 0.0 || hs_run_total < done.best_total)) {
+                    done.best_total = hs_run_total;
+                    profile_dirty = true;
+                }
+                if (profile_dirty) save_profile();
             }
+            // An episode's level 1 begins its time; starting part-way, no episode time.
+            if (state.level == 1) hs_run_total = 0.0, hs_run_from_first = true;
+            else if (!cleared) hs_run_total = 0.0, hs_run_from_first = false;
             level_now = state.level;
+            chapter_now = chapter;
         }
+        auto& record = hs_records[chapter];
         level_time = std::max(0.0, clock_now);
         view.time_label = "Time";
         view.time = hud_time(level_time);
@@ -1828,9 +1858,16 @@ std::uint16_t hide_and_seek_skips() {
     // Later levels of a run: skip the intro (A, as the player can), until the
     // card comes; only while the level's clock has not started (+0x2B0C).
     const bool clock_started = guest::load32(guest_rdram, 0x80110220u + 0x2B0C) != clock_at_level;
-    if (levels_in_run >= 2 && !clock_started && level_since && now - *level_since > std::chrono::milliseconds(500) &&
-        now - *level_since < std::chrono::seconds(8))
-        return pulse(*level_since);
+    // One press a moment in, and once more 2.5 s later if the card has not
+    // come (pressing on could close a card that has just appeared, before it
+    // is seen here).
+    if (levels_in_run >= 2 && !clock_started && level_since) {
+        const auto in = now - *level_since;
+        const auto press = [&](std::chrono::milliseconds at) {
+            return in >= at && in < at + std::chrono::milliseconds(100);
+        };
+        if (press(std::chrono::milliseconds(800)) || press(std::chrono::milliseconds(3300))) return 0x8000;
+    }
     return 0;
 }
 
@@ -4334,6 +4371,23 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
                 continue;
             }
+            if (*command == "hs_next_episode") {
+                blockplanet::ui::request_close();  // the game's card shows; A carries on
+                continue;
+            }
+            if (*command == "hs_exit") {
+                blockplanet::ui::request_close();
+                hs_exit_since = std::chrono::steady_clock::now();
+                hs_exit_paused = false;
+                grid_quit_at = *hs_exit_since, grid_quit_red = false;  // the grid covers the way out
+                continue;
+            }
+            if (command->rfind("research_hs_level:", 0) == 0 && game_option_applier) {
+                // Research (the test harness): Hide & Seek from level N.
+                game_option_applier->choose_start(0, std::atoi(command->c_str() + 18));
+                launch_mode(LaunchMode::HideAndSeek);
+                continue;
+            }
             if (*command == "research_win" && guest_rdram != nullptr &&
                 guest::load16(guest_rdram, 0x800E121C) == -1) {
                 // Research (the test harness, "poke cmd:research_win"): wins the
@@ -4596,7 +4650,7 @@ bool handle_profile_command(const std::string& command) {
                 }
                 if (start_card_requested && now_c - *start_card_requested > std::chrono::seconds(4)) start_card_requested.reset();
             }
-            const std::uint16_t hs_buttons = hide_and_seek_skips();
+            std::uint16_t hs_buttons = hide_and_seek_skips();
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
                                                    start_pressed_recently());
@@ -4625,7 +4679,57 @@ bool handle_profile_command(const std::string& command) {
                 if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + launch_place;
                 return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
             };
-            if (pause.open_menu && start_card_requested) {
+            // Hide & Seek's episode end (the shared pattern): after level 30
+            // the game shows the next episode's card (the pause row at 100)
+            // and waits for A. BlockPlanet's results panel comes first: Next
+            // Episode shows the card; Exit closes it and leaves through the
+            // next level's pause.
+            {
+                static bool hs_end_shown = false;
+                const bool hs_card = guest::load16(guest_rdram, 0x800E44A8) == 5 && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                                     guest::load16(guest_rdram, 0x800E1228) == 100 && guest::load16(guest_rdram, 0x800E4498) == 29;
+                if (!hs_card) hs_end_shown = false;
+                else if (!hs_end_shown && !hs_exit_since && guest::load16(guest_rdram, 0x800DFF08u) == 1) {
+                    hs_end_shown = true;
+                    const int chapter = guest::load16(guest_rdram, 0x800E44A0) + 1;
+                    std::string line;
+                    if (hs_run_from_first) {
+                        const double total = hs_run_total + hs_level_time;
+                        const auto& rec = profile_data.progress.episode_records["hide_and_seek"][chapter];
+                        line = "Episode time " + hud_time(total);
+                        // (The best was just updated if this run beat it: compare with the levels' sum only when it is another run's.)
+                        if (rec.best_total <= 0.0 || total <= rec.best_total + 0.01) line += "  \u00B7  New best";
+                        else line += "  \u00B7  Best " + hud_time(rec.best_total) + " (" + hud_delta(total - rec.best_total) + ")";
+                    }
+                    blockplanet::ui::set_text("end_title", "Episode Cleared");
+                    blockplanet::ui::set_text("end_where", "Hide & Seek \u00B7 Episode " + std::to_string(chapter));
+                    blockplanet::ui::set_text("end_line", line);
+                    blockplanet::ui::ListItem next{"next", "Next Episode", "Episode " + std::to_string(chapter + 1), "command:hs_next_episode", true, 1, true};
+                    next.icon = "\uE140";
+                    blockplanet::ui::ListItem leave{"exit", exit_label(), "", "command:hs_exit", true};
+                    leave.icon = "\uE112";
+                    blockplanet::ui::set_list("end", {next, leave});
+                    blockplanet::ui::request_open("episode_end");
+                }
+                if (hs_exit_since) {
+                    const auto now_x = std::chrono::steady_clock::now();
+                    if (now_x - *hs_exit_since > std::chrono::seconds(20)) {
+                        hs_exit_since.reset();  // give up
+                    } else if (hs_card) {
+                        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now_x - *hs_exit_since).count();
+                        hs_buttons = ms % 350 < 100 ? 0x8000 : 0;  // close the card
+                    } else if (!hs_exit_paused && guest::load16(guest_rdram, 0x800E1228) < 0 && guest::load16(guest_rdram, 0x800E121C) == -1) {
+                        hs_exit_paused = true;
+                        pause_bridge.request_pause(now_x);
+                    }
+                }
+            }
+            if (pause.open_menu && hs_exit_since) {
+                hs_exit_since.reset();
+                hs_exit_paused = false;
+                end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now();
+                pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
+            } else if (pause.open_menu && start_card_requested) {
                 start_card_requested.reset();
                 start_card_showing = true;
                 // Shown once per game type for each profile; after that the
