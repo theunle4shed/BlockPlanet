@@ -539,6 +539,9 @@ float card_text_scale() {
     return size == "small" ? 0.85f : size == "large" ? 1.2f : size == "larger" ? 1.4f : 1.0f;
 }
 
+// A puzzle just solved, for the results panel shown as the next one starts.
+struct PuzzleResult { int number = 0; double time = 0.0, best_before = 0.0; int moves = 0; double best_moves_before = 0.0; };
+std::optional<PuzzleResult> puzzle_result;
 int& last_drops_seen() { static int v = 0; return v; }
 int& last_slides_seen() { static int v = 0; return v; }
 
@@ -552,8 +555,14 @@ void update_puzzle_hud() {
     const int number = guest::load16(guest_rdram, p1 + 0x23BA) + 1;
     const int drops = guest::load16(guest_rdram, p1 + 0x25C6);
     const int slides = guest::load16(guest_rdram, p1 + 0x25C8);
-    const double seconds = static_cast<std::int32_t>(guest::load32(guest_rdram, p1 + 0x2B0C)) / 60.0;
+    const double clock = static_cast<std::int32_t>(guest::load32(guest_rdram, p1 + 0x2B0C)) / 60.0;
     static int puzzle = -1, start_drops = 0, start_slides = 0;
+    // The game's clock runs on from one puzzle to the next: a puzzle's time
+    // counts from its start.
+    static double clock_at_start = 0.0;
+    if (number != puzzle) clock_at_start = puzzle >= 1 && number == puzzle + 1 ? clock : 0.0;
+    if (clock < clock_at_start) clock_at_start = 0.0;  // started again
+    const double seconds = clock - clock_at_start;
     static double last_seconds = 0.0;
     auto& times = profile_data.progress.episode_records["puzzle"][0].best_levels;
     auto& moves = profile_data.progress.episode_records["puzzle_moves"][0].best_levels;
@@ -565,6 +574,7 @@ void update_puzzle_hud() {
             if (moves.size() <= i) moves.resize(i + 1, 0.0);
             const double used = double(start_drops - last_drops_seen() + start_slides - last_slides_seen());
             bool changed = false;
+            puzzle_result = PuzzleResult{puzzle, last_seconds, times[i], int(used), moves[i]};
             if (times[i] <= 0.0 || last_seconds < times[i]) times[i] = last_seconds, changed = true;
             if (used > 0.0 && (moves[i] <= 0.0 || used < moves[i])) moves[i] = used, changed = true;
             if (changed) {
@@ -4395,6 +4405,26 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
                 continue;
             }
+            if (*command == "research_dump_board" && guest_rdram != nullptr) {
+                const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
+                for (int layer = 1; layer <= 2; ++layer)
+                    for (int y = 8; y < 24; ++y) {
+                        std::string row;
+                        for (int x = 8; x < 24; ++x) {
+                            const int v = guest::load16(guest_rdram, values + 2u * std::uint32_t(layer * 1024 + y * 32 + x));
+                            char b[8]; std::snprintf(b, sizeof b, "%4d", v); row += b;
+                        }
+                        std::fprintf(stderr, "BOARD L%d y%2d %s\n", layer, y, row.c_str());
+                    }
+                std::fprintf(stderr, "BOARD cursor %d %d\n", 8 + guest::load16(guest_rdram, 0x80110220u + 0x2B2A), 8 + guest::load16(guest_rdram, 0x80110220u + 0x2B2E));
+                continue;
+            }
+            if (command->rfind("puzzle_again:", 0) == 0) {
+                // The puzzle just solved, once more: quit through the pause and start it again.
+                continue_mode = PendingLaunch{LaunchMode::Puzzle, std::pair{1, std::atoi(command->c_str() + 13)}, true};
+                pause_bridge.choose(PauseBridge::Choice::Quit, std::chrono::steady_clock::now());
+                continue;
+            }
             if (*command == "hs_next_episode") {
                 blockplanet::ui::request_close();  // the game's card shows; A carries on
                 continue;
@@ -4679,6 +4709,25 @@ bool handle_profile_command(const std::string& command) {
                 }
                 if (start_card_requested && now_c - *start_card_requested > std::chrono::seconds(4)) start_card_requested.reset();
             }
+            // A puzzle solved: pause as the next one starts and show its results.
+            static std::optional<std::chrono::steady_clock::time_point> puzzle_results_requested;
+            {
+                static std::optional<std::chrono::steady_clock::time_point> solved_seen;
+                const auto now_p = std::chrono::steady_clock::now();
+                if (puzzle_result && !puzzle_results_requested) {
+                    if (!solved_seen) solved_seen = now_p;
+                    const bool puzzle_play = guest::load16(guest_rdram, 0x800E44A8) == 4 && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                                             std::int16_t(guest::load16(guest_rdram, 0x800E1228)) < 0;
+                    if (!puzzle_play && now_p - *solved_seen > std::chrono::seconds(10)) puzzle_result.reset(), solved_seen.reset();
+                    else if (puzzle_play && now_p - *solved_seen > std::chrono::milliseconds(700) && !blockplanet::ui::menus_open()) {
+                        puzzle_results_requested = now_p;
+                        solved_seen.reset();
+                        pause_bridge.request_pause(now_p);
+                    }
+                }
+                if (puzzle_results_requested && now_p - *puzzle_results_requested > std::chrono::seconds(4))
+                    puzzle_results_requested.reset(), puzzle_result.reset();
+            }
             std::uint16_t hs_buttons = hide_and_seek_skips();
             track_puzzle_limits();
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
@@ -4754,7 +4803,27 @@ bool handle_profile_command(const std::string& command) {
                     }
                 }
             }
-            if (pause.open_menu && hs_exit_since) {
+            if (pause.open_menu && puzzle_results_requested && puzzle_result) {
+                const auto r = *puzzle_result;
+                puzzle_results_requested.reset();
+                puzzle_result.reset();
+                std::string line = hud_time(r.time);
+                if (r.best_before <= 0.0 || r.time < r.best_before) line += "  \u00B7  New best";
+                else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.time - r.best_before) + ")";
+                if (r.moves > 0) line += "  \u00B7  " + std::to_string(r.moves) + (r.moves == 1 ? " move" : " moves");
+                blockplanet::ui::set_text("results_title", "Puzzle Solved");
+                blockplanet::ui::set_text("results_where", "Puzzle " + std::to_string(r.number));
+                blockplanet::ui::set_text("results_line", line);
+                std::vector<blockplanet::ui::ListItem> items;
+                blockplanet::ui::ListItem next{"next", "Next Puzzle", "Puzzle " + std::to_string(r.number + 1), "command:pause_resume", true, 1, true};
+                next.icon = "\uE140";
+                blockplanet::ui::ListItem again{"again", "Try Again", "", "command:puzzle_again:" + std::to_string(r.number), true};
+                again.icon = "\uE14C";
+                blockplanet::ui::ListItem leave{"quit", exit_label(), "", "command:pause_quit", true};
+                leave.icon = "\uE112";
+                blockplanet::ui::set_list("results", {next, again, leave});
+                blockplanet::ui::request_open("puzzle_results");
+            } else if (pause.open_menu && hs_exit_since) {
                 hs_exit_since.reset();
                 hs_exit_paused = false;
                 end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now();

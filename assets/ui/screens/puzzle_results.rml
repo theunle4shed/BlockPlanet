@@ -1,0 +1,17 @@
+<rml>
+<head>
+    <title>Puzzle Solved</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- The results panel after a puzzle (the shared pattern, docs/MODE_MATRIX.md):
+     over the game's own pause, which BlockPlanet opens as the next puzzle
+     starts, so it waits. Back is Next Puzzle (Resume). -->
+<body data-grid="green" class="over-pause" data-back="command:pause_resume">
+    <div id="panel">
+        <div class="title" data-text="results_title">Puzzle Solved</div>
+        <div class="subtitle" data-text="results_where"></div>
+        <div class="result" data-text="results_line"></div>
+        <div class="list" data-list="results"></div>
+    </div>
+</body>
+</rml>
