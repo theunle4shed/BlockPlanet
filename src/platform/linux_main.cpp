@@ -1744,6 +1744,96 @@ std::string hide_and_seek_title(const std::string& card) {
     return {};
 }
 
+// A new Hide & Seek run (launched from the menus; a restart is the same run):
+// its first level plays the intro.
+bool hide_and_seek_new_run = false;
+// Hide & Seek's goal in full, for the pause screen (the card's text as
+// BlockPlanet rewords it, under the owner's title for the goal).
+std::string hide_and_seek_goal_text(int goal) {
+    switch (goal) {
+    case 1: return "Any Picture: uncover any picture to win.";
+    case 2: return "Five Drills: five pink drills poke out of the sphere. Dig under them to find a picture, then uncover it to win.";
+    case 3: return "Help Them Escape: uncover enough of the core for your friend to escape, then catch them!";
+    case 4: return "Four Parts: four drills each hide part of the core picture. Uncover all four, then slide them together with the blue 2\u00D72 brick.";
+    case 5: return "Unique Shape: uncover the unique shape under the drill.";
+    case 7: return "Brick Drop: clear the bricks under a red brick until it falls to the core.";
+    case 9: return "Connected Pictures: under the drill is a picture with lines. Follow them to find and uncover every picture.";
+    case 10: return "Tower: a picture lies under the tower. Clear around it to show the whole picture.";
+    case 11: return "Crystal Tower: uncover the picture under the crystal tower, without breaking the tower.";
+    default: return "";
+    }
+}
+
+// Hide & Seek in the shared pattern (docs/MODE_MATRIX.md; the owner,
+// 2026-11-15): its intro animation plays once per start (the run's first
+// level; later levels skip it, as A does), and each goal's card shows the
+// first time a profile meets that goal; after that it closes by itself and
+// the goal is on the pause screen. Returns the buttons to press (A) for this
+// pass, or 0. BLOCKPLANET_HS_SKIPS=0 leaves both as the game shows them.
+std::uint16_t hide_and_seek_skips() {
+    static const bool enabled = [] {
+        const char* text = std::getenv("BLOCKPLANET_HS_SKIPS");
+        return text == nullptr || std::string_view(text) != "0";
+    }();
+    using clock = std::chrono::steady_clock;
+    static int level_now = -1, levels_in_run = 0;
+    static std::optional<clock::time_point> level_since, card_since;
+    static bool card_handled = false, card_first = false;
+    static std::uint32_t clock_at_level = 0;
+    if (!enabled || guest_rdram == nullptr) return 0;
+    const auto now = clock::now();
+    const bool in_mode = guest::load16(guest_rdram, 0x800E44A8) == 5 && guest::load16(guest_rdram, 0x800E121C) == -1;
+    if (hide_and_seek_new_run) hide_and_seek_new_run = false, levels_in_run = 0, level_now = -1;
+    if (!in_mode) {
+        level_now = -1;  // out of play (a restart, the menus): the level starts afresh
+        return 0;
+    }
+    const int level = guest::load16(guest_rdram, 0x800E4498);
+    if (level != level_now) {
+        level_now = level;
+        ++levels_in_run;
+        level_since = now;
+        card_since.reset();
+        card_handled = false;
+        card_first = false;
+        // The level's clock (+0x2B0C) stands still through the intro and the
+        // card; it moves once play starts.
+        clock_at_level = guest::load32(guest_rdram, 0x80110220u + 0x2B0C);
+    }
+    if (guest::load16(guest_rdram, 0x800E1228) >= 0) return 0;  // paused
+    const auto box = blockplanet::recent_card_box();
+    const bool card = box && box->kind == 1;
+    const auto pulse = [&](clock::time_point from) -> std::uint16_t {
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - from).count();
+        return ms % 350 < 100 ? 0x8000 : 0;
+    };
+    if (card) {
+        if (!card_since) card_since = now;
+        if (!card_handled) {
+            card_handled = true;
+            const int goal = guest::load16(guest_rdram, 0x800E44A4);
+            const std::string key = "hide_and_seek:" + std::to_string(goal);
+            if (profile_data.progress.start_cards_seen.insert(key).second) {
+                profile_dirty = true;
+                save_profile();
+                card_first = true;  // seen now for the first time: the player closes it
+            }
+        }
+        if (card_first) return 0;
+        // A card already seen: close it (after a moment, so it is not a flash).
+        if (card_since && now - *card_since > std::chrono::milliseconds(400)) return pulse(*card_since);
+        return 0;
+    }
+    if (card_since) return 0;  // the card is closing: play has started
+    // Later levels of a run: skip the intro (A, as the player can), until the
+    // card comes; only while the level's clock has not started (+0x2B0C).
+    const bool clock_started = guest::load32(guest_rdram, 0x80110220u + 0x2B0C) != clock_at_level;
+    if (levels_in_run >= 2 && !clock_started && level_since && now - *level_since > std::chrono::milliseconds(500) &&
+        now - *level_since < std::chrono::seconds(8))
+        return pulse(*level_since);
+    return 0;
+}
+
 // The pause menu's How to Play: BlockPlanet's own short guide to the mode
 // (the owner's choice: to read, no demonstration), naming the player's own
 // buttons. One paragraph per line.
@@ -3308,6 +3398,7 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
         return text == nullptr || std::string_view(text) != "0";
     }();
     start_card_pending.reset();
+    if (mode == LaunchMode::HideAndSeek && !keep_music) hide_and_seek_new_run = true;
     if (mode == LaunchMode::Rescue && !keep_music && start_cards) start_card_pending = std::chrono::steady_clock::now();
     // Story, Training, Puzzle, Lines, Hide & Seek and Versus start directly, without the original menus, from the game's main
     // menu (docs/research/blockplanet-game-state.md, "Starting modes
@@ -4505,6 +4596,7 @@ bool handle_profile_command(const std::string& command) {
                 }
                 if (start_card_requested && now_c - *start_card_requested > std::chrono::seconds(4)) start_card_requested.reset();
             }
+            const std::uint16_t hs_buttons = hide_and_seek_skips();
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
                                                    start_pressed_recently());
@@ -4561,16 +4653,19 @@ bool handle_profile_command(const std::string& command) {
                 start_card_showing = false;
                 blockplanet::ui::set_text("pause_where", where_now());
                 // The goal, as the start card gave it (Rescue; the other modes to follow).
-                blockplanet::ui::set_text("pause_goal", guest::load16(guest_rdram, 0x800E44A8) == 1 &&
-                                                                tetrisphere::minefield_sphere::arena_name().empty()
+                const int mode_now = guest::load16(guest_rdram, 0x800E44A8);
+                blockplanet::ui::set_text("pause_goal", mode_now == 1 && tetrisphere::minefield_sphere::arena_name().empty()
                                                             ? rescue_goal(guest::load16(guest_rdram, 0x80110220u + 0x23E4))
-                                                            : std::string());
+                                                        : mode_now == 5 ? hide_and_seek_goal_text(guest::load16(guest_rdram, 0x800E44A4))
+                                                                        : std::string());
                 auto pause_items = pause.items;
                 for (auto& item : pause_items) {
                     if (item.id == "quit") item.label = exit_label();
                     // Rescue: its runs are episodes; a stage played on its own restarts itself.
                     if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 1)
                         item.label = single_stage ? "Restart Stage" : "Restart Episode";
+                    // Hide & Seek: its run goes back to level 1.
+                    if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 5) item.label = "Restart from Level 1";
                 }
                 // Minefield on the sphere (played in Story's mode): its own
                 // name, New Field in place of Restart Chapter, and no Story
@@ -4619,6 +4714,7 @@ bool handle_profile_command(const std::string& command) {
             if ((pause.close_menu || end.close_menu) && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
             launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons)
                                    : end.inject ? (0x10000u | end.buttons)
+                                   : hs_buttons != 0 ? (0x10000u | hs_buttons)
                                                 : training_inject.load());
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original() || end_menu.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
