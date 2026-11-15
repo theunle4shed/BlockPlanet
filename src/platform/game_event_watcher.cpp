@@ -56,6 +56,7 @@ std::string game_mode_name(std::int16_t mode) {
         case 4: return "puzzle";
         case 5: return "hide_and_seek";
         case 6: return "vs_cpu";
+        case 9: return "lines";
         default: return "";
     }
 }
@@ -74,7 +75,7 @@ std::vector<GameEvent> GameEventWatcher::update(const GameStateSnapshot& now) {
     if (playing && last_play_ && last_play_->mode == now.mode) {
         const auto& before = *last_play_;
         const auto mode = game_mode_name(now.mode);
-        const bool chaptered = now.mode == 1 || now.mode == 5;  // Rescue, Hide & Seek
+        const bool chaptered = now.mode == 1 || now.mode == 5 || now.mode == 9;  // Rescue, Hide & Seek, Lines
         const bool advanced = now.chapter > before.chapter ||
             (now.chapter == before.chapter && now.level > before.level);
         if (chaptered && advanced) {

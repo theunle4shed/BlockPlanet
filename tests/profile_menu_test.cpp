@@ -144,15 +144,16 @@ int main(int argc, char** argv) {
     auto story = story_chapters({}, 15);
     assert(story.size() == 1 && story[0].action == "command:stages:1" && story[0].focus && story[0].note == "next");
     {
-        // A chapter's stages: the whole episode, then the stages done and the next.
-        auto stages = story_stages(2, {1, 2}, {40.5, 0.0, 0.0});
-        assert(stages.size() == 4 && stages[0].action == "command:chapter:2" && stages[0].focus);
+        // A chapter's stages: until the whole episode is done, only the whole episode.
+        assert(story_stages(2, {1, 2}, {40.5, 0.0, 0.0}).size() == 1);
+        assert(story_stages(1, {}, {}).size() == 1);
+        // Done: the whole episode, then every stage, with its best.
+        auto stages = story_stages(2, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, {40.5, 0.0, 0.0});
+        assert(stages.size() == 11 && stages[0].action == "command:chapter:2" && stages[0].focus);
         assert(stages[1].label == "Stage 2:1" && stages[1].action == "command:stage:2:1" && stages[1].note == "best 0:40");
-        assert(stages[3].label == "Stage 2:3" && stages[3].note == "next");
-        // Only the furthest open stage is "next", not every stage not yet played.
-        const auto gaps = story_stages(1, {5}, {});
-        assert(gaps.size() == 7 && gaps[1].note.empty() && gaps[5].note.empty() && gaps[6].note == "next");
-        assert(story_stages(1, {}, {}).size() == 2);
+        assert(stages[3].label == "Stage 2:3" && stages[3].note.empty());
+        // All open (testing): every stage.
+        assert(story_stages(1, {5}, {}, 10, true).size() == 11);
         // Puzzles: the solved ones and the next.
         const auto puzzles = puzzle_list({1, 2}, {12.0}, {2.0});
         assert(puzzles.size() == 3 && puzzles[0].note == "best 0:12 \u00B7 2 moves" && puzzles[1].note == "solved");

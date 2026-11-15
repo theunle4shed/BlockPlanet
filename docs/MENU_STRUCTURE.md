@@ -71,3 +71,8 @@ The owner can correct any of these; they are set in `src/platform/menu_unlocks.c
 - **Campaign** carries on from the next stage not yet completed; once every episode is done it offers the episode list.
 - **Training** is on the main menu.
 - In the main build all of it shows, with each item's status; `BLOCKPLANET_LOCKED=1` shows the menus as a player would see them.
+
+## Lines (2026-11-15)
+
+The owner: Lines gets the same kind of menu as Rescue (Campaign, Time Attack, Score Attack); Local and Online versions later. As Rescue, Lines starts with Episode 1 until it is done, and a single stage can be played only once its whole episode has been played through. Lines has five episodes of ten stages (the game's final Lines ending follows episode 5).
+

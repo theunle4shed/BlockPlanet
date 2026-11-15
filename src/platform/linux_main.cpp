@@ -239,6 +239,11 @@ const char* start_card_key(PlayVariant v) {
            : v == PlayVariant::ScoreAttack ? "score_attack" : "rescue";
 }
 PlayVariant menu_variant = PlayVariant::Story;  // the chapter list on screen
+// Lines' menus (the owner, 2026-11-15: Lines as Rescue, with Campaign, Time
+// Attack and Score Attack): the episode and stage lists on screen are Lines'
+// (menu_lines), and the run in play is Lines (play_lines).
+bool menu_lines = false, play_lines = false;
+constexpr int lines_chapters = 5;  // the game's final Lines ending follows episode 5
 const char* variant_records(PlayVariant v) {
     return v == PlayVariant::TimeAttack ? "time_attack" : v == PlayVariant::ScoreAttack ? "score_attack" : "rescue";
 }
@@ -482,6 +487,7 @@ void publish_menus() {
     blockplanet::ui::set_list("local_items", tetrisphere::local_menu_items(u));
     blockplanet::ui::set_list("local_bonus_items", tetrisphere::local_bonus_items(u));
     blockplanet::ui::set_list("rescue_items", tetrisphere::rescue_menu_items(u));
+    blockplanet::ui::set_list("lines_items", tetrisphere::lines_menu_items(u));
     // Developer items in Options (main build only, for testing the unlocks).
     std::vector<blockplanet::ui::ListItem> developer;
     if (unlock_all_testing && profile_save) {
@@ -1183,6 +1189,12 @@ void update_hud() {
             if (key_now >= 0 && (key == key_now + 1 || next_chapter) && stage_time > 0.5) {
                 auto& record = profile_data.progress.episode_records["lines"][key_now / 100];
                 const int done = key_now % 100;
+                // A stage played on its own (Lines' menus): done; back to the menu shortly.
+                if (single_stage && play_lines && key_now / 100 == single_stage->first && done == single_stage->second) {
+                    const auto i = std::size_t(done - 1);
+                    single_stage_result = SingleStageResult{stage_time, i < record.best_levels.size() ? record.best_levels[i] : 0.0};
+                    single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
+                }
                 if (record.best_levels.size() < std::size_t(done)) record.best_levels.resize(std::size_t(done), 0.0);
                 double& best = record.best_levels[std::size_t(done - 1)];
                 if (best <= 0.0 || stage_time < best) {
@@ -3514,7 +3526,9 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     if (game_option_applier) {
         // Casual (Story without a game over) applies to Story's launches only,
         // and pauses trophies as --casual does.
-        if (mode != LaunchMode::Rescue) play_variant = PlayVariant::Story;  // the variants are Story's
+        // The variants are Rescue's and, from its own menus, Lines'.
+        play_lines = mode == LaunchMode::Lines;
+        if (mode != LaunchMode::Rescue && !(play_lines && menu_lines)) play_variant = PlayVariant::Story;
         const bool casual = mode == LaunchMode::Rescue && play_variant == PlayVariant::Casual;
         game_option_applier->set_menu_casual(casual);
         trophy_engine().set_awards_enabled(!casual && !game_option_applier->affects_awards());
@@ -3554,8 +3568,10 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
             if (mode == LaunchMode::VsCpu) request.mode = DirectMode::Versus;
             request.chapter = game_option_applier->rescue_start_chapter() - 1;
             request.level = game_option_applier->rescue_start_level() - 1;
-            if (mode != LaunchMode::Rescue) request.chapter = 0;  // the menus clear it (Puzzle: the puzzle is the level)
-            if (mode == LaunchMode::Lines || mode == LaunchMode::VsCpu) request.level = 0;
+            // The menus clear the chapter (Puzzle: the puzzle is the level);
+            // Rescue and Lines start at the episode and stage chosen.
+            if (mode != LaunchMode::Rescue && mode != LaunchMode::Lines) request.chapter = 0;
+            if (mode == LaunchMode::VsCpu) request.level = 0;
         }
         if (direct_start::request(request)) {
             direct_wait = DirectWait{mode, std::chrono::steady_clock::now()};
@@ -4368,7 +4384,8 @@ bool handle_profile_command(const std::string& command) {
                 case 4: mode = LaunchMode::Puzzle; start = std::pair{state.chapter + 1, state.level + 1}; break;
                 case 2: mode = LaunchMode::TimeTrial; break;
                 case 6: mode = LaunchMode::VsCpu; break;
-                case 9: mode = LaunchMode::Lines; break;
+                // Lines: the episode from its first stage, or a single stage itself.
+                case 9: mode = LaunchMode::Lines; start = std::pair{state.chapter + 1, single_stage ? state.level + 1 : 1}; break;
                 case 3:
                     if (state.training_type == 1) mode = LaunchMode::TrainingBasics;
                     if (state.training_type == 2) mode = LaunchMode::TrainingAdvanced;
@@ -4426,6 +4443,7 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "story" || *command == "time_attack" || *command == "score_attack" || *command == "casual") {
+                menu_lines = false;
                 menu_variant = *command == "story" ? PlayVariant::Story
                                : *command == "casual" ? PlayVariant::Casual
                                : *command == "time_attack" ? PlayVariant::TimeAttack : PlayVariant::ScoreAttack;
@@ -4437,6 +4455,7 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "open_story") {
+                menu_lines = false;
                 // Solo > Rescue: until Episode 1 is done it launches Episode 1
                 // straight away; afterwards its menu (docs/MENU_STRUCTURE.md).
                 if (tetrisphere::rescue_menu_open(menu_unlocks_now())) {
@@ -4447,22 +4466,58 @@ bool handle_profile_command(const std::string& command) {
                 }
                 continue;
             }
-            if (*command == "campaign") {
+            if (*command == "open_lines") {
+                // Solo > Bonus > Lines: as Rescue, Episode 1 straight away until
+                // it is done; afterwards Lines' menu.
+                const auto& done = profile_data.progress.chapters_completed;
+                const bool opened = menu_unlocks_now().everything || (done.count("lines") && done.at("lines").count(1));
+                menu_lines = true;
+                menu_variant = PlayVariant::Story;
+                if (opened) blockplanet::ui::request_show("lines_menu");
+                else blockplanet::ui::send_command("chapter:1");
+                continue;
+            }
+            if (*command == "lines_time_attack" || *command == "lines_score_attack") {
+                menu_lines = true;
+                menu_variant = *command == "lines_time_attack" ? PlayVariant::TimeAttack : PlayVariant::ScoreAttack;
+                std::set<int> completed;
+                if (const auto found = profile_data.progress.chapters_completed.find("lines");
+                    found != profile_data.progress.chapters_completed.end())
+                    completed = found->second;
+                blockplanet::ui::set_text("chapters_title", std::string("Lines ") + variant_title(menu_variant));
+                blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
+                blockplanet::ui::set_list("chapters", story_chapters(completed, lines_chapters, unlock_all_testing));
+                blockplanet::ui::request_show("chapters");
+                continue;
+            }
+            if (*command == "campaign" || *command == "lines_campaign") {
                 // Campaign: on from the next stage not yet completed (the
                 // owner's plan; earlier stages are replayed in the attack modes).
+                // Rescue's, or Lines' (lines_campaign).
+                const bool lines = *command == "lines_campaign";
+                menu_lines = lines;
+                const char* game = lines ? "lines" : "rescue";
+                const int episodes_in_game = lines ? lines_chapters : rescue_chapters;
                 menu_variant = PlayVariant::Story;
                 const auto& levels = profile_data.progress.levels_completed;
                 const auto& chapters = profile_data.progress.chapters_completed;
-                const auto episodes = chapters.find("rescue");
+                const auto episodes = chapters.find(game);
                 int episode = 1;
-                while (episode <= rescue_chapters && episodes != chapters.end() && episodes->second.count(episode)) ++episode;
-                if (episode > rescue_chapters) {
+                while (episode <= episodes_in_game && episodes != chapters.end() && episodes->second.count(episode)) ++episode;
+                if (episode > episodes_in_game) {
                     // Every episode done: the episode list, to play any again.
-                    blockplanet::ui::send_command("story");
+                    if (lines) {
+                        blockplanet::ui::set_text("chapters_title", "Lines Campaign");
+                        blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
+                        blockplanet::ui::set_list("chapters", story_chapters(episodes->second, lines_chapters, unlock_all_testing));
+                        blockplanet::ui::request_show("chapters");
+                    } else {
+                        blockplanet::ui::send_command("story");
+                    }
                     continue;
                 }
                 int stage = 1;
-                if (const auto found = levels.find("rescue"); found != levels.end())
+                if (const auto found = levels.find(game); found != levels.end())
                     if (const auto c = found->second.find(episode); c != found->second.end())
                         while (stage < 10 && c->second.count(stage)) ++stage;
                 blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
@@ -4506,8 +4561,10 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (command->rfind("research_lines_level:", 0) == 0 && game_option_applier) {
-                // Research (the test harness): Lines from stage 1:N.
-                game_option_applier->choose_start(1, std::atoi(command->c_str() + 21));
+                // Research (the test harness): Lines from stage C:L ("research_lines_level:C:L").
+                const int c = std::atoi(command->c_str() + 21);
+                const auto colon = command->find(':', 21);
+                game_option_applier->choose_start(c, colon == std::string::npos ? 1 : std::atoi(command->c_str() + colon + 1));
                 launch_mode(LaunchMode::Lines);
                 continue;
             }
@@ -4629,10 +4686,12 @@ bool handle_profile_command(const std::string& command) {
             if (command->rfind("stages:", 0) == 0) {
                 const int chapter = std::atoi(command->c_str() + 7);
                 std::set<int> done;
-                if (const auto m = profile_data.progress.levels_completed.find("rescue"); m != profile_data.progress.levels_completed.end())
+                if (const auto m = profile_data.progress.levels_completed.find(menu_lines ? "lines" : "rescue"); m != profile_data.progress.levels_completed.end())
                     if (const auto c = m->second.find(chapter); c != m->second.end()) done = c->second;
                 std::vector<double> best;
-                if (const auto m = profile_data.progress.episode_records.find(variant_records(menu_variant)); m != profile_data.progress.episode_records.end())
+                // (Lines keeps one set of stage times for now, whichever menu it was played from.)
+                const std::string records_key = menu_lines ? "lines" : variant_records(menu_variant);
+                if (const auto m = profile_data.progress.episode_records.find(records_key); m != profile_data.progress.episode_records.end())
                     if (const auto c = m->second.find(chapter); c != m->second.end()) best = c->second.best_levels;
                 if (menu_variant == PlayVariant::ScoreAttack) best.clear();  // points, not times: not shown as times
                 blockplanet::ui::set_text("stages_title", stages_title_now = "Episode " + std::to_string(chapter));
@@ -4682,14 +4741,14 @@ bool handle_profile_command(const std::string& command) {
                 const int chapter = std::atoi(command->c_str() + 6);
                 const auto colon = command->find(':', 6);
                 const int level = colon == std::string::npos ? 1 : std::atoi(command->c_str() + colon + 1);
-                if (chapter >= 1 && chapter <= rescue_chapters && level >= 1 && game_option_applier) {
+                if (chapter >= 1 && chapter <= (menu_lines ? lines_chapters : rescue_chapters) && level >= 1 && game_option_applier) {
                     continue_mode.reset();
                     single_stage = std::pair{chapter, level};
                     play_variant = menu_variant;
                     single_stage_quit_at.reset();
                     single_stage_result.reset();
                     game_option_applier->choose_start(chapter, level);
-                    launch_mode(LaunchMode::Rescue);
+                    launch_mode(menu_lines ? LaunchMode::Lines : LaunchMode::Rescue);
                 }
                 continue;
             }
@@ -4701,14 +4760,16 @@ bool handle_profile_command(const std::string& command) {
                 continue_mode.reset();
                 if (chapter == 0) {
                     launch_mode(LaunchMode::TrainingBasics);
-                } else if (chapter <= rescue_chapters && game_option_applier) {
-                    // chapter:N, or chapter:N:L to start at level L.
+                } else if (chapter <= (menu_lines ? lines_chapters : rescue_chapters) && game_option_applier) {
+                    // chapter:N, or chapter:N:L to start at level L (Rescue's, or Lines' from its menus).
                     const auto colon = command->find(':', 8);
                     if (colon != std::string::npos)
                         game_option_applier->choose_start(chapter, std::atoi(command->c_str() + colon + 1));
+                    else if (menu_lines)
+                        game_option_applier->choose_start(chapter, 1);  // Lines' start is set as Puzzle's
                     else
                         game_option_applier->choose_chapter(chapter);
-                    launch_mode(LaunchMode::Rescue);
+                    launch_mode(menu_lines ? LaunchMode::Lines : LaunchMode::Rescue);
                 }
                 continue;
             }
@@ -4820,7 +4881,7 @@ bool handle_profile_command(const std::string& command) {
                 case 4: where = "Puzzle " + std::to_string(state.level + 1); break;
                 case 5: where = "Hide & Seek \u00B7 Level " + std::to_string(state.level + 1); break;  // its chapter is not the Rescue one
                 case 6: where = "Versus"; break;
-                case 9: where = "Lines"; break;
+                case 9: where = "Lines \u00B7 " + std::to_string(state.chapter + 1) + ":" + std::to_string(state.level + 1); break;
                 default: break;
                 }
                 return where;
@@ -4955,7 +5016,8 @@ bool handle_profile_command(const std::string& command) {
                     if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 5) item.label = "Restart from Level 1";
                     if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 4) item.label = "Restart Puzzle";
                     // Lines starts again from its first stage.
-                    if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 9) item.label = "Restart from 1:1";
+                    if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 9)
+                        item.label = single_stage ? "Restart Stage" : "Restart Episode";
                 }
                 // Minefield on the sphere (played in Story's mode): its own
                 // name, New Field in place of Restart Chapter, and no Story
@@ -5043,7 +5105,7 @@ bool handle_profile_command(const std::string& command) {
                     if (single_stage_result)
                         pending_results = StageResults{single_stage->first, single_stage->second, play_variant == PlayVariant::ScoreAttack,
                                                        single_stage_result->time, single_stage_result->best_before,
-                                                       std::string(variant_title(play_variant)) + " \u00B7 " +
+                                                       std::string(play_lines ? "Lines" : variant_title(play_variant)) + " \u00B7 " +
                                                            std::to_string(single_stage->first) + ":" + std::to_string(single_stage->second)};
                 }
                 single_stage.reset();

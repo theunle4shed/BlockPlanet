@@ -39,5 +39,7 @@ std::vector<blockplanet::ui::ListItem> rescue_menu_items(const MenuUnlocks& unlo
 // Whether Solo > Rescue opens its menu; until Episode 1 is done it launches
 // Episode 1 straight away.
 bool rescue_menu_open(const MenuUnlocks& unlocks);
+// Lines' menu (Campaign, Time Attack, Score Attack), as Rescue's.
+std::vector<blockplanet::ui::ListItem> lines_menu_items(const MenuUnlocks& unlocks);
 
 } // namespace tetrisphere

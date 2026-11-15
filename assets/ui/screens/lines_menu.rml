@@ -1,0 +1,15 @@
+<rml>
+<head>
+    <title>Lines</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body data-grid="green">
+    <div id="panel">
+        <div class="title">Lines</div>
+        <div class="subtitle">Choose how to play</div>
+        <div class="list" data-list="lines_items"></div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

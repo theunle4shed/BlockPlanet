@@ -260,10 +260,15 @@ std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<
     std::vector<blockplanet::ui::ListItem> items;
     const auto c = std::to_string(chapter);
     items.push_back({"episode", "Whole Episode", "", "command:chapter:" + c, true, 1, true});
-    int last = 1;
-    for (int level : levels_done)
-        if (level >= 1) last = std::max(last, level + 1);
-    last = all_open ? levels : std::min(last, levels);
+    // Single stages open once the whole episode has been played through (the
+    // owner's rule, 2026-11-15); until then, only the whole episode.
+    bool episode_done = true;
+    for (int level = 1; level <= levels; ++level) episode_done = episode_done && levels_done.count(level) != 0;
+    if (!all_open && !episode_done) {
+        items.front().description = "Play the whole episode through to play its stages one at a time.";
+        return items;
+    }
+    const int last = levels;
     for (int level = 1; level <= last; ++level) {
         const auto i = std::size_t(level - 1);
         std::string note;

@@ -99,7 +99,7 @@ std::vector<blockplanet::ui::ListItem> solo_bonus_items(const MenuUnlocks& u) {
          Status::Viable, -1},
         {"puzzle", "Puzzle", "\uE29C", "command:puzzle", "Clear set spheres with the pieces you are given. Think before you drop.", Status::Viable, -1,
          "command:puzzle_chapter:0", "Puzzle Training"},
-        {"lines", "Lines", "\uE58F", "command:lines", "A different game on the sphere, with its own levels.", Status::Viable, -1},
+        {"lines", "Lines", "\uE58F", "command:open_lines", "A different game on the sphere: line up three bricks to remove them. Five episodes.", Status::Viable, -1},
         {"minefield", "Minefield", "\uE0EC", "command:minefield", "Uncover the grid without setting off a mine: each number counts the mines around it.",
          Status::InProgress, -1},
         {"multiphasic", "Multiphasic", "\uE104", "command:multiphasic", "One long run: each core you open becomes the next sphere. How far can you go?",
@@ -139,5 +139,18 @@ std::vector<blockplanet::ui::ListItem> rescue_menu_items(const MenuUnlocks& u) {
 }
 
 bool rescue_menu_open(const MenuUnlocks& u) { return u.everything || u.episodes.count(1) != 0; }
+
+std::vector<blockplanet::ui::ListItem> lines_menu_items(const MenuUnlocks& u) {
+    // Lines as Rescue (the owner, 2026-11-15): Campaign, Time Attack and
+    // Score Attack on its five episodes.
+    static const std::vector<Entry> entries{
+        {"lines_campaign", "Campaign", "", "command:lines_campaign", "Carry on from your next stage, episode by episode.", Status::Viable, 0},
+        {"lines_time_attack", "Time Attack", "", "command:lines_time_attack",
+         "Lines' episodes as fast as you can, against your best time for every stage. A whole episode or one stage.", Status::InProgress, 0},
+        {"lines_score_attack", "Score Attack", "", "command:lines_score_attack",
+         "As many points as you can on Lines' stages, against the clock.", Status::InProgress, 0},
+    };
+    return build(entries, u);
+}
 
 } // namespace tetrisphere

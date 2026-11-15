@@ -114,7 +114,8 @@ constexpr int keyboard_columns = 10;
 std::vector<blockplanet::ui::ListItem> story_chapters(const std::set<int>& completed, int chapters, bool all_open = false);
 
 // A Story chapter's stage list: "Whole episode", then each stage completed
-// and the next one (up to `levels`), with its best time as a note
+// and the next one (up to `levels`), with its best time as a note. The single
+// stages are listed only once every stage of the episode is done (or all_open)
 // (best_levels: seconds per stage, 0 = none). Actions: chapter:N (the whole
 // episode) and stage:N:L (one stage).
 std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<int>& levels_done,
