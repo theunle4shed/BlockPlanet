@@ -209,6 +209,8 @@ std::string chapter_zero_lesson;  // "basics" or "puzzle"
 // A lesson chosen in Training's menu (lesson:T:L): when the game moves on to
 // the next lesson, BlockPlanet leaves through the pause, back to the menu.
 std::optional<int> single_lesson;
+// A lost field under its shell: the sphere can no longer be turned (the owner's design).
+std::atomic<bool> minefield_frozen{false};
 float card_stick = 0.0f;  // the right stick's vertical position, scrolling the card panel
 // A mode to start once the game is back at its menu: after a Chapter 0, or
 // for Restart level. `start` is the chapter and level (1-based) to begin at.
@@ -2884,6 +2886,7 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     const auto mapped = map_port_input(port, controller, keys,
                                        controller_bindings(), magic_control());
     const std::uint16_t mouse_bits = port == 0 ? mouse_play.next_frame() : 0;
+    if (minefield_frozen.load()) {*buttons=0;*x=0;*y=0;return true;}
     *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons | mouse_bits) : mapped.buttons;
     note_start(mapped.buttons);
     *x = mapped.x;
@@ -3576,6 +3579,9 @@ void begin_launch_presentation(LaunchMode mode) {
     static const char* names[] = {"Rescue", "Hide & Seek", "Puzzle", "Time Trial", "Versus", "Lines",
                                   "Training", "Training", "Puzzle Training"};
     loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
+    // Minefield plays in Rescue's mode: its own name on the loading cover.
+    if (tetrisphere::minefield_sphere::armed()) loading_title = "Minefield";
+    else if (mode == LaunchMode::Rescue) loading_title = variant_title(play_variant);
     // A restart from the pause keeps the menus the game was first started
     // from: the pause screen is not a place to come back to.
     if (const auto path = blockplanet::ui::menu_path();
@@ -5030,7 +5036,10 @@ bool handle_profile_command(const std::string& command) {
                 if (tetrisphere::minefield_sphere::take_lost_game_over()) shell_since = now_m;
                 const bool in_play_m = guest::load16(guest_rdram, 0x800E121C) == -1;
                 if (shell_since && !in_play_m) shell_since.reset();
+                // Only while that field is lost and in play (a new field starts bare).
+                if (shell_since && !tetrisphere::minefield_sphere::lost()) shell_since.reset();
                 tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value());
+                minefield_frozen.store(shell_since.has_value());
                 if (false) {
                 } else if (shell_since && now_m - *shell_since > std::chrono::milliseconds(2500) && !blockplanet::ui::menus_open()) {
                     shell_since = now_m + std::chrono::hours(24);  // shown once

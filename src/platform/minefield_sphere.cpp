@@ -299,6 +299,10 @@ void arm(int arena, int mines) {
 
 bool armed() { return armed_flag.load(); }
 bool active() { return active_flag.load(); }
+bool lost() {
+    std::lock_guard lock(mutex);
+    return field && active_flag.load() && field->state() == Minefield::State::Lost;
+}
 
 std::uint16_t filter_input(std::uint16_t buttons) {
     if (!active_flag.load()) {

@@ -70,6 +70,8 @@ inline const std::vector<Arena>& arenas() { return tetrisphere::minefield_arenas
 void arm(int arena, int mines = -1);
 bool armed();
 bool active();
+// The field in play is lost (a mine opened).
+bool lost();
 // Called each frame with player 1's buttons on their way to the game: notes
 // presses of A (uncover) and B (flag) and removes both while active.
 std::uint16_t filter_input(std::uint16_t buttons);

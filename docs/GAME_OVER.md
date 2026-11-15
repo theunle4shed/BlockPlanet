@@ -27,3 +27,16 @@ The owner (2026-11-15): failing should look and work the same in every mode, whe
 - **Research:** `poke cmd:research_minefield_lose` flags two mines and a cell with none, then opens a mine.
 - **Found:** after the game's own game over in Rescue, with a score table it can enter (a new profile's, empty), the game shows the table (RESCUE and five rows) and waits for a name before its menu, under BlockPlanet's red grid. Seen when forcing game overs in the test setup; to check in real play.
 
+## The shell, second version (the owner's design, 2026-11-15)
+
+The owner's report on the first: the shell clipped the sphere's cells and its 4 × 4 blocks were too big. The design: on a game over the sphere can no longer be turned; black blocks come in at the height of the tallest block in that game (Minefield: layer 2; a deep Rescue stage: more), starting from behind the sphere and closing in from the sides until the whole sphere is covered, each block spinning and growing into its place.
+
+Built (`src/graphics/game_over_shell.cpp`):
+- One block per board cell (`BLOCKPLANET_GAMEOVER_SHELL_CELLS=4` gives the first version's).
+- Every block is a solid column from the core to one height: the tallest column in view when the game ended, so the shell is smooth and nothing pokes through.
+- Blocks start at the rim and sweep in to the middle over 1.2 s (a little scatter so it reads as many blocks), each spinning about its own axis and growing from nothing over 0.5 s.
+- Minefield: turning is frozen while the shell is up; the shell is only on while that field is lost (it once carried over into a new field).
+- The loading cover says "Minefield" for a new field (it said "Rescue"), and a Rescue variant's own name.
+
+Still to do: the game's own game over sequence (dark bricks streaming past the camera, the GAME OVER letters, the camera pull-away) still plays in the modes with hearts, and the shell is drawn only while the sphere is in view; replacing that sequence needs its routines found. Blocks cannot yet start behind the sphere (only its visible side is drawn).
+

@@ -40,11 +40,17 @@ constexpr std::uint32_t board_pointer = 0x800E44DCu;    // one byte per cell, he
 constexpr std::uint32_t p1_hearts = 0x80110220u + 0x2D7Eu;
 constexpr std::uint32_t main_row = 0x800E121Cu;
 
-constexpr int block_cells = 4;          // 32 cells round the sphere: 8 blocks a row, no gap
-constexpr double start_layers = 1.5;    // how far above its place a block starts (more comes at the camera)
+// One block a board cell (the owner, 2026-11-15: the 4 x 4 blocks were too big
+// and clipped the cells; each block now falls onto its own column, as a real
+// block would). BLOCKPLANET_GAMEOVER_SHELL_CELLS=4 gives the first version's.
+const int block_cells = [] {
+    const char* v = std::getenv("BLOCKPLANET_GAMEOVER_SHELL_CELLS");
+    const int n = v ? std::atoi(v) : 1;
+    return n == 2 || n == 4 ? n : 1;
+}();
 constexpr double fall_seconds = 0.5;    // each block's slide
 constexpr double bevel = 3.0;           // how far each block's corner normals lean out
-constexpr double spread_seconds = 0.7;  // the last block starts this long after the first
+constexpr double spread_seconds = 1.2;  // the last block starts this long after the first
 
 // The face work area the sphere's face code reads (sphere_cell.cpp's table),
 // by mesh axis: corner order (row, column) = (0, 0), (1, 0), (1, 1), (0, 1).
@@ -134,6 +140,8 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
         const char* v = std::getenv("BLOCKPLANET_GAMEOVER_SHELL_PIN");
         return v == nullptr || v[0] != '0';
     }();
+    static int shell_height = 2;
+    const bool starting = !running;
     if (!running) running = true, started = now, delays.clear();
     const double seconds = std::chrono::duration<double>(now - started).count();
 
@@ -162,6 +170,15 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     };
     const auto rows = origins(off_row), columns = origins(off_column);
     if (rows.empty() || columns.empty()) return;
+    // The owner's design (2026-11-15): one smooth shell at the height of the
+    // tallest column in play when the game ended (Minefield's 2, a deep Rescue
+    // stage's more), so nothing pokes through; the blocks come in from the rim
+    // to the middle, each spinning and growing into its place.
+    if (starting) {
+        shell_height = 2;
+        for (int r = sphere.first_cell(); r <= sphere.last_cell(); ++r)
+            for (int c = sphere.first_cell(); c <= sphere.last_cell(); ++c) shell_height = std::max(shell_height, height_at(r, c));
+    }
 
     // Near-black blocks: a dark primitive colour times the lit shade (no
     // texture: the one last loaded came out olive on the real game), put back
@@ -193,7 +210,7 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     double far = 1.0;
     for (int r : rows)
         for (int c : columns)
-            far = std::max(far, std::hypot(r + 2.0 - centre, c + 2.0 - centre));
+            far = std::max(far, std::hypot(r + 0.5 * block_cells - centre, c + 0.5 * block_cells - centre));
     for (int r : rows)
         for (int c : columns) {
             // From the edge of the view inwards, so the nearest blocks (which
@@ -206,27 +223,52 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
             // out afresh, for comparison.
             const std::uint32_t board_cell = ((static_cast<std::uint32_t>(c) + off_column) & 0x1Fu) << 5 |
                                              ((static_cast<std::uint32_t>(r) + off_row) & 0x1Fu);
-            const double fresh = spread_seconds * (1.0 - std::hypot(r + 2.0 - centre, c + 2.0 - centre) / far);
+            // From the rim inwards, each cell a little apart from its neighbours (as a
+            // rain of blocks rather than a closing ring).
+            const double jitter = block_cells == 1 ? 0.25 * double((board_cell * 2654435761u) >> 24 & 0xFF) / 255.0 : 0.0;
+            const double fresh = spread_seconds * (1.0 - std::hypot(r + 0.5 * block_cells - centre, c + 0.5 * block_cells - centre) / far) + jitter;
             const auto pinned = delays.try_emplace(board_cell, fresh).first->second;
             const double delay = pin ? pinned : fresh;
             const double u = (seconds - delay) / fall_seconds;
             if (u <= 0.0) continue;  // not yet
-            int top = 1;
-            for (int dr = 0; dr < block_cells; ++dr)
-                for (int dc = 0; dc < block_cells; ++dc) top = std::max(top, height_at(r + dr, c + dc));
-            // Its inner face on the top of the board there (the outer face of
-            // the column's top block is base + (height - 1) steps), lifted
-            // while it slides down.
-            const double lift = start_layers * (1.0 - ease_out(u));
-            const double inner = top - 1 + lift, outer = inner + 1.0;
+            // A solid column from the core to the shell's height; while it comes
+            // in it spins about its own radial axis and grows from nothing.
+            const double outer = shell_height, inner = 0.0;
+            const double grown = ease_out(u), angle = (1.0 - grown) * 3.14159265 * 1.5;
+            double top_p[4][3], bottom_p[4][3], centre_p[3] = {0, 0, 0}, axis_v[3] = {0, 0, 0};
             for (std::size_t k = 0; k < corners.size(); ++k) {
                 const MeshEntry& e = sphere.point(r + corners[k].row * block_cells, c + corners[k].column * block_cells);
                 for (int axis = 0; axis < 3; ++axis) {
-                    memory.write16(corners[k].top[axis], static_cast<std::int16_t>(std::lround(e.outer[axis] + outer * e.inner[axis])));
-                    memory.write16(corners[k].bottom[axis], static_cast<std::int16_t>(std::lround(e.outer[axis] + inner * e.inner[axis])));
+                    top_p[k][axis] = e.outer[axis] + outer * e.inner[axis];
+                    bottom_p[k][axis] = e.outer[axis] + inner * e.inner[axis];
+                    centre_p[axis] += (top_p[k][axis] + bottom_p[k][axis]) / 8.0;
+                    axis_v[axis] += e.inner[axis];
                 }
+            }
+            const double axis_len = std::sqrt(axis_v[0] * axis_v[0] + axis_v[1] * axis_v[1] + axis_v[2] * axis_v[2]);
+            for (double& a : axis_v) a = axis_len > 0 ? a / axis_len : 0.0;
+            const double cs = std::cos(angle), sn = std::sin(angle);
+            const auto place = [&](const double (&p)[3], std::uint32_t const (&out)[3]) {
+                double d[3] = {p[0] - centre_p[0], p[1] - centre_p[1], p[2] - centre_p[2]};
+                const double dot = d[0] * axis_v[0] + d[1] * axis_v[1] + d[2] * axis_v[2];
+                const double cr[3] = {axis_v[1] * d[2] - axis_v[2] * d[1], axis_v[2] * d[0] - axis_v[0] * d[2], axis_v[0] * d[1] - axis_v[1] * d[0]};
+                for (int axis = 0; axis < 3; ++axis) {
+                    const double rot = d[axis] * cs + cr[axis] * sn + axis_v[axis] * dot * (1.0 - cs);  // Rodrigues
+                    memory.write16(out[axis], static_cast<std::int16_t>(std::lround(centre_p[axis] + grown * rot)));
+                }
+            };
+            for (std::size_t k = 0; k < corners.size(); ++k) {
+                const std::uint32_t top_at[3] = {corners[k].top[0], corners[k].top[1], corners[k].top[2]};
+                const std::uint32_t bottom_at[3] = {corners[k].bottom[0], corners[k].bottom[1], corners[k].bottom[2]};
+                place(top_p[k], top_at);
+                place(bottom_p[k], bottom_at);
                 const Normal& n = sphere.point_normal(r + corners[k].row * block_cells, c + corners[k].column * block_cells);
-                const Normal& middle = sphere.point_normal(r + block_cells / 2, c + block_cells / 2);
+                // The block's middle normal: the average of its four corners'.
+                double middle[3] = {0, 0, 0};
+                for (const auto& q : corners) {
+                    const Normal& m = sphere.point_normal(r + q.row * block_cells, c + q.column * block_cells);
+                    for (int axis = 0; axis < 3; ++axis) middle[axis] += m[axis] / 4.0;
+                }
                 double v[3], length = 0.0;
                 for (int axis = 0; axis < 3; ++axis) {
                     v[axis] = middle[axis] + bevel * (n[axis] - middle[axis]);
