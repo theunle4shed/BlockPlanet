@@ -159,6 +159,13 @@ int episode_end_expected = 0;
 // The episode-end panel's line: the episode's time against the best (a run
 // from stage 1 only).
 std::string episode_end_line;
+// The start card (the shared pattern, docs/MODE_MATRIX.md): a Rescue run
+// launched from the menus (not a restart) waits on a card with its goal.
+// Pending from the launch until play starts; then BlockPlanet opens the
+// game's pause and shows the card in place of the pause screen.
+std::optional<std::chrono::steady_clock::time_point> start_card_pending;
+std::optional<std::chrono::steady_clock::time_point> start_card_requested;
+bool start_card_showing = false;
 bool grid_quit_red = false;
 std::chrono::steady_clock::time_point loading_since;
 bool credits_pending = false; // --credits: play them when the title shows
@@ -3279,6 +3286,14 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     }
     if (direct_wait) return;  // a direct start is already on its way
     if (!keep_music) end_track_override();
+    // The start card: Rescue launched from the menus (a restart keeps the
+    // music and goes straight back into play). BLOCKPLANET_START_CARD=0: none.
+    static const bool start_cards = [] {
+        const char* text = std::getenv("BLOCKPLANET_START_CARD");
+        return text == nullptr || std::string_view(text) != "0";
+    }();
+    start_card_pending.reset();
+    if (mode == LaunchMode::Rescue && !keep_music && start_cards) start_card_pending = std::chrono::steady_clock::now();
     // Story, Training, Puzzle, Lines, Hide & Seek and Versus start directly, without the original menus, from the game's main
     // menu (docs/research/blockplanet-game-state.md, "Starting modes
     // directly"); BLOCKPLANET_LAUNCH=menus keeps the menu route.
@@ -4452,6 +4467,28 @@ bool handle_profile_command(const std::string& command) {
             }
         }
         if (!launching() && guest_rdram != nullptr) {
+            // The start card: once play has started (a moment in, as the
+            // sphere arrives), pause the game; the pause shows the card.
+            {
+                const auto now_c = std::chrono::steady_clock::now();
+                if (start_card_pending) {
+                    const bool rescue_play = guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E44A8) == 1 &&
+                                             std::int16_t(guest::load16(guest_rdram, 0x800E1228)) < 0 &&
+                                             std::int16_t(guest::load16(guest_rdram, 0x80110220u + 0x2D7E)) >= 0;
+                    static std::optional<std::chrono::steady_clock::time_point> play_seen;
+                    if (!rescue_play) play_seen.reset();
+                    else if (!play_seen) play_seen = now_c;
+                    if (tetrisphere::minefield_sphere::armed() || sky_test_profile || now_c - *start_card_pending > std::chrono::seconds(40)) {
+                        start_card_pending.reset();
+                    } else if (play_seen && now_c - *play_seen > std::chrono::milliseconds(600) && !blockplanet::ui::menus_open()) {
+                        start_card_pending.reset();
+                        play_seen.reset();
+                        start_card_requested = now_c;
+                        pause_bridge.request_pause(now_c);
+                    }
+                }
+                if (start_card_requested && now_c - *start_card_requested > std::chrono::seconds(4)) start_card_requested.reset();
+            }
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
                                                    start_pressed_recently());
@@ -4480,7 +4517,30 @@ bool handle_profile_command(const std::string& command) {
                 if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + launch_place;
                 return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
             };
-            if (pause.open_menu) {
+            if (pause.open_menu && start_card_requested) {
+                start_card_requested.reset();
+                start_card_showing = true;
+                const auto state = read_game_state(guest_rdram);
+                const int chapter = state.chapter + 1, level = state.level + 1;
+                const int square = guest::load16(guest_rdram, 0x80110220u + 0x23E4);
+                blockplanet::ui::set_text("card_title", variant_title(play_variant));
+                blockplanet::ui::set_text("card_where", single_stage ? "Stage " + std::to_string(chapter) + ":" + std::to_string(level)
+                                                        : level > 1 ? "Episode " + std::to_string(chapter) + " \u00B7 from stage " +
+                                                                          std::to_string(chapter) + ":" + std::to_string(level)
+                                                                    : "Episode " + std::to_string(chapter));
+                std::string goal = "Dig down to the core: uncover a " + std::to_string(square) + "\u00A0\u00D7\u00A0" + std::to_string(square) +
+                                   " square of it to rescue the friend inside.";
+                if (play_variant == PlayVariant::Casual) goal += " Lost hearts come back: no game over.";
+                else if (play_variant == PlayVariant::TimeAttack) goal += " Against the clock: each stage's time is set against your best.";
+                else if (play_variant == PlayVariant::ScoreAttack) goal += " Score all you can before the clock runs out; clearing blocks adds time.";
+                if (!single_stage && level == 1) goal += " Ten stages in all.";
+                blockplanet::ui::set_text("card_goal", goal);
+                blockplanet::ui::ListItem go{"start", "Start", "", "command:pause_resume", true, 1, true};
+                go.icon = "\uE140";
+                blockplanet::ui::set_list("start_card", {go});
+                blockplanet::ui::request_open("start_card");
+            } else if (pause.open_menu) {
+                start_card_showing = false;
                 blockplanet::ui::set_text("pause_where", where_now());
                 auto pause_items = pause.items;
                 for (auto& item : pause_items) {
@@ -4830,7 +4890,7 @@ bool handle_profile_command(const std::string& command) {
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             const auto screen = blockplanet::ui::current_screen();
             if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm" &&
-                                  screen != "gameover" && screen != "episode_end") ||
+                                  screen != "gameover" && screen != "episode_end" && screen != "start_card") ||
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
                 grid_quit_at.reset(), grid_quit_red = false;
             const bool over_pause = start_at || paused || unpaused_at || (grid_quit_at && !grid_quit_red);

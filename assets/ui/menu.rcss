@@ -347,6 +347,7 @@ body.shared .hint { display: block; margin-top: 20dp; }
 
 /* Results (a stage played on its own): the time or score against the best. */
 .result { font-size: 40dp; font-weight: bold; color: #f8f8f8; margin: 8dp 0dp 16dp 0dp; }
+.goal { font-size: 26dp; color: #e8e8ee; margin: 10dp 0dp 18dp 0dp; }
 
 /* The grid test screen: a narrow panel at the left, leaving the grid in view. */
 body.lab #panel { left: 40dp; width: 640dp; top: 20dp; padding: 28dp 36dp; max-height: 96vh; }

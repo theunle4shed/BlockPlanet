@@ -1,0 +1,20 @@
+<rml>
+<head>
+    <title>Start</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- The start card (the shared pattern, docs/MODE_MATRIX.md): the mode, where
+     the run starts and its goal, then Start. Shown over the game's own pause,
+     which BlockPlanet opens as the stage starts, so play waits for it. Back
+     leaves for the menus the game was started from. -->
+<body data-grid="pause" class="over-pause" data-back="command:pause_quit">
+    <div id="panel">
+        <div class="title" data-text="card_title">Rescue</div>
+        <div class="subtitle" data-text="card_where"></div>
+        <div class="goal" data-text="card_goal"></div>
+        <div class="list" data-list="start_card"></div>
+        <div class="list icon-row"><div class="item" id="back" data-action="command:pause_quit" data-description="Back to the menus"><span class="icon">&#xE2A1;</span></div></div>
+        <div id="description" class="description empty"></div>
+    </div>
+</body>
+</rml>
