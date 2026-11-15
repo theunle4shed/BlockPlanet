@@ -436,6 +436,16 @@ void publish_menus() {
     blockplanet::ui::set_list("main_items", tetrisphere::main_menu_items(u));
     blockplanet::ui::set_list("solo_items", tetrisphere::solo_menu_items(u));
     blockplanet::ui::set_list("rescue_items", tetrisphere::rescue_menu_items(u));
+    // Developer items in Options (main build only, for testing the unlocks).
+    std::vector<blockplanet::ui::ListItem> developer;
+    if (unlock_all_testing && profile_save) {
+        blockplanet::ui::ListItem complete{"dev_complete_rescue", "Complete Every Rescue Episode", "(Developer)",
+                                           "command:dev_complete_rescue", true};
+        complete.description = "Marks every Rescue episode and stage completed for this profile, to test what unlocks. "
+                                "It cannot be undone.";
+        developer.push_back(complete);
+    }
+    blockplanet::ui::set_list("developer_items", std::move(developer));
 }
 
 void refresh_continue() {
@@ -4117,6 +4127,30 @@ bool handle_profile_command(const std::string& command) {
                     if (const auto c = found->second.find(episode); c != found->second.end())
                         while (stage < 10 && c->second.count(stage)) ++stage;
                 blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
+                continue;
+            }
+            if (*command == "dev_complete_rescue" && profile_save) {
+                // Developer (main build): every Rescue episode and stage completed
+                // for this profile, as if played; asks first.
+                blockplanet::ui::set_text("confirm_title", "Complete every episode?");
+                blockplanet::ui::set_text("confirm_note", "For " + profile_store->active().name +
+                                                              ": every Rescue episode and stage marked completed. This cannot be undone.");
+                blockplanet::ui::set_list("confirm", {{"yes", "Yes", "", "command:dev_complete_rescue_yes", true},
+                                                      {"no", "No", "", "back", true, 1, true}});
+                blockplanet::ui::request_show("confirm");
+                continue;
+            }
+            if (*command == "dev_complete_rescue_yes" && profile_save) {
+                auto& progress = profile_data.progress;
+                for (int episode = 1; episode <= rescue_chapters; ++episode) {
+                    progress.chapters_completed["rescue"].insert(episode);
+                    for (int stage = 1; stage <= 10; ++stage) progress.levels_completed["rescue"][episode].insert(stage);
+                }
+                profile_dirty = true;
+                save_profile();
+                std::fprintf(stdout, "{\"event\":\"dev_complete_rescue\",\"profile\":\"%s\"}\n", profile_store->active().id.c_str());
+                std::fflush(stdout);
+                blockplanet::ui::queue_action(blockplanet::ui::Action::Back);
                 continue;
             }
             if (*command == "first_training_yes") {
