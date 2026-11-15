@@ -40,3 +40,17 @@ Built (`src/graphics/game_over_shell.cpp`):
 
 Still to do: the game's own game over sequence (dark bricks streaming past the camera, the GAME OVER letters, the camera pull-away) still plays in the modes with hearts, and the shell is drawn only while the sphere is in view; replacing that sequence needs its routines found. Starting behind the sphere is not needed (the owner: the sphere is never turned to see the back under the shell).
 
+## Research: the game's own game over sequence (2026-11-15)
+
+Recorded in Rescue 1:1 (hearts set to 0 and the drop timer near its limit, so the next heart lost is the last):
+
+1. About 0.6 s after the last heart: the board's bricks turn grey and dark bricks start streaming out from the sphere past the camera.
+2. About 1.2 s: the camera pushes away from the sphere and the large 3D **GAME OVER** letters fly in, grey turning red.
+3. About 2.5 s: everything fades to black (the bricks still streaming), then the game's menu (BlockPlanet's red grid and Game Over panel).
+
+**The letters are their own LightWave scene, `0x801EED20`, with eight objects** (the eight letters, first drawn at the moment they appear; parts lists `0x801DC8EC` to `0x801DC99C`). `BLOCKPLANET_OBJECT_ONLY=801EED20:0,1,2,3` drew only some letters (G, A, E, E), and `801EED20:99` none at all, with nothing else changed: so **the letters can be isolated** and hidden, or drawn by BlockPlanet itself at its own place and time, as the title's 3D letters already are (`blockplanet_title_object`).
+
+**The dark bricks** are not in that scene (they stayed with every letter hidden) and not among the models logged (`BLOCKPLANET_MODEL_LOG`); the routine that draws them is still to find. **The camera's pull-away** is also still to find (ROADMAP already notes it).
+
+Recommendation: reuse the game's own letters (they are the original's art, drawn by the game from the ROM at run time, so nothing is copied into BlockPlanet), shown after BlockPlanet's shell has closed, centred over the sphere; hide the dark bricks and hold the camera on the sphere once their routines are found. Rebuilding the letters as new models would be BlockPlanet's own art: more work, and only needed if the owner wants a different look.
+
