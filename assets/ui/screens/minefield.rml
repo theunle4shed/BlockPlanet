@@ -14,7 +14,7 @@
         <div class="item" id="decompartmental" data-action="command:minefield_sphere:4">Decompartmental<span class="note">walled compartments · 47 mines</span></div>
         <div class="item" id="horizon" data-action="command:minefield_sphere:5">Horizon<span class="note">a band over the poles · 124 mines</span></div>
         <div class="item" id="full" data-action="command:minefield_sphere:6">Full<span class="note">32 × 32, the whole sphere · 231 mines</span></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div class="hint">Drop uncovers a cell, slide flags it. Each number counts the mines in the eight cells around it.</div>
     </div>
 </body>

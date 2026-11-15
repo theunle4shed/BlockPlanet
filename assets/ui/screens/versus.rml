@@ -9,7 +9,7 @@
         <div class="subtitle">Who is player 2?</div>
         <div class="item" id="computer" data-action="command:versus" data-description="Play against the computer."><span class="icon"></span>Computer<span class="rag in-progress">(In progress)</span></div>
         <div class="item" id="person" data-action="command:versus_people" data-description="A friend on a second controller, split screen."><span class="icon"></span>A Second Player<span class="rag not-started">(Not started)</span></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>

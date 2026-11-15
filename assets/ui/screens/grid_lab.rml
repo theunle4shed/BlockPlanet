@@ -36,7 +36,7 @@
              data-options="0.5:0.5,1:1,1.4:1.4,1.8:1.8,2.2:2.2,2.6:2.6,3:3,4:4,5:5">Fly Outwards<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="item value slider" id="grid_fly_toward" data-setting="grid_fly_toward" data-description="Flying out (and in), how far the tiles come towards you."
              data-options="0:0 %,10:10 %,20:20 %,35:35 %,50:50 %,75:75 %">Fly Towards You<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>

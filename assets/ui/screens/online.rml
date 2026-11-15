@@ -9,7 +9,7 @@
         <div class="subtitle">Play over the internet</div>
         <div class="item" id="host" data-action="command:online_host" data-description="Start a game and share its join code with friends. In streamer mode the code stays hidden; Copy still works."><span class="icon"></span>Host a Game<span class="rag not-started">(Not started)</span></div>
         <div class="item" id="join" data-action="command:online_join" data-description="Join a friend's game with their code."><span class="icon"></span>Join with a Code<span class="rag not-started">(Not started)</span></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>

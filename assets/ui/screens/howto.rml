@@ -8,7 +8,7 @@
         <div class="header">How to Play</div>
         <div class="subtitle" data-text="howto_title"></div>
         <div class="howto" data-text="howto_body" data-paragraphs="1"></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
     </div>
 </body>
 </rml>

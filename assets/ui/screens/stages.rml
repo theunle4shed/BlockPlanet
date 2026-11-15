@@ -8,7 +8,7 @@
         <div class="title" data-text="stages_title">Episode</div>
         <div class="subtitle" data-text="stages_subtitle">The whole episode, or one stage</div>
         <div class="list" data-list="stages"></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
     </div>
 </body>
 </rml>

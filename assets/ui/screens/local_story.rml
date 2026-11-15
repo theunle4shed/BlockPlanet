@@ -9,7 +9,7 @@
         <div class="subtitle">Two players</div>
         <div class="item" id="versus" data-action="open:versus" data-description="Race to the core against a friend or the computer; combos send trouble their way."><span class="icon"></span>Versus<span class="rag in-progress">(In progress)</span></div>
         <div class="item" id="cooperative" data-action="command:cooperative" data-description="Two players on one sphere, working together: one drops, one supports."><span class="icon"></span>Cooperative<span class="rag not-started">(Not started)</span></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>

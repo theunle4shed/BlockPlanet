@@ -9,7 +9,7 @@
         <div class="subtitle">Two players</div>
         <div class="item" id="versus" data-action="command:lines_versus" data-description="Lines against a friend or the computer."><span class="icon"></span>Versus<span class="rag not-started">(Not started)</span></div>
         <div class="item" id="cooperative" data-action="command:lines_cooperative" data-description="Lines with a friend or the computer on one sphere."><span class="icon"></span>Cooperative<span class="rag not-started">(Not started)</span></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>

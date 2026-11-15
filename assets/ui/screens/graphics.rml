@@ -21,7 +21,7 @@
              data-options="near:Near the sphere,edges:Screen edges,follow:Follow the sphere">HUD Panels<span class="value"></span></div>
         <div class="item value" id="text_size" data-description="The size of all text and panels: menus, the HUD, cards and Wheels’ speech." data-setting="text_size"
              data-options="small:Small,default:Default,large:Large,larger:Larger">Text Size<span class="value"></span></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>

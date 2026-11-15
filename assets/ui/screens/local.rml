@@ -8,7 +8,7 @@
         <div class="title">Local</div>
         <div class="subtitle">Two players on this PC: a friend or the computer</div>
         <div class="list" data-list="local_items"></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>

@@ -15,7 +15,7 @@
              data-options="auto:Auto,random:Random,choose:Choose">Music Order<span class="value"></span></div>
         <div class="item value" id="track" data-description="Pick a track: it plays straight away, for the rest of this game." data-setting="track"
              data-options="0:Prophetic,1:Azule Lux,2:Martist,3:Compliant Confuse,4:Faze,5:Flim Flam,6:Manicdrummix,7:Hallucid,8:Perpetuate303,9:Phony,10:T. Grey,11:Learn,12:Zyp Zyp,13:Extol,14:Magic Fluter,15:Spooky Baby,16:Zooming Car,17:Cheddar Funk,18:Snowy Mushrooms,19:Dog Robot,20:Sappy,21:Skank Bowl Fight,22:Birthday Bumps">Track<span class="value"></span></div>
-        <div class="item" id="back" data-action="back">Back</div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>
 </body>
