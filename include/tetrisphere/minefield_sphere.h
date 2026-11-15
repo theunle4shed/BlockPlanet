@@ -105,6 +105,11 @@ std::optional<Progress> progress();
 // New Field (the pause menu): the field stays armed through the restart that
 // follows, so the same arena starts again with a new field.
 void again();
+// A lost field, its mines shown: true once, when the game over should start.
+bool take_lost_game_over();
+// Research (the test harness, "poke cmd:research_minefield_lose"): flags two mines and a
+// cell with none, then opens a mine.
+void research_lose();
 // The arena being played (when armed), for the pause menu; empty otherwise.
 std::string arena_name();
 

@@ -17,4 +17,9 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere);
 // over), so the original sphere's path builds a sphere for it only then.
 bool game_over_shell_wanted(const std::uint8_t* rdram);
 
+// A failure that is not the game's own game over (a lost Minefield): the
+// shell closes over the sphere while this is on (BlockPlanet then shows its
+// Game Over panel itself).
+void set_game_over_shell_forced(bool on);
+
 } // namespace tetrisphere::sphere

@@ -19,3 +19,11 @@ The owner (2026-11-15): failing should look and work the same in every mode, whe
 1. **One failure sequence:** the black shell closes over the sphere, then the Game Over panel (red grid) with what was reached, then Try Again, Training and Exit.
 2. **Every mode that can fail uses it:** Rescue and its variants, Hide & Seek, Lines, Puzzle and Minefield.
 3. **The shell, redesigned** (fresh, not patched): how it closes and what it looks like are the owner's call.
+
+## Built (2026-11-15)
+
+- **Puzzle:** a failed puzzle (the game takes a heart and shows its own menu) now opens the Game Over panel (Try Again, Training, Exit); it was a blank grid. The game's own dark bricks close in first.
+- **Minefield** (the owner: "show the mine locations and that they've missed a mine… and add the black shell from the standard game over"): when a mine is opened, every other cube goes and the mines stay: **the mine opened flashes red and yellow, mines not flagged are red, mines flagged are green, and flags with no mine under them purple**, with the numbers still on the core. Three seconds later the black shell closes over the sphere (BlockPlanet's, `set_game_over_shell_forced`), then the Game Over panel ("Minefield · Mini"): New Field and Exit. The game's own game over is not used here: in Rescue's mode it goes on to its high-score table, which waits for a name.
+- **Research:** `poke cmd:research_minefield_lose` flags two mines and a cell with none, then opens a mine.
+- **Found:** after the game's own game over in Rescue, with a score table it can enter (a new profile's, empty), the game shows the table (RESCUE and five rows) and waits for a name before its menu, under BlockPlanet's red grid. Seen when forcing game overs in the test setup; to check in real play.
+

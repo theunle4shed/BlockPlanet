@@ -467,5 +467,6 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Training's pause: the line names the lesson ("Training · Combos"), Exit reads "Exit to Training" (it said "Exit to Rescue"), and Restart Lesson restarts the lesson in play rather than the training's first.
 - Fixed: a failed puzzle showed a blank grid. The game takes a heart and shows its game over menu with hearts left, which BlockPlanet did not count as a game over, so the pause grid covered it; the Game Over panel now shows (`EndMenuBridge::puzzle_failed`).
 - New: `docs/GAME_OVER.md`, how each mode fails today and a plan for one failure sequence (the black shell, then the Game Over panel) in every mode.
+- Minefield: a lost field shows where the mines were (the mine opened flashing, missed mines red, flagged mines green, wrong flags purple), then the black shell closes over the sphere, then the Game Over panel (New Field, Exit) (the owner's design; docs/GAME_OVER.md).
 - Research: the menu command `research_win` (the test harness: `poke cmd:research_win`) wins the stage in play by painting the top layer one colour.
 - Checked in the Linux test setup: the mouse's right-button slide, horizontal wheel and middle button reach the game as B with directions, steps of the cursor, and C-down.

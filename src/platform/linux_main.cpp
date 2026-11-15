@@ -26,6 +26,7 @@
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/mouse_play.h"
+#include "tetrisphere/game_over_shell.h"
 #include "tetrisphere/menu_unlocks.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/brick_sky.h"
@@ -4418,6 +4419,22 @@ bool handle_profile_command(const std::string& command) {
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
                 continue;
             }
+            if (*command == "research_minefield_lose") {
+                tetrisphere::minefield_sphere::research_lose();
+                continue;
+            }
+            if (*command == "minefield_lost_again" || *command == "minefield_lost_exit") {
+                // From a lost field's Game Over panel: leave play through the pause
+                // (as a single stage ends), then a new field, or back to its menu.
+                blockplanet::ui::request_close();
+                if (*command == "minefield_lost_again") {
+                    tetrisphere::minefield_sphere::again();
+                    continue_mode = PendingLaunch{LaunchMode::Rescue, std::pair{1, 1}, true};
+                }
+                grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = true;
+                single_stage_quit_at = std::chrono::steady_clock::now();
+                continue;
+            }
             if (*command == "minefield_again") {
                 // A new field in the same arena: Casual 1:1 again, kept armed.
                 tetrisphere::minefield_sphere::again();
@@ -5003,6 +5020,30 @@ bool handle_profile_command(const std::string& command) {
                 if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + launch_place;
                 return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
             };
+            // A lost Minefield (the owner, 2026-11-15): after its mines are shown,
+            // the standard game over's black shell closes over the sphere, then
+            // the Game Over panel (BlockPlanet's: the game's own game over goes
+            // on to its high-score table instead).
+            {
+                static std::optional<std::chrono::steady_clock::time_point> shell_since;
+                const auto now_m = std::chrono::steady_clock::now();
+                if (tetrisphere::minefield_sphere::take_lost_game_over()) shell_since = now_m;
+                const bool in_play_m = guest::load16(guest_rdram, 0x800E121C) == -1;
+                if (shell_since && !in_play_m) shell_since.reset();
+                tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value());
+                if (false) {
+                } else if (shell_since && now_m - *shell_since > std::chrono::milliseconds(2500) && !blockplanet::ui::menus_open()) {
+                    shell_since = now_m + std::chrono::hours(24);  // shown once
+                    blockplanet::ui::set_text("end_title", "Game Over");
+                    blockplanet::ui::set_text("end_where", "Minefield \u00B7 " + tetrisphere::minefield_sphere::arena_name());
+                    blockplanet::ui::ListItem again{"try_again", "New Field", "", "command:minefield_lost_again", true, 1, true};
+                    again.icon = "\uE14C";
+                    blockplanet::ui::ListItem leave{"exit", exit_label(), "", "command:minefield_lost_exit", true};
+                    leave.icon = "\uE112";
+                    blockplanet::ui::set_list("end", {again, leave});
+                    blockplanet::ui::request_open("gameover");
+                }
+            }
             // Hide & Seek's episode end (the shared pattern): after level 30
             // the game shows the next episode's card (the pause row at 100)
             // and waits for A. BlockPlanet's results panel comes first: Next

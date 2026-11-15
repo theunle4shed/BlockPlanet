@@ -54,6 +54,11 @@ int frames_in_play = 0;
 bool built = false;
 std::vector<bool> shown_open;  // cells already cleared on the board
 int over_frames = 0;           // frames since the field was won or lost
+// A lost field (the owner, 2026-11-15): the mines are shown, then the
+// standard game over (with its black shell) follows; linux_main ends play.
+std::atomic<bool> lost_game_over_flag{false};
+std::atomic<bool> research_lose_pending{false};  // research: open a mine (the test harness)
+constexpr auto lost_show_time = std::chrono::seconds(3);  // to see the mines
 int cursor_cell = -1, cursor_field = -1;  // the board and field cell last under the cursor
 // The directions the cursor may not move in (the field's edge), for the
 // input filters; and its last place inside the field.
@@ -471,7 +476,8 @@ void poll(std::uint8_t* rdram) {
     // At the end (below), once the board is cleared, the goal drops to a
     // 4 x 4 square and the timer to just short of its limit: the game's own
     // drop then lands and its check finds the core uncovered.
-    if (over_frames < 90) {
+    const bool lost_now = field->state() == Minefield::State::Lost;
+    if (over_frames < 90 || lost_now) {  // a lost field never ends as a stage: the game over follows
         guest::store32(rdram, player1 + 0x2408, 0);
         guest::store16(rdram, player1 + 0x2B10, 0);
         guest::store16(rdram, player1 + 0x23E4, board);
@@ -502,6 +508,19 @@ void poll(std::uint8_t* rdram) {
     const int under_cursor = in_bounds(x, y);  // walls included, for the cursor's colour
     const int here = field_at(x, y);  // -1 on the wall: nothing happens
     if (ended) pending_flag = 0, pending_open = 0;
+    if (research_lose_pending.exchange(false) && !ended) {
+        // Flag the first two mines (green at the end), a cell with no mine (purple), then open a mine.
+        int flagged = 0, wrong = -1, open_mine = -1;
+        for (int c = 0; c < field->size(); ++c) {
+            const auto& cell = field->cell(c);
+            if (field->wall(c) || cell.open) continue;
+            if (cell.mine && flagged < 2) field->toggle_flag(c), ++flagged;
+            else if (cell.mine && open_mine < 0) open_mine = c;
+            else if (!cell.mine && wrong < 0) wrong = c;
+        }
+        if (wrong >= 0) field->toggle_flag(wrong);
+        if (open_mine >= 0) field->open(open_mine);
+    }
     for (int n = pending_flag.exchange(0); n > 0; --n) field->toggle_flag(here);
     for (int n = pending_open.exchange(0); n > 0; --n) {
         if (here >= 0 && field->open(here)) {
@@ -538,7 +557,16 @@ void poll(std::uint8_t* rdram) {
     // A board with no cube left is the core uncovered, so the game plays its
     // own stage end (the sphere pulls away and fades) and, the field being
     // played as a single stage, goes back to the menus.
-    if (over && over_frames == 90) {
+    static bool lost_signalled = false;
+    if (!over) lost_signalled = false;
+    if (field->state() == Minefield::State::Lost && !lost_signalled && play_ended &&
+        std::chrono::steady_clock::now() - *play_ended >= lost_show_time) {
+        lost_signalled = true;
+        lost_game_over_flag.store(true);
+        std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"game_over\"}\n");
+        std::fflush(stdout);
+    }
+    if (over && over_frames == 90 && field->state() == Minefield::State::Won) {
         for (int c = 0; c < layer_cells; ++c) clear_cell(rdram, c % board, c / board);
         std::fprintf(stdout, "{\"event\":\"minefield_sphere\",\"state\":\"ending\"}\n");
         std::fflush(stdout);
@@ -567,8 +595,14 @@ void poll(std::uint8_t* rdram) {
     // at once: the owner's call), the cursor's lavender (red over a wall); at the end the
     // mines green (won) or red (lost).
     {
-        constexpr int yellow = 32, green = 34, lavender = 36, red = 37;
+        constexpr int yellow = 32, green = 34, purple = 35, lavender = 36, red = 37;
         const bool won = field->state() == Minefield::State::Won;
+        // Lost (the owner, 2026-11-15: show where the mines were and the one
+        // missed): the mine opened flashes red and yellow, the other mines not
+        // flagged are red, the mines flagged green, and flags with no mine
+        // under them purple.
+        const bool flash_on = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch()).count() / 250 % 2 == 0;
         for (int c = 0; c < field->size(); ++c) {
             const auto& cell = field->cell(c);
             const bool cursor = c == under_cursor && !over;
@@ -579,7 +613,10 @@ void poll(std::uint8_t* rdram) {
                 cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(32 + (c % field_width) / 2 % 6, std::memory_order_relaxed);
                 continue;
             }
-            const int colour = over && cell.mine ? (won ? green : red)
+            const int colour = over && !won && c == field->exploded() ? (flash_on ? red : yellow)
+                               : over && !won && cell.mine ? (cell.flag ? green : red)
+                               : over && !won && cell.flag ? purple
+                               : over && cell.mine ? green
                                : cell.flag ? yellow
                                : cursor ? (field->wall(c) ? red : lavender) : 0;
             cube_colours()[cell_index(origin_x + c % field_width, origin_y + c / field_width)].store(colour, std::memory_order_relaxed);
@@ -643,6 +680,9 @@ std::vector<Mark> marks(const std::uint8_t* rdram) {
 }
 
 void again() { again_pending = true; }
+
+bool take_lost_game_over() { return lost_game_over_flag.exchange(false); }
+void research_lose() { research_lose_pending.store(true); }
 
 std::string arena_name() {
     if (!armed_flag.load()) return {};

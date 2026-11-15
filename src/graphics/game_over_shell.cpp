@@ -9,6 +9,8 @@
 
 #include "tetrisphere/game_over_shell.h"
 
+#include <atomic>
+
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_extended.h"
@@ -103,8 +105,12 @@ double ease_out(double u) {
 
 } // namespace
 
+std::atomic<bool> forced{false};
+
+void set_game_over_shell_forced(bool on) { forced.store(on); }
+
 bool game_over_shell_wanted(const std::uint8_t* rdram) {
-    return enabled() && load16(rdram, p1_hearts) == -1 && load16(rdram, main_row) == -1;
+    return enabled() && ((load16(rdram, p1_hearts) == -1 && load16(rdram, main_row) == -1) || forced.load());
 }
 
 void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
@@ -117,7 +123,7 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     }
     static std::chrono::steady_clock::time_point started{};
     static bool running = false;
-    const bool game_over = load16(rdram, p1_hearts) == -1 && load16(rdram, main_row) == -1;
+    const bool game_over = (load16(rdram, p1_hearts) == -1 && load16(rdram, main_row) == -1) || forced.load();
     if (!game_over) {
         running = false;
         return;
