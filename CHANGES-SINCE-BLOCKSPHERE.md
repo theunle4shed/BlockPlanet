@@ -465,5 +465,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Training (the owner's design): its menu lists every lesson on its own, all open, each starting at that lesson and returning to the menu when it ends; the direct start sets the lesson (`direct_start_hooks.cpp`). Topics the game's training leaves out are listed as Not started (Gravity Combos, Mystery Blocks, Rubble, The Six Magics, Lines). `training_lessons` in `profile_menu.cpp`, with tests.
 - Naming (the owner): the small purple single-cell blocks are **Rubble** (they were called filler blocks), in Training's menu and the docs.
 - Training's pause: the line names the lesson ("Training · Combos"), Exit reads "Exit to Training" (it said "Exit to Rescue"), and Restart Lesson restarts the lesson in play rather than the training's first.
+- Fixed: a failed puzzle showed a blank grid. The game takes a heart and shows its game over menu with hearts left, which BlockPlanet did not count as a game over, so the pause grid covered it; the Game Over panel now shows (`EndMenuBridge::puzzle_failed`).
+- New: `docs/GAME_OVER.md`, how each mode fails today and a plan for one failure sequence (the black shell, then the Game Over panel) in every mode.
 - Research: the menu command `research_win` (the test harness: `poke cmd:research_win`) wins the stage in play by painting the top layer one colour.
 - Checked in the Linux test setup: the mouse's right-button slide, horizontal wheel and middle button reach the game as B with directions, steps of the cursor, and C-down.

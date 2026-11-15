@@ -5461,7 +5461,7 @@ bool handle_profile_command(const std::string& command) {
                 // (The episode-end menu uses the row too, and the next
                 // episode's card sets it to 100: neither is a pause, whose
                 // rows are 0 to 3.)
-                paused = playing && row >= 0 && row <= 3 && !game_over && !end_menu.episode_end();
+                paused = playing && row >= 0 && row <= 3 && !game_over && !end_menu.episode_end() && !end_menu.puzzle_failed();
                 // Resumed (BlockPlanet's pause screen was open in this pause
                 // and is closed now) and the game's fade back in done: counted
                 // as no longer paused, unless waiting for the row.

@@ -99,6 +99,8 @@ public:
     // row is let go.
     void expect_episode_end(bool expected) { episode_expected_ = expected; }
     bool episode_end() const { return episode_end_; }
+    // A puzzle failed (its game over menu, with hearts left).
+    bool puzzle_failed() const { return puzzle_failed_; }
     // The player chose the item on this row (its command "end_choose:ROW").
     void choose(int row, Clock::time_point now);
     bool showing() const { return showing_; }
@@ -113,7 +115,7 @@ private:
     std::vector<blockplanet::ui::ListItem> items_;
     std::string title_;
     int exit_row_ = -1;
-    bool episode_expected_ = false, episode_end_ = false;
+    bool episode_expected_ = false, episode_end_ = false, puzzle_failed_ = false;
 };
 // The end screen's items from the game's menu text: rows in the game's order
 // (top first), shown in BlockPlanet's order (Try again or Continue,

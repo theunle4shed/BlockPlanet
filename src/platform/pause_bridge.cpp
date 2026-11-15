@@ -180,7 +180,12 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
     Output out;
     const bool playing = load16(rdram, scene) == -1;
     const std::int16_t row = load16(rdram, pause_row);
-    const bool game_over = load16(rdram, p1_hearts) == -1;
+    // A failed puzzle is a game over too: the game takes a heart (not to -1)
+    // and shows the same menu (TRY AGAIN, EXIT, TRAINING) on the pause row.
+    const bool has_try_again = std::any_of(labels.begin(), labels.end(), [](const Label& l) { return l.text == "TRY AGAIN"; });
+    if (load16(rdram, scene) != -1 || load16(rdram, pause_row) < 0 || load16(rdram, mode) != 4) puzzle_failed_ = false;
+    else if (has_try_again && !pause_showing) puzzle_failed_ = true;
+    const bool game_over = load16(rdram, p1_hearts) == -1 || puzzle_failed_;
     const bool versus = load16(rdram, mode) == 6;
     // After a choice, the game moved the row on itself (the episode's end:
     // CONTINUE goes to the next episode's card, row 100): done.
