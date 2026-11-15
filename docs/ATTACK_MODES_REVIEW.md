@@ -59,6 +59,7 @@ What the screenshots show (sent separately; not kept in the repository): in Time
 3. Score Attack: a combo shows the time it adds ("+4 s") **over the sphere**, rising from the bricks that broke, then fading.
 4. Rescue: **combo words, no numbers** over the sphere. The game's own point numbers (the small floating points, the 1K/2K/3K bubbles, the large grey 3D number) are hidden in Rescue; BlockPlanet shows short text for notable moves instead ("Combo ×12", "Gravity combo", "Fuse combo", "+ Magic"), sharp and in the menus' style.
 5. The developer records: not answered yet.
+6. Later the same day (docs/FLOATING_TEXT.md): **keep the game's own floating numbers in Rescue for now**; the HUD's score list names the combo's kind (Gravity combo, Fuse combo, + Magic). This replaces answer 4's hiding and words over the sphere.
 
 **Also from the owner (2026-11-15), the score list under Score:** a combo shows as one entry, its total with its block count ("+30,100 ×21", growing while the combo runs); points scored outside a combo (a drop) show on their own. Built: the combo is the game's own combo counter (`+0x2AE0`), and points landing within 0.6 s after it ends still count towards it.
 

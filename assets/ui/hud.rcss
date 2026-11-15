@@ -195,6 +195,7 @@ div { display: block; }
 #gains { display: block; margin-top: 6dp; }
 #gains .gain { display: block; font-size: 20dp; color: #9aa6c8; }
 #gains .gain.newest { font-size: 20dp; color: #e8b818; }
+#gains .gain-kind { display: block; font-size: 15dp; color: #86d8ff; margin-bottom: 2dp; }
 #best { display: block; font-size: 20dp; color: #c8d0e8; margin-top: 6dp; }
 #net { display: block; font-size: 26dp; font-weight: bold; margin-top: -2dp; }
 /* Splits, LiveSplit style: stage, difference, time; the current one highlighted. */

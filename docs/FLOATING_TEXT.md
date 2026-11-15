@@ -26,3 +26,13 @@ Everything that floats over the sphere or flashes up in Rescue (and the modes bu
 ## For the owner to decide
 
 For each of G1, G2, G3 and G6's ring: keep in Rescue, hide in Rescue, or replace with BlockPlanet's own (B5)? And whether the score modes (Score Attack) keep the game's numbers, since score matters there.
+
+## The owner's decision (2026-11-15)
+
+For Rescue: **keep the game's own floating numbers** (G1 to G3) for now, and make sure **the HUD's score list reports the right thing and makes sense**, naming the kind of combo when there is one. Built:
+
+- A combo is one entry: its total and block count ("+30,100 ×21"), growing while it runs; points outside a combo (a drop) show on their own.
+- Under a combo's entry, in smaller blue text, its kind: **Gravity combo** (the game's gravity count, player context `+0x2AE6`, rose during it: a piece fell into a match mid-combo, `func_8009423C` → `func_800C7FC4`), **Fuse combo** (`+0x2AE8` rose: a piece was dropped into a combo still running, in `func_800CD3B8` at `0x800CE9A8`), and **+ Magic** (the held magic changed during it). Both counts also add 3 to the magic meter. `BLOCKPLANET_GAIN_SAMPLE=1` fills the list with the longest line, to check the layout.
+
+B5 (combo words over the sphere) is not built: the HUD carries them instead.
+

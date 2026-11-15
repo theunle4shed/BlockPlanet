@@ -354,7 +354,7 @@ For the HUD's floating numbers (points, time and combo names rising from where t
 - **Where blocks cleared:** BlockPlanet can see this directly by comparing the board (`0x800E44D0`, 9 layers × 1,024 cells) from one frame to the next: cells that turn to 0 cleared in that frame. A combo clears over several frames, so the cells cleared between the combo counter (`+0x2AE0`) rising from 0 and returning to 0 are the combo; their centre is where the number rises from. BlockPlanet draws the sphere, so it can turn a cell into a screen position with the same mesh.
 - **Points earned:** the change in the score (`+0x2AF8`, shown × 10) over the same frames.
 - **Time Trial's clock:** player context **`+0x2B0C`** (s32), frames left at 60 per second (16,758 showed as 4:38 to 4:39; three seconds later 16,470). Time gained is a jump upwards; the HUD routine reads it at `0x8007611C`.
-- **Combo names** (fuse, gravity): the magic meter's +3 calls (`func_800C7FC4` and one in `func_800CD3B8`) mark them; telling fuse from gravity still needs a look at those two places.
+- **Combo names** (fuse, gravity), **found 2026-11-15:** the magic meter's +3 calls mark them, each with its own count. `func_800C7FC4` (called from `func_8009423C`, which clears a piece during a combo, when a piece that has fallen makes a new match) adds 1 to **`+0x2AE6`, the gravity combo count** (and `+0x2C88`); the drop code in `func_800CD3B8` (`0x800CE9A8`, a piece dropped into a combo still running) adds 1 to **`+0x2AE8`, the fuse combo count**. Both are cleared at a level's start. BlockPlanet's score list names a combo by which count rose during it.
 
 So the floating numbers need no hooks into the game: BlockPlanet reads the board, the combo counter, the score and the clock each frame.
 

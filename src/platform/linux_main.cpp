@@ -1179,7 +1179,15 @@ void update_hud() {
         // The points added, newest first (five at most). A combo is one entry,
         // its total with its block count ("+30,100 ×21"), growing while it runs;
         // points scored outside a combo show on their own (the owner, 2026-11-15).
-        struct Gain { long long points = 0; int blocks = 0; bool live = false; };
+        // Special combos, from the game's counts (docs/research): gravity
+        // (+0x2AE6, a piece falling into a match mid-combo, func_8009423C) and
+        // fuse (+0x2AE8, a piece dropped into a combo still running); magic
+        // from a combo of 20 or more (the held magic, +0x702, changing).
+        struct Gain { long long points = 0; int blocks = 0; bool live = false; bool gravity = false, fuse = false, magic = false; };
+        static int last_gravity = -1, last_fuse = -1, last_magic = -2;
+        const int gravity_now = guest::load16(guest_rdram, 0x80110220u + 0x2AE6);
+        const int fuse_now = guest::load16(guest_rdram, 0x80110220u + 0x2AE8);
+        const int magic_now = std::int8_t(guest::load8(guest_rdram, 0x80110220u + 0x702));
         static long long last_score = -1;
         static std::deque<Gain> gains;
         static bool was_running = false;
@@ -1192,6 +1200,9 @@ void update_hud() {
             if (gains.empty() || !gains.front().live) gains.push_front({0, 0, true});
             gains.front().points += added;
             gains.front().blocks = running;
+            if (last_gravity >= 0 && gravity_now > last_gravity) gains.front().gravity = true;
+            if (last_fuse >= 0 && fuse_now > last_fuse) gains.front().fuse = true;
+            if (last_magic > -2 && magic_now >= 0 && magic_now != last_magic) gains.front().magic = true;
         } else {
             if (was_running && !gains.empty() && gains.front().live) {
                 gains.front().live = false;
@@ -1207,12 +1218,21 @@ void update_hud() {
             }
         }
         was_running = running > 0;
+        last_gravity = gravity_now, last_fuse = fuse_now, last_magic = magic_now;
         while (gains.size() > 5) gains.pop_back();
         last_score = score;
         view.story_score = hud_number(score);
         for (const auto& g : gains) {
             if (g.points <= 0 && !g.live) continue;
-            view.story_gains.push_back("+" + hud_number(g.points) + (g.blocks >= 2 ? " \u00D7" + std::to_string(g.blocks) : ""));
+            std::string line = "+" + hud_number(g.points) + (g.blocks >= 2 ? " \u00D7" + std::to_string(g.blocks) : "");
+            // The combo's kind on a smaller line beneath (after a tab).
+            std::string kind;
+            if (g.gravity) kind = "Gravity combo";
+            if (g.fuse) kind += std::string(kind.empty() ? "" : " \u00B7 ") + "Fuse combo";
+            if (g.magic) kind += std::string(kind.empty() ? "" : " \u00B7 ") + "+ Magic";
+            if (std::getenv("BLOCKPLANET_GAIN_SAMPLE")) line = "+30,100 \u00D721", kind = "Gravity combo \u00B7 + Magic";  // research: the longest
+            if (!kind.empty()) line += "\t" + kind;
+            view.story_gains.push_back(line);
         }
     } else if (state.mode == 9) {
         // Lines: the stage's play time against the best for it (records
