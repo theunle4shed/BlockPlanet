@@ -249,7 +249,8 @@ bool start_training(std::uint8_t* rdram, recomp_context* ctx, const DirectStartR
     store8(rdram, p1_extra, 0);
     store16(rdram, training_type, static_cast<std::int16_t>(request.training_type));
     store16(rdram, level_count, 0);
-    store16(rdram, next_level, 0);
+    // The lesson to start at (a lesson is a level of its training; 0 the first).
+    store16(rdram, next_level, static_cast<std::int16_t>(std::max(0, request.level)));
     store16(rdram, chapter, 0);
 
     clear_menu_presentation(rdram);

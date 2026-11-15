@@ -205,6 +205,9 @@ bool profile_dirty = false;
 // finished, carry on into that mode's next part (Story Chapter 1, or the
 // puzzles).
 std::string chapter_zero_lesson;  // "basics" or "puzzle"
+// A lesson chosen in Training's menu (lesson:T:L): when the game moves on to
+// the next lesson, BlockPlanet leaves through the pause, back to the menu.
+std::optional<int> single_lesson;
 float card_stick = 0.0f;  // the right stick's vertical position, scrolling the card panel
 // A mode to start once the game is back at its menu: after a Chapter 0, or
 // for Restart level. `start` is the chapter and level (1-based) to begin at.
@@ -3621,6 +3624,9 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
         if (training) {
             request.mode = DirectMode::Training;
             request.training_type = mode == LaunchMode::TrainingBasics ? 1 : mode == LaunchMode::TrainingAdvanced ? 2 : 3;
+            // A lesson is a level of its training (context +0x23BA, func_80088E50's
+            // lesson): the one chosen in Training's list, else the first.
+            request.level = game_option_applier->rescue_start_level() - 1;
         } else {
             if (mode == LaunchMode::Puzzle) request.mode = DirectMode::Puzzle;
             if (mode == LaunchMode::Lines) request.mode = DirectMode::Lines;
@@ -4583,6 +4589,30 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
                 continue;
             }
+            if (command->rfind("lesson:", 0) == 0 && game_option_applier) {
+                // lesson:T:L: Training type T (1 Basics, 2 Advanced, 3 Puzzle), lesson L (1-based).
+                const int type = std::atoi(command->c_str() + 7);
+                const auto colon = command->find(':', 7);
+                const int lesson = colon == std::string::npos ? 1 : std::atoi(command->c_str() + colon + 1);
+                single_stage.reset();
+                continue_mode.reset();
+                chapter_zero_lesson.clear();  // back to the menus afterwards
+                single_lesson = lesson - 1;  // the lesson's level (0-based)
+                game_option_applier->choose_start(0, lesson);
+                launch_mode(type == 2 ? LaunchMode::TrainingAdvanced : type == 3 ? LaunchMode::TrainingPuzzle : LaunchMode::TrainingBasics);
+                continue;
+            }
+            if (command->rfind("research_text:", 0) == 0 && guest_rdram != nullptr) {
+                // Research: the guest's text at an address, up to 300 bytes ("research_text:800EEED0").
+                std::uint32_t a = std::uint32_t(std::strtoul(command->c_str() + 14, nullptr, 16));
+                std::string t;
+                for (int k = 0; k < 300; ++k) {
+                    const char ch = char(guest::load8(guest_rdram, a + std::uint32_t(k)));
+                    t += ch == 0 ? '|' : (ch >= 32 && ch < 127 ? ch : '?');
+                }
+                std::fprintf(stderr, "TEXT %08X %s\n", a, t.c_str());
+                continue;
+            }
             if (command->rfind("research_card:", 0) == 0) {
                 const auto t = find_card_text(command->substr(14));
                 std::fprintf(stderr, "CARD %s => %s || %s\n", command->c_str() + 14, t ? t->c_str() : "-",
@@ -4689,8 +4719,8 @@ bool handle_profile_command(const std::string& command) {
                     return profile_save && found != profile_data.progress.chapters_completed.end() && found->second.count(0) != 0;
                 };
                 blockplanet::ui::set_text("chapters_title", "Training");
-                blockplanet::ui::set_text("chapters_subtitle", "Learn from Wheels");
-                blockplanet::ui::set_list("chapters", story_training(done("rescue"), done("training_advanced")));
+                blockplanet::ui::set_text("chapters_subtitle", "Choose a lesson");
+                blockplanet::ui::set_list("chapters", training_lessons(done("rescue"), done("training_advanced")));
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
@@ -5151,6 +5181,21 @@ bool handle_profile_command(const std::string& command) {
             }
             publish_game_text();
             update_training_presses(blockplanet::recent_card_box().has_value());
+            // A lesson chosen on its own: once the game moves on to the next
+            // lesson (its level counts on), leave through the pause.
+            if (single_lesson && guest::load16(guest_rdram, 0x800E44A8) == 3 && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                guest::load16(guest_rdram, 0x80110220u + 0x23BA) > *single_lesson) {
+                single_lesson.reset();
+                end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now();
+                single_stage_quit_at = std::chrono::steady_clock::now();
+            }
+            // The training's last lesson: the game ends Training itself and goes
+            // back to its menu; BlockPlanet's menus then open at the launch path
+            // (return_to_menu_chapter 0), as after Exit.
+            if (single_lesson && guest::load16(guest_rdram, 0x800E121C) >= 0) {
+                single_lesson.reset();
+                end_track_override(), return_to_menu_chapter = 0;
+            }
             // A single stage finished: pause, then quit to the menu.
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();

@@ -462,5 +462,6 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Score Attack: a combo's added time rises over the sphere from its bricks ("+4 s").
 - New: `docs/FLOATING_TEXT.md`, a catalogue of the floating text in play (the game's and BlockPlanet's), for the owner to decide what stays before anything is hidden.
 - Rescue's score list names a combo's kind on a line beneath its points: Gravity combo, Fuse combo, + Magic (from the game's gravity and fuse counts, `+0x2AE6` and `+0x2AE8`, found in its code). The game's own floating numbers stay (the owner's decision, docs/FLOATING_TEXT.md).
+- Training (the owner's design): its menu lists every lesson on its own, all open, each starting at that lesson and returning to the menu when it ends; the direct start sets the lesson (`direct_start_hooks.cpp`). Topics the game's training leaves out are listed as Not started (Gravity Combos, Mystery Blocks, Filler Blocks, The Six Magics, Lines). `training_lessons` in `profile_menu.cpp`, with tests.
 - Research: the menu command `research_win` (the test harness: `poke cmd:research_win`) wins the stage in play by painting the top layer one colour.
 - Checked in the Linux test setup: the mouse's right-button slide, horizontal wheel and middle button reach the game as B with directions, steps of the cursor, and C-down.

@@ -298,6 +298,46 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
     return {basics, advanced};
 }
 
+std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done) {
+    struct Lesson { const char* id; const char* label; const char* group; const char* action; const char* description; const char* icon; };
+    static const Lesson lessons[] = {
+        {"basics", "The Basics", "Basics", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB"},
+        {"lives", "Lives", "Basics", "command:lesson:1:2", "Your hearts, and how a drop that matches nothing costs one.", "\uE0F5"},
+        {"combos", "Combos", "Basics", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4"},
+        {"magic", "Magic", "Basics", "command:lesson:1:4", "A combo of 20 or more earns magic, and how to use it.", "\uE417"},
+        {"crystal", "Crystal Bricks", "Advanced", "command:lesson:2:1", "Turn a group of crystal bricks into a power brick.", "\uE242"},
+        {"x_count", "X Count", "Advanced", "command:lesson:2:2", "The multiplier on your combo score.", "\uE1B2"},
+        {"fuse", "Fuse Combos", "Advanced", "command:lesson:2:3", "Slide a flashing brick into a match to keep a combo going.", "\uE0D7"},
+        {"puzzle", "Puzzle Controls", "Puzzle", "command:lesson:3:1", "Zooming and the other controls for puzzles.", "\uE1B6"},
+    };
+    std::vector<blockplanet::ui::ListItem> items;
+    for (const auto& l : lessons) {
+        blockplanet::ui::ListItem item{l.id, l.label, l.group, l.action, true};
+        item.description = l.description;
+        item.icon = l.icon;
+        items.push_back(item);
+    }
+    // The first lesson not yet done has the focus.
+    const std::size_t first = !basics_done ? 0 : !advanced_done ? 4 : 0;
+    items[first].focus = true;
+    // Topics the game's training leaves out (the owner: listed, marked Not started).
+    struct Missing { const char* id; const char* label; const char* description; };
+    static const Missing missing[] = {
+        {"gravity", "Gravity Combos", "When bricks fall into a new match during a combo."},
+        {"mystery", "Mystery Blocks", "The flickering yellow and red blocks that give magic."},
+        {"filler", "Filler Blocks", "The small purple blocks: sliding into them, and turning them into a brick."},
+        {"magic_kinds", "The Six Magics", "Firecracker to Ray Gun: what each one does."},
+        {"lines_rules", "Lines", "Lining up three in a row to remove bricks."},
+    };
+    for (const auto& m : missing) {
+        blockplanet::ui::ListItem item{m.id, m.label, "(Not started)", "", false};
+        item.description = m.description;
+        item.classes = "rag-not-started";
+        items.push_back(item);
+    }
+    return items;
+}
+
 std::string next_profile_name(const ProfileStore& store) {
     for (int number = 1;; ++number) {
         const auto name = "Player " + std::to_string(number);

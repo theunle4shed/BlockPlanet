@@ -125,6 +125,11 @@ std::vector<blockplanet::ui::ListItem> story_stages(int chapter, const std::set<
 // Story's Training lessons (X on Story in the menus): Basics and Advanced,
 // focused on the first not yet done.
 std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool advanced_done);
+// Training's menu (the owner, 2026-11-15): every lesson on its own, all open
+// (anyone can look one up by its title), each starting at that lesson
+// (lesson:T:L); then the topics the game's training does not cover yet, as
+// items marked Not started.
+std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done);
 // The puzzles to choose from: each solved one (with its best time and fewest
 // moves, when known) and the next unsolved, up to `count`; the next is focused.
 // The game's all-capitals text in BlockPlanet's style: short labels (three
