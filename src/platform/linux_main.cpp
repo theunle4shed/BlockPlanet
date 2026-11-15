@@ -156,6 +156,7 @@ bool end_menu_cleared = false;  // the end menu is an episode's end (not a game 
 // An episode's last stage just cleared in a whole-episode Rescue run (1), or
 // a stage before the last in play (-1): told to the end menu bridge.
 int episode_end_expected = 0;
+bool lines_time_reset = false;  // a launch: Lines' stage time starts again
 // The episode-end panel's line: the episode's time against the best (a run
 // from stage 1 only).
 std::string episode_end_line;
@@ -1172,10 +1173,15 @@ void update_hud() {
         // "lines", by chapter).
         static int key_now = -1;
         static double stage_time = 0.0;
+        if (lines_time_reset) lines_time_reset = false, key_now = -1, stage_time = 0.0;
         auto& record = profile_data.progress.episode_records["lines"][state.chapter];
         const int key = state.chapter * 100 + state.level;
         if (key != key_now) {
-            if (key_now >= 0 && key == key_now + 1 && stage_time > 0.5) {
+            // Cleared: the next stage, or the next chapter's first after stage 10
+            // (whose best was never saved before).
+            const bool next_chapter = key_now >= 0 && key_now % 100 == 10 && state.level == 1 && state.chapter == key_now / 100 + 1;
+            if (key_now >= 0 && (key == key_now + 1 || next_chapter) && stage_time > 0.5) {
+                auto& record = profile_data.progress.episode_records["lines"][key_now / 100];
                 const int done = key_now % 100;
                 if (record.best_levels.size() < std::size_t(done)) record.best_levels.resize(std::size_t(done), 0.0);
                 double& best = record.best_levels[std::size_t(done - 1)];
@@ -1189,6 +1195,15 @@ void update_hud() {
             stage_time = 0.0;
         }
         if (!paused && elapsed < 1.0 && state.progress < 1.0f) stage_time += elapsed;
+        // Lines' episode ends as Rescue's (CONTINUE, EXIT on the pause row,
+        // then the next episode's card): the end menu bridge is told.
+        {
+            static bool last_cleared = false;
+            const bool last_cleared_now = state.level >= 10 && state.progress >= 1.0f;
+            if (last_cleared_now && !last_cleared) episode_end_expected = 1;
+            else if (state.level < 10 && last_cleared) episode_end_expected = -1;
+            last_cleared = last_cleared_now;
+        }
         view.time = hud_time(stage_time);
         const auto i = std::size_t(state.level - 1);
         const double best = i < record.best_levels.size() ? record.best_levels[i] : 0.0;
@@ -1902,6 +1917,41 @@ std::uint16_t hide_and_seek_skips() {
     return 0;
 }
 
+// Lines' rules card (two pages) shows the first time a profile plays Lines;
+// after that it closes by itself (A, through both pages) and the rules are on
+// the pause screen. Returns the buttons to press, or 0.
+std::uint16_t lines_card_once() {
+    using clock = std::chrono::steady_clock;
+    static std::optional<clock::time_point> card_since, card_gone;
+    static bool first = false;
+    if (guest_rdram == nullptr || guest::load16(guest_rdram, 0x800E44A8) != 9 || guest::load16(guest_rdram, 0x800E121C) != -1) {
+        card_since.reset();
+        return 0;
+    }
+    const auto now = clock::now();
+    const auto box = blockplanet::recent_card_box();
+    if (box && box->kind == 1) {
+        card_gone.reset();
+        if (!card_since) {
+            card_since = now;
+            first = profile_data.progress.start_cards_seen.insert("lines").second;
+            if (first) {
+                profile_dirty = true;
+                save_profile();
+            }
+        }
+        if (first || now - *card_since < std::chrono::milliseconds(400)) return 0;
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - *card_since).count();
+        return ms % 350 < 100 ? 0x8000 : 0;
+    }
+    // Between the card's pages the box goes for a moment: the same card.
+    if (card_since) {
+        if (!card_gone) card_gone = now;
+        if (now - *card_gone > std::chrono::seconds(2)) card_since.reset(), card_gone.reset();
+    }
+    return 0;
+}
+
 // The pause menu's How to Play: BlockPlanet's own short guide to the mode
 // (the owner's choice: to read, no demonstration), naming the player's own
 // buttons. One paragraph per line.
@@ -1942,7 +1992,10 @@ std::string how_to_play(int mode) {
                "Your combos send dark bricks to your opponent's sphere. Dark bricks break only as part of a combo.";
     default:
         return "Line up three bricks in a row, across or down, to remove them.\n"
-               "Clear a big enough area of the core for your friend to escape.";
+               "Clear a big enough area of the core for your friend to escape.\n"
+               "Move the shadow over the sphere with " + move + ", and drop your brick with " + a + ".\n"
+               "To slide a brick, line the shadow up with it, hold " + b + " and move.\n"
+               "Dropping where it makes no line costs a heart.";
     }
 }
 
@@ -2385,10 +2438,19 @@ void publish_game_text() {
                 std::string first;
                 for (char ch : texts[card_lines.begin()->second.front()].text)
                     if (std::isalpha(static_cast<unsigned char>(ch))) first += ch; else break;
-                if (const auto found = find_card_text(first)) {
-                    add_text(tetrisphere::text_rewrite(*found).value_or(*found), hide_and_seek_title(*found), {});
+                // The card's whole text, shown from its first page; a later
+                // page of the same card (Lines' rules run on to a second) keeps
+                // it, rather than the game's text from mid-sentence.
+                static std::optional<std::string> shown;
+                static auto shown_at = std::chrono::steady_clock::time_point{};
+                const auto now_card = std::chrono::steady_clock::now();
+                if (now_card - shown_at > std::chrono::seconds(1)) shown.reset();  // a new card
+                if (const auto found = find_card_text(first)) shown = *found;
+                if (shown) {
+                    add_text(tetrisphere::text_rewrite(*shown).value_or(*shown), hide_and_seek_title(*shown), {});
                     card_found = true;
                 }
+                shown_at = now_card;
             }
             if (box->prompt == 1) panel.hint = buttons("%A%") + " More";
             if (box->prompt == 2) panel.hint = "Wheels is showing you\u2026";  // a demonstration: it moves on by itself
@@ -3467,6 +3529,7 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     }();
     start_card_pending.reset();
     if (mode == LaunchMode::HideAndSeek && !keep_music) hide_and_seek_new_run = true;
+    lines_time_reset = true;
     if ((mode == LaunchMode::Rescue || mode == LaunchMode::Puzzle) && !keep_music && start_cards) {
         start_card_pending = std::chrono::steady_clock::now();
         start_card_mode = mode == LaunchMode::Puzzle ? 4 : 1;
@@ -4405,6 +4468,12 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
                 continue;
             }
+            if (command->rfind("research_card:", 0) == 0) {
+                const auto t = find_card_text(command->substr(14));
+                std::fprintf(stderr, "CARD %s => %s || %s\n", command->c_str() + 14, t ? t->c_str() : "-",
+                             t ? tetrisphere::text_rewrite(*t).value_or("(same)").c_str() : "-");
+                continue;
+            }
             if (*command == "research_dump_board" && guest_rdram != nullptr) {
                 const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
                 for (int layer = 1; layer <= 2; ++layer)
@@ -4434,6 +4503,12 @@ bool handle_profile_command(const std::string& command) {
                 hs_exit_since = std::chrono::steady_clock::now();
                 hs_exit_paused = false;
                 grid_quit_at = *hs_exit_since, grid_quit_red = false;  // the grid covers the way out
+                continue;
+            }
+            if (command->rfind("research_lines_level:", 0) == 0 && game_option_applier) {
+                // Research (the test harness): Lines from stage 1:N.
+                game_option_applier->choose_start(1, std::atoi(command->c_str() + 21));
+                launch_mode(LaunchMode::Lines);
                 continue;
             }
             if (command->rfind("research_hs_level:", 0) == 0 && game_option_applier) {
@@ -4729,6 +4804,7 @@ bool handle_profile_command(const std::string& command) {
                     puzzle_results_requested.reset(), puzzle_result.reset();
             }
             std::uint16_t hs_buttons = hide_and_seek_skips();
+            if (const auto lines_buttons = lines_card_once()) hs_buttons = lines_buttons;
             track_puzzle_limits();
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
@@ -4867,6 +4943,7 @@ bool handle_profile_command(const std::string& command) {
                                                             ? rescue_goal(guest::load16(guest_rdram, 0x80110220u + 0x23E4))
                                                         : mode_now == 5 ? hide_and_seek_goal_text(guest::load16(guest_rdram, 0x800E44A4))
                                                         : mode_now == 4 ? puzzle_goal()
+                                                        : mode_now == 9 ? std::string("Line up three bricks across or down to remove them. Clear enough of the core for your friend to escape.")
                                                                         : std::string());
                 auto pause_items = pause.items;
                 for (auto& item : pause_items) {
@@ -4877,6 +4954,8 @@ bool handle_profile_command(const std::string& command) {
                     // Hide & Seek: its run goes back to level 1.
                     if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 5) item.label = "Restart from Level 1";
                     if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 4) item.label = "Restart Puzzle";
+                    // Lines starts again from its first stage.
+                    if (item.id == "restart" && guest::load16(guest_rdram, 0x800E44A8) == 9) item.label = "Restart from 1:1";
                 }
                 // Minefield on the sphere (played in Story's mode): its own
                 // name, New Field in place of Restart Chapter, and no Story
@@ -4905,7 +4984,9 @@ bool handle_profile_command(const std::string& command) {
             end_menu_cleared = end.cleared;
             if (end.open_menu) {
                 blockplanet::ui::set_text("end_title", end.title);
-                blockplanet::ui::set_text("end_where", end.cleared ? std::string(variant_title(play_variant)) + " \u00B7 Episode " +
+                const bool lines_end = guest::load16(guest_rdram, 0x800E44A8) == 9;
+                if (lines_end) episode_end_line.clear();  // (no episode time kept for Lines yet)
+                blockplanet::ui::set_text("end_where", end.cleared ? std::string(lines_end ? "Lines" : variant_title(play_variant)) + " \u00B7 Episode " +
                                                                          std::to_string(read_game_state(guest_rdram).chapter + 1)
                                                                    : where_now());
                 blockplanet::ui::set_text("end_line", end.cleared ? episode_end_line : "");

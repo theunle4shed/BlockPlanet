@@ -195,7 +195,8 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
     // The episode's end: expected, in Rescue with hearts left, and on the
     // row; it stays so until the row is let go (or play is left).
     if (!playing || row < 0) episode_end_ = false;
-    else if (episode_expected_ && row <= 3 && !game_over && load16(rdram, mode) == 1 && !pause_showing) episode_end_ = true;
+    else if (episode_expected_ && row <= 3 && !game_over && (load16(rdram, mode) == 1 || load16(rdram, mode) == 9) && !pause_showing)
+        episode_end_ = true;
     if (episode_end_) episode_expected_ = false;
     const bool ended = playing && row >= 0 && (game_over || versus || episode_end_) && !pause_showing;
     out.cleared = episode_end_;
