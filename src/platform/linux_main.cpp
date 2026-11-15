@@ -434,7 +434,11 @@ tetrisphere::MenuUnlocks menu_unlocks_now() {
 void publish_menus() {
     const auto u = menu_unlocks_now();
     blockplanet::ui::set_list("main_items", tetrisphere::main_menu_items(u));
+    blockplanet::ui::set_list("main_icons", tetrisphere::main_icon_items(u));
     blockplanet::ui::set_list("solo_items", tetrisphere::solo_menu_items(u));
+    blockplanet::ui::set_list("solo_bonus_items", tetrisphere::solo_bonus_items(u));
+    blockplanet::ui::set_list("local_items", tetrisphere::local_menu_items(u));
+    blockplanet::ui::set_list("local_bonus_items", tetrisphere::local_bonus_items(u));
     blockplanet::ui::set_list("rescue_items", tetrisphere::rescue_menu_items(u));
     // Developer items in Options (main build only, for testing the unlocks).
     std::vector<blockplanet::ui::ListItem> developer;

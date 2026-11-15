@@ -339,6 +339,12 @@ body.shared .hint { display: block; margin-top: 20dp; }
 .item.rag-in-progress .note, .item.rag-in-progress.focused .note { color: #e8b818; }
 .item.rag-viable .note, .item.rag-viable.focused .note { color: #5bd16a; }
 
+/* The main menu's row of icons (Profiles, Trophies, Options, Exit), right
+   aligned under the last item with a little space above (the owner's layout). */
+.list.icon-row { text-align: right; margin-top: 28dp; }
+.list.icon-row .item { display: inline-block; width: auto; padding: 8dp 14dp; margin-left: 8dp; }
+.list.icon-row .item .icon { margin: 0dp; font-size: 1.15em; }
+
 /* Results (a stage played on its own): the time or score against the best. */
 .result { font-size: 40dp; font-weight: bold; color: #f8f8f8; margin: 8dp 0dp 16dp 0dp; }
 

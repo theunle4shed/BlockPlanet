@@ -1,0 +1,15 @@
+<rml>
+<head>
+    <title>Bonus</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<body data-grid="green">
+    <div id="panel">
+        <div class="title">Bonus</div>
+        <div class="subtitle">Modes Adventure has introduced</div>
+        <div class="list" data-list="solo_bonus_items"></div>
+        <div class="item" id="back" data-action="back">Back</div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

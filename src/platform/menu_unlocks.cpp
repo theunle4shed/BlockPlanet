@@ -56,38 +56,73 @@ std::vector<blockplanet::ui::ListItem> build(const std::vector<Entry>& entries, 
 
 std::vector<blockplanet::ui::ListItem> main_menu_items(const MenuUnlocks& u) {
     static const std::vector<Entry> entries{
-        {"solo", "Solo", "", "open:solo", "Play on your own.", Status::Viable, 0},
-        {"training", "Training", "", "command:training_story", "Wheels shows you how to play, step by step.", Status::Viable, 0},
-        {"local", "Local", "", "open:local", "Play with friends on this PC.", Status::InProgress, -1},
-        {"online", "Online", "", "open:online", "Play with friends and others over the internet.", Status::NotStarted, -1},
-        {"profiles", "Profiles", "", "command:profiles", "Choose who is playing, or add a profile.", Status::Viable, 0},
-        {"media", "Media Player", "", "command:media_player", "", Status::NotStarted, -1},
-        {"trophies", "Trophies", "", "command:trophies", "", Status::InProgress, -1},
-        {"options", "Options", "", "open:options", "Graphics, sound, controls and more.", Status::Viable, 0},
-        {"credits", "Credits", "", "command:credits", "The people who made Tetrisphere.", Status::Viable, 0},
-        {"exit", "Exit to Desktop", "", "command:exit", "", Status::None, 0},
+        {"solo", "Solo", "\uE19F", "open:solo", "Play on your own.", Status::Viable, 0},
+        {"training", "Training", "\uE234", "command:training_story", "Wheels shows you how to play, step by step.", Status::Viable, 0},
+        {"local", "Local", "\uE1A4", "open:local", "Play with friends on this PC.", Status::InProgress, -1},
+        {"online", "Online", "\uE0EB", "open:online", "Play with friends and others over the internet.", Status::NotStarted, -1},
+        {"credits", "Credits", "\uE464", "command:credits", "The people who made Tetrisphere.", Status::Viable, 0},
     };
     auto items = build(entries, u);
     for (auto& i : items) i.focus = false;  // the main menu keeps its own focus (Continue, when shown, comes first)
     return items;
 }
 
+std::vector<blockplanet::ui::ListItem> main_icon_items(const MenuUnlocks& u) {
+    // Icons only, in a row (the owner's layout, 2026-11-14); the description
+    // names each one.
+    static const std::vector<Entry> entries{
+        {"profiles", "", "\uE466", "command:profiles", "Profiles: choose who is playing, or add a profile.", Status::None, 0},
+        {"trophies", "", "\uE377", "command:trophies", "Trophies (in progress).", Status::None, -1},
+        {"options", "", "\uE158", "open:options", "Options: graphics, sound, controls and more.", Status::None, 0},
+        {"exit", "", "\uE112", "command:exit", "Exit to the desktop.", Status::None, 0},
+    };
+    auto items = build(entries, u);
+    for (auto& i : items) i.focus = false;
+    return items;
+}
+
 std::vector<blockplanet::ui::ListItem> solo_menu_items(const MenuUnlocks& u) {
     static const std::vector<Entry> entries{
-        {"story", "Rescue", "", "command:open_story",
+        {"story", "Rescue", "\uE063", "command:open_story",
          "Break through each sphere to its core and rescue the friend inside, episode by episode.", Status::Viable, 0},
-        {"adventure", "Adventure", "", "command:adventure",
+        {"adventure", "Adventure", "\uE114", "command:adventure",
          "A journey across the sphere that introduces new game modes one at a time.", Status::NotStarted, 5},
-        {"bonus", "Bonus", "", "command:bonus", "The game modes Adventure has introduced, to play on their own.", Status::NotStarted, -1},
-        {"hide_and_seek", "Hide & Seek", "", "command:hide_and_seek", "Dig away the blocks to find the pictures hidden in each sphere.",
+        {"bonus", "Bonus", "\uE0E4", "open:bonus", "The game modes Adventure has introduced, to play on their own.", Status::InProgress, -1},
+    };
+    return build(entries, u);
+}
+
+std::vector<blockplanet::ui::ListItem> solo_bonus_items(const MenuUnlocks& u) {
+    static const std::vector<Entry> entries{
+        {"hide_and_seek", "Hide & Seek", "\uE155", "command:hide_and_seek", "Dig away the blocks to find the pictures hidden in each sphere.",
          Status::Viable, -1},
-        {"puzzle", "Puzzle", "", "command:puzzle", "Clear set spheres with the pieces you are given. Think before you drop.", Status::Viable, -1,
+        {"puzzle", "Puzzle", "\uE29C", "command:puzzle", "Clear set spheres with the pieces you are given. Think before you drop.", Status::Viable, -1,
          "command:puzzle_chapter:0", "Puzzle Training"},
-        {"lines", "Lines", "", "command:lines", "A different game on the sphere, with its own levels.", Status::Viable, -1},
-        {"minefield", "Minefield", "", "command:minefield", "Uncover the grid without setting off a mine: each number counts the mines around it.",
+        {"lines", "Lines", "\uE58F", "command:lines", "A different game on the sphere, with its own levels.", Status::Viable, -1},
+        {"minefield", "Minefield", "\uE0EC", "command:minefield", "Uncover the grid without setting off a mine: each number counts the mines around it.",
          Status::InProgress, -1},
-        {"multiphasic", "Multiphasic", "", "command:multiphasic", "One long run: each core you open becomes the next sphere. How far can you go?",
+        {"multiphasic", "Multiphasic", "\uE104", "command:multiphasic", "One long run: each core you open becomes the next sphere. How far can you go?",
          Status::NotStarted, -1},
+        {"escape", "Escape", "\uE3DA", "command:escape", "The view from inside the sphere: break your way out through a hole.", Status::NotStarted, -1},
+        {"media", "Media Player", "\uE126", "command:media_player", "The game's music and your own.", Status::NotStarted, -1},
+    };
+    return build(entries, u);
+}
+
+std::vector<blockplanet::ui::ListItem> local_menu_items(const MenuUnlocks& u) {
+    static const std::vector<Entry> entries{
+        {"story", "Rescue", "\uE063", "open:local_story", "Rescue's spheres for two: race each other to the core, or work together on one sphere.",
+         Status::InProgress, -1},
+        {"bonus", "Bonus", "\uE0E4", "open:local_bonus", "The game modes Adventure has introduced, for two.", Status::InProgress, -1},
+    };
+    return build(entries, u);
+}
+
+std::vector<blockplanet::ui::ListItem> local_bonus_items(const MenuUnlocks& u) {
+    static const std::vector<Entry> entries{
+        {"lines", "Lines", "\uE58F", "open:local_lines", "Lines for two.", Status::NotStarted, -1},
+        {"custom", "Custom", "\uE29A", "command:multiplayer_custom", "Your own rules for a game with friends.", Status::NotStarted, -1},
+        {"media", "Media Player", "\uE126", "command:media_player", "The game's music and your own.", Status::NotStarted, -1},
     };
     return build(entries, u);
 }

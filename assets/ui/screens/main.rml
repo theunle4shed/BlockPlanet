@@ -10,6 +10,7 @@
         <div class="subtitle">Main menu<span data-text="player_line"></span></div>
         <div data-list="continue"></div>
         <div class="list" data-list="main_items"></div>
+        <div class="list icon-row" data-list="main_icons" data-columns="4"></div>
         <div id="description" class="description"></div>
     </div>
 </body>

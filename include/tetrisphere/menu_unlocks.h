@@ -6,7 +6,7 @@
 // With `everything` set (the main build, the owner's call) every item shows,
 // each with its status in brackets. Otherwise only what the player has
 // unlocked shows, without statuses:
-//   from the start  Main: Solo, Training, Profiles, Options, Credits, Exit;
+//   from the start  Main: Solo, Training, Credits; icons for Profiles, Options and Exit;
 //                   Solo: Rescue (which launches Episode 1)
 //   Episode 1 done  Rescue: Campaign, Score Attack, Casual
 //   Episode 3 done  Rescue: Time Attack as well
@@ -27,7 +27,14 @@ struct MenuUnlocks {
 };
 
 std::vector<blockplanet::ui::ListItem> main_menu_items(const MenuUnlocks& unlocks);
+// Profiles, Trophies, Options and Exit: icons in a row under the main menu.
+std::vector<blockplanet::ui::ListItem> main_icon_items(const MenuUnlocks& unlocks);
 std::vector<blockplanet::ui::ListItem> solo_menu_items(const MenuUnlocks& unlocks);
+// Solo > Bonus and Local > Bonus: the modes Adventure introduces (all of them
+// in the main build, each with its status), and the Media Player.
+std::vector<blockplanet::ui::ListItem> solo_bonus_items(const MenuUnlocks& unlocks);
+std::vector<blockplanet::ui::ListItem> local_menu_items(const MenuUnlocks& unlocks);
+std::vector<blockplanet::ui::ListItem> local_bonus_items(const MenuUnlocks& unlocks);
 std::vector<blockplanet::ui::ListItem> rescue_menu_items(const MenuUnlocks& unlocks);
 // Whether Solo > Rescue opens its menu; until Episode 1 is done it launches
 // Episode 1 straight away.

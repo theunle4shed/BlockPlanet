@@ -47,17 +47,22 @@ The owner's picture of how the menus grow as the player progresses. It replaces 
 - **Existing profiles** keep what they have unlocked: unlocks are worked out from the progress already saved.
 - **Testing:** no separate "everything unlocked" choice. The main build shows the whole menu as if unlocked, each item with its development status in brackets: (Not started) in red, (In progress) in amber, (Viable) in green. `BLOCKPLANET_LOCKED=1` applies the unlocking, for testing it.
 
-## Development status shown in the menus (2026-11-14)
+## Development status shown in the menus (2026-11-14, updated)
+
+The owner's layout (2026-11-14): the main menu lists Solo, Training, Local, Online and Credits, with Profiles, Trophies, Options and Exit as a row of icons below, right-aligned (the description under the menu names the focused icon). Solo and Local each have a Bonus menu that can be entered, holding every mode that will come through Adventure, and the Media Player.
 
 | Menu | Viable | In progress | Not started |
 |---|---|---|---|
-| Main | Solo, Profiles, Options, Credits | Local, Trophies | Online, Media Player |
-| Solo | Rescue, Hide & Seek, Puzzle, Lines | Minefield | Multiphasic, Adventure, Bonus |
+| Main | Solo, Training, Credits | Local | Online |
+| Main (icons) | Profiles, Options, Exit | Trophies | |
+| Solo | Rescue | Bonus | Adventure |
+| Solo > Bonus | Hide & Seek, Puzzle, Lines | Minefield | Multiphasic, Escape, Media Player |
 | Rescue | Campaign, Time Attack, Score Attack, Casual | | |
-| Local | | Rescue (Versus against the computer) | Lines, Custom, Cooperative, a second player |
+| Local | | Rescue (Versus against the computer), Bonus | |
+| Local > Bonus | | | Lines for two, Custom, Media Player |
 | Online | | | Host, Join |
 
-The owner can correct any of these; they are set in each screen's file (`assets/ui/screens/*.rml`, the `rag` notes).
+The owner can correct any of these; they are set in `src/platform/menu_unlocks.cpp` (and, for the screens not yet built by the game, in their files' `rag` notes).
 
 ## Built (2026-11-14)
 
