@@ -48,7 +48,7 @@ const int block_cells = [] {
     const int n = v ? std::atoi(v) : 1;
     return n == 2 || n == 4 ? n : 1;
 }();
-constexpr double fall_seconds = 0.5;    // each block's slide
+constexpr double fall_seconds = 0.6;    // each block's slide
 constexpr double bevel = 3.0;           // how far each block's corner normals lean out
 constexpr double spread_seconds = 1.2;  // the last block starts this long after the first
 
@@ -185,12 +185,15 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     // to the sphere's own combine after. Each block's corner normals lean
     // out from its middle, so its face shades a little towards its edges and
     // the blocks read apart (a faint bevel).
-    std::uint32_t previous_w0 = 0, previous_w1 = 0;
-    for (std::uint32_t at = load32(rdram, display_list_pointer) - 8u, n = 0; n < 20000 && at >= 0x80000000u; at -= 8u, ++n)
-        if ((load32(rdram, at) >> 24) == 0xFCu) {
-            previous_w0 = load32(rdram, at), previous_w1 = load32(rdram, at + 4u);
-            break;
-        }
+    std::uint32_t previous_w0 = 0, previous_w1 = 0, previous_mode_w0 = 0, previous_mode_w1 = 0;
+    for (std::uint32_t at = load32(rdram, display_list_pointer) - 8u, n = 0; n < 20000 && at >= 0x80000000u; at -= 8u, ++n) {
+        const std::uint32_t op = load32(rdram, at) >> 24;
+        if (op == 0xFCu && previous_w0 == 0) previous_w0 = load32(rdram, at), previous_w1 = load32(rdram, at + 4u);
+        // The render mode (F3D's G_SETOTHERMODE_L, shift 3 length 29), put back after.
+        if (op == 0xB9u && load32(rdram, at) == 0xB900031Du && previous_mode_w0 == 0)
+            previous_mode_w0 = load32(rdram, at), previous_mode_w1 = load32(rdram, at + 4u);
+        if (previous_w0 != 0 && previous_mode_w0 != 0) break;
+    }
     // gsDPSetCombineLERP(PRIMITIVE, 0, SHADE, 0, 0, 0, 0, 1) in both cycles.
     const auto combine = [](std::uint32_t a, std::uint32_t b, std::uint32_t c, std::uint32_t d, std::uint32_t aa, std::uint32_t ab,
                             std::uint32_t ac, std::uint32_t ad) {
@@ -199,10 +202,13 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
                                  (ad & 7) << 9 | (d & 7) << 6 | (ab & 7) << 3 | (ad & 7);
         return std::pair{w0, w1};
     };
-    const auto [cw0, cw1] = combine(3 /*PRIMITIVE*/, 15 /*0*/, 4 /*SHADE*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 6 /*1*/);
+    // Alpha from the primitive colour: each block fades in (the owner's design).
+    const auto [cw0, cw1] = combine(3 /*PRIMITIVE*/, 15 /*0*/, 4 /*SHADE*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 7 /*0*/, 3 /*PRIMITIVE*/);
     static const bool plain = std::getenv("BLOCKPLANET_GAMEOVER_SHELL_PLAIN") != nullptr;  // research
     append(rdram, 0xE7000000u, 0);           // pipe sync
     if (!plain) append(rdram, cw0, cw1);
+    // Translucent surface with the depth test and update (G_RM_AA_ZB_XLU_SURF, both cycles).
+    if (!plain) append(rdram, 0xB900031Du, 0x005049F8u);
     append(rdram, 0xFA000000u, 0x3A3C46FFu); // primitive colour: near black, a little blue
 
     Live memory(rdram);
@@ -231,10 +237,13 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
             const double delay = pin ? pinned : fresh;
             const double u = (seconds - delay) / fall_seconds;
             if (u <= 0.0) continue;  // not yet
-            // A solid column from the core to the shell's height; while it comes
-            // in it spins about its own radial axis and grows from nothing.
+            // A solid column from the core to the shell's height, already in its
+            // place: small and invisible, it fades in and grows to full size
+            // (the owner's design, 2026-11-15).
             const double outer = shell_height, inner = 0.0;
-            const double grown = ease_out(u), angle = (1.0 - grown) * 3.14159265 * 1.5;
+            const double grown = 0.15 + 0.85 * ease_out(u), angle = 0.0;
+            const double fade = std::clamp(u, 0.0, 1.0);
+            append(rdram, 0xFA000000u, 0x3A3C4600u | static_cast<std::uint32_t>(std::lround(fade * 255.0)));
             double top_p[4][3], bottom_p[4][3], centre_p[3] = {0, 0, 0}, axis_v[3] = {0, 0, 0};
             for (std::size_t k = 0; k < corners.size(); ++k) {
                 const MeshEntry& e = sphere.point(r + corners[k].row * block_cells, c + corners[k].column * block_cells);
@@ -303,6 +312,7 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     }
     append(rdram, 0xE7000000u, 0);
     if (previous_w0 != 0) append(rdram, previous_w0, previous_w1);
+    if (previous_mode_w0 != 0 && !plain) append(rdram, previous_mode_w0, previous_mode_w1);
 }
 
 } // namespace tetrisphere::sphere
