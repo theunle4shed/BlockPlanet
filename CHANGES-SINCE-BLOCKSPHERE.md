@@ -460,5 +460,6 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - New: `docs/ATTACK_MODES_REVIEW.md`, Rescue's Time Attack and Score Attack and the floating score text as they work today, with the owner's answers.
 - Rescue's score list (under Score): a combo is one entry with its total and block count ("+300 ×3"); points outside a combo show on their own (the owner's request).
 - Score Attack: a combo's added time rises over the sphere from its bricks ("+4 s").
+- New: `docs/FLOATING_TEXT.md`, a catalogue of the floating text in play (the game's and BlockPlanet's), for the owner to decide what stays before anything is hidden.
 - Research: the menu command `research_win` (the test harness: `poke cmd:research_win`) wins the stage in play by painting the top layer one colour.
 - Checked in the Linux test setup: the mouse's right-button slide, horizontal wheel and middle button reach the game as B with directions, steps of the cursor, and C-down.
