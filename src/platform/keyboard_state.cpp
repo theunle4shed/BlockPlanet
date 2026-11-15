@@ -16,6 +16,8 @@ std::uint32_t bit_for(SDL_Scancode key) {
         case SDL_SCANCODE_X: return east;
         case SDL_SCANCODE_C: return 0x2000;
         case SDL_SCANCODE_RETURN: return 0x1000;
+        // Escape pauses in play too (the menus take it as Back first).
+        case SDL_SCANCODE_ESCAPE: return 0x1000;
         case SDL_SCANCODE_UP: return 0x0800;
         case SDL_SCANCODE_DOWN: return 0x0400;
         case SDL_SCANCODE_LEFT: return 0x0200;

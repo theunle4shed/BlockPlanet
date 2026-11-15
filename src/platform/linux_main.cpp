@@ -25,6 +25,7 @@
 #include "tetrisphere/profiles.h"
 #include "tetrisphere/profile_menu.h"
 #include "tetrisphere/minefield_sphere.h"
+#include "tetrisphere/mouse_play.h"
 #include "tetrisphere/menu_unlocks.h"
 #include "tetrisphere/pause_bridge.h"
 #include "tetrisphere/brick_sky.h"
@@ -101,6 +102,7 @@ QaVirtualControllers qa_virtual_controllers;
 bool qa_controllers_active = false;
 KeyboardState keyboard_state;
 std::mutex input_snapshot_mutex;
+tetrisphere::MousePlay mouse_play;  // the mouse in play, turned into N64 buttons
 std::array<ControllerPortSnapshot, 2> input_snapshot{};
 std::uint16_t keyboard_snapshot = 0;
 AudioOutput audio_output;
@@ -2534,10 +2536,16 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (port == 1 && !controller.connected) return false;
     const auto mapped = map_port_input(port, controller, keys,
                                        controller_bindings(), magic_control());
-    *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons) : mapped.buttons;
+    const std::uint16_t mouse_bits = port == 0 ? mouse_play.next_frame() : 0;
+    *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons | mouse_bits) : mapped.buttons;
     note_start(mapped.buttons);
     *x = mapped.x;
     *y = mapped.y;
+    // The game moves the cursor by the stick, so the mouse's steps go there too.
+    if (mouse_bits & 0x0200) *x = -1.0f;
+    if (mouse_bits & 0x0100) *x = 1.0f;
+    if (mouse_bits & 0x0800) *y = 1.0f;
+    if (mouse_bits & 0x0400) *y = -1.0f;
     if (port == 0) tetrisphere::minefield_sphere::filter_stick(*x, *y);
     static std::array<std::uint16_t, 2> previous{};
     if (mapped.buttons != previous[port]) {
@@ -3907,7 +3915,24 @@ bool handle_profile_command(const std::string& command) {
                 if (event.type == SDL_KEYDOWN && (event.key.keysym.scancode == SDL_SCANCODE_PAGEUP ||
                                                   event.key.keysym.scancode == SDL_SCANCODE_PAGEDOWN))
                     blockplanet::ui::scroll_card(event.key.keysym.scancode == SDL_SCANCODE_PAGEUP ? -3.0f : 3.0f);
-                if (event.type == SDL_MOUSEWHEEL) blockplanet::ui::scroll_card(-2.0f * float(event.wheel.y));
+                if (event.type == SDL_MOUSEWHEEL && blockplanet::ui::card_needs_scroll())
+                    blockplanet::ui::scroll_card(-2.0f * float(event.wheel.y));
+                // The mouse in play (the owner's design, 2026-11-15): see
+                // include/tetrisphere/mouse_play.h.
+                if (window != nullptr) {
+                    int w = 0, h = 0;
+                    SDL_GetWindowSize(window, &w, &h);
+                    mouse_play.set_window_height(h);
+                }
+                if (event.type == SDL_MOUSEMOTION) mouse_play.motion(event.motion.xrel, event.motion.yrel);
+                if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)
+                    mouse_play.button(event.button.button, event.type == SDL_MOUSEBUTTONDOWN);
+                if (event.type == SDL_MOUSEWHEEL && !blockplanet::ui::card_needs_scroll()) {
+                    const int flip = event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -1 : 1;
+                    mouse_play.wheel(flip * event.wheel.x, flip * event.wheel.y);
+                }
+            } else {
+                mouse_play.reset();
             }
             // The mouse in the menus (the owner's request, 2026-11-15): pointing
             // focuses an item, the left button chooses it, the right button goes

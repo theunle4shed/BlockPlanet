@@ -98,7 +98,15 @@ Requests are refused during play and inside other original pages such as Options
 - Checked in the Linux test setup (audio recorded from the game): the Music slider at 0 silences the title music and the game's music and effects levels follow the sliders; in a game, Pause → Audio → Track plays the next track at once and sets the game to Choose, and Quit to menu returns it to Auto. Options reviewed at 16:9 and 21:9.
 - Checked in the Linux test setup: the pause screen opens with Start and with F1, hides the original pause's line, text and instructor, resumes with B, opens Options and returns, quits to the menu, and skips a Training lesson; reviewed at 16:9, 4:3 and 21:9.
 - Checked in the Linux test setup: the launch prompt with two profiles, switching to the other profile (the game restarts as it), deleting another profile, adding "Player 2", deleting the playing profile (restarts as Player 1, folder moved to `deleted/`) and playing as a guest; renaming by typing, choosing a character and colour, and naming a new profile. The name and character screens were reviewed at 16:9, 4:3 and 21:9. The on-screen keyboard was checked with the QA virtual controller: it appears on the first controller press, Up from 5 reaches the Space bar and back, and a keyboard key hides it again.
-- Mouse (2026-11-15): pointing at a menu item selects it, the left button chooses it, the right button goes back, the wheel moves up and down. Not in play yet.
+- Mouse (2026-11-15): pointing at a menu item selects it, the left button chooses it, the right button goes back, the wheel moves up and down.
+- Mouse in play (the owner's design, 2026-11-15):
+  - Hold the left button and drag: turns the sphere, any direction including diagonals. The sphere follows the pointer. A cell for every twelfth of the window's height.
+  - Left click without dragging: drops the piece where the cursor is.
+  - Hold the right button: slide; dragging moves the piece the way the pointer goes.
+  - Wheel: the cursor up and down a cell a notch. Horizontal wheel (or tilting the wheel): left and right.
+  - Middle button: magic.
+  - Escape (or Enter): pause. In the menus Escape goes back.
+  - Earlier ideas (ROADMAP, 2026-11-08) not built yet: Space for magic, W A S D for the other actions, Q and E to peek round the sphere, the wheel to zoom.
 - Not yet: Custom and the other commands, showing the profile's character in the game, replacing the original title and mode menus, and checks on Windows. Taller-than-wide windows (portrait) still show a small picture: the renderer widens but does not heighten.
 
 ## Next

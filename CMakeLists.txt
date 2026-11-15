@@ -365,6 +365,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/minefield.cpp
     src/platform/window_placement.cpp
     src/platform/menu_unlocks.cpp
+    src/platform/mouse_play.cpp
     src/platform/minefield_sphere.cpp
     src/platform/pause_bridge.cpp
     src/platform/story_hud.cpp
@@ -695,6 +696,15 @@ else()
     target_compile_options(menu_unlocks_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME menu_unlocks COMMAND menu_unlocks_test)
+
+add_executable(mouse_play_test tests/mouse_play_test.cpp src/platform/mouse_play.cpp)
+target_include_directories(mouse_play_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(mouse_play_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(mouse_play_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME mouse_play COMMAND mouse_play_test)
 
 add_executable(trophies_test tests/trophies_test.cpp src/platform/trophies.cpp)
 target_include_directories(trophies_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
@@ -1126,6 +1136,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/minefield.cpp
         src/platform/window_placement.cpp
         src/platform/menu_unlocks.cpp
+        src/platform/mouse_play.cpp
         src/platform/minefield_sphere.cpp
         src/platform/pause_bridge.cpp
         src/platform/story_hud.cpp

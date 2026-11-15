@@ -12,7 +12,9 @@
 #   size W H          resize the window
 #   mouse X Y         move the mouse to (X, Y) in the game window
 #   click X Y         move there and press the left button; rclick: the right
-#   wheel up|down     turn the mouse wheel one step
+#   wheel up|down|left|right  turn the mouse wheel one step
+#   drag B X1 Y1 X2 Y2  hold mouse button B (1 left, 3 right) from one point to another
+#   mclick            press the middle button
 #   shot NAME         screenshot of the whole display -> NAME.png
 #   wshot NAME        screenshot of the game window -> NAME.png
 #   rec S             record the display for S seconds -> rec.mp4 (ffmpeg)
@@ -39,7 +41,11 @@ while read -r cmd arg; do
     mouse) xdotool mousemove --window "$win" $arg;;
     click) xdotool mousemove --window "$win" $arg; sleep 0.2; xdotool click 1;;
     rclick) xdotool mousemove --window "$win" $arg; sleep 0.2; xdotool click 3;;
-    wheel) [ "$arg" = up ] && xdotool click 4 || xdotool click 5;;
+    wheel) case $arg in up) xdotool click 4;; down) xdotool click 5;; left) xdotool click 6;; right) xdotool click 7;; esac;;
+    drag) set -- $arg; xdotool mousemove --window "$win" "$2" "$3"; sleep 0.1; xdotool mousedown "$1"
+          for i in 1 2 3 4 5 6 7 8 9 10; do xdotool mousemove --window "$win" $(( $2 + ($4 - $2) * i / 10 )) $(( $3 + ($5 - $3) * i / 10 )); sleep 0.03; done
+          sleep 0.1; xdotool mouseup "$1";;
+    mclick) xdotool click 2;;
     pad) press "$arg" true; sleep 0.15; press "$arg" false;;
     padd) press "$arg" true;;
     padu) press "$arg" false;;
