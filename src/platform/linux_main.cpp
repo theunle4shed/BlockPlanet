@@ -152,6 +152,13 @@ std::optional<std::chrono::steady_clock::time_point> grid_quit_at;
 // The game's end menus under BlockPlanet's panel (EndMenuBridge): while they
 // (or their fade) are up the grid shows in red, and after Exit too.
 bool end_menu_active = false;
+bool end_menu_cleared = false;  // the end menu is an episode's end (not a game over)
+// An episode's last stage just cleared in a whole-episode Rescue run (1), or
+// a stage before the last in play (-1): told to the end menu bridge.
+int episode_end_expected = 0;
+// The episode-end panel's line: the episode's time against the best (a run
+// from stage 1 only).
+std::string episode_end_line;
 bool grid_quit_red = false;
 std::chrono::steady_clock::time_point loading_since;
 bool credits_pending = false; // --credits: play them when the title shows
@@ -849,7 +856,9 @@ void update_hud() {
     else if (!game_over_since) game_over_since = std::chrono::steady_clock::now();
     blockplanet::set_original_hud_keep_models(game_over_since &&
                                              std::chrono::steady_clock::now() - *game_over_since > std::chrono::milliseconds(600));
-    if (!story) {
+    // The next episode's card after an episode's end (the pause row at
+    // 100): the game's own full-screen card, with no HUD over it.
+    if (!story || guest::load16(guest_rdram, 0x800E1228) >= 100) {
         show_hud(std::nullopt);
         blockplanet::set_magic_box(false, NAN, NAN, 1.0f, NAN, 0.0f);
         return;
@@ -870,6 +879,7 @@ void update_hud() {
         if (record.best_levels.size() < 10) record.best_levels.resize(10, 0.0);
         const auto i = std::size_t(std::clamp(finished->level, 1, 10) - 1);
         const double best_before = record.best_levels[i];
+        const double best_total_before = record.best_total;
         bool changed = false;
         const bool keeps_records = play_variant != PlayVariant::Casual;  // Casual sets no records
         if (keeps_records && finished->time > 0.5 && (record.best_levels[i] <= 0.0 || finished->time < record.best_levels[i]))
@@ -879,6 +889,16 @@ void update_hud() {
         if (changed) {
             profile_dirty = true;
             save_profile();
+        }
+        if (finished->episode_done && finished->episode_total > 0.5) {
+            episode_end_line = "Episode time " + hud_time(finished->episode_total);
+            if (!keeps_records) {
+            } else if (best_total_before <= 0.0 || finished->episode_total < best_total_before) {
+                episode_end_line += "  \u00B7  New best";
+            } else {
+                episode_end_line += "  \u00B7  Best " + hud_time(best_total_before) + " (" +
+                                    hud_delta(finished->episode_total - best_total_before) + ")";
+            }
         }
         if (play_variant == PlayVariant::TimeAttack && finished->time > 0.5)
             attack_stage_done("time_attack", finished->chapter, finished->level, finished->time);
@@ -918,6 +938,15 @@ void update_hud() {
     const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
     // A whole episode in an attack mode is done when its last stage is
     // cleared (the core opened; the final episode has no next one to start).
+    // Rescue's episode-end menu follows the last stage of a whole-episode
+    // run (Story and Casual; the attack modes leave by themselves).
+    if (state.mode == 1 && !single_stage && (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual)) {
+        static bool last_cleared = false;  // told once, as it becomes so
+        const bool last_cleared_now = state.level >= 10 && state.progress >= 1.0f;
+        if (last_cleared_now && !last_cleared) episode_end_expected = 1;
+        else if (state.level < 10 && last_cleared) episode_end_expected = -1, episode_end_line.clear();
+        last_cleared = last_cleared_now;
+    }
     {
         static int cleared_episode_key = -1;
         if (variant_competes(play_variant) && !single_stage && state.level >= 10 && state.progress >= 1.0f &&
@@ -4113,7 +4142,8 @@ bool handle_profile_command(const std::string& command) {
                 // to the menus the game was started from, as Quit to menu does.
                 const int row = std::atoi(command->c_str() + 11);
                 if (row == end_menu.exit_row())
-                    end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = true;
+                    end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(),
+                    grid_quit_red = !end_menu.episode_end();
                 end_menu.choose(row, std::chrono::steady_clock::now());
                 continue;
             }
@@ -4181,6 +4211,17 @@ bool handle_profile_command(const std::string& command) {
                     if (const auto c = found->second.find(episode); c != found->second.end())
                         while (stage < 10 && c->second.count(stage)) ++stage;
                 blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
+                continue;
+            }
+            if (*command == "research_win" && guest_rdram != nullptr &&
+                guest::load16(guest_rdram, 0x800E121C) == -1) {
+                // Research (the test harness, "poke cmd:research_win"): wins the
+                // stage in play. Every top-layer cell is painted one colour
+                // (288), which sets off one combo that clears the layer and
+                // wins (docs/research/blockplanet-game-state.md, the one-colour board).
+                auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
+                const std::uint32_t values = guest::load32(rdram, 0x800E44D0u);
+                for (int c = 0; c < 1024; ++c) guest::store16(rdram, values + 2048u + 2u * std::uint32_t(c), 288);
                 continue;
             }
             if (*command == "dev_complete_rescue" && profile_save) {
@@ -4468,17 +4509,28 @@ bool handle_profile_command(const std::string& command) {
             std::vector<EndMenuBridge::Label> end_labels;
             for (const auto& t : blockplanet::recent_game_text())
                 if (t.font == 0) end_labels.push_back({t.text, t.y});
+            if (episode_end_expected != 0) end_menu.expect_episode_end(episode_end_expected > 0), episode_end_expected = 0;
             const auto end = end_menu.update(const_cast<std::uint8_t*>(guest_rdram), end_labels, blockplanet::ui::menus_open(),
                                              std::chrono::steady_clock::now(), pause_bridge.hide_original());
             end_menu_active = end.active;
+            end_menu_cleared = end.cleared;
             if (end.open_menu) {
                 blockplanet::ui::set_text("end_title", end.title);
-                blockplanet::ui::set_text("end_where", where_now());
+                blockplanet::ui::set_text("end_where", end.cleared ? std::string(variant_title(play_variant)) + " \u00B7 Episode " +
+                                                                         std::to_string(read_game_state(guest_rdram).chapter + 1)
+                                                                   : where_now());
+                blockplanet::ui::set_text("end_line", end.cleared ? episode_end_line : "");
                 auto end_items = end.items;
-                for (auto& item : end_items)
+                for (auto& item : end_items) {
                     if (item.id == "exit") item.label = exit_label();
+                    if (item.id == "continue" && end.cleared) {
+                        const int next = read_game_state(guest_rdram).chapter + 2;  // (0-based there)
+                        item.label = "Next Episode";
+                        if (next <= rescue_chapters) item.note = "Episode " + std::to_string(next);
+                    }
+                }
                 blockplanet::ui::set_list("end", end_items);
-                blockplanet::ui::request_open("gameover");
+                blockplanet::ui::request_open(end.cleared ? "episode_end" : "gameover");
             }
             // Only in play: back at the game's menu (after Quit), the menus shown are the launch path's.
             if ((pause.close_menu || end.close_menu) && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
@@ -4750,7 +4802,10 @@ bool handle_profile_command(const std::string& command) {
                 playing = guest::load16(guest_rdram, 0x800E121C) == -1;
                 const auto row = std::int16_t(guest::load16(guest_rdram, 0x800E1228));
                 const bool game_over = std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) == -1;
-                paused = playing && row >= 0 && !game_over;
+                // (The episode-end menu uses the row too, and the next
+                // episode's card sets it to 100: neither is a pause, whose
+                // rows are 0 to 3.)
+                paused = playing && row >= 0 && row <= 3 && !game_over && !end_menu.episode_end();
                 // Resumed (BlockPlanet's pause screen was open in this pause
                 // and is closed now) and the game's fade back in done: counted
                 // as no longer paused, unless waiting for the row.
@@ -4775,12 +4830,12 @@ bool handle_profile_command(const std::string& command) {
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             const auto screen = blockplanet::ui::current_screen();
             if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm" &&
-                                  screen != "gameover") ||
+                                  screen != "gameover" && screen != "episode_end") ||
                                  now_g - *grid_quit_at > std::chrono::seconds(8)))
                 grid_quit_at.reset(), grid_quit_red = false;
             const bool over_pause = start_at || paused || unpaused_at || (grid_quit_at && !grid_quit_red);
             // The end menus (and Exit from them): red, as the game over screen.
-            const bool over_end = end_menu_active || (grid_quit_at && grid_quit_red);
+            const bool over_end = (end_menu_active && !end_menu_cleared) || (grid_quit_at && grid_quit_red);
             // The box art shows over BlockPlanet's grid (tetrisphere/box_art.h),
             // which stays up as the title hands over to the menus (half a
             // second, until they open), on the way back to it from them, and
@@ -4794,6 +4849,7 @@ bool handle_profile_command(const std::string& command) {
             const bool box_art_grid = box_art || box_art_handover || box_art_returning || to_demo;
             blockplanet::ui::set_grid_override(over_pause && !launching()            ? "pause"
                                                : over_end && !mode_launcher.active() ? "red"
+                                               : end_menu_cleared && !mode_launcher.active() ? "green"
                                                : box_art_grid                        ? "blue"
                                                                                      : "");
         }

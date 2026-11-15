@@ -72,8 +72,10 @@ private:
 // (0x800E1228) during play. The items are the ones the game draws (its menu
 // text, read with their heights, so rows follow the game's order, top first)
 // once its menu has faded in (0x800DFF08 = 1); choosing sets the row and
-// presses A, as the pause does. Not the chapter-end menu (CONTINUE, EXIT
-// with hearts left in Story), which is left as it is.
+// presses A, as the pause does. Also the episode-end menu (CONTINUE, EXIT
+// with hearts left in Rescue, after an episode's last stage), once told it
+// is coming (expect_episode_end): "Episode Cleared" (2026-11-15; the game
+// shows it on the pause row without a Start press).
 class EndMenuBridge {
 public:
     using Clock = std::chrono::steady_clock;
@@ -82,6 +84,7 @@ public:
         bool open_menu = false;   // show the end screen (with `items` and `title`)
         bool close_menu = false;  // close BlockPlanet's menus
         bool active = false;      // the end menu (or its fade) is up: the grid shows, in red
+        bool cleared = false;     // an episode's end (not a game over): the grid shows in green
         std::vector<blockplanet::ui::ListItem> items;
         std::string title;
         std::uint16_t buttons = 0;
@@ -91,6 +94,11 @@ public:
     // pause is in charge of the row.
     Output update(std::uint8_t* rdram, const std::vector<Label>& labels, bool menus_open, Clock::time_point now,
                   bool pause_showing = false);
+    // The episode's last stage is cleared (Rescue's whole-episode runs): the
+    // pause row's next use is the episode-end menu. Cleared again when the
+    // row is let go.
+    void expect_episode_end(bool expected) { episode_expected_ = expected; }
+    bool episode_end() const { return episode_end_; }
     // The player chose the item on this row (its command "end_choose:ROW").
     void choose(int row, Clock::time_point now);
     bool showing() const { return showing_; }
@@ -105,6 +113,7 @@ private:
     std::vector<blockplanet::ui::ListItem> items_;
     std::string title_;
     int exit_row_ = -1;
+    bool episode_expected_ = false, episode_end_ = false;
 };
 // The end screen's items from the game's menu text: rows in the game's order
 // (top first), shown in BlockPlanet's order (Try again or Continue,

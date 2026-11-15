@@ -182,7 +182,23 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
     const std::int16_t row = load16(rdram, pause_row);
     const bool game_over = load16(rdram, p1_hearts) == -1;
     const bool versus = load16(rdram, mode) == 6;
-    const bool ended = playing && row >= 0 && (game_over || versus) && !pause_showing;
+    // After a choice, the game moved the row on itself (the episode's end:
+    // CONTINUE goes to the next episode's card, row 100): done.
+    if (choice_ && row >= 0 && row != *choice_ && now - since_ > press_time) {
+        out.close_menu = menus_open && playing;
+        choice_.reset();
+        showing_ = false;
+        episode_end_ = false;
+        items_.clear();
+        return out;
+    }
+    // The episode's end: expected, in Rescue with hearts left, and on the
+    // row; it stays so until the row is let go (or play is left).
+    if (!playing || row < 0) episode_end_ = false;
+    else if (episode_expected_ && row <= 3 && !game_over && load16(rdram, mode) == 1 && !pause_showing) episode_end_ = true;
+    if (episode_end_) episode_expected_ = false;
+    const bool ended = playing && row >= 0 && (game_over || versus || episode_end_) && !pause_showing;
+    out.cleared = episode_end_;
     if (!ended) {
         if (showing_ || choice_) out.close_menu = menus_open && playing;
         showing_ = false;
@@ -190,7 +206,7 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
         items_.clear();
         return out;
     }
-    out.active = game_over || showing_ || choice_;
+    out.active = game_over || episode_end_ || showing_ || choice_;
     if (choice_) {
         if (now - since_ > std::chrono::seconds(4)) {  // give up; show the panel again
             choice_.reset();
@@ -210,7 +226,7 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
         auto items = end_menu_items(labels, &exit_row_);
         if (items.empty()) return out;
         items_ = std::move(items);
-        title_ = game_over ? "Game Over" : "Match Over";
+        title_ = game_over ? "Game Over" : episode_end_ ? "Episode Cleared" : "Match Over";
         showing_ = true;
         out.active = true;
     }

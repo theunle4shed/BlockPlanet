@@ -1,0 +1,18 @@
+<rml>
+<head>
+    <title>Episode Cleared</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- BlockPlanet's panel over the game's episode-end menu (CONTINUE, EXIT
+     after an episode's last stage in Rescue): the shared pattern's results
+     panel (docs/MODE_MATRIX.md). The items are the game's own, chosen
+     through its row (EndMenuBridge, include/tetrisphere/pause_bridge.h). -->
+<body data-grid="green" class="over-pause">
+    <div id="panel">
+        <div class="title" data-text="end_title">Episode Cleared</div>
+        <div class="subtitle" data-text="end_where"></div>
+        <div class="result" data-text="end_line"></div>
+        <div class="list" data-list="end"></div>
+    </div>
+</body>
+</rml>
