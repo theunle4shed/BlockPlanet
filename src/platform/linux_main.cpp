@@ -212,6 +212,21 @@ std::optional<std::pair<int, int>> single_stage;
 // Casual is Story without a game over (no records or trophies).
 enum class PlayVariant { Story, TimeAttack, ScoreAttack, Casual };
 PlayVariant play_variant = PlayVariant::Story;  // the run in progress
+// What Rescue's run asks of the player, for the start card and the pause:
+// the core square to uncover (the stage's, +0x23E4) and the variant's rule.
+std::string rescue_goal(int square) {
+    std::string goal = "Dig down to the core: uncover a " + std::to_string(square) + "\u00A0\u00D7\u00A0" + std::to_string(square) +
+                       " square of it to rescue the friend inside.";
+    if (play_variant == PlayVariant::Casual) goal += " Lost hearts come back: no game over.";
+    else if (play_variant == PlayVariant::TimeAttack) goal += " Against the clock: each stage's time is set against your best.";
+    else if (play_variant == PlayVariant::ScoreAttack) goal += " Score all you can before the clock runs out; clearing blocks adds time.";
+    return goal;
+}
+// The start card's key for the run being played (one card per game type).
+const char* start_card_key(PlayVariant v) {
+    return v == PlayVariant::Casual ? "casual" : v == PlayVariant::TimeAttack ? "time_attack"
+           : v == PlayVariant::ScoreAttack ? "score_attack" : "rescue";
+}
 PlayVariant menu_variant = PlayVariant::Story;  // the chapter list on screen
 const char* variant_records(PlayVariant v) {
     return v == PlayVariant::TimeAttack ? "time_attack" : v == PlayVariant::ScoreAttack ? "score_attack" : "rescue";
@@ -4478,7 +4493,8 @@ bool handle_profile_command(const std::string& command) {
                     static std::optional<std::chrono::steady_clock::time_point> play_seen;
                     if (!rescue_play) play_seen.reset();
                     else if (!play_seen) play_seen = now_c;
-                    if (tetrisphere::minefield_sphere::armed() || sky_test_profile || now_c - *start_card_pending > std::chrono::seconds(40)) {
+                    if (tetrisphere::minefield_sphere::armed() || sky_test_profile || now_c - *start_card_pending > std::chrono::seconds(40) ||
+                        profile_data.progress.start_cards_seen.count(start_card_key(play_variant)) != 0) {
                         start_card_pending.reset();
                     } else if (play_seen && now_c - *play_seen > std::chrono::milliseconds(600) && !blockplanet::ui::menus_open()) {
                         start_card_pending.reset();
@@ -4520,6 +4536,12 @@ bool handle_profile_command(const std::string& command) {
             if (pause.open_menu && start_card_requested) {
                 start_card_requested.reset();
                 start_card_showing = true;
+                // Shown once per game type for each profile; after that the
+                // goal is on the pause screen.
+                if (profile_data.progress.start_cards_seen.insert(start_card_key(play_variant)).second) {
+                    profile_dirty = true;
+                    save_profile();
+                }
                 const auto state = read_game_state(guest_rdram);
                 const int chapter = state.chapter + 1, level = state.level + 1;
                 const int square = guest::load16(guest_rdram, 0x80110220u + 0x23E4);
@@ -4528,11 +4550,7 @@ bool handle_profile_command(const std::string& command) {
                                                         : level > 1 ? "Episode " + std::to_string(chapter) + " \u00B7 from stage " +
                                                                           std::to_string(chapter) + ":" + std::to_string(level)
                                                                     : "Episode " + std::to_string(chapter));
-                std::string goal = "Dig down to the core: uncover a " + std::to_string(square) + "\u00A0\u00D7\u00A0" + std::to_string(square) +
-                                   " square of it to rescue the friend inside.";
-                if (play_variant == PlayVariant::Casual) goal += " Lost hearts come back: no game over.";
-                else if (play_variant == PlayVariant::TimeAttack) goal += " Against the clock: each stage's time is set against your best.";
-                else if (play_variant == PlayVariant::ScoreAttack) goal += " Score all you can before the clock runs out; clearing blocks adds time.";
+                std::string goal = rescue_goal(square);
                 if (!single_stage && level == 1) goal += " Ten stages in all.";
                 blockplanet::ui::set_text("card_goal", goal);
                 blockplanet::ui::ListItem go{"start", "Start", "", "command:pause_resume", true, 1, true};
@@ -4542,6 +4560,11 @@ bool handle_profile_command(const std::string& command) {
             } else if (pause.open_menu) {
                 start_card_showing = false;
                 blockplanet::ui::set_text("pause_where", where_now());
+                // The goal, as the start card gave it (Rescue; the other modes to follow).
+                blockplanet::ui::set_text("pause_goal", guest::load16(guest_rdram, 0x800E44A8) == 1 &&
+                                                                tetrisphere::minefield_sphere::arena_name().empty()
+                                                            ? rescue_goal(guest::load16(guest_rdram, 0x80110220u + 0x23E4))
+                                                            : std::string());
                 auto pause_items = pause.items;
                 for (auto& item : pause_items) {
                     if (item.id == "quit") item.label = exit_label();

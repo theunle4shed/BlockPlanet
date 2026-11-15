@@ -7,6 +7,7 @@
     <div id="panel">
         <div class="header">Paused</div>
         <div class="subtitle" data-text="pause_where"></div>
+        <div class="goal" data-text="pause_goal"></div>
         <div class="list" data-list="pause"></div>
     </div>
 </body>
