@@ -3657,6 +3657,10 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
 // player came from, and show the loading cover until play has started.
 void begin_launch_presentation(LaunchMode mode) {
     blockplanet::ui::request_close();
+    // A grid held after leaving play (Exit, New Field, Try Again) hands over to
+    // the loading cover, which keeps it up with the mode's name until play has
+    // started (it held for up to 8 s, over the new stage; the owner's report).
+    grid_quit_at.reset(), grid_quit_red = false;
     // The loading cover (the owner's request): over the game's own menus
     // while they are pressed through, or the stage's first frames after a
     // direct start, until play has started.
