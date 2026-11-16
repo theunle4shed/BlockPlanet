@@ -23,7 +23,7 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 - **The game's own 3D Next pieces in BlockPlanet's HUD (final touches):** let the game draw its Next models again and move them onto the panel, as the held magic's model already is; check every screen shape, Training's row and two players.
 - **The flat cubes on the owner's PC:** the same graphics difference as the game over shell, probably; looked at with it.
 
-**New profiles and the volume (the owner, 2026-11-16, for later).** Creating a new profile switches to that profile's audio settings, which start at the defaults, so the music jumps up for a player who had it turned down. Not a bug, but a surprise. Options: a new profile starts from the audio settings in use when it is made (as the PC's controls are already copied), or the profile screen says the volume will change.
+**New profiles and the volume (the owner, 2026-11-16; done the same day: a new profile starts from the volume in use).** Creating a new profile switches to that profile's audio settings, which start at the defaults, so the music jumps up for a player who had it turned down. Not a bug, but a surprise. Options: a new profile starts from the audio settings in use when it is made (as the PC's controls are already copied), or the profile screen says the volume will change.
 
 **The owner's test notes (2026-11-16), lower priority:**
 - **Puzzle:** solving puzzle 1, then exiting to the puzzle list, does not let puzzle 2 be chosen (puzzle progression to look at); puzzle 2 loads before the green grid flies in; a failed puzzle still has the game's own dark bricks, not the shell.

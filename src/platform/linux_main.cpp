@@ -3852,6 +3852,9 @@ void switch_profile(std::optional<std::string> name, bool guest, const std::stri
     profile_to_remove = remove_id;
     // BlockPlanet's records and preferences for the profile.
     profile_save.reset();
+    // The volume in use now: a profile with no audio settings of its own (a
+    // new one) starts from it, rather than full volume (the owner's note).
+    const AudioPreferences audio_before = current_audio();
     profile_data = ProfileSaveData{};
     profile_dirty = false;
     continue_mode.reset();
@@ -3883,8 +3886,13 @@ void switch_profile(std::optional<std::string> name, bool guest, const std::stri
         blockplanet::set_audio_levels(profile_data.preferences.audio->music, profile_data.preferences.audio->effects);
         blockplanet::set_music_random(profile_data.preferences.audio->random_music);
     } else {
-        blockplanet::set_audio_levels(100, 100);
-        blockplanet::set_music_random(false);
+        blockplanet::set_audio_levels(audio_before.music, audio_before.effects);
+        blockplanet::set_music_random(audio_before.random_music);
+        if (!guest) {
+            profile_data.preferences.audio = audio_before;
+            profile_dirty = true;
+            save_profile();
+        }
     }
     const auto trophies = profile_path / "trophies.json";
     switch_trophies(trophy_definitions_path, guest ? nullptr : &trophies);
