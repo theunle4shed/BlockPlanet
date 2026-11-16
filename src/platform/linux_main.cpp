@@ -913,7 +913,9 @@ void update_hud() {
     static std::optional<std::chrono::steady_clock::time_point> game_over_since;
     if (!game_over) game_over_since.reset();
     else if (!game_over_since) game_over_since = std::chrono::steady_clock::now();
-    blockplanet::set_original_hud_keep_models(game_over_since &&
+    // (Not under BlockPlanet's shell: its bricks are hidden there, and the
+    // original queue's models would show beside the sphere.)
+    blockplanet::set_original_hud_keep_models(game_over_since && !tetrisphere::sphere::game_over_shell_wanted(guest_rdram) &&
                                              std::chrono::steady_clock::now() - *game_over_since > std::chrono::milliseconds(600));
     // The next episode's card after an episode's end (the pause row at
     // 100): the game's own full-screen card, with no HUD over it.

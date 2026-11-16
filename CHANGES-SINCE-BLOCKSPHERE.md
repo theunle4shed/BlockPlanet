@@ -473,6 +473,6 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Game over: the camera eases back to its resting distance before the shell closes (the drop timer can have closed it in; the owner's request; a hook at `0x800CEFE0` in `func_800CD3B8`). Research: the menu command `research_drop_timer:N`.
 - Game over: the piece's shadow is not drawn while the shell is up (it showed through), and the shell rises to cover the piece that lands after it has begun.
 - Game over: the camera stays on the covered sphere through the game's own game over (its pull-away is held off; `BLOCKPLANET_GAMEOVER_PULL=1` lets it run), so the GAME OVER letters fly in over the shell.
-- Game over: the game's dark bricks (`func_800BB3D0`) are not drawn while the shell covers the sphere, so only the GAME OVER letters show over it.
+- Game over: the game's dark bricks (`func_800BB3D0`) are not drawn while the shell covers the sphere, so only the GAME OVER letters show over it; the original piece queue's models no longer show beside the sphere then.
 - Research: the menu command `research_win` (the test harness: `poke cmd:research_win`) wins the stage in play by painting the top layer one colour.
 - Checked in the Linux test setup: the mouse's right-button slide, horizontal wheel and middle button reach the game as B with directions, steps of the cursor, and C-down.
