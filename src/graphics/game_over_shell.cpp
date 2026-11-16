@@ -387,7 +387,13 @@ extern "C" void blockplanet_game_over_camera(std::uint8_t* rdram, recomp_context
     };
     static float rest = 0.0f, eased = 0.0f;
     const float distance = read_float(context + 0x2420u), extra = read_float(context + 0x243Cu);
-    if (!loss_held.load()) {
+    // Held, or the game's own game over after it (hearts at -1: it pushes the
+    // camera far away, +0x2414 = 0x1838): the camera stays at rest on the
+    // covered sphere (the owner's design). BLOCKPLANET_GAMEOVER_PULL=1 lets
+    // the game's pull-away run.
+    static const bool pull = std::getenv("BLOCKPLANET_GAMEOVER_PULL") != nullptr;
+    const bool over = static_cast<std::int16_t>(load16(rdram, context + 0x2D7Eu)) == -1 && !pull && enabled();
+    if (!loss_held.load() && !over) {
         if (load16(rdram, context + 0x2B10u) < 100) rest = distance + extra;
         eased = distance + extra;
         return;

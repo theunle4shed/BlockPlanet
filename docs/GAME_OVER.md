@@ -78,3 +78,7 @@ The owner: the camera should go back to its starting distance for the shell, as 
 
 Research: the menu command `research_drop_timer:N` sets the drop timer N units short of its limit (6,000).
 
+## The game's own pull-away held off (2026-11-16)
+
+During its game over the game sets player context `+0x2414` to `0x1838` (`func_800CD3B8` at `0x800CF1A8`, while `+0x5A4` is set), which drives the camera far out: its pull-away. BlockPlanet's camera hook now also keeps the camera at its resting distance while player 1's hearts are −1 (`BLOCKPLANET_GAMEOVER_PULL=1` lets the pull-away run), so the GAME OVER letters fly in over the covered sphere. The dark bricks are drawn apart from the sphere (they stayed with `BLOCKPLANET_HIDE_SPHERE=1`), and not by the routines that read the piece's floats (`func_8008A2BC`, `func_800A4AF0`, `func_800A5BB4`, skipped in turn); still to find.
+
