@@ -96,3 +96,5 @@ The panel now has a results line under where the player was, from the HUD as it 
 
 The owner: hear the heart's smash, the game over's sounds, the shell and the letters all at once (the hold made the smash come after the shell), and a slower shell. Now: the last heart's loss is no longer held (`BLOCKPLANET_GAMEOVER_HOLD=1` holds it, as first built); the game's own game over starts at once (its sounds, its letters), BlockPlanet's shell closes over the sphere meanwhile, the camera is kept at its resting distance and offset (+0x2420 and +0x243C) and the sphere kept round (the game squashes it during its game over: mesh scale +0x247E, held at 0x4000), and the game's bricks are hidden. The shell is slower: each block over 1.0 s, the sweep over 2.2 s.
 
+The owner (2026-11-16): the blocks looked like lines turning into cubes (each was a column from the core up, grown about its middle). Each is now a cube one layer thick at the shell's height, growing from the middle of its place to its full size; grown together they cover everything beneath.
+

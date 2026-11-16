@@ -242,7 +242,10 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
             // A solid column from the core to the shell's height, already in its
             // place: small and invisible, it fades in and grows to full size
             // (the owner's design, 2026-11-15).
-            const double outer = shell_height, inner = 0.0;
+            // One layer thick at the shell's height (the owner: cubes all the
+            // way, growing from the middle of their place, not lines rising from
+            // the core); grown together they cover everything beneath.
+            const double outer = shell_height, inner = shell_height - 1.0;
             const double grown = 0.15 + 0.85 * ease_out(u), angle = 0.0;
             const double fade = std::clamp(u, 0.0, 1.0);
             append(rdram, 0xFA000000u, 0x3A3C4600u | static_cast<std::uint32_t>(std::lround(fade * 255.0)));

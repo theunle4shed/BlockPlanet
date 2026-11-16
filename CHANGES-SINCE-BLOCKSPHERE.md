@@ -477,5 +477,6 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - The Game Over panel shows a results line (the time, the score and, for a single stage, the best) from the HUD as it last showed in play; Minefield's shows its time.
 - Menus: Training's Not started topics can be selected (the list scrolled no further than Mystery Blocks, as they were disabled; the owner's report), and the start card, pause and Game Over text has more room above the first item (the owner's request).
 - Game over (the owner's timing): the heart's smash, the game's game over sounds, the shell and the GAME OVER letters start together (no hold); the shell is slower; the sphere stays round and at its resting distance throughout.
+- Game over shell: each block is a cube one layer thick, growing from the middle of its place (it was a column from the core, which looked like lines turning into cubes).
 - Research: the menu command `research_win` (the test harness: `poke cmd:research_win`) wins the stage in play by painting the top layer one colour.
 - Checked in the Linux test setup: the mouse's right-button slide, horizontal wheel and middle button reach the game as B with directions, steps of the cursor, and C-down.
