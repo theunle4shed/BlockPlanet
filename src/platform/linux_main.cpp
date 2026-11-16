@@ -546,7 +546,28 @@ std::string hide_and_seek_goal(int goal) {
 void update_magic_box();
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state);
 std::optional<blockplanet::ui::HudView> last_hud_view;  // what update_hud last showed (nullopt: none)
-void show_hud(std::optional<blockplanet::ui::HudView> view) { last_hud_view = std::move(view); }
+// The last HUD shown in play, kept for the Game Over panel's line (the HUD
+// itself is hidden once the game is over).
+std::optional<blockplanet::ui::HudView> last_play_hud;
+void show_hud(std::optional<blockplanet::ui::HudView> view) {
+    if (view) last_play_hud = view;
+    last_hud_view = std::move(view);
+}
+// The Game Over panel's line (the shared results panel): the time, the score
+// and the best as the HUD last showed them, e.g. "Time 3:21 · Score 12,300".
+std::string game_over_line(bool time_only = false) {
+    if (!last_play_hud) return {};
+    const auto& v = *last_play_hud;
+    std::vector<std::string> parts;
+    if (!v.time.empty()) parts.push_back((v.time_label.empty() ? std::string("Time") : v.time_label) + " " + v.time);
+    if (time_only) return parts.empty() ? std::string() : parts.front();
+    if (!v.story_score.empty()) parts.push_back("Score " + v.story_score);
+    else if (!v.score.empty()) parts.push_back((v.score_label.empty() ? std::string("Score") : v.score_label) + " " + v.score);
+    if (!v.best.empty()) parts.push_back(v.best);
+    std::string line;
+    for (const auto& p : parts) line += (line.empty() ? "" : "  \u00B7  ") + p;
+    return line;
+}
 void publish_game_text();
 // Graphics > Text size, as a scale for the card and speech text.
 float card_text_scale() {
@@ -5137,6 +5158,7 @@ bool handle_profile_command(const std::string& command) {
                     shell_since = now_m + std::chrono::hours(24);  // shown once
                     blockplanet::ui::set_text("end_title", "Game Over");
                     blockplanet::ui::set_text("end_where", "Minefield \u00B7 " + tetrisphere::minefield_sphere::arena_name());
+                    blockplanet::ui::set_text("end_line", game_over_line(true));  // (the mines' count reads "Boom" by then)
                     blockplanet::ui::ListItem again{"try_again", "New Field", "", "command:minefield_lost_again", true, 1, true};
                     again.icon = "\uE14C";
                     blockplanet::ui::ListItem leave{"exit", exit_label(), "", "command:minefield_lost_exit", true};
@@ -5301,7 +5323,7 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::set_text("end_where", end.cleared ? std::string(lines_end ? "Lines" : variant_title(play_variant)) + " \u00B7 Episode " +
                                                                          std::to_string(read_game_state(guest_rdram).chapter + 1)
                                                                    : where_now());
-                blockplanet::ui::set_text("end_line", end.cleared ? episode_end_line : "");
+                blockplanet::ui::set_text("end_line", end.cleared ? episode_end_line : game_over_line());
                 auto end_items = end.items;
                 for (auto& item : end_items) {
                     if (item.id == "exit") item.label = exit_label();

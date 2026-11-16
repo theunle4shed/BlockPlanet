@@ -86,3 +86,9 @@ During its game over the game sets player context `+0x2414` to `0x1838` (`func_8
 
 Skipping the routines that call the block face code (`func_8009C330`) one at a time during a game over (`BLOCKPLANET_SKIP_FN`, research only, now removed): with **`func_800BB3D0`** skipped no dark bricks fly at all, with everything else unchanged. It is now skipped while BlockPlanet's shell covers the sphere (held, or hearts at −1; not in Versus; `BLOCKPLANET_GAMEOVER_SHELL=0` keeps the game's own). The sequence is now the owner's: the sphere freezes, the camera eases back, the shell closes, the GAME OVER letters fly in over the covered sphere, then the Game Over panel. A small piece showed left of the sphere as the shell closed: the original HUD's 3D piece queue, which BlockPlanet lets draw from 0.6 s into a game over (for the game's bricks, which are queued models too). Not under BlockPlanet's shell now, since its bricks are hidden there.
 
+## The Game Over panel's line (2026-11-16)
+
+The panel now has a results line under where the player was, from the HUD as it last showed in play (the HUD is hidden once the game is over): the time (or the mode's own time label), the score, and the best for a single stage, e.g. "Time 3:21 · Score 12,300". Minefield shows its time only (its mines' count reads "Boom" by then). Checked on Minefield's panel.
+
+**The score table found again:** in the test setup a Rescue game over goes to the game's RESCUE score table and waits there (A and Start do nothing) under the red grid, with or without the shell (so not from the new sequence). The test setup's cartridge save is blank: every score row reads 00, so any score makes the table. A real save starts with the default tables (2,000,000 and down, docs/SAVES.md), which a low score does not reach. To check on the owner's PC: whether a brand-new profile's save has the default tables; if not, its first game over would hang the same way.
+

@@ -12,6 +12,7 @@
     <div id="panel">
         <div class="header" data-text="end_title">Game Over</div>
         <div class="subtitle" data-text="end_where"></div>
+        <div class="goal" data-text="end_line"></div>
         <div class="list" data-list="end"></div>
     </div>
 </body>
