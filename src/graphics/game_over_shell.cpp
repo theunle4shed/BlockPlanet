@@ -396,8 +396,6 @@ extern "C" void blockplanet_game_over_camera(std::uint8_t* rdram, recomp_context
     const float distance = read_float(context + 0x2420u), extra = read_float(context + 0x243Cu);
     static const bool pull = std::getenv("BLOCKPLANET_GAMEOVER_PULL") != nullptr;
     const bool over = static_cast<std::int16_t>(load16(rdram, context + 0x2D7Eu)) == -1 && !pull && enabled();
-    { static int n = 0; if (over && n++ % 6 == 0) std::fprintf(stderr, "CAMLOG d %.0f x %.0f rest %.0f %.0f mesh %d %d %d %d\n", distance, extra, rest, rest_extra,
-        load16(rdram, context + 0x2478u), load16(rdram, context + 0x247Au), load16(rdram, context + 0x247Cu), load16(rdram, context + 0x247Eu)); }
     if (!loss_held.load() && !over) {
         if (load16(rdram, context + 0x2B10u) < 100) rest = distance, rest_extra = extra;
         eased = distance, eased_extra = extra;
