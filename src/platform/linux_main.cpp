@@ -211,6 +211,7 @@ std::string chapter_zero_lesson;  // "basics" or "puzzle"
 std::optional<int> single_lesson;
 // A lost field under its shell: the sphere can no longer be turned (the owner's design).
 std::atomic<bool> minefield_frozen{false};
+std::atomic<bool> minefield_end_chosen{false};  // a choice made on the game's end menu: no fallback panel
 std::atomic<bool> game_over_frozen{false};  // the shell closing before the game's game over
 std::atomic<bool> hold_shell_on{false};     // the shell drawn while the game over is held
 float card_stick = 0.0f;  // the right stick's vertical position, scrolling the card panel
@@ -3668,7 +3669,10 @@ void begin_launch_presentation(LaunchMode mode) {
     // A restart from the pause keeps the menus the game was first started
     // from: the pause screen is not a place to come back to.
     if (const auto path = blockplanet::ui::menu_path();
-        !path.empty() && std::none_of(path.begin(), path.end(), [](const auto& s) { return s.first == "pause"; }))
+        !path.empty() && std::none_of(path.begin(), path.end(), [](const auto& s) {
+            // (Nor the end screens: New Field and Try Again start from there.)
+            return s.first == "pause" || s.first == "gameover" || s.first == "episode_end" || s.first == "puzzle_results";
+        }))
         launch_path = path, launch_place = path.back().first == "stages" ? stages_title_now : std::string();
     loading_since = std::chrono::steady_clock::now();
     loading_active = true;
@@ -4531,6 +4535,7 @@ bool handle_profile_command(const std::string& command) {
                 tetrisphere::minefield_sphere::again();
                 continue_mode = PendingLaunch{LaunchMode::Rescue, std::pair{1, 1}, true};
                 grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = true;
+                minefield_end_chosen.store(true);
                 end_menu.choose(end_menu.exit_row(), std::chrono::steady_clock::now());
                 continue;
             }
@@ -4612,6 +4617,7 @@ bool handle_profile_command(const std::string& command) {
                 // The end screen: the game's row for that item. Exit goes back
                 // to the menus the game was started from, as Quit to menu does.
                 const int row = std::atoi(command->c_str() + 11);
+                minefield_end_chosen.store(true);
                 if (row == end_menu.exit_row())
                     end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(),
                     grid_quit_red = !end_menu.episode_end();
@@ -5168,9 +5174,7 @@ bool handle_profile_command(const std::string& command) {
                 const auto now_m = std::chrono::steady_clock::now();
                 // (The owner, 2026-11-16: the GAME OVER letters too.) The game's own
                 // game over now follows (Casual's refill off, the hearts to 0): the
-                // shell, its letters, then its menu as the Game Over panel. If its
-                // menu does not come (its score table waiting for a name, as with
-                // a blank save), BlockPlanet's own panel opens after 9 s.
+                // shell, its letters, then its menu as the Game Over panel.
                 if (tetrisphere::minefield_sphere::take_lost_game_over()) {
                     shell_since = now_m;
                     if (game_option_applier) game_option_applier->set_menu_casual(false);
@@ -5180,19 +5184,9 @@ bool handle_profile_command(const std::string& command) {
                 if (shell_since && !in_play_m) shell_since.reset();
                 tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value() || hold_shell_on.load());
                 minefield_frozen.store(shell_since.has_value());
-                if (end_menu.showing()) {
-                } else if (shell_since && now_m - *shell_since > std::chrono::seconds(9) && !blockplanet::ui::menus_open()) {
-                    shell_since = now_m + std::chrono::hours(24);  // shown once
-                    blockplanet::ui::set_text("end_title", "Game Over");
-                    blockplanet::ui::set_text("end_where", "Minefield \u00B7 " + tetrisphere::minefield_sphere::arena_name());
-                    blockplanet::ui::set_text("end_line", game_over_line(true));  // (the mines' count reads "Boom" by then)
-                    blockplanet::ui::ListItem again{"try_again", "New Field", "", "command:minefield_lost_again", true, 1, true};
-                    again.icon = "\uE14C";
-                    blockplanet::ui::ListItem leave{"exit", exit_label(), "", "command:minefield_lost_exit", true};
-                    leave.icon = "\uE112";
-                    blockplanet::ui::set_list("end", {again, leave});
-                    blockplanet::ui::request_open("gameover");
-                }
+                // (No panel of BlockPlanet's own: if the game's menu does not come,
+                // nothing can leave play from there either.)
+                if (minefield_end_chosen.exchange(false)) shell_since.reset();
             }
             // Hide & Seek's episode end (the shared pattern): after level 30
             // the game shows the next episode's card (the pause row at 100)
@@ -5714,8 +5708,16 @@ bool handle_profile_command(const std::string& command) {
         // whether the GAME OVER scene stays on screen.
         {
             static const bool hold = std::getenv("BLOCKPLANET_HOLD_GAMEOVER") != nullptr;
-            if (hold && guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E1228) >= 0 &&
-                guest::load16(guest_rdram, 0x800DFF08) == 4 && std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) < 0)
+            // The owner (2026-11-16): the GAME OVER letters stay a moment longer
+            // over the shell before the fade (the fade held back for 1.5 s).
+            static std::optional<std::chrono::steady_clock::time_point> fade_from;
+            const bool fading = guest_rdram != nullptr && guest::load16(guest_rdram, 0x800E1228) >= 0 &&
+                                guest::load16(guest_rdram, 0x800DFF08) == 4 && std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) < 0;
+            if (!fading) fade_from.reset();
+            else if (!fade_from) fade_from = std::chrono::steady_clock::now();
+            const bool delay = fading && tetrisphere::sphere::game_over_shell_wanted(guest_rdram) &&
+                               std::chrono::steady_clock::now() - *fade_from < std::chrono::milliseconds(1500);
+            if ((hold && fading) || delay)
                 guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x800E1202, 0);
         }
         const auto now = std::chrono::steady_clock::now();
