@@ -25,6 +25,11 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 
 **New profiles and the volume (the owner, 2026-11-16, for later).** Creating a new profile switches to that profile's audio settings, which start at the defaults, so the music jumps up for a player who had it turned down. Not a bug, but a surprise. Options: a new profile starts from the audio settings in use when it is made (as the PC's controls are already copied), or the profile screen says the volume will change.
 
+**The owner's test notes (2026-11-16), lower priority:**
+- **Puzzle:** solving puzzle 1, then exiting to the puzzle list, does not let puzzle 2 be chosen (puzzle progression to look at); puzzle 2 loads before the green grid flies in; a failed puzzle still has the game's own dark bricks, not the shell.
+- **Hide & Seek:** hide the HUD during its intro and title; the mode needs more work, as Puzzle does.
+- **Lines:** the game over shell works. Reminder: compare making combos in BlockPlanet's Lines with the original.
+
 ## How the game is built, and why it matters for these plans
 
 BlockPlanet runs the original game code, recompiled to PC code, inside N64ModernRuntime, with RT64 drawing the graphics. That shapes every item below:
