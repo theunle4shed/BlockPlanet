@@ -55,6 +55,7 @@ void blockplanet_minefield_centre_view(std::uint8_t* rdram, recomp_context* ctx)
 bool blockplanet_game_over_hold_loss(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_game_over_replay(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_game_over_camera(std::uint8_t* rdram, recomp_context* ctx);
+bool blockplanet_research_skip_fn(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t fn);
 void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_context* ctx, int quadrant);
 void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx);

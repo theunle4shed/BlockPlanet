@@ -407,3 +407,14 @@ extern "C" void blockplanet_game_over_camera(std::uint8_t* rdram, recomp_context
     store32(rdram, context + 0x2420u, bits);
     camera_settled.store(eased == rest);
 }
+
+// Research: BLOCKPLANET_SKIP_FN=addr skips that hooked routine in play.
+extern "C" bool blockplanet_research_skip_fn(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t fn) {
+    static const std::uint32_t skip = [] {
+        const char* v = std::getenv("BLOCKPLANET_SKIP_FN");
+        return v ? static_cast<std::uint32_t>(std::strtoul(v, nullptr, 16)) : 0u;
+    }();
+    if (skip != fn || tetrisphere::guest::load16(rdram, 0x800E121Cu) != -1) return false;
+    ctx->r2 = 0;
+    return true;
+}

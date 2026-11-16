@@ -750,3 +750,38 @@ text = "blockplanet_game_over_replay(rdram, ctx);"
 func = "func_800CD3B8"
 before_vram = 0x800CEFE0
 text = "blockplanet_game_over_camera(rdram, ctx);"
+
+# Research (BLOCKPLANET_SKIP_FN=8009A044): skip this routine in play.
+[[patches.hook]]
+func = "func_8009A044"
+text = "if (blockplanet_research_skip_fn(rdram, ctx, 0x8009A044u)) return;"
+
+# Research (BLOCKPLANET_SKIP_FN=800A18F4): skip this routine in play.
+[[patches.hook]]
+func = "func_800A18F4"
+text = "if (blockplanet_research_skip_fn(rdram, ctx, 0x800A18F4u)) return;"
+
+# Research (BLOCKPLANET_SKIP_FN=800A1E58): skip this routine in play.
+[[patches.hook]]
+func = "func_800A1E58"
+text = "if (blockplanet_research_skip_fn(rdram, ctx, 0x800A1E58u)) return;"
+
+# Research (BLOCKPLANET_SKIP_FN=800A3894): skip this routine in play.
+[[patches.hook]]
+func = "func_800A3894"
+text = "if (blockplanet_research_skip_fn(rdram, ctx, 0x800A3894u)) return;"
+
+# Research (BLOCKPLANET_SKIP_FN=800BB3D0): skip this routine in play.
+[[patches.hook]]
+func = "func_800BB3D0"
+text = "if (blockplanet_research_skip_fn(rdram, ctx, 0x800BB3D0u)) return;"
+
+# Research (BLOCKPLANET_SKIP_FN=800BD170): skip this routine in play.
+[[patches.hook]]
+func = "func_800BD170"
+text = "if (blockplanet_research_skip_fn(rdram, ctx, 0x800BD170u)) return;"
+
+# Research (BLOCKPLANET_SKIP_FN=800BFA94): skip this routine in play.
+[[patches.hook]]
+func = "func_800BFA94"
+text = "if (blockplanet_research_skip_fn(rdram, ctx, 0x800BFA94u)) return;"
