@@ -92,3 +92,7 @@ The panel now has a results line under where the player was, from the HUD as it 
 
 **The score table found again:** in the test setup a Rescue game over goes to the game's RESCUE score table and waits there (A and Start do nothing) under the red grid, with or without the shell (so not from the new sequence). The test setup's cartridge save is blank: every score row reads 00, so any score makes the table. A real save starts with the default tables (2,000,000 and down, docs/SAVES.md), which a low score does not reach. To check on the owner's PC: whether a brand-new profile's save has the default tables; if not, its first game over would hang the same way.
 
+## Everything at once (the owner, 2026-11-16)
+
+The owner: hear the heart's smash, the game over's sounds, the shell and the letters all at once (the hold made the smash come after the shell), and a slower shell. Now: the last heart's loss is no longer held (`BLOCKPLANET_GAMEOVER_HOLD=1` holds it, as first built); the game's own game over starts at once (its sounds, its letters), BlockPlanet's shell closes over the sphere meanwhile, the camera is kept at its resting distance and offset (+0x2420 and +0x243C) and the sphere kept round (the game squashes it during its game over: mesh scale +0x247E, held at 0x4000), and the game's bricks are hidden. The shell is slower: each block over 1.0 s, the sweep over 2.2 s.
+

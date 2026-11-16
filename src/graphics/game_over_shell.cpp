@@ -50,9 +50,9 @@ const int block_cells = [] {
     const int n = v ? std::atoi(v) : 1;
     return n == 2 || n == 4 ? n : 1;
 }();
-constexpr double fall_seconds = 0.6;    // each block's slide
+constexpr double fall_seconds = 1.0;    // each block's slide
 constexpr double bevel = 3.0;           // how far each block's corner normals lean out
-constexpr double spread_seconds = 1.2;  // the last block starts this long after the first
+constexpr double spread_seconds = 2.2;  // the last block starts this long after the first
 
 // The face work area the sphere's face code reads (sphere_cell.cpp's table),
 // by mesh axis: corner order (row, column) = (0, 0), (1, 0), (1, 1), (0, 1).
@@ -341,7 +341,11 @@ void release_game_over() {
 extern "C" bool blockplanet_game_over_hold_loss(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace tetrisphere::sphere;
     using tetrisphere::guest::load16;
-    if (replaying) return false;
+    // The owner (2026-11-16): the heart's smash, the game over's sounds, the
+    // shell and the letters all at once, so the loss is no longer held back
+    // (BLOCKPLANET_GAMEOVER_HOLD=1 holds it, as first built).
+    static const bool hold = std::getenv("BLOCKPLANET_GAMEOVER_HOLD") != nullptr;
+    if (!hold || replaying) return false;
     const std::uint32_t context = static_cast<std::uint32_t>(ctx->r4);
     if (context != 0x80110220u || load16(rdram, context + 0x2D7Eu) != 1) return false;
     const int mode_now = load16(rdram, 0x800E44A8u);
@@ -385,27 +389,36 @@ extern "C" void blockplanet_game_over_camera(std::uint8_t* rdram, recomp_context
         std::memcpy(&v, &bits, sizeof v);
         return v;
     };
-    static float rest = 0.0f, eased = 0.0f;
+    // The distance (+0x2420) and the offset added to it (+0x243C) as they
+    // were in calm play (the drop timer low); while the game is over both are
+    // eased back to them and held there.
+    static float rest = 0.0f, rest_extra = 0.0f, eased = 0.0f, eased_extra = 0.0f;
     const float distance = read_float(context + 0x2420u), extra = read_float(context + 0x243Cu);
-    // Held, or the game's own game over after it (hearts at -1: it pushes the
-    // camera far away, +0x2414 = 0x1838): the camera stays at rest on the
-    // covered sphere (the owner's design). BLOCKPLANET_GAMEOVER_PULL=1 lets
-    // the game's pull-away run.
     static const bool pull = std::getenv("BLOCKPLANET_GAMEOVER_PULL") != nullptr;
     const bool over = static_cast<std::int16_t>(load16(rdram, context + 0x2D7Eu)) == -1 && !pull && enabled();
+    { static int n = 0; if (over && n++ % 6 == 0) std::fprintf(stderr, "CAMLOG d %.0f x %.0f rest %.0f %.0f mesh %d %d %d %d\n", distance, extra, rest, rest_extra,
+        load16(rdram, context + 0x2478u), load16(rdram, context + 0x247Au), load16(rdram, context + 0x247Cu), load16(rdram, context + 0x247Eu)); }
     if (!loss_held.load() && !over) {
-        if (load16(rdram, context + 0x2B10u) < 100) rest = distance + extra;
-        eased = distance + extra;
+        if (load16(rdram, context + 0x2B10u) < 100) rest = distance, rest_extra = extra;
+        eased = distance, eased_extra = extra;
+        camera_settled.store(false);
         return;
     }
     if (rest <= 100.0f) return;
-    eased += (rest - eased) * 0.25f;
-    if (std::abs(eased - rest) < 4.0f) eased = rest;
-    const float value = eased - extra;
-    std::uint32_t bits = 0;
-    std::memcpy(&bits, &value, sizeof bits);
-    store32(rdram, context + 0x2420u, bits);
-    camera_settled.store(eased == rest);
+    const auto ease = [](float& value, float target) {
+        value += (target - value) * 0.25f;
+        if (std::abs(value - target) < 2.0f) value = target;
+    };
+    ease(eased, rest);
+    ease(eased_extra, rest_extra);
+    const auto write_float = [&](std::uint32_t at, float value) {
+        std::uint32_t bits = 0;
+        std::memcpy(&bits, &value, sizeof bits);
+        store32(rdram, at, bits);
+    };
+    write_float(context + 0x2420u, eased);
+    write_float(context + 0x243Cu, eased_extra);
+    camera_settled.store(eased == rest && eased_extra == rest_extra);
 }
 
 // The game's dark bricks during its game over (func_800BB3D0): not drawn
