@@ -23,6 +23,8 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 - **The game's own 3D Next pieces in BlockPlanet's HUD (final touches):** let the game draw its Next models again and move them onto the panel, as the held magic's model already is; check every screen shape, Training's row and two players.
 - **The flat cubes on the owner's PC:** the same graphics difference as the game over shell, probably; looked at with it.
 
+**New profiles and the volume (the owner, 2026-11-16, for later).** Creating a new profile switches to that profile's audio settings, which start at the defaults, so the music jumps up for a player who had it turned down. Not a bug, but a surprise. Options: a new profile starts from the audio settings in use when it is made (as the PC's controls are already copied), or the profile screen says the volume will change.
+
 ## How the game is built, and why it matters for these plans
 
 BlockPlanet runs the original game code, recompiled to PC code, inside N64ModernRuntime, with RT64 drawing the graphics. That shapes every item below:
