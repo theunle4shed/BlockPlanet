@@ -1,0 +1,18 @@
+<rml>
+<head>
+    <title>Jukebox</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- The jukebox (the Media Player's first part): the game's 23 tracks, each
+     played at once when chosen; it keeps playing in the menus until a game
+     starts. -->
+<body data-grid="blue">
+    <div id="panel">
+        <div class="title">Jukebox</div>
+        <div class="subtitle" data-text="jukebox_now">Choose a track</div>
+        <div class="list" data-list="jukebox"></div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

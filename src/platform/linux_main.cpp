@@ -4538,6 +4538,24 @@ bool handle_profile_command(const std::string& command) {
             }
             if (*command == "research_diff_start") { diff_start = std::chrono::steady_clock::now(); diff_mark.reset(); continue; }
             if (*command == "research_diff_mark") { diff_mark = std::chrono::steady_clock::now(); continue; }
+            if (*command == "jukebox" || command->rfind("jukebox_play:", 0) == 0) {
+                // The jukebox (main menu's icons): the game's tracks; choosing one
+                // plays it now, and it plays on in the menus until a game starts.
+                if (command->rfind("jukebox_play:", 0) == 0) blockplanet::play_track(std::atoi(command->c_str() + 13));
+                const int playing = command->rfind("jukebox_play:", 0) == 0 ? std::atoi(command->c_str() + 13)
+                                    : guest_rdram != nullptr ? blockplanet::current_track(guest_rdram) : -1;
+                std::vector<blockplanet::ui::ListItem> tracks;
+                for (int t = 0; t < 23; ++t) {
+                    blockplanet::ui::ListItem item{"track" + std::to_string(t), blockplanet::track_name(t), t == playing ? "Now playing" : "",
+                                                   "command:jukebox_play:" + std::to_string(t), true, 1, t == std::max(0, playing)};
+                    item.icon = t == playing ? "\uE140" : "";
+                    tracks.push_back(item);
+                }
+                blockplanet::ui::set_text("jukebox_now", playing >= 0 ? std::string("Now playing: ") + blockplanet::track_name(playing) : "Choose a track");
+                blockplanet::ui::set_list("jukebox", tracks);
+                if (*command == "jukebox") blockplanet::ui::request_show("jukebox");
+                continue;
+            }
             if (*command == "research_minefield_lose") {
                 tetrisphere::minefield_sphere::research_lose();
                 continue;

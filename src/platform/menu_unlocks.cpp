@@ -73,7 +73,7 @@ std::vector<blockplanet::ui::ListItem> main_icon_items(const MenuUnlocks& u) {
     static const std::vector<Entry> entries{
         {"profiles", "", "\uE466", "command:profiles", "Profiles: choose who is playing, or add a profile.", Status::None, 0},
         {"trophies", "", "\uE377", "command:trophies", "Trophies (in progress).", Status::None, -1},
-        {"media", "", "\uE126", "command:media_player", "Media Player: the game's music and your own (not started).", Status::None, -1},
+        {"media", "", "\uE126", "command:jukebox", "Jukebox: listen to the game's music.", Status::None, 0},
         {"options", "", "\uE158", "open:options", "Options: graphics, sound, controls and more.", Status::None, 0},
         {"exit", "", "\uE112", "command:exit", "Exit to the desktop.", Status::None, 0},
     };
