@@ -212,6 +212,7 @@ std::optional<int> single_lesson;
 // A lost field under its shell: the sphere can no longer be turned (the owner's design).
 std::atomic<bool> minefield_frozen{false};
 std::atomic<bool> game_over_frozen{false};  // the shell closing before the game's game over
+std::atomic<bool> hold_shell_on{false};     // the shell drawn while the game over is held
 float card_stick = 0.0f;  // the right stick's vertical position, scrolling the card panel
 // A mode to start once the game is back at its menu: after a Chapter 0, or
 // for Restart level. `start` is the chapter and level (1-based) to begin at.
@@ -4472,6 +4473,18 @@ bool handle_profile_command(const std::string& command) {
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
                 continue;
             }
+            if (command->rfind("research_drop_timer:", 0) == 0 && guest_rdram != nullptr) {
+                // Research: the drop timer set this many units short of its limit (the camera closes in near the end).
+                float limit = 0.0f;
+                const std::uint32_t bits = guest::load32(guest_rdram, 0x800F116Cu);
+                std::memcpy(&limit, &bits, sizeof limit);
+                const float value = std::max(0.0f, limit - float(std::atof(command->c_str() + 20)));
+                std::uint32_t out = 0;
+                std::memcpy(&out, &value, sizeof out);
+                guest::store32(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x2408, out);
+                std::fprintf(stderr, "DROPTIMER limit %.0f set %.0f\n", limit, value);
+                continue;
+            }
             if (*command == "research_diff_start") { diff_start = std::chrono::steady_clock::now(); diff_mark.reset(); continue; }
             if (*command == "research_diff_mark") { diff_mark = std::chrono::steady_clock::now(); continue; }
             if (*command == "research_minefield_lose") {
@@ -5032,20 +5045,30 @@ bool handle_profile_command(const std::string& command) {
                     puzzle_results_requested.reset(), puzzle_result.reset();
             }
             // The last heart lost (the owner's game over): its loss is held while
-            // the sphere freezes and the shell closes, then released.
+            // the sphere freezes, the camera goes back to its resting distance
+            // (the drop timer and other effects close it in; the owner: "pull the
+            // camera back to its starting point"), and the shell closes; then released.
             {
-                static std::optional<std::chrono::steady_clock::time_point> held_since;
+                static std::optional<std::chrono::steady_clock::time_point> held_since, shell_from;
                 const auto now_h = std::chrono::steady_clock::now();
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                const bool in_play_c = guest::load16(guest_rdram, 0x800E121C) == -1;
                 if (tetrisphere::sphere::game_over_held()) {
-                    if (!held_since) held_since = now_h;
-                    auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                    if (!held_since) held_since = now_h, shell_from.reset();
                     guest::store32(rd, 0x80110220u + 0x2408, 0);  // no drop meanwhile
                     guest::store16(rd, 0x80110220u + 0x2B10, 0);
-                    if (now_h - *held_since > std::chrono::milliseconds(2400) || guest::load16(guest_rdram, 0x800E121C) != -1) {
-                        tetrisphere::sphere::release_game_over(), held_since.reset();
-                    }
+                    // Eased back and held there for the whole hold (the game's own
+                    // pushes would close it in again).
+                    // (The camera is eased back on the game's own thread: game_over_shell.cpp.)
+                    if (!shell_from && tetrisphere::sphere::game_over_camera_settled()) shell_from = now_h;
+                    // The shell once the camera is back (or after a second at most).
+                    if (!shell_from && now_h - *held_since > std::chrono::seconds(1)) shell_from = now_h;
+                    hold_shell_on.store(shell_from.has_value());
+                    if ((shell_from && now_h - *shell_from > std::chrono::milliseconds(2400)) || !in_play_c)
+                        tetrisphere::sphere::release_game_over(), held_since.reset(), shell_from.reset();
                 } else {
-                    held_since.reset();
+                    held_since.reset(), shell_from.reset();
+                    hold_shell_on.store(false);
                 }
                 game_over_frozen.store(tetrisphere::sphere::game_over_held());
             }
@@ -5105,7 +5128,7 @@ bool handle_profile_command(const std::string& command) {
                 if (shell_since && !in_play_m) shell_since.reset();
                 // Only while that field is lost and in play (a new field starts bare).
                 if (shell_since && !tetrisphere::minefield_sphere::lost()) shell_since.reset();
-                tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value() || tetrisphere::sphere::game_over_held());
+                tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value() || hold_shell_on.load());
                 minefield_frozen.store(shell_since.has_value());
                 if (false) {
                 } else if (shell_since && now_m - *shell_since > std::chrono::milliseconds(2500) && !blockplanet::ui::menus_open()) {

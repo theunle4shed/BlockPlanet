@@ -72,3 +72,9 @@ Built: the last heart's loss is held back (`blockplanet_game_over_hold_loss`), t
 
 Still to do: keep the camera on the covered sphere and hide the game's dark bricks during its game over, so only the letters show over the shell; the piece in hand still shows through the shell.
 
+## The camera back to its starting point (2026-11-16)
+
+The owner: the camera should go back to its starting distance for the shell, as some modes close it in (the drop timer, for one). The camera's distance for a frame is worked out in `func_800CD3B8` just before `0x800CEFE0`: player context `+0x2420` (from the drop timer's push, `+0x2416`, and `+0x2454`) plus `+0x243C`; writing `+0x2420` elsewhere is overwritten each frame. BlockPlanet hooks `0x800CEFE0` (`blockplanet_game_over_camera`): in calm play (drop timer `+0x2B10` below 100) it notes the resting distance; while the game over is held it eases the distance back to it, a quarter of the way each frame, and the shell starts once it is there (at most a second after the hold began). Checked in Rescue 1:1 with the drop timer run out (closed in to about 1,750 against a resting 2,423): the sphere eases back to its normal size, then the shell closes.
+
+Research: the menu command `research_drop_timer:N` sets the drop timer N units short of its limit (6,000).
+

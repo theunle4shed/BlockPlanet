@@ -11,6 +11,7 @@
 #include "tetrisphere/recomp_support.h"
 
 #include <atomic>
+#include <cstring>
 
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/sphere_cell.h"
@@ -323,9 +324,11 @@ extern "C" void func_800940F0(std::uint8_t* rdram, recomp_context* ctx);
 namespace tetrisphere::sphere {
 namespace {
 std::atomic<bool> loss_held{false}, loss_replay{false};
+std::atomic<bool> camera_settled{false};
 bool replaying = false;
 } // namespace
 bool game_over_held() { return loss_held.load(); }
+bool game_over_camera_settled() { return camera_settled.load(); }
 void release_game_over() {
     loss_held.store(false);
     loss_replay.store(true);
@@ -344,7 +347,6 @@ extern "C" bool blockplanet_game_over_hold_loss(std::uint8_t* rdram, recomp_cont
     const int mode_now = load16(rdram, 0x800E44A8u);
     if (!enabled() || mode_now == 6 || mode_now == 4 || mode_now == 3) return false;
     if (!loss_held.exchange(true)) {
-        set_game_over_shell_forced(true);
         std::fprintf(stdout, "{\"event\":\"game_over_held\"}\n");
         std::fflush(stdout);
     }
@@ -365,4 +367,37 @@ extern "C" void blockplanet_game_over_replay(std::uint8_t* rdram, recomp_context
     *ctx = saved;
     std::fprintf(stdout, "{\"event\":\"game_over_released\"}\n");
     std::fflush(stdout);
+}
+
+// Each frame of play, once the camera's distance has been worked out (player
+// context +0x2420, plus +0x243C): its resting value is noted in calm play
+// (the drop timer low, +0x2B10), and while the game over is held the distance
+// is eased back to it (a quarter of the way each frame).
+extern "C" void blockplanet_game_over_camera(std::uint8_t* rdram, recomp_context*) {
+    using namespace tetrisphere::sphere;
+    using tetrisphere::guest::load16;
+    using tetrisphere::guest::load32;
+    using tetrisphere::guest::store32;
+    constexpr std::uint32_t context = 0x80110220u;
+    const auto read_float = [&](std::uint32_t at) {
+        float v = 0.0f;
+        const std::uint32_t bits = load32(rdram, at);
+        std::memcpy(&v, &bits, sizeof v);
+        return v;
+    };
+    static float rest = 0.0f, eased = 0.0f;
+    const float distance = read_float(context + 0x2420u), extra = read_float(context + 0x243Cu);
+    if (!loss_held.load()) {
+        if (load16(rdram, context + 0x2B10u) < 100) rest = distance + extra;
+        eased = distance + extra;
+        return;
+    }
+    if (rest <= 100.0f) return;
+    eased += (rest - eased) * 0.25f;
+    if (std::abs(eased - rest) < 4.0f) eased = rest;
+    const float value = eased - extra;
+    std::uint32_t bits = 0;
+    std::memcpy(&bits, &value, sizeof bits);
+    store32(rdram, context + 0x2420u, bits);
+    camera_settled.store(eased == rest);
 }

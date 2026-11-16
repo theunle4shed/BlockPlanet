@@ -741,3 +741,12 @@ text = "if (blockplanet_game_over_hold_loss(rdram, ctx)) return;"
 func = "func_800CD3B8"
 before_vram = 0x800CEDE8
 text = "blockplanet_game_over_replay(rdram, ctx);"
+
+# The game over sequence: the camera's distance for this frame is worked out
+# just before 0x800CEFE0 (+0x2420 from the drop timer's push, plus +0x243C);
+# while the game over is held BlockPlanet eases it back to its resting value
+# (the owner: "pull the camera back to its starting point").
+[[patches.hook]]
+func = "func_800CD3B8"
+before_vram = 0x800CEFE0
+text = "blockplanet_game_over_camera(rdram, ctx);"

@@ -26,5 +26,7 @@ void set_game_over_shell_forced(bool on);
 bool game_over_held();
 // Let the held loss run (on the game's next frame): its game over follows.
 void release_game_over();
+// While held: whether the camera is back at its resting distance.
+bool game_over_camera_settled();
 
 } // namespace tetrisphere::sphere
