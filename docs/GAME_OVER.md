@@ -82,3 +82,7 @@ Research: the menu command `research_drop_timer:N` sets the drop timer N units s
 
 During its game over the game sets player context `+0x2414` to `0x1838` (`func_800CD3B8` at `0x800CF1A8`, while `+0x5A4` is set), which drives the camera far out: its pull-away. BlockPlanet's camera hook now also keeps the camera at its resting distance while player 1's hearts are −1 (`BLOCKPLANET_GAMEOVER_PULL=1` lets the pull-away run), so the GAME OVER letters fly in over the covered sphere. The dark bricks are drawn apart from the sphere (they stayed with `BLOCKPLANET_HIDE_SPHERE=1`), and not by the routines that read the piece's floats (`func_8008A2BC`, `func_800A4AF0`, `func_800A5BB4`, skipped in turn); still to find.
 
+## The dark bricks found and hidden (2026-11-16)
+
+Skipping the routines that call the block face code (`func_8009C330`) one at a time during a game over (`BLOCKPLANET_SKIP_FN`, research only, now removed): with **`func_800BB3D0`** skipped no dark bricks fly at all, with everything else unchanged. It is now skipped while BlockPlanet's shell covers the sphere (held, or hearts at −1; not in Versus; `BLOCKPLANET_GAMEOVER_SHELL=0` keeps the game's own). The sequence is now the owner's: the sphere freezes, the camera eases back, the shell closes, the GAME OVER letters fly in over the covered sphere, then the Game Over panel. Still seen: a small piece left of the sphere for a moment as the shell closes (to look at).
+
