@@ -176,11 +176,11 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
     // tallest column in play when the game ended (Minefield's 2, a deep Rescue
     // stage's more), so nothing pokes through; the blocks come in from the rim
     // to the middle, each spinning and growing into its place.
-    if (starting) {
-        shell_height = 2;
-        for (int r = sphere.first_cell(); r <= sphere.last_cell(); ++r)
-            for (int c = sphere.first_cell(); c <= sphere.last_cell(); ++c) shell_height = std::max(shell_height, height_at(r, c));
-    }
+    // (Kept up to date: the piece just dropped can land after the shell has
+    // begun, a layer above the rest, and would show through.)
+    if (starting) shell_height = 2;
+    for (int r = sphere.first_cell(); r <= sphere.last_cell(); ++r)
+        for (int c = sphere.first_cell(); c <= sphere.last_cell(); ++c) shell_height = std::max(shell_height, height_at(r, c));
 
     // Near-black blocks: a dark primitive colour times the lit shade (no
     // texture: the one last loaded came out olive on the real game), put back
