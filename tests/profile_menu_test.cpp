@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
     // Training's menu: every lesson open, the first not done focused, then topics not covered yet.
     auto all = training_lessons(false, false);
     assert(all.size() == 13 && all[0].focus && all[2].action == "command:lesson:1:3" && all[7].action == "command:lesson:3:1");
-    assert(training_lessons(true, false)[4].focus && !all[8].enabled && all[8].classes == "rag-not-started");
+    assert(training_lessons(true, false)[4].focus && all[8].enabled && all[8].action.empty() && all[8].classes == "rag-not-started");
 
     auto confirm = delete_confirmation(store, "1");
     assert(confirm.size() == 2 && confirm[0].action == "command:profile_delete_confirmed:1" &&

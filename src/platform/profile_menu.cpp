@@ -330,7 +330,9 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         {"lines_rules", "Lines", "Lining up three in a row to remove bricks."},
     };
     for (const auto& m : missing) {
-        blockplanet::ui::ListItem item{m.id, m.label, "(Not started)", "", false};
+        // Selectable (so the list scrolls to it and its description shows), as
+        // the other menus' Not started items; choosing it does nothing yet.
+        blockplanet::ui::ListItem item{m.id, m.label, "(Not started)", "", true};
         item.description = m.description;
         item.classes = "rag-not-started";
         items.push_back(item);
