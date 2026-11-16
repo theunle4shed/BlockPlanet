@@ -4526,6 +4526,14 @@ bool handle_profile_command(const std::string& command) {
                 tetrisphere::minefield_sphere::research_lose();
                 continue;
             }
+            if (*command == "minefield_again_end") {
+                // From the game's end menu: leave through its Exit, then a new field.
+                tetrisphere::minefield_sphere::again();
+                continue_mode = PendingLaunch{LaunchMode::Rescue, std::pair{1, 1}, true};
+                grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = true;
+                end_menu.choose(end_menu.exit_row(), std::chrono::steady_clock::now());
+                continue;
+            }
             if (*command == "minefield_lost_again" || *command == "minefield_lost_exit") {
                 // From a lost field's Game Over panel: leave play through the pause
                 // (as a single stage ends), then a new field, or back to its menu.
@@ -5158,15 +5166,22 @@ bool handle_profile_command(const std::string& command) {
             {
                 static std::optional<std::chrono::steady_clock::time_point> shell_since;
                 const auto now_m = std::chrono::steady_clock::now();
-                if (tetrisphere::minefield_sphere::take_lost_game_over()) shell_since = now_m;
+                // (The owner, 2026-11-16: the GAME OVER letters too.) The game's own
+                // game over now follows (Casual's refill off, the hearts to 0): the
+                // shell, its letters, then its menu as the Game Over panel. If its
+                // menu does not come (its score table waiting for a name, as with
+                // a blank save), BlockPlanet's own panel opens after 9 s.
+                if (tetrisphere::minefield_sphere::take_lost_game_over()) {
+                    shell_since = now_m;
+                    if (game_option_applier) game_option_applier->set_menu_casual(false);
+                    guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x2D7E, 0);
+                }
                 const bool in_play_m = guest::load16(guest_rdram, 0x800E121C) == -1;
                 if (shell_since && !in_play_m) shell_since.reset();
-                // Only while that field is lost and in play (a new field starts bare).
-                if (shell_since && !tetrisphere::minefield_sphere::lost()) shell_since.reset();
                 tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value() || hold_shell_on.load());
                 minefield_frozen.store(shell_since.has_value());
-                if (false) {
-                } else if (shell_since && now_m - *shell_since > std::chrono::milliseconds(3800) && !blockplanet::ui::menus_open()) {  // once the shell has closed
+                if (end_menu.showing()) {
+                } else if (shell_since && now_m - *shell_since > std::chrono::seconds(9) && !blockplanet::ui::menus_open()) {
                     shell_since = now_m + std::chrono::hours(24);  // shown once
                     blockplanet::ui::set_text("end_title", "Game Over");
                     blockplanet::ui::set_text("end_where", "Minefield \u00B7 " + tetrisphere::minefield_sphere::arena_name());
@@ -5337,6 +5352,15 @@ bool handle_profile_command(const std::string& command) {
                                                                    : where_now());
                 blockplanet::ui::set_text("end_line", end.cleared ? episode_end_line : game_over_line());
                 auto end_items = end.items;
+                // Minefield: New Field (a new field in the same arena) and Exit; no Training.
+                if (!tetrisphere::minefield_sphere::arena_name().empty() && !end.cleared) {
+                    end_items.erase(std::remove_if(end_items.begin(), end_items.end(), [](const auto& i) { return i.id == "training"; }),
+                                    end_items.end());
+                    for (auto& item : end_items)
+                        if (item.id == "try_again") item.label = "New Field", item.action = "command:minefield_again_end";
+                    blockplanet::ui::set_text("end_where", "Minefield \u00B7 " + tetrisphere::minefield_sphere::arena_name());
+                    blockplanet::ui::set_text("end_line", game_over_line(true));
+                }
                 for (auto& item : end_items) {
                     if (item.id == "exit") item.label = exit_label();
                     if (item.id == "continue" && end.cleared) {

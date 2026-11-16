@@ -98,3 +98,7 @@ The owner: hear the heart's smash, the game over's sounds, the shell and the let
 
 The owner (2026-11-16): the blocks looked like lines turning into cubes (each was a column from the core up, grown about its middle). Each is now a cube one layer thick at the shell's height, growing from the middle of its place to its full size; grown together they cover everything beneath.
 
+## Minefield uses the game's game over (2026-11-16)
+
+The owner: no GAME OVER letters in Minefield. A lost field now shows its mines for three seconds, then the game's own game over runs (Casual's refill off, hearts to 0), so it gets the shell and the letters as Rescue does; the game's end menu becomes the Game Over panel ("Minefield · Mini", the time, New Field and Exit; New Field leaves through the game's Exit and starts a new field). If the panel has not come after 9 s, BlockPlanet's own panel opens. With a blank save (the test setup's) the game stops at its RESCUE score table waiting for a name, and from there neither panel can leave play: New Field did nothing. With a save holding the default tables a Minefield score of 0 does not reach the table.
+
