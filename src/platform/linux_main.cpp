@@ -5154,7 +5154,7 @@ bool handle_profile_command(const std::string& command) {
                 tetrisphere::sphere::set_game_over_shell_forced(shell_since.has_value() || hold_shell_on.load());
                 minefield_frozen.store(shell_since.has_value());
                 if (false) {
-                } else if (shell_since && now_m - *shell_since > std::chrono::milliseconds(2500) && !blockplanet::ui::menus_open()) {
+                } else if (shell_since && now_m - *shell_since > std::chrono::milliseconds(3800) && !blockplanet::ui::menus_open()) {  // once the shell has closed
                     shell_since = now_m + std::chrono::hours(24);  // shown once
                     blockplanet::ui::set_text("end_title", "Game Over");
                     blockplanet::ui::set_text("end_where", "Minefield \u00B7 " + tetrisphere::minefield_sphere::arena_name());
