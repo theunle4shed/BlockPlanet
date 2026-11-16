@@ -1,4 +1,5 @@
 #include "tetrisphere/minefield_sphere.h"
+#include "tetrisphere/game_over_shell.h"
 #include "tetrisphere/sphere_cell.h"
 #include "tetrisphere/sphere_mesh.h"
 
@@ -721,8 +722,9 @@ std::string counter() {
 
 } // namespace tetrisphere::minefield_sphere
 
-extern "C" bool blockplanet_minefield_hide_marker(std::uint8_t*, recomp_context*) {
-    return tetrisphere::minefield_sphere::hide_cursor_marker();
+extern "C" bool blockplanet_minefield_hide_marker(std::uint8_t* rdram, recomp_context*) {
+    // Also under the game over shell (the piece's shadow showed through it).
+    return tetrisphere::minefield_sphere::hide_cursor_marker() || tetrisphere::sphere::game_over_shell_wanted(rdram);
 }
 
 // The view centred on the cursor's cell (the owner's report, 2026-11-13): the

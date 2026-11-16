@@ -70,7 +70,7 @@ A memory diff around the last bad drop (menu commands `research_diff_start`, the
 
 Built: the last heart's loss is held back (`blockplanet_game_over_hold_loss`), the sphere freezes (no input) and BlockPlanet's shell closes over it with the HUD still up; after 2.4 s the held loss is run on the game's own thread (`blockplanet_game_over_replay`, before the hearts check in `func_800CD3B8`), and the game's own game over follows (its camera pull-away, its dark bricks and its GAME OVER letters), then the Game Over panel. Not in Versus, Puzzle or Training; `BLOCKPLANET_GAMEOVER_SHELL=0` leaves the game's own game over alone.
 
-Still to do: keep the camera on the covered sphere and hide the game's dark bricks during its game over, so only the letters show over the shell; the piece in hand still shows through the shell.
+Still to do: keep the camera on the covered sphere and hide the game's dark bricks during its game over, so only the letters show over the shell; the piece in hand still showed through the shell (fixed 2026-11-16: its shadow, the cursor marker `func_8009AB60`, is not drawn while the shell is up; a piece in flight can still show above it).
 
 ## The camera back to its starting point (2026-11-16)
 
