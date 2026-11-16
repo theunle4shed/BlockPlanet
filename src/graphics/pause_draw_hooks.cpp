@@ -27,6 +27,7 @@
 // Recompiled calls do not keep return addresses, so draws are told apart by
 // their arguments.
 
+#include "tetrisphere/game_over_shell.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/brick_sky.h"
@@ -343,6 +344,12 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
         // 2026-11-11). So from a use (held magic gone with no heart lost)
         // until nothing has been drawn there for half a second, nothing is
         // skipped.
+        // Under BlockPlanet's game over shell nothing drawn there shows (a
+        // piece floated beside the sphere as the shell formed; the owner's report).
+        if (static_cast<std::uint32_t>(ctx->r7) == 0x801309A8u && tetrisphere::sphere::game_over_shell_wanted(rdram)) {
+            ctx->r2 = 0;
+            return true;
+        }
         if (static_cast<std::uint32_t>(ctx->r7) == 0x801309A8u) {
             using Clock = std::chrono::steady_clock;
             static std::int8_t last_held = -1;

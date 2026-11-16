@@ -51,7 +51,10 @@ const int block_cells = [] {
     return n == 2 || n == 4 ? n : 1;
 }();
 constexpr double fall_seconds = 1.0;    // each block's slide
-constexpr double bevel = 3.0;           // how far each block's corner normals lean out
+// Each cube's corner normals as the sphere's own (1.0): neighbours shade
+// alike, so the finished shell reads as one smooth surface, as the smooth
+// purple wall blocks do (the owner, 2026-11-16; 3.0 gave each a bevel).
+const double bevel = [] { const char* v = std::getenv("BLOCKPLANET_GAMEOVER_SHELL_BEVEL"); return v ? std::atof(v) : 1.0; }();
 constexpr double spread_seconds = 2.2;  // the last block starts this long after the first
 
 // The face work area the sphere's face code reads (sphere_cell.cpp's table),
@@ -247,7 +250,8 @@ void draw_game_over_shell(std::uint8_t* rdram, const ExtendedSphere& sphere) {
             // the core); grown together they cover everything beneath.
             const double outer = shell_height, inner = shell_height - 1.0;
             const double grown = 0.15 + 0.85 * ease_out(u), angle = 0.0;
-            const double fade = std::clamp(u, 0.0, 1.0);
+            // Faded in over the first quarter of its growth, then solid (the owner).
+            const double fade = std::clamp(u * 4.0, 0.0, 1.0);
             append(rdram, 0xFA000000u, 0x3A3C4600u | static_cast<std::uint32_t>(std::lround(fade * 255.0)));
             double top_p[4][3], bottom_p[4][3], centre_p[3] = {0, 0, 0}, axis_v[3] = {0, 0, 0};
             for (std::size_t k = 0; k < corners.size(); ++k) {
