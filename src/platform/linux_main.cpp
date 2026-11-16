@@ -988,7 +988,7 @@ void update_hud() {
         if (play_variant != PlayVariant::ScoreAttack && single_stage && finished->chapter == single_stage->first &&
             finished->level == single_stage->second) {
             single_stage_result = SingleStageResult{finished->time, best_before};
-            single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
+            single_stage_quit_at = std::chrono::steady_clock::now();  // at once: the grid already covers the next stage
         }
     }
 
@@ -1018,6 +1018,18 @@ void update_hud() {
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
     }
     const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
+    // A single stage cleared: the game plays its stage end, then builds the
+    // next stage. The grid comes in over the stage end (after a moment of it),
+    // so the next stage is never seen (the owner's report in Score Attack);
+    // play is left as soon as the next stage begins.
+    {
+        static std::optional<std::chrono::steady_clock::time_point> cleared_at;
+        const bool cleared_now = single && state.level == single_stage->second && state.progress >= 1.0f;
+        if (!cleared_now) cleared_at.reset();
+        else if (!cleared_at) cleared_at = std::chrono::steady_clock::now();
+        else if (std::chrono::steady_clock::now() - *cleared_at > std::chrono::milliseconds(1800) && !grid_quit_at)
+            grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = false;
+    }
     // A whole episode in an attack mode is done when its last stage is
     // cleared (the core opened; the final episode has no next one to start).
     // Rescue's episode-end menu follows the last stage of a whole-episode
@@ -1060,7 +1072,7 @@ void update_hud() {
             if (f.points > 0) attack_stage_done("score_attack", chapter, f.stage, double(f.points));
             if (single_stage && chapter == single_stage->first && f.stage == single_stage->second) {
                 single_stage_result = SingleStageResult{double(f.points), before};
-                single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
+                single_stage_quit_at = std::chrono::steady_clock::now();  // at once: the grid already covers the next stage
             }
         };
         // Bonus points for the time left: into the game's score, credited to
@@ -1284,7 +1296,7 @@ void update_hud() {
                 if (single_stage && play_lines && key_now / 100 == single_stage->first && done == single_stage->second) {
                     const auto i = std::size_t(done - 1);
                     single_stage_result = SingleStageResult{stage_time, i < record.best_levels.size() ? record.best_levels[i] : 0.0};
-                    single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
+                    single_stage_quit_at = std::chrono::steady_clock::now();  // at once: the grid already covers the next stage
                 }
                 if (record.best_levels.size() < std::size_t(done)) record.best_levels.resize(std::size_t(done), 0.0);
                 double& best = record.best_levels[std::size_t(done - 1)];
