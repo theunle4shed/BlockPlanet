@@ -41,7 +41,7 @@ The visualisers drawn today are BlockPlanet's own elements over the game, colour
 3. **VORTEX** (found 2026-11-17, below): a ready-made animation of the game's own models, with its own song.
 4. **Pictures of models.** Not possible without drawing the models ourselves (BlockPlanet keeps nothing from the ROM in the repository; anything taken from it is read at run time).
 
-Suggested next steps: VORTEX as a jukebox background (below), then 1 or 2 as a "Planet" background.
+Done: VORTEX as a jukebox background (below). Next: 1 or 2 as a "Planet" background.
 
 ## VORTEX (found 2026-11-17)
 
@@ -58,5 +58,7 @@ Suggested next steps: VORTEX as a jukebox background (below), then 1 or 2 as a "
 **Seeing it:** the research command `research_vortex` (test harness: `poke cmd:research_vortex`) sets the flag and starts the reset screen as if Reset were held; the vortex appears about five seconds later. There is no way back from it yet (on the console, letting go of Reset restarts the game).
 
 **For the jukebox:**
-- **A "Vortex" background**: run the game's reset screen with the flag behind the jukebox, drawing the real scene. To build: the way back (clear `0x800E11F8` and `0x800DF728`, put the title back as it was), and the jukebox's own song kept playing instead of song `0x143` (or offered as its track).
+- **The Vortex background (built 2026-11-17, `src/graphics/vortex_backdrop.cpp`).** Chosen in the jukebox, the game's reset screen is started behind it with the flag on, and undone when another background is chosen or the jukebox is left. What the reset screen changes: it rewinds the model pool to the mark after the common assets (`*0x801026B8`; the title's and menus' models live above it), copies the last picture into its fade buffer (`*0x800DFF00`), sets its fade state (`0x800DFF08` = 4) and its flags, and stops and restarts the jingle player. So, at the top of the game's frame (the top-level loop, `0x80070180`): entering saves the pool from the mark to its top (about 600 KB on the title) and the values it changes (`0x800DFEF0`–`0x800DFF20`, `0x800E11F0`–`0x800E1270`, `0x800E12A0`–`0x800E12D8`, the flag, `0x8010B330`–`0x8010B360`, the pool top), then sets the flag, `0x800E11F8` = 1 and the counters to 0; the counter is then set to 298, so the scene comes at once but steps a frame at a time; the copied picture is filled with an opaque dark colour (16-bit with the alpha bit: zero, transparent, hid the scene too); the vortex's song is stopped as soon as it starts, so the jukebox's track plays on. Leaving puts it all back. While it shows, BlockPlanet's hold on the idle counters and its hiding of the game's menu scenes are off.
+  - **The crash found on the way:** waiting for the graphics tasks in flight (calling the game's `func_8002A140`, as it does before rebuilding models) on entering crashed the renderer about every other time: it takes the scheduler's messages out of the game's turn. Without it: 13 runs, 27 entries and leavings, no crash; play (a Training lesson) starts normally afterwards.
+- **Still to do:** the scene sits right of centre on a wide screen (its camera is the console's 4:3 one).
 - **Three more songs**: the game has songs outside the 23 tracks, started on the jingle player: `0x129` (the intro), `0x134` (the title) and `0x143` (the vortex). They could join the jukebox as extra tracks (and the secret ones among the unlockables).

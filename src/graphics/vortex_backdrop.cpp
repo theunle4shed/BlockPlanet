@@ -6,13 +6,12 @@
 // the VORTEX flag (0x800E12F4) on and 300 frames counted, builds scene 0x130
 // and plays song 0x143 on the jingle player, drawing the scene on a loop.
 // On a console a restart follows; here it is undone instead:
-//   entering  wait for the graphics tasks in flight, save the pool from the
-//             mark to its top and the values the reset screen changes, then
+//   entering  save the pool from the mark to its top and the values the reset screen changes, then
 //             set the flag, the reset screen's flag and its counters (past
 //             the 300 frames, so the vortex comes at once);
 //   on        black out the copied picture, stop the vortex's song once it
 //             starts (the jukebox's track plays on, on the other player);
-//   leaving   wait for the graphics tasks, put everything back.
+//   leaving   put everything back.
 
 #include "tetrisphere/vortex_backdrop.h"
 #include "tetrisphere/guest_memory.h"
@@ -27,7 +26,6 @@
 #include <vector>
 
 extern "C" {
-void func_8002A140(std::uint8_t* rdram, recomp_context* ctx);
 void func_8007ADF8(std::uint8_t* rdram, recomp_context* ctx);
 }
 
@@ -43,7 +41,6 @@ constexpr std::uint32_t vortex_started = 0x800E11FCu;  // u16: the scene built, 
 constexpr std::uint32_t pool_top = 0x800F22C0u;      // the model pool's next free byte
 constexpr std::uint32_t pool_mark = 0x801026B8u;     // the pool after the common assets
 constexpr std::uint32_t fade_picture = 0x800DFF00u;  // the reset screen's copy of the last picture
-constexpr std::uint32_t tasks_sent = 0x800DF710u, tasks_done = 0x800DF714u;
 constexpr std::uint32_t reset_signal = 0x800DF728u;
 constexpr std::uint32_t jingle_player = 0x80109DC0u;
 constexpr std::uint32_t scene_row = 0x800E121Cu;     // -1 in play
@@ -80,30 +77,23 @@ void copy_in(std::uint8_t* rdram, std::uint32_t from, const std::vector<std::uin
     for (std::uint32_t i = 0; i < in.size(); ++i) store8(rdram, from + i, in[i]);
 }
 
-// As the game does before rebuilding models: wait for the graphics tasks sent.
-void wait_for_graphics(std::uint8_t* rdram, recomp_context* ctx) {
-    for (int guard = 0; guard < 120 && static_cast<std::int32_t>(load32(rdram, tasks_done)) <
-                                           static_cast<std::int32_t>(load32(rdram, tasks_sent)); ++guard) {
-        const recomp_context saved = *ctx;
-        func_8002A140(rdram, ctx);
-        *ctx = saved;
-    }
-}
-
 bool at_title_or_menus(const std::uint8_t* rdram) {
     // The title, or the game's menus (not play, not its pause).
     if (load16(rdram, 0x800E1646u) == 0) return true;
     return load16(rdram, scene_row) >= 0;  // -1 in play (its pause included)
 }
 
-void enter(std::uint8_t* rdram, recomp_context* ctx) {
+void enter(std::uint8_t* rdram) {
     const std::uint32_t base = load32(rdram, pool_mark), top = load32(rdram, pool_top);
     if ((base >> 24) != 0x80u || top < base || top - base > 0x600000u) {
         std::fprintf(stderr, "{\"event\":\"vortex_refused\",\"base\":\"%08X\",\"top\":\"%08X\"}\n", base, top);
         wanted.store(false);
         return;
     }
-    wait_for_graphics(rdram, ctx);
+    // No wait for the graphics tasks in flight here: taking the scheduler's
+    // messages out of turn (func_8002A140) crashed the renderer about every
+    // other time; the reset screen waits itself before it rewrites the pool,
+    // and saving only reads.
     saved_base = base;
     copy_out(rdram, base, top, saved_pool);
     saved_values.clear();
@@ -119,11 +109,14 @@ void enter(std::uint8_t* rdram, recomp_context* ctx) {
     song_stopped = false;
     frames_on = 0;
     showing.store(true);
-    std::fprintf(stdout, "{\"event\":\"vortex_backdrop\",\"on\":true,\"saved_bytes\":%zu}\n", saved_pool.size());
+    std::fprintf(stdout, "{\"event\":\"vortex_backdrop\",\"on\":true,\"saved_bytes\":%zu,\"started\":%d,\"scene\":\"%08X\",\"fade\":%d,\"init\":%d}\n",
+                 saved_pool.size(), load16(rdram, vortex_started), load32(rdram, 0x800E1264u), load16(rdram, 0x800DFF08u), load16(rdram, 0x800DFD5Cu));
+    std::fflush(stdout);
 }
 
 void leave(std::uint8_t* rdram, recomp_context* ctx) {
-    wait_for_graphics(rdram, ctx);
+    // No wait for the graphics tasks here either (see enter): the pool is put
+    // back at the top of the game's frame, before this frame's drawing.
     {  // the jingle player silenced (the vortex's song, if it started)
         const recomp_context saved = *ctx;
         ctx->r4 = address(jingle_player);
@@ -143,7 +136,10 @@ void leave(std::uint8_t* rdram, recomp_context* ctx) {
 
 } // namespace
 
-void set_vortex_backdrop(bool on) { wanted.store(on); }
+void set_vortex_backdrop(bool on) {
+    static const bool off = std::getenv("BLOCKPLANET_VORTEX_OFF") != nullptr;  // research: the jukebox side only
+    wanted.store(on && !off);
+}
 bool vortex_backdrop_on() { return showing.load(); }
 
 } // namespace blockplanet
@@ -155,7 +151,7 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
     using namespace tetrisphere::guest;
     const bool want = wanted.load();
     if (state == State::off) {
-        if (want && load16(rdram, reset_screen) == 0 && at_title_or_menus(rdram)) enter(rdram, ctx);
+        if (want && load16(rdram, reset_screen) == 0 && at_title_or_menus(rdram)) enter(rdram);
         return;
     }
     if (!want) {

@@ -32,10 +32,8 @@ int shown_seconds = -2;
 // The backgrounds: the grid's own (Water, Pulse, Bars), then full-screen
 // Winamp-inspired ones built from the game's bricks (src/ui/ui_jukebox.cpp).
 // Last, the Vortex: the game's own scene (src/graphics/vortex_backdrop.cpp).
-// The Vortex is not offered yet: its draw crashed now and then in testing
-// (being fixed); research_vortex and jukebox_vortex still reach it.
-constexpr int visualiser_count = 6;
-constexpr int visualiser_known = 7;
+constexpr int visualiser_count = 7;
+constexpr int visualiser_known = visualiser_count;
 constexpr int vortex = 6;
 const char* const visualiser_names[visualiser_known] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces", "Vortex"};
 const char* const visualiser_icons[visualiser_known] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF", "\uE499"};
@@ -143,7 +141,7 @@ bool command(const std::string& command, const unsigned char* rdram) {
     else if (command == "jukebox_shuffle") shuffle = !shuffle;
     else if (command == "jukebox_repeat") repeat = !repeat;
     else if (command == "jukebox_vis") visualiser = (visualiser + 1) % visualiser_count;
-    else if (command == "jukebox_vortex") visualiser = vortex;  // research, until it is offered
+    else if (command == "jukebox_vortex") visualiser = vortex;  // for testing
     else if (command == "jukebox_hide") {
         ui::set_jukebox_hidden(true);
         return true;
