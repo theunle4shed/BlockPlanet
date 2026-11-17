@@ -1,6 +1,7 @@
 #include "ui_system.h"
 
 #include "tetrisphere/under_layer.h"
+#include "tetrisphere/audio_spectrum.h"
 
 #include "grid_texture.h"
 #include "ui_grid.h"
@@ -957,7 +958,29 @@ std::string grid_override;
 std::string lab_theme = "blue";
 bool lab_present = true;
 std::string lab_show = "both";  // both, tiles or background
+std::atomic<int> jukebox_visualiser{1};
+
+// The jukebox: the grid's music reaction and the player's spectrum bars.
+void update_jukebox() {
+    const auto screen = navigator->current_screen();
+    const bool open = screen == "jukebox" || screen == "jukebox_list";
+    const auto bands = tetrisphere::audio_spectrum::bands();
+    std::array<float, 16> values{};
+    for (std::size_t i = 0; i < values.size() && i < bands.size(); ++i) values[i] = bands[i];
+    set_grid_music(open ? jukebox_visualiser.load() : 0, values, tetrisphere::audio_spectrum::level());
+    if (screen != "jukebox") return;
+    Rml::ElementDocument* document = navigator->top_document();
+    if (document == nullptr) return;
+    for (int i = 0; i < 16; ++i) {
+        Rml::Element* bar = document->GetElementById("jb" + std::to_string(i));
+        if (bar == nullptr) continue;
+        const float v = std::clamp(values[i], 0.0f, 1.0f);  // squared: quiet bands stay low
+        bar->SetProperty("height", std::to_string(int(4 + v * v * 92)) + "dp");
+    }
+}
+
 void update_grid() {
+    update_jukebox();
     const auto screens = navigator->documents();
     const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     std::string colour = grid_colour_of(screens);
@@ -1242,6 +1265,8 @@ void pointer(float x, float y, bool click) {
     std::lock_guard lock(requests_mutex);
     requests.push_back(PointerRequest{x, y, click});
 }
+
+void set_jukebox_visualiser(int mode) { jukebox_visualiser.store(mode); }
 
 void set_text(const std::string& name, const std::string& text) {
     std::lock_guard lock(requests_mutex);

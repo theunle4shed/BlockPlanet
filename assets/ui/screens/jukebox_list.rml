@@ -1,0 +1,15 @@
+<rml>
+<head>
+    <title>Playlist</title>
+    <link type="text/rcss" href="../menu.rcss"/>
+</head>
+<!-- The jukebox's playlist: the game's 23 tracks; choosing one plays it. -->
+<body data-grid="blue" class="jukebox">
+    <div id="panel" class="player playlist">
+        <div class="player-head"><span class="icon">&#xE2E0;</span>Playlist<span class="player-sub">23 tracks</span></div>
+        <div class="list" data-list="jukebox"></div>
+        <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back to the player"><span class="icon">&#xE2A1;</span></div></div>
+        <div id="description" class="description"></div>
+    </div>
+</body>
+</rml>

@@ -391,6 +391,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/text_rewrites.cpp
     src/platform/linux_ai.cpp
     src/platform/linux_main.cpp
+    src/platform/jukebox.cpp
     src/platform/wav_capture.cpp
     src/graphics/rt64_context.cpp
     src/graphics/f3d_flat_shade.cpp
@@ -1163,6 +1164,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/controller_mappings.cpp
         src/platform/controls_sdl.cpp
         src/platform/linux_main.cpp
+        src/platform/jukebox.cpp
         src/platform/close_game_menu.cpp
     src/platform/pc_settings_menu.cpp
     src/platform/pc_settings_hook.cpp

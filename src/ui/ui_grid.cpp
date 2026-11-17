@@ -476,13 +476,14 @@ void MenuGrid::place(double now) {
         // The jukebox: lifted (and lit) by the music.
         float music_light = 1.0f;
         if (music_mode == 1) {
-            for (auto& l : lifts) l += music_level * 70.0f;
-            music_light = 1.0f + music_level * 0.8f;
+            for (auto& l : lifts) l += music_level * 100.0f;
+            music_light = 0.8f + music_level * 1.0f;
         } else if (music_mode == 2 && layout_.columns > 0) {
             const int band = std::clamp(at.column * 16 / layout_.columns, 0, 15);
-            const float v = music_bands[std::size_t(band)];
-            for (auto& l : lifts) l += v * v * 90.0f;
-            music_light = 0.8f + v * 0.9f;
+            // Spread out: the bands mostly sit between a third and full.
+            const float v = std::clamp((music_bands[std::size_t(band)] - 0.35f) / 0.65f, 0.0f, 1.0f);
+            for (auto& l : lifts) l += v * v * 140.0f;
+            music_light = 0.5f + v * 1.3f;
         }
         // Turned towards edge on, a tile catches less light (in steps, so its
         // colour, which rebuilds its shape, changes only a few times a flip).

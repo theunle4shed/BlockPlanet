@@ -48,6 +48,10 @@ void set_list(const std::string& name, std::vector<ListItem> items);
 // there takes the focus, and with `click` is chosen.
 void pointer(float x, float y, bool click);
 void set_text(const std::string& name, const std::string& text);
+// The jukebox's background (0 Water, 1 Pulse, 2 Bars): while the jukebox's
+// screens are open, the menu grid reacts to the music this way, and the
+// player's spectrum (elements jb0 to jb15) follows the music.
+void set_jukebox_visualiser(int mode);
 // A full-screen loading cover over everything (0: none, 1: opaque), with the
 // mode being started ("Story · Stage 1:1"), while a mode is started through
 // the game's own menus behind it.

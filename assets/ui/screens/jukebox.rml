@@ -3,14 +3,29 @@
     <title>Jukebox</title>
     <link type="text/rcss" href="../menu.rcss"/>
 </head>
-<!-- The jukebox (the Media Player's first part): the game's 23 tracks, each
-     played at once when chosen; it keeps playing in the menus until a game
-     starts. -->
-<body data-grid="blue">
-    <div id="panel">
-        <div class="title">Jukebox</div>
-        <div class="subtitle" data-text="jukebox_now">Choose a track</div>
-        <div class="list" data-list="jukebox"></div>
+<!-- The jukebox (the Media Player's first part; the owner's design,
+     2026-11-17: Winamp-inspired, a place to hang out): a player in the middle
+     of the screen over the grid, which reacts to the music (Visualiser). The
+     display, spectrum and buttons are filled by src/platform/jukebox.cpp and
+     src/ui/ui_system.cpp (update_jukebox). -->
+<body data-grid="blue" class="jukebox">
+    <div id="panel" class="player">
+        <div class="player-head"><span class="icon">&#xE499;</span>Jukebox<span class="player-sub">BlockPlanet Media Player</span></div>
+        <div class="player-display">
+            <div class="player-left">
+                <div class="player-state icon" data-text="jb_state"></div>
+                <div class="player-time" data-text="jb_time">-:--</div>
+            </div>
+            <div class="player-right">
+                <div class="player-track"><span class="player-number" data-text="jb_number">01</span><span data-text="jb_track"></span></div>
+                <div class="player-info" data-text="jb_info"></div>
+                <div class="player-spectrum"><div class="band" id="jb0"></div><div class="band" id="jb1"></div><div class="band" id="jb2"></div><div class="band" id="jb3"></div><div class="band" id="jb4"></div><div class="band" id="jb5"></div><div class="band" id="jb6"></div><div class="band" id="jb7"></div><div class="band" id="jb8"></div><div class="band" id="jb9"></div><div class="band" id="jb10"></div><div class="band" id="jb11"></div><div class="band" id="jb12"></div><div class="band" id="jb13"></div><div class="band" id="jb14"></div><div class="band" id="jb15"></div></div>
+                <div class="player-modes" data-text="jb_modes"></div>
+            </div>
+        </div>
+        <div class="list player-controls" data-list="jukebox_controls" data-columns="8"></div>
+        <div class="item value slider player-volume" id="music_volume" data-description="How loud the music is (saved, as on the Audio page)." data-setting="music_volume"
+             data-options="0:0%,10:10%,20:20%,30:30%,40:40%,50:50%,60:60%,70:70%,80:80%,90:90%,100:100%"><span class="icon">&#xE1AB;</span>Volume<span class="value"></span><div class="bar"><div class="fill"></div></div></div>
         <div class="list icon-row"><div class="item" id="back" data-action="back" data-description="Back"><span class="icon">&#xE2A1;</span></div></div>
         <div id="description" class="description"></div>
     </div>

@@ -78,7 +78,9 @@ The larger steps cost mostly CPU (the game builds the vertices itself) and buffe
 
 Large multi-layer spheres seem to build in over several frames when they come into view. The likely cause is a per-frame work budget that made sense on N64 hardware. Plan: capture it happening, find the code that builds sphere geometry and any per-frame limit, then raise or remove the limit on PC. Blocksphere's 1.0 notes say it did not change sphere size or culling, so this area is untouched.
 
-### Jukebox and sound test (M) — the jukebox built 2026-11-16 (all 23 tracks, play now); the sound test and the Media Player's visualiser and own music still to do
+### Jukebox and sound test (M) — the jukebox built 2026-11-16 (all 23 tracks, play now), and made a player 2026-11-17; the sound test and own music still to do
+
+**The player (the owner's design, 2026-11-17):** "winamp inspired, so it's not just a place to change music, but a place to hang out too", a player in the middle in the game's style, and backgrounds that react to the music (more to come). Built: a display (time, track number and name, a 16-band spectrum), Previous, Play, Stop, Next, Shuffle, Repeat, Playlist, a Visualiser key (Water, Pulse, Bars on the menu grid) and the music volume. Still to do: a true Pause (needs the game's song player paused, not just silenced), track lengths (Repeat off moves on after three minutes for now), a way to hide the player and watch the background, more backgrounds, and saving the jukebox's choices in the profile.
 
 A menu that lists every music track and sound effect and plays them. Research: find the game's song table and the function that starts a song (the music format is documented by Chris Gilmore's `n64tetristools` and `dcm2xm` research, credited in the README). Then call that function from a new menu. Unlockables or track names can come later.
 

@@ -9,6 +9,9 @@ namespace blockplanet {
 // The game's music and effects levels, 0..100 percent each, kept applied
 // (the game resets the music level when a song starts).
 void set_audio_levels(int music_percent, int effects_percent);
+// The jukebox's Stop: silences the music without changing the saved level.
+void set_music_muted(bool muted);
+bool music_muted();
 
 // How the game picks music: random (true) or automatic (false). Ends a
 // track override.

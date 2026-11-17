@@ -56,6 +56,7 @@ std::atomic<bool> levels_wanted{false};
 std::atomic<bool> levels_changed{false};
 std::atomic<int> music_percent{100};
 std::atomic<int> effects_percent{100};
+std::atomic<bool> muted{false};          // the jukebox's Stop
 std::atomic<int> selection_wanted{-1};  // 0 auto, 1 random, -1 leave the game's
 std::atomic<int> override_track{-1};    // CHOOSE this track
 std::atomic<int> play_request{-1};      // play this track now
@@ -86,6 +87,15 @@ void set_audio_levels(int music, int effects) {
     levels_wanted.store(true);
     levels_changed.store(true);
 }
+
+void set_music_muted(bool on) {
+    if (muted.exchange(on) != on) {
+        levels_wanted.store(true);
+        levels_changed.store(true);
+    }
+}
+
+bool music_muted() { return muted.load(); }
 
 void set_music_random(bool random) {
     override_track.store(-1);
@@ -162,7 +172,7 @@ gpr scaled(gpr volume, int percent) {
 extern "C" void blockplanet_scale_music_volume(std::uint8_t*, recomp_context* ctx) {
     using namespace blockplanet;
     if (!levels_wanted.load(std::memory_order_relaxed)) return;
-    ctx->r4 = scaled(ctx->r4, music_percent.load());
+    ctx->r4 = scaled(ctx->r4, muted.load(std::memory_order_relaxed) ? 0 : music_percent.load());
 }
 
 extern "C" void blockplanet_scale_effects_volume(std::uint8_t*, recomp_context* ctx) {

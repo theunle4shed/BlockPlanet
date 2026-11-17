@@ -35,6 +35,7 @@
 #include "tetrisphere/developer_records.h"
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/audio_settings.h"
+#include "tetrisphere/jukebox.h"
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
 #include "tetrisphere/mode_launcher.h"
@@ -3656,6 +3657,7 @@ std::vector<blockplanet::ui::ListItem> chapter_choices() {
 // A start has been accepted: close BlockPlanet's menus, remember where the
 // player came from, and show the loading cover until play has started.
 void begin_launch_presentation(LaunchMode mode) {
+    blockplanet::jukebox::on_launch();
     blockplanet::ui::request_close();
     // A grid held after leaving play (Exit, New Field, Try Again) hands over to
     // the loading cover, which keeps it up with the mode's name until play has
@@ -4538,24 +4540,8 @@ bool handle_profile_command(const std::string& command) {
             }
             if (*command == "research_diff_start") { diff_start = std::chrono::steady_clock::now(); diff_mark.reset(); continue; }
             if (*command == "research_diff_mark") { diff_mark = std::chrono::steady_clock::now(); continue; }
-            if (*command == "jukebox" || command->rfind("jukebox_play:", 0) == 0) {
-                // The jukebox (main menu's icons): the game's tracks; choosing one
-                // plays it now, and it plays on in the menus until a game starts.
-                if (command->rfind("jukebox_play:", 0) == 0) blockplanet::play_track(std::atoi(command->c_str() + 13));
-                const int playing = command->rfind("jukebox_play:", 0) == 0 ? std::atoi(command->c_str() + 13)
-                                    : guest_rdram != nullptr ? blockplanet::current_track(guest_rdram) : -1;
-                std::vector<blockplanet::ui::ListItem> tracks;
-                for (int t = 0; t < 23; ++t) {
-                    blockplanet::ui::ListItem item{"track" + std::to_string(t), blockplanet::track_name(t), t == playing ? "Now playing" : "",
-                                                   "command:jukebox_play:" + std::to_string(t), true, 1, t == std::max(0, playing)};
-                    item.icon = t == playing ? "\uE140" : "";
-                    tracks.push_back(item);
-                }
-                blockplanet::ui::set_text("jukebox_now", playing >= 0 ? std::string("Now playing: ") + blockplanet::track_name(playing) : "Choose a track");
-                blockplanet::ui::set_list("jukebox", tracks);
-                if (*command == "jukebox") blockplanet::ui::request_show("jukebox");
-                continue;
-            }
+            // The jukebox (main menu's music icon): docs/UI.md, Media Player.
+            if (blockplanet::jukebox::command(*command, guest_rdram)) continue;
             if (*command == "research_minefield_lose") {
                 tetrisphere::minefield_sphere::research_lose();
                 continue;
@@ -5708,6 +5694,7 @@ bool handle_profile_command(const std::string& command) {
             if (was_paused && !paused) unpaused_at = now_g;
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
+            blockplanet::jukebox::tick();
             const auto screen = blockplanet::ui::current_screen();
             if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm" &&
                                   screen != "gameover" && screen != "episode_end" && screen != "start_card") ||
