@@ -179,6 +179,9 @@ void log_background_dl(const std::uint8_t* rdram, std::uint32_t from, std::uint3
             if (op == 0x04u && at) {  // G_VTX: length in the low 16 bits
                 std::fprintf(stdout, " vtx n=%u hash=%016llX", ((w0 >> 20) & 0xFu) + 1u,
                              (unsigned long long)hash_words(rdram, at, w0 & 0xFFFFu));
+            } else if (op == 0x03u && at) {  // G_MOVEMEM (lights): its words
+                std::fprintf(stdout, " mem %08X %08X %08X %08X", guest32(rdram, at), guest32(rdram, at + 4u), guest32(rdram, at + 8u),
+                             guest32(rdram, at + 12u));
             } else if (op == 0x01u && at) {  // G_MTX
                 std::fprintf(stdout, " mtx p=%02X hash=%016llX", (w0 >> 16) & 0xFFu,
                              (unsigned long long)hash_words(rdram, at, 64));
@@ -228,6 +231,8 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
     if (intro_cover)
         tetrisphere::intro_cover_active().store(guest16(rdram, 0x800E1648u) == 0 && guest16(rdram, 0x800E1646u) == 0,
                                                 std::memory_order_relaxed);
+    // The jukebox's stage backgrounds, as bright as in play (vortex_backdrop.cpp).
+    if (helper == 0x8002D93Cu && blockplanet_vortex_draw(rdram, ctx)) return true;
     // The brick sky (an experiment, src/graphics/brick_sky.cpp): when on, it
     // is drawn in the play background's place and the game's is skipped.
     if (helper == 0x8002D93Cu && guest16(rdram, 0x800E121Cu) == -1 &&
@@ -241,8 +246,12 @@ extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx
         return v == nullptr ? 0 : std::max(1, std::atoi(v) > 0 ? std::atoi(v) : 120);
     }();
     static bool bg_dl_inside = false;
-    if (bg_dl_draw > 0 && !bg_dl_inside && helper == 0x8002D93Cu && guest16(rdram, 0x800E121Cu) == -1 &&
-        static_cast<std::uint32_t>(ctx->r4) == guest32(rdram, 0x801033BCu) && guest32(rdram, 0x801033BCu) != 0) {
+    // (Also the reset screen's scene, the jukebox's Vortex and stage backgrounds.)
+    const bool bg_in_play = guest16(rdram, 0x800E121Cu) == -1 && static_cast<std::uint32_t>(ctx->r4) == guest32(rdram, 0x801033BCu) &&
+                            guest32(rdram, 0x801033BCu) != 0;
+    const bool bg_in_reset = guest16(rdram, 0x800E11F8u) == 1 && static_cast<std::uint32_t>(ctx->r4) == guest32(rdram, 0x800E1264u) &&
+                             guest32(rdram, 0x800E1264u) != 0;
+    if (bg_dl_draw > 0 && !bg_dl_inside && helper == 0x8002D93Cu && (bg_in_play || bg_in_reset)) {
         static int draws = 0;
         ++draws;
         if (draws == bg_dl_draw || draws == bg_dl_draw + 30) {

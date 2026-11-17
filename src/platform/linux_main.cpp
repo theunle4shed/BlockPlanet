@@ -4543,6 +4543,14 @@ bool handle_profile_command(const std::string& command) {
             if (*command == "research_diff_mark") { diff_mark = std::chrono::steady_clock::now(); continue; }
             // The jukebox (main menu's music icon): docs/UI.md, Media Player.
             if (blockplanet::jukebox::command(*command, guest_rdram)) continue;
+            if (command->rfind("research_peek:", 0) == 0 && guest_rdram != nullptr) {
+                // Research: reads a word (research_peek:ADDR, hex), to the log.
+                const auto address = static_cast<std::uint32_t>(std::strtoul(command->c_str() + 14, nullptr, 16));
+                std::fprintf(stdout, "{\"event\":\"peek\",\"address\":\"%08X\",\"word\":\"%08X\"}\n", address,
+                             guest::load32(guest_rdram, address & ~3u));
+                std::fflush(stdout);
+                continue;
+            }
             if (*command == "research_vortex" && guest_rdram != nullptr) {
                 // Research (docs/research/jukebox.md, VORTEX): as if the name code
                 // had been typed and Reset were held: the reset screen starts,

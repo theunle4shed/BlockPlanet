@@ -61,6 +61,7 @@ void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_attract_guard(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_reset_wait(std::uint8_t* rdram, recomp_context* ctx);
+bool blockplanet_vortex_draw(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_logo_scene_stepped(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_logo_scene_before(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t scene);
 bool blockplanet_box_art_scene(std::uint8_t* rdram, recomp_context* ctx);

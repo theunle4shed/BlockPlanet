@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -33,6 +34,7 @@ void func_8007ADF8(std::uint8_t* rdram, recomp_context* ctx);
 void func_8002A0C0(std::uint8_t* rdram, recomp_context* ctx);
 void func_8002A100(std::uint8_t* rdram, recomp_context* ctx);
 void func_8002CF70(std::uint8_t* rdram, recomp_context* ctx);
+void func_8002D93C(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace blockplanet {
@@ -225,7 +227,11 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         if ((picture >> 24) == 0x80u)
             {
             // RGBA 5551 with the alpha bit set (zero, transparent, hid the scene too).
-            const std::uint32_t pixel = (1u << 11) | (1u << 6) | (4u << 1) | 1u;  // a very dark blue
+            static const int fill = [] {  // research: BLOCKPLANET_VORTEX_FILL=zero|dark
+                const char* v = std::getenv("BLOCKPLANET_VORTEX_FILL");
+                return v != nullptr && std::string(v) == "zero" ? 0 : v != nullptr && std::string(v) == "white" ? 2 : 1;
+            }();
+            const std::uint32_t pixel = fill == 0 ? 0u : fill == 2 ? 0xFFFFu : (1u << 11) | (1u << 6) | (4u << 1) | 1u;  // a very dark blue
             for (std::uint32_t at = picture; at < picture + 320u * 240u * 2u; at += 4) store32(rdram, at, pixel << 16 | pixel);
         }
     }
@@ -307,4 +313,56 @@ extern "C" void blockplanet_vortex_object(std::uint8_t* rdram, std::uint32_t sce
         mtx_set(rdram, cam, i, 0, zoom * (mtx_get(rdram, cam, i, 0) + k * mtx_get(rdram, cam, i, 2)));
         if (zoom != 1.0f) mtx_set(rdram, cam, i, 1, zoom * mtx_get(rdram, cam, i, 1));
     }
+}
+
+// The stage backgrounds' brightness (the owner: "match how they look in
+// play"). In play a background is drawn into an off-screen picture that is
+// then copied to the screen as tiles, and it comes out twice as bright as the
+// same scene drawn straight, as the reset screen does (measured on Training's
+// background 25: x2.0 to x2.2 in every channel, at every level). So each
+// layer's colour is brightened at the colour mixer. The game mixes in two
+// steps: (TEXEL1 - TEXEL0) * LOD + TEXEL0 (the texture's two detail levels),
+// then COMBINED * SHADE. It becomes TEXEL0 * SHADE (the detail-level blend
+// dropped), then (1 - COMBINED) * COMBINED + COMBINED: c (2 - c), twice the
+// colour while it is dark (most of these backgrounds), easing off towards
+// white. A plain doubling (COMBINED * ENV + COMBINED) overflowed in the bright
+// parts: wrong colours (yellow edges, green patches) instead of white.
+// Also tried, and no better: doubling the lights (the shading tops out),
+// changing the layers' blend (no effect here), a full-screen rectangle adding
+// the screen to itself (no effect here). The commands are changed in place
+// (sub-lists hung or crashed: the model pool is restored when the background
+// changes, and a jump in the game's own list stopped its frames). Called from
+// the scene draw filter (pause_draw_hooks.cpp) for the reset screen's scene:
+// the scene is drawn here and its commands then changed. Returns whether it drew.
+extern "C" bool blockplanet_vortex_draw(std::uint8_t* rdram, recomp_context* ctx) {
+    using namespace blockplanet;
+    using namespace tetrisphere::guest;
+    if (!showing.load(std::memory_order_relaxed) || shown_stage == 0 || !stage_built) return false;
+    if (static_cast<std::uint32_t>(ctx->r4) != load32(rdram, 0x800E1264u)) return false;
+    static bool inside = false;  // the draw below comes back through the filter
+    if (inside) return false;
+    constexpr std::uint32_t cursor = 0x800F22B4u;  // the game's next free display-list command
+    std::uint32_t at = load32(rdram, cursor);
+    if ((at >> 24) != 0x80u) return false;
+    const std::uint32_t from = at;
+    const recomp_context saved = *ctx;
+    ctx->r29 = static_cast<gpr>(static_cast<std::int32_t>(saved.r29) - 0x80);
+    inside = true;
+    func_8002D93C(rdram, ctx);
+    inside = false;
+    const auto result = ctx->r2;
+    *ctx = saved;
+    ctx->r2 = result;
+    const std::uint32_t to = load32(rdram, cursor);
+    if (to < from || to - from > 0x10000u) return true;
+    static const bool off = std::getenv("BLOCKPLANET_STAGE_LIGHT") != nullptr && std::getenv("BLOCKPLANET_STAGE_LIGHT")[0] == '0';
+    if (off) return true;
+    for (std::uint32_t a = from; a + 8u <= to; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+        if (w0 == 0xFC26A004u && w1 == 0x1F0C93FFu) {
+            store32(rdram, a, 0xFC1220C0u);
+            store32(rdram, a + 4u, 0xF00F923Fu);
+        }
+    }
+    return true;
 }
