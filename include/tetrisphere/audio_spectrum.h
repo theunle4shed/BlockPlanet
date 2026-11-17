@@ -18,6 +18,9 @@ void push(const std::int16_t* samples, std::size_t count);
 // The bands now (smoothed between calls) and the overall level (0 to 1).
 std::array<float, band_count> bands();
 float level();
+// The wave now (the oscilloscope): 128 points from -1 to 1, about 13 ms of
+// sound, starting where it crosses zero going up so a steady note stands still.
+std::array<float, 128> waveform();
 
 // For tests: the bands of a mono block (no smoothing), 512 samples at 44.1 kHz.
 std::array<float, band_count> analyse(const float* mono, std::size_t count, int frequency = 44100);

@@ -77,6 +77,7 @@ function(blockplanet_add_ui TARGET)
         "${BLOCKPLANET_SOURCE_DIR}/src/ui/ui_navigator.cpp"
         "${BLOCKPLANET_SOURCE_DIR}/src/ui/ui_renderer.cpp"
         "${BLOCKPLANET_SOURCE_DIR}/src/ui/ui_system.cpp"
+        "${BLOCKPLANET_SOURCE_DIR}/src/ui/ui_jukebox.cpp"
         "${BLOCKPLANET_SOURCE_DIR}/src/platform/menu_input.cpp"
         "${BLOCKPLANET_SOURCE_DIR}/src/platform/mode_launcher.cpp")
     blockplanet_ui_shader(${TARGET} UiVS vs_6_3 VSMain)

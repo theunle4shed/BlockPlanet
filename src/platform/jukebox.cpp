@@ -28,7 +28,11 @@ bool repeat = true;
 int visualiser = 1;                   // 0 Water, 1 Pulse, 2 Bars
 int shown_seconds = -2;
 
-const char* const visualiser_names[] = {"Water", "Pulse", "Bars"};
+// The backgrounds: the grid's own (Water, Pulse, Bars), then full-screen
+// Winamp-inspired ones built from the game's bricks (src/ui/ui_jukebox.cpp).
+constexpr int visualiser_count = 6;
+const char* const visualiser_names[visualiser_count] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces"};
+const char* const visualiser_icons[visualiser_count] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF"};
 
 int elapsed_seconds() {
     if (!started) return -1;
@@ -132,7 +136,11 @@ bool command(const std::string& command, const unsigned char* rdram) {
     }
     else if (command == "jukebox_shuffle") shuffle = !shuffle;
     else if (command == "jukebox_repeat") repeat = !repeat;
-    else if (command == "jukebox_vis") visualiser = (visualiser + 1) % 3;
+    else if (command == "jukebox_vis") visualiser = (visualiser + 1) % visualiser_count;
+    else if (command == "jukebox_hide") {
+        ui::set_jukebox_hidden(true);
+        return true;
+    }
     else return false;
     publish(rdram);
     return true;

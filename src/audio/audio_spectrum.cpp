@@ -94,6 +94,27 @@ std::array<float, band_count> bands() {
     return smoothed;
 }
 
+std::array<float, 128> waveform() {
+    std::array<float, window> copy;
+    std::size_t at;
+    {
+        std::lock_guard lock(mutex);
+        copy = ring, at = head;
+    }
+    // Oldest first; look for a rising zero crossing in the first half.
+    std::array<float, window> mono;
+    for (std::size_t i = 0; i < window; ++i) mono[i] = copy[(at + i) % window];
+    std::size_t start = 0;
+    for (std::size_t i = 1; i < window / 2; ++i)
+        if (mono[i - 1] < 0.0f && mono[i] >= 0.0f) { start = i; break; }
+    std::array<float, 128> out{};
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        const std::size_t k = start + i * 4;
+        out[i] = k < window ? std::clamp(mono[k] * 2.0f, -1.0f, 1.0f) : 0.0f;
+    }
+    return out;
+}
+
 float level() {
     std::lock_guard lock(mutex);
     return smoothed_level;

@@ -5,6 +5,7 @@
 
 #include "grid_texture.h"
 #include "ui_grid.h"
+#include "ui_jukebox.h"
 #include "ui_navigator.h"
 #include "ui_renderer.h"
 
@@ -102,6 +103,7 @@ struct PadRequest {
 using Request = std::variant<OpenRequest, CloseRequest, PointerRequest, RestoreRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest,
                              AltButtonRequest>;
 std::mutex requests_mutex;
+std::atomic<bool> jukebox_hidden{false};  // the jukebox's Hide: only the visualiser shows
 std::deque<Request> requests;
 std::deque<std::string> commands;
 std::vector<std::pair<std::string, std::size_t>> shown_path;  // the last open menus (under requests_mutex)
@@ -237,7 +239,8 @@ void apply_requests() {
             navigator->close();
         } else if (auto* pointer = std::get_if<PointerRequest>(&request)) {
             const auto size = context->GetDimensions();
-            navigator->point(pointer->x * float(size.x), pointer->y * float(size.y), pointer->click);
+            if (pointer->click && jukebox_hidden.load()) jukebox_hidden.store(false);
+            else navigator->point(pointer->x * float(size.x), pointer->y * float(size.y), pointer->click);
         } else if (auto* restore = std::get_if<RestoreRequest>(&request)) {
             navigator->restore(restore->path);
         } else if (auto* setting = std::get_if<SettingRequest>(&request)) {
@@ -255,6 +258,8 @@ void apply_requests() {
             else navigator->set_text(text->name, text->text);
         } else if (auto* alt = std::get_if<AltButtonRequest>(&request)) {
             navigator->set_alt_button(with_buttons(alt->spec));
+        } else if (jukebox_hidden.load() && (navigator->current_screen() == "jukebox" || navigator->current_screen() == "jukebox_list")) {
+            jukebox_hidden.store(false);  // any button brings the player back
         } else {
             navigator->handle(std::get<Action>(request));
         }
@@ -959,22 +964,35 @@ std::string lab_theme = "blue";
 bool lab_present = true;
 std::string lab_show = "both";  // both, tiles or background
 std::atomic<int> jukebox_visualiser{1};
+bool jukebox_vis_full = false;  // a full-screen visualiser replaces the grid
 
-// The jukebox: the grid's music reaction and the player's spectrum bars.
+// The jukebox: the grid's music reaction, the player's spectrum bars, the
+// full-screen visualisers (ui_jukebox.h) and the hidden player.
 void update_jukebox() {
     const auto screen = navigator->current_screen();
     const bool open = screen == "jukebox" || screen == "jukebox_list";
+    const int mode = jukebox_visualiser.load();
+    JukeboxSound sound;
     const auto bands = tetrisphere::audio_spectrum::bands();
-    std::array<float, 16> values{};
-    for (std::size_t i = 0; i < values.size() && i < bands.size(); ++i) values[i] = bands[i];
-    set_grid_music(open ? jukebox_visualiser.load() : 0, values, tetrisphere::audio_spectrum::level());
-    if (screen != "jukebox") return;
+    for (std::size_t i = 0; i < sound.bands.size() && i < bands.size(); ++i) sound.bands[i] = bands[i];
+    sound.level = tetrisphere::audio_spectrum::level();
+    if (open && jukebox_full_screen(mode)) sound.wave = tetrisphere::audio_spectrum::waveform();
+    set_grid_music(open && !jukebox_full_screen(mode) ? mode : 0, sound.bands, sound.level);
+    jukebox_vis_full = open && jukebox_full_screen(mode);
+    if (!open) {
+        jukebox_hidden.store(false);
+        return;
+    }
     Rml::ElementDocument* document = navigator->top_document();
     if (document == nullptr) return;
+    const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    update_jukebox_visual(document, mode, sound, now);
+    document->SetClass("player-hidden", jukebox_hidden.load());
+    if (screen != "jukebox") return;
     for (int i = 0; i < 16; ++i) {
         Rml::Element* bar = document->GetElementById("jb" + std::to_string(i));
         if (bar == nullptr) continue;
-        const float v = std::clamp(values[i], 0.0f, 1.0f);  // squared: quiet bands stay low
+        const float v = std::clamp(sound.bands[std::size_t(i)], 0.0f, 1.0f);  // squared: quiet bands stay low
         bar->SetProperty("height", std::to_string(int(4 + v * v * 92)) + "dp");
     }
 }
@@ -984,6 +1002,7 @@ void update_grid() {
     const auto screens = navigator->documents();
     const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     std::string colour = grid_colour_of(screens);
+    if (jukebox_vis_full) colour.clear();  // the jukebox's visualiser instead
     if (navigator->current_screen() == "grid_lab") colour = lab_present ? lab_theme : "";
     else if (colour.empty()) {
         std::lock_guard lock(grid_override_mutex);
@@ -1267,6 +1286,7 @@ void pointer(float x, float y, bool click) {
 }
 
 void set_jukebox_visualiser(int mode) { jukebox_visualiser.store(mode); }
+void set_jukebox_hidden(bool hidden) { jukebox_hidden.store(hidden); }
 
 void set_text(const std::string& name, const std::string& text) {
     std::lock_guard lock(requests_mutex);

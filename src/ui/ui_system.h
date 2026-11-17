@@ -52,6 +52,8 @@ void set_text(const std::string& name, const std::string& text);
 // screens are open, the menu grid reacts to the music this way, and the
 // player's spectrum (elements jb0 to jb15) follows the music.
 void set_jukebox_visualiser(int mode);
+// The jukebox's Hide: the player is hidden until any button or a click.
+void set_jukebox_hidden(bool hidden);
 // A full-screen loading cover over everything (0: none, 1: opaque), with the
 // mode being started ("Story · Stage 1:1"), while a mode is started through
 // the game's own menus behind it.
