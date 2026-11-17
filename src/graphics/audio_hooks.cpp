@@ -28,6 +28,8 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 
 extern "C" {
 void func_80079B80(std::uint8_t* rdram, recomp_context* ctx);
@@ -50,6 +52,7 @@ constexpr std::uint32_t effects_level_address = 0x800E28ECu;
 constexpr std::uint32_t changing_track = 0x800DFE84u;
 constexpr std::uint32_t track_banner = 0x800E14A8u;
 constexpr std::uint32_t music_player = 0x80107290u;
+constexpr std::uint32_t song_count = 0x800E28E4u;  // the highest track the game will start
 constexpr std::uint32_t effects_max = 0x7FFF;
 
 std::atomic<bool> levels_wanted{false};
@@ -137,6 +140,17 @@ extern "C" void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx
     }
     // Music choice: CHOOSE while a track override is on, else auto or random.
     const int track = override_track.load();
+    // A hidden track chosen (above the game's count, see below): the count is
+    // raised while the choice lasts, so the game can start it again at each
+    // stage, and put back after (unless the name code had raised it).
+    static bool count_raised = false;
+    if (track >= 0 && !count_raised && load16(rdram, song_count) < track_count - 1) {
+        store16(rdram, song_count, track_count - 1);
+        count_raised = true;
+    } else if (track < 0 && count_raised) {
+        store16(rdram, song_count, 13);
+        count_raised = false;
+    }
     const int selection = track >= 0 ? 2 : selection_wanted.load();
     if (selection >= 0 && load32(rdram, selection_address) != static_cast<std::uint32_t>(selection)) {
         store32(rdram, selection_address, static_cast<std::uint32_t>(selection));
@@ -145,7 +159,18 @@ extern "C" void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx
     if (const int play = play_request.exchange(-1); play >= 0) {
         store32(rdram, track_address, static_cast<std::uint32_t>(play));
         store32(rdram, changing_track, 1);
+        // The song routine refuses tracks above the count at 0x800E28E4: 13
+        // (set in func_8007F0D0), raised to 22 only by the special-music name
+        // code (func_8004127C). So the last nine tracks are the hidden ones;
+        // the jukebox plays them all, raising the count just for this call
+        // so the game's own Auto and Random keep to its usual songs.
+        const auto count = load16(rdram, song_count);
+        if (count < track_count - 1) store16(rdram, song_count, track_count - 1);
         call(func_8007F720, rdram, ctx, static_cast<gpr>(play), address(music_player));
+        store16(rdram, song_count, count);
+        static const bool log = std::getenv("BLOCKPLANET_MUSIC_LOG") != nullptr;
+        if (log) std::fprintf(stdout, "{\"event\":\"jukebox_play\",\"track\":%d,\"player_song\":%d,\"count\":%d}\n", play,
+                              static_cast<int>(static_cast<std::uint16_t>(load16(rdram, music_player + 0x157C))), count);
         call(func_8007ACFC, rdram, ctx, address(music_player));
         store32(rdram, changing_track, 0);
         store32(rdram, track_banner, 15);

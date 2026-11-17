@@ -318,10 +318,10 @@ extern "C" void blockplanet_music_log(std::uint8_t* rdram, recomp_context* ctx) 
     };
     std::fprintf(stdout,
                  "{\"event\":\"music_start\",\"track\":%u,\"player\":\"0x%08X\",\"intro_done\":%d,\"title_done\":%d,"
-                 "\"logo_frame\":%d,\"intro_frame\":%d,\"timer\":%d}\n",
+                 "\"logo_frame\":%d,\"intro_frame\":%d,\"timer\":%d,\"songs\":%d}\n",
                  static_cast<unsigned>(ctx->r4), static_cast<std::uint32_t>(ctx->r5), load16(rdram, 0x800E1648u),
                  load16(rdram, 0x800E1646u), frame_of(logo_scene_pointer), frame_of(intro_scene_pointer),
-                 static_cast<int>(load32(rdram, 0x800E1208u)));
+                 static_cast<int>(load32(rdram, 0x800E1208u)), static_cast<int>(load16(rdram, 0x800E28E4u)));
     std::fflush(stdout);
 }
 
