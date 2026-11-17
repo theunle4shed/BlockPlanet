@@ -719,6 +719,13 @@ extern "C" void blockplanet_attract_guard(std::uint8_t* rdram, recomp_context*) 
     if (outside_play) store32(rdram, reset_signal, 0), last = 0;
 }
 
+// The reset screen's wait (func_8005C410 at 0x8005C688, docs/research/jukebox.md,
+// VORTEX): while Reset is held the game busy-waits for 300 frames on a
+// counter that the retrace handler, another game thread, advances. The
+// runtime runs one game thread at a time, so the loop hung; let the others run.
+extern "C" void yield_self_1ms(std::uint8_t* rdram);
+extern "C" void blockplanet_reset_wait(std::uint8_t* rdram, recomp_context*) { yield_self_1ms(rdram); }
+
 extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace tetrisphere;
     using namespace tetrisphere::guest;

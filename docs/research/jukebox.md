@@ -38,7 +38,25 @@ The visualisers drawn today are BlockPlanet's own elements over the game, colour
 
 1. **The game's own screen behind the player.** With no grid, the menus show the game's picture underneath. A background that is the game's title scene (the big sphere and the logo) would need the game sent to that scene while the jukebox is open, then back. Medium; risky only in leaving the game in the right state.
 2. **The intro's sphere, moved by the music.** BlockPlanet already moves the intro scene's bricks (src/graphics/intro_logo_hooks.cpp rewrites their matrices). Played as the jukebox's background, the bricks could pulse and the sphere spin with the music. Large, but the most "made from the game" option; needs the intro scene kept running instead of ending.
-3. **VORTEX.** The VORTEX name code plays an animation (docs/research/fan-feedback.md); finding what it starts could give a ready-made visualiser from the game itself. Research first.
+3. **VORTEX** (found 2026-11-17, below): a ready-made animation of the game's own models, with its own song.
 4. **Pictures of models.** Not possible without drawing the models ourselves (BlockPlanet keeps nothing from the ROM in the repository; anything taken from it is read at run time).
 
-Suggested next steps: try 3 (cheap research), then 1 or 2 as a "Planet" background.
+Suggested next steps: VORTEX as a jukebox background (below), then 1 or 2 as a "Planet" background.
+
+## VORTEX (found 2026-11-17)
+
+**What it is in the original.** Typing VORTEX at New Name sets `0x800E12F4` = 1 (`func_8004127C`, at `0x80044BB0`; not saved, so for that session only) and plays a confirming sound. It changes **the screen shown while the console's Reset button is held.** When Reset is pressed, the scheduler sends the game a pre-reset message (type 4 in `func_8002A140`, which sets `0x800DF728`). The top-level loop then runs `func_8005C410` every frame (`0x800E11F8` = 1) in place of everything else. Normally that is a fade to black that waits for the console to restart. With VORTEX on, once Reset has been held for 300 frames (five seconds; it busy-waits on the frame counter `0x800E120C`), it:
+
+- builds a LightWave scene, **scene `0x130` with nine objects** (`0x7B`, 0, 1, `0x31`, 3, 4, 5, 6, `0x22`), into the model pool, pointer at `0x800E1264` (`func_8002CF70`, the same builder as the title and play backgrounds);
+- starts **song `0x143`** (323) on the jingle player (`0x80109DC0`), at full volume;
+- draws the scene each frame (`func_8002D93C`) and loops it when it ends.
+
+**What it looks like** (seen in BlockPlanet, 2026-11-17): a glowing orange and green ring with a teal spiral turning inside it, and the game's robot characters (the round yellow robot, the green one, the long creature and others) swept past the camera and sucked into it one after another, matching the cheat sites' description (docs/research/cheat-codes.md). It sits right of centre on a 16:9 screen; the title's grid sphere stays behind it.
+
+**Why it could not be seen in BlockPlanet before.** The five-second wait is a busy loop on a counter the retrace handler (another game thread) advances. The runtime runs one game thread at a time, so the loop never ended and the game froze. Fixed with a hook in the loop (`blockplanet_reset_wait`, at `0x8005C688`) that lets the other threads run, as BlockPlanet already does for the game's other retrace wait. BlockPlanet has no Reset button, so this matters only for research for now.
+
+**Seeing it:** the research command `research_vortex` (test harness: `poke cmd:research_vortex`) sets the flag and starts the reset screen as if Reset were held; the vortex appears about five seconds later. There is no way back from it yet (on the console, letting go of Reset restarts the game).
+
+**For the jukebox:**
+- **A "Vortex" background**: run the game's reset screen with the flag behind the jukebox, drawing the real scene. To build: the way back (clear `0x800E11F8` and `0x800DF728`, put the title back as it was), and the jukebox's own song kept playing instead of song `0x143` (or offered as its track).
+- **Three more songs**: the game has songs outside the 23 tracks, started on the jingle player: `0x129` (the intro), `0x134` (the title) and `0x143` (the vortex). They could join the jukebox as extra tracks (and the secret ones among the unlockables).

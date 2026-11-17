@@ -598,6 +598,14 @@ func = "func_80070118"
 before_vram = 0x80070180
 text = "blockplanet_attract_guard(rdram, ctx);"
 
+# The reset screen (func_8005C410) busy-waits for 300 frames while Reset is
+# held (then, after the VORTEX name code, plays the vortex scene); yield in
+# the loop so the retrace handler can advance its counter.
+[[patches.hook]]
+func = "func_8005C410"
+before_vram = 0x8005C688
+text = "blockplanet_reset_wait(rdram, ctx);"
+
 
 # The title (func_800685FC) draws the letters scene (0x800E1670) until its
 # animation ends, then clears the pointer. BlockPlanet can keep it there,

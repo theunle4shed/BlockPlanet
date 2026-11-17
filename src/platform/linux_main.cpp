@@ -4542,6 +4542,17 @@ bool handle_profile_command(const std::string& command) {
             if (*command == "research_diff_mark") { diff_mark = std::chrono::steady_clock::now(); continue; }
             // The jukebox (main menu's music icon): docs/UI.md, Media Player.
             if (blockplanet::jukebox::command(*command, guest_rdram)) continue;
+            if (*command == "research_vortex" && guest_rdram != nullptr) {
+                // Research (docs/research/jukebox.md, VORTEX): as if the name code
+                // had been typed and Reset were held: the reset screen starts,
+                // and after 300 frames plays the vortex scene and its song.
+                auto* ram = const_cast<std::uint8_t*>(guest_rdram);
+                guest::store16(ram, 0x800E12F4u, 1);
+                guest::store32(ram, 0x800E1208u, 0);
+                guest::store32(ram, 0x800E120Cu, 0);
+                guest::store16(ram, 0x800E11F8u, 1);
+                continue;
+            }
             if (*command == "research_minefield_lose") {
                 tetrisphere::minefield_sphere::research_lose();
                 continue;
