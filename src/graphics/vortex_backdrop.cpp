@@ -169,9 +169,12 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
                      frames_on, load16(rdram, reset_screen), load16(rdram, vortex_started), load32(rdram, timer_a), load32(rdram, timer_b),
                      load32(rdram, 0x800E1210u), load32(rdram, 0x800E1264u), load16(rdram, 0x800DFF08u), load16(rdram, 0x800E123Eu));
     if (log) std::fflush(stdout);
-    // Past the reset screen's 300-frame wait at once, and its counters kept
+    // Through the reset screen's 300-frame wait at once, and its counters kept
     // running (BlockPlanet's menus hold them otherwise: linux_main.cpp).
-    if (frames_on == 2) store32(rdram, timer_b, 310);
+    // Set just short of the wait's end (301), so the scene's first draws step
+    // it a frame at a time: jumping past it made the first draw step ~300
+    // frames at once, and the game's scene player crashed now and then.
+    if (frames_on == 2) store32(rdram, timer_b, 298);
     // The copied picture (320 x 240, 16-bit) filled dark, so only the vortex shows.
     static const bool keep_picture = std::getenv("BLOCKPLANET_VORTEX_KEEP_PICTURE") != nullptr;  // research
     if (frames_on <= 3 && !keep_picture) {
