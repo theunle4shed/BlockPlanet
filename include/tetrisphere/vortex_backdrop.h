@@ -34,5 +34,8 @@ bool game_idle();  // parked with no background asked for
 // play frozen where it is; and whether it is parked now.
 void set_pause_park(bool park);
 bool pause_parked();
+// The same behind BlockPlanet's end screens (EndMenuBridge::set_parker).
+void set_end_park(bool park);
+bool end_parked();
 
 } // namespace blockplanet

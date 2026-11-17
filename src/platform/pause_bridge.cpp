@@ -243,6 +243,7 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
     // CONTINUE goes to the next episode's card, row 100): done.
     if (choice_ && row >= 0 && row != *choice_ && now - since_ > press_time) {
         out.close_menu = menus_open && playing;
+        park(false);
         choice_.reset();
         showing_ = false;
         episode_end_ = false;
@@ -259,6 +260,7 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
     out.cleared = episode_end_;
     if (!ended) {
         if (showing_ || choice_) out.close_menu = menus_open && playing;
+        park(false);
         showing_ = false;
         choice_.reset();
         items_.clear();
@@ -266,6 +268,13 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
     }
     out.active = game_over || episode_end_ || showing_ || choice_;
     if (choice_) {
+        // Parked: let the game out first; its row and A once it is out.
+        if (parking_ || (parked_ && parked_())) {
+            park(false);
+            since_ = now;
+            out.close_menu = menus_open;
+            return out;
+        }
         if (now - since_ > std::chrono::seconds(4)) {  // give up; show the panel again
             choice_.reset();
             showing_ = false;
@@ -288,6 +297,8 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
         showing_ = true;
         out.active = true;
     }
+    // BlockPlanet's panel is up: the game parked behind it (set_parker).
+    if (showing_ && menus_open) park(true);
     // Opening, or closed with Back: the panel stays until a choice (asked
     // again only after a moment, as the menus take a frame or two to open).
     if (!menus_open && now - opened_at_ > std::chrono::milliseconds(500)) {

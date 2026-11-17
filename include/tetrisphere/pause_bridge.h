@@ -128,8 +128,24 @@ public:
     bool hide_original() const { return showing_ || choice_.has_value(); }
     // The row of EXIT in the menu shown (-1 if none).
     int exit_row() const { return exit_row_; }
+    // BlockPlanet's own end screens (the owner, 2026-11-17: "move the
+    // end-of-game menus over"): with a parker set, the game is parked once
+    // BlockPlanet's panel is open, so the game's end menu does not run behind
+    // it; a choice lets the game out first, then sets its row and presses A.
+    void set_parker(std::function<void(bool)> park, std::function<bool()> parked) {
+        park_ = std::move(park);
+        parked_ = std::move(parked);
+    }
 
 private:
+    std::function<void(bool)> park_;
+    std::function<bool()> parked_;
+    bool parking_ = false;
+    void park(bool on) {
+        if (!park_) return;
+        if (on != parking_) park_(on);
+        parking_ = on;
+    }
     bool showing_ = false;
     std::optional<int> choice_;
     Clock::time_point since_{}, opened_at_{};

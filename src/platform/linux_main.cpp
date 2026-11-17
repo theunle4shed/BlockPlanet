@@ -5184,6 +5184,13 @@ bool handle_profile_command(const std::string& command) {
                     set_own_pause_keys(true);
                     pause_bridge.set_parker([](bool park) { blockplanet::set_pause_park(park); },
                                             [] { return blockplanet::pause_parked(); });
+                    static const bool own_end = [] {
+                        const char* v = std::getenv("BLOCKPLANET_OWN_END");
+                        return v == nullptr || v[0] != '0';
+                    }();
+                    if (own_end)
+                        end_menu.set_parker([](bool park) { blockplanet::set_end_park(park); },
+                                            [] { return blockplanet::end_parked(); });
                 }
                 const bool in_play_now = guest::load16(guest_rdram, 0x800E121C) == -1 &&
                                          std::int16_t(guest::load16(guest_rdram, 0x800E1228)) < 0 &&
