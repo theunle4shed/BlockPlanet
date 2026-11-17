@@ -366,6 +366,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/window_placement.cpp
     src/platform/menu_unlocks.cpp
     src/platform/mouse_play.cpp
+    src/audio/audio_spectrum.cpp
     src/platform/minefield_sphere.cpp
     src/platform/pause_bridge.cpp
     src/platform/story_hud.cpp
@@ -384,6 +385,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/platform/guest_trace_hooks.cpp
     src/platform/keyboard_state.cpp
     src/platform/audio_output.cpp
+    src/audio/audio_spectrum.cpp
     src/platform/diagnostic_log.cpp
     src/platform/crash_report.cpp
     src/platform/text_rewrites.cpp
@@ -705,6 +707,15 @@ else()
     target_compile_options(mouse_play_test PRIVATE -UNDEBUG)
 endif()
 add_test(NAME mouse_play COMMAND mouse_play_test)
+
+add_executable(audio_spectrum_test tests/audio_spectrum_test.cpp src/audio/audio_spectrum.cpp)
+target_include_directories(audio_spectrum_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(audio_spectrum_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(audio_spectrum_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME audio_spectrum COMMAND audio_spectrum_test)
 
 add_executable(trophies_test tests/trophies_test.cpp src/platform/trophies.cpp)
 target_include_directories(trophies_test PRIVATE "${CMAKE_SOURCE_DIR}/include"
@@ -1173,6 +1184,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/guest_trace_hooks.cpp
         src/platform/keyboard_state.cpp
         src/platform/audio_output.cpp
+        src/audio/audio_spectrum.cpp
         src/platform/diagnostic_log.cpp
         src/platform/crash_report.cpp
         src/platform/text_rewrites.cpp
@@ -1293,7 +1305,7 @@ if(TETRISPHERE_GAME_ENABLED)
     target_include_directories(rt64 PRIVATE "${BLOCKPLANET_UI_SHADER_DIR}")
     blockplanet_add_ui(tetrisphere-m1)
     add_executable(audio_output_test tests/audio_output_test.cpp
-        src/platform/audio_output.cpp)
+        src/platform/audio_output.cpp src/audio/audio_spectrum.cpp)
     if(NOT WIN32)
         find_path(TETRISPHERE_AUDIO_SDL_INCLUDE SDL.h
             HINTS "/home/linuxbrew/.linuxbrew/include" PATH_SUFFIXES SDL2)

@@ -1,3 +1,4 @@
+#include "tetrisphere/audio_spectrum.h"
 #include "tetrisphere/audio_output.h"
 #include "tetrisphere/audio_length_pacer.h"
 
@@ -80,6 +81,7 @@ bool AudioOutput::queue(const std::int16_t* samples, std::size_t count,
         error = "AI DMA FIFO full, empty or unaligned";
         return false;
     }
+    tetrisphere::audio_spectrum::push(samples, count);  // the jukebox's spectrum
     if (SDL_QueueAudio(device_, samples, count * sizeof(std::int16_t)) != 0) {
         error = std::string("SDL audio queue failed: ") + SDL_GetError();
         fifo_ = AudioDmaFifo{fifo_capacity_};
