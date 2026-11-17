@@ -30,6 +30,9 @@
 
 extern "C" {
 void func_8007ADF8(std::uint8_t* rdram, recomp_context* ctx);
+void func_8002A0C0(std::uint8_t* rdram, recomp_context* ctx);
+void func_8002A100(std::uint8_t* rdram, recomp_context* ctx);
+void func_8002CF70(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace blockplanet {
@@ -61,6 +64,9 @@ constexpr std::pair<std::uint32_t, std::uint32_t> saved_ranges[] = {
 
 enum class State { off, on };
 std::atomic<bool> wanted{false};
+std::atomic<int> wanted_stage{0};  // 0 the vortex, 1 to 25 a play background
+int shown_stage = 0;               // what the reset screen draws now (game thread)
+bool stage_built = false;
 std::atomic<bool> showing{false};
 State state = State::off;
 bool song_stopped = false;
@@ -111,6 +117,8 @@ void enter(std::uint8_t* rdram) {
     state = State::on;
     song_stopped = false;
     frames_on = 0;
+    shown_stage = wanted_stage.load();
+    stage_built = false;
     showing.store(true);
     std::fprintf(stdout, "{\"event\":\"vortex_backdrop\",\"on\":true,\"saved_bytes\":%zu,\"started\":%d,\"scene\":\"%08X\",\"fade\":%d,\"init\":%d}\n",
                  saved_pool.size(), load16(rdram, vortex_started), load32(rdram, 0x800E1264u), load16(rdram, 0x800DFF08u), load16(rdram, 0x800DFD5Cu));
@@ -174,8 +182,9 @@ void set_vortex_aspect(float aspect) {
     if (aspect > 0.1f && aspect < 10.0f) window_aspect.store(aspect, std::memory_order_relaxed);
 }
 
-void set_vortex_backdrop(bool on) {
+void set_vortex_backdrop(bool on, int stage) {
     static const bool off = std::getenv("BLOCKPLANET_VORTEX_OFF") != nullptr;  // research: the jukebox side only
+    wanted_stage.store(stage >= 1 && stage <= 25 ? stage : 0);
     wanted.store(on && !off);
 }
 bool vortex_backdrop_on() { return showing.load(); }
@@ -192,8 +201,8 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         if (want && load16(rdram, reset_screen) == 0 && at_title_or_menus(rdram)) enter(rdram);
         return;
     }
-    if (!want) {
-        leave(rdram, ctx);
+    if (!want || wanted_stage.load() != shown_stage) {
+        leave(rdram, ctx);  // (a different background: entered again next frame)
         return;
     }
     ++frames_on;
@@ -230,6 +239,50 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         // song, if one was playing (audio_hooks.cpp): start it again.
         if (const int song = extra_song(); song >= 0) play_song(song);
     }
+    // A play background instead (the jukebox's Stage backgrounds): built once
+    // the vortex is (the reset screen's pool and lights then set up), as the
+    // game's own loader does (func_8006EE6C: scene and object ids from the
+    // tables at 0x800E2262 and 0x800E2296, one object, the pool aligned to 16,
+    // the built scene's byte +0x49 cleared), and put where the reset screen
+    // draws its scene from (0x800E1264).
+    if (shown_stage > 0 && !stage_built && song_stopped) {
+        stage_built = true;
+        const auto scene_id = static_cast<std::uint16_t>(load16(rdram, 0x800E2262u + 2u * std::uint32_t(shown_stage)));
+        const auto object_id = static_cast<std::uint16_t>(load16(rdram, 0x800E2296u + 2u * std::uint32_t(shown_stage)));
+        const recomp_context saved = *ctx;
+        ctx->r4 = scene_id;
+        func_8002A0C0(rdram, ctx);
+        const std::uint32_t scene = static_cast<std::uint32_t>(ctx->r2);
+        *ctx = saved;
+        ctx->r4 = object_id;
+        func_8002A100(rdram, ctx);
+        const std::uint32_t object = static_cast<std::uint32_t>(ctx->r2);
+        *ctx = saved;
+        // The object list and the size out, in the pool just before the build.
+        const std::uint32_t scratch = (load32(rdram, pool_top) + 15u) & ~15u;
+        store32(rdram, scratch, object);
+        store32(rdram, scratch + 4u, 0);
+        const std::uint32_t build_at = scratch + 16u;
+        ctx->r29 = static_cast<gpr>(static_cast<std::int64_t>(static_cast<std::int32_t>(static_cast<std::uint32_t>(ctx->r29) - 0x40u)));
+        store32(rdram, static_cast<std::uint32_t>(ctx->r29) + 0x10u, scratch + 4u);
+        ctx->r4 = address(build_at);
+        ctx->r5 = address(scene);
+        ctx->r6 = address(scratch);
+        ctx->r7 = 1;
+        func_8002CF70(rdram, ctx);
+        const std::uint32_t built = static_cast<std::uint32_t>(ctx->r2);
+        *ctx = saved;
+        const std::uint32_t size = load32(rdram, scratch + 4u);
+        std::fprintf(stdout, "{\"event\":\"vortex_stage\",\"stage\":%d,\"scene_id\":%u,\"object_id\":%u,\"built\":\"%08X\",\"size\":%u}\n",
+                     shown_stage, scene_id, object_id, built, size);
+        std::fflush(stdout);
+        if ((built >> 24) == 0x80u && size > 0 && size < 0x400000u) {
+            store32(rdram, pool_top, build_at + size);
+            store8(rdram, built + 0x49u, 0);
+            store32(rdram, built + 0x24u, 0);  // its frame
+            store32(rdram, 0x800E1264u, built);
+        }
+    }
 }
 
 // From the scene object hook (pause_draw_hooks.cpp, blockplanet_scene_object),
@@ -239,7 +292,7 @@ extern "C" void blockplanet_vortex_object(std::uint8_t* rdram, std::uint32_t sce
     using namespace tetrisphere::guest;
     (void)object;
     if (!showing.load(std::memory_order_relaxed) || scene == 0 || scene != load32(rdram, 0x800E1264u)) return;
-    const float k = vortex_shift();
+    const float k = shown_stage == 0 ? vortex_shift() : 0.0f;  // the play backgrounds are centred
     // With a margin (8%) once wider: the camera turns, and a corner showed at 21:9 without it.
     const float wider = window_aspect.load(std::memory_order_relaxed) / (16.0f / 9.0f);
     const float zoom = wider > 1.01f ? wider * 1.08f : 1.0f;

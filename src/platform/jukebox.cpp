@@ -9,6 +9,7 @@
 #include "tetrisphere/vortex_backdrop.h"
 #include "../ui/ui_system.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -32,8 +33,14 @@ int shown_seconds = -2;
 // The backgrounds: the grid's own (Water, Pulse, Bars), then full-screen
 // Winamp-inspired ones built from the game's bricks (src/ui/ui_jukebox.cpp).
 // Last, the Vortex: the game's own scene (src/graphics/vortex_backdrop.cpp).
-constexpr int visualiser_count = 7;
-constexpr int visualiser_known = visualiser_count;
+// Then the game's 25 play backgrounds ("Stage 1" to "Stage 25"), drawn by the
+// same means (vortex_backdrop.cpp). All open for now (the owner, 2026-11-17:
+// everything unlocked for testing; how they are earned is for later).
+constexpr int visualiser_known = 7;
+constexpr int stage_backgrounds = 25;
+constexpr int visualiser_count = visualiser_known + stage_backgrounds;
+int stage_of(int v) { return v >= visualiser_known ? v - visualiser_known + 1 : 0; }
+
 constexpr int vortex = 6;
 // After the game's 23 tracks, three songs it plays outside them (started on
 // its jingle player there; ids from docs/research/jukebox.md): the intro's
@@ -46,6 +53,10 @@ const char* song_name(int t) { return t < track_count ? track_name(t) : extra_so
 
 const char* const visualiser_names[visualiser_known] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces", "Vortex"};
 const char* const visualiser_icons[visualiser_known] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF", "\uE499"};
+std::string visualiser_name(int v) {
+    return v < visualiser_known ? visualiser_names[v] : "Stage " + std::to_string(stage_of(v));
+}
+const char* visualiser_icon(int v) { return v < visualiser_known ? visualiser_icons[v] : "\uE499"; }
 
 int elapsed_seconds() {
     if (!started) return -1;
@@ -93,7 +104,7 @@ void publish(const unsigned char* rdram) {
     ui::set_text("jb_info", info);
     ui::set_text("jb_state", stopped ? "" : "");
     std::string modes = std::string(shuffle ? "Shuffle" : "In order") + " · " + (repeat ? "Repeat track" : "Play on") +
-                        " · " + visualiser_names[visualiser];
+                        " · " + visualiser_name(visualiser);
     ui::set_text("jb_modes", modes);
     shown_seconds = -2;
     tick();
@@ -107,9 +118,10 @@ void publish(const unsigned char* rdram) {
     controls.push_back(button("repeat", repeat ? "" : "", "Repeat", "jukebox_repeat",
                               "On: the track plays on and on, as in the game. Off: the next track after three minutes", repeat));
     controls.push_back(button("playlist", "", "Playlist", "jukebox_list", "All 26 songs: the 23 tracks, then the intro's, the title's and the vortex's"));
-    controls.push_back(button("visualiser", "", visualiser_names[visualiser], "jukebox_vis",
-                              "The background: Water (still), Pulse (the grid lifts with the beat) or Bars (columns rise with the music)",
-                              visualiser != 0));
+    controls.push_back(button("visualiser", visualiser_icon(visualiser), visualiser_name(visualiser), "jukebox_vis",
+                              "The background: Water, Pulse and Bars on the tiles; Spectrum, Scope and Pieces full screen, "
+                              "built from the game's bricks; Vortex, the game's hidden scene; then the backgrounds of the "
+                              "game's stages, Stage 1 to Stage 25", visualiser != 0));
     ui::set_list("jukebox_controls", controls);
 
     std::vector<ui::ListItem> tracks;
@@ -152,6 +164,8 @@ bool command(const std::string& command, const unsigned char* rdram) {
     else if (command == "jukebox_repeat") repeat = !repeat;
     else if (command == "jukebox_vis") visualiser = (visualiser + 1) % visualiser_count;
     else if (command == "jukebox_vortex") visualiser = vortex;  // for testing
+    else if (command.rfind("jukebox_stage:", 0) == 0)  // for testing: a stage background
+        visualiser = visualiser_known - 1 + std::clamp(std::atoi(command.c_str() + 14), 1, stage_backgrounds);
     else if (command == "jukebox_hide") {
         ui::set_jukebox_hidden(true);
         return true;
@@ -164,7 +178,7 @@ bool command(const std::string& command, const unsigned char* rdram) {
 void tick() {
     // The Vortex while a jukebox screen is on top and it is chosen.
     const auto screen = ui::current_screen();
-    set_vortex_backdrop(visualiser == vortex && (screen == "jukebox" || screen == "jukebox_list"));
+    set_vortex_backdrop(visualiser >= vortex && (screen == "jukebox" || screen == "jukebox_list"), stage_of(visualiser));
     const int seconds = elapsed_seconds();
     if (!repeat && !stopped && seconds >= 180 && track_override()) {
         play(shuffle ? random_other(track) : track + 1);

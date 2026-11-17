@@ -11,7 +11,9 @@ namespace blockplanet {
 
 // Asked for by the jukebox (any thread); applied on the game's thread at the
 // top of its next frame, and only while the game shows its title or menus.
-void set_vortex_backdrop(bool wanted);
+// `stage` 1 to 25: one of the game's play backgrounds instead of the vortex
+// (drawn by the same reset screen); 0: the vortex.
+void set_vortex_backdrop(bool wanted, int stage = 0);
 // Whether the game is showing the vortex now (or entering it).
 bool vortex_backdrop_on();
 // The window's width over its height (from the main loop), to fill wide screens.

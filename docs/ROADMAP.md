@@ -86,6 +86,8 @@ A menu that lists every music track and sound effect and plays them. Research: f
 
 **Secret music as an unlockable (the owner's note, 2026-11-17: "might need to add secret music to unlockables").** The nine bonus tracks (15 to 23, the G'MEBOY name code's music) play in the jukebox for now. To decide: how they are earned (a trophy, finishing an episode or the game, the name code typed in New Name, or a mix), and how they show while locked (hidden, or listed as "Secret track" with how to earn it). Built on menu_unlocks like the other unlocks; the pause menu's track choice and Random would follow the same rule.
 
+**Jukebox backgrounds as unlockables too (the owner, 2026-11-17).** The stage backgrounds in the jukebox (and the Vortex) may also be earned: for example each stage's background once that stage has been seen in the main game, or some other way. **For now everything is unlocked, for testing** (the owner's instruction); the rules come later.
+
 ### Casual play: no game over (S, done as a launch option)
 
 `--casual` refills hearts as soon as one is lost and stops the Time Trial clock at 30 seconds, so a game never ends. Trophies are paused while it is on. It becomes an Options setting with the new menus. Requested both for testing later stages and as a relaxed way to play.
