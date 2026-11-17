@@ -157,6 +157,11 @@ struct GridTuning {
     float fly_out = 2.2f, fly_toward = 0.35f;
 };
 GridTuning& grid_tuning();  // the presentation thread's (and tests')
+// The jukebox's backgrounds (the owner, 2026-11-17): the grid moved by the
+// music. Mode 0 off, 1 Pulse (the whole grid breathes and brightens with the
+// level), 2 Bars (each column rises with its band, bass on the left).
+// Set each frame (the presentation thread).
+void set_grid_music(int mode, const std::array<float, 16>& bands, float level);
 // The grid test screen's settings (grid_lab.rml): each one's name and
 // current value as its slider shows it (seconds, percent or milliseconds),
 // and setting one from its slider. Returns false for an unknown name.

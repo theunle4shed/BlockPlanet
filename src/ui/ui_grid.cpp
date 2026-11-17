@@ -418,6 +418,16 @@ void MenuGrid::drift(GridRgb colour) {
     target_ = colour;
 }
 
+namespace {
+int music_mode = 0;
+std::array<float, 16> music_bands{};
+float music_level = 0.0f;
+} // namespace
+
+void set_grid_music(int mode, const std::array<float, 16>& bands, float level) {
+    music_mode = mode, music_bands = bands, music_level = level;
+}
+
 void MenuGrid::place(double now) {
     bool active = false;
     for (std::size_t i = 0; i < tiles_.size(); ++i) {
@@ -462,11 +472,22 @@ void MenuGrid::place(double now) {
         tile.shown = shown;
         tile.turn = turn;
         // Each corner on the water (its place in tiles from the top left).
-        const std::array<float, 4> lifts = grid_tile_lifts(at, now);
+        std::array<float, 4> lifts = grid_tile_lifts(at, now);
+        // The jukebox: lifted (and lit) by the music.
+        float music_light = 1.0f;
+        if (music_mode == 1) {
+            for (auto& l : lifts) l += music_level * 70.0f;
+            music_light = 1.0f + music_level * 0.8f;
+        } else if (music_mode == 2 && layout_.columns > 0) {
+            const int band = std::clamp(at.column * 16 / layout_.columns, 0, 15);
+            const float v = music_bands[std::size_t(band)];
+            for (auto& l : lifts) l += v * v * 90.0f;
+            music_light = 0.8f + v * 0.9f;
+        }
         // Turned towards edge on, a tile catches less light (in steps, so its
         // colour, which rebuilds its shape, changes only a few times a flip).
         const float edge = std::round(std::abs(std::cos(turn * pi / 180.0f)) * 6.0f) / 6.0f;
-        const float shade = at.shade * (0.35f + 0.65f * edge) * grid_tile_light(at, lifts);
+        const float shade = at.shade * (0.35f + 0.65f * edge) * grid_tile_light(at, lifts) * music_light;
         // Layers: the tile's place on the sphere, its part
         // in the wave (lifted outwards), its flip. Worked out here and given
         // to RmlUi as one matrix per tile.
