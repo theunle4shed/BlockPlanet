@@ -65,7 +65,8 @@ constexpr std::pair<std::uint32_t, std::uint32_t> saved_ranges[] = {
 };
 
 enum class State { off, on };
-std::atomic<bool> wanted{false};
+std::atomic<bool> wanted{false};       // the jukebox asks for a game-drawn background
+std::atomic<bool> idle_wanted{false};  // the game parked behind BlockPlanet's menus (step 4)
 std::atomic<int> wanted_stage{0};  // 0 the vortex, 1 to 25 a play background
 int shown_stage = 0;               // what the reset screen draws now (game thread)
 bool stage_built = false;
@@ -194,6 +195,11 @@ void set_vortex_backdrop(bool on, int stage) {
 }
 bool vortex_backdrop_on() { return showing.load(); }
 bool vortex_backdrop_ready() { return ready.load(); }
+void set_game_idle(bool idle) {
+    static const bool off = std::getenv("BLOCKPLANET_GAME_IDLE") != nullptr && std::getenv("BLOCKPLANET_GAME_IDLE")[0] == '0';
+    idle_wanted.store(idle && !off);
+}
+bool game_idle() { return showing.load() && !wanted.load(); }
 
 } // namespace blockplanet
 
@@ -202,7 +208,9 @@ bool vortex_backdrop_ready() { return ready.load(); }
 extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace blockplanet;
     using namespace tetrisphere::guest;
-    const bool want = wanted.load();
+    const bool want = wanted.load() || idle_wanted.load();
+    // Only the jukebox's choice keeps a stage background (else: the vortex, not drawn).
+    if (!wanted.load()) wanted_stage.store(0);
     if (state == State::off) {
         if (want && load16(rdram, reset_screen) == 0 && at_title_or_menus(rdram)) enter(rdram);
         return;
@@ -349,8 +357,14 @@ extern "C" void blockplanet_vortex_object(std::uint8_t* rdram, std::uint32_t sce
 extern "C" bool blockplanet_vortex_draw(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace blockplanet;
     using namespace tetrisphere::guest;
-    if (!showing.load(std::memory_order_relaxed) || shown_stage == 0 || !stage_built) return false;
+    if (!showing.load(std::memory_order_relaxed)) return false;
     if (static_cast<std::uint32_t>(ctx->r4) != load32(rdram, 0x800E1264u)) return false;
+    // Parked behind BlockPlanet's menus with no background asked for: nothing drawn.
+    if (!wanted.load(std::memory_order_relaxed)) {
+        ctx->r2 = 0;  // "animation finished": no
+        return true;
+    }
+    if (shown_stage == 0 || !stage_built) return false;
     static bool inside = false;  // the draw below comes back through the filter
     if (inside) return false;
     constexpr std::uint32_t cursor = 0x800F22B4u;  // the game's next free display-list command

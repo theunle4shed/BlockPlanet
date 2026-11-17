@@ -22,4 +22,13 @@ bool vortex_backdrop_ready();
 // The window's width over its height (from the main loop), to fill wide screens.
 void set_vortex_aspect(float aspect);
 
+// Step 4 of the direct launch (docs/ROADMAP.md): while BlockPlanet's menus are
+// open over the game's own menu, the game is parked in the same reset screen,
+// drawing nothing (unless the jukebox asks for a background), so the game's
+// menu code does not run behind BlockPlanet's. Asked for by the main loop each
+// frame; left as soon as it is not (a start, a save switch, a title restart).
+// BLOCKPLANET_GAME_IDLE=0 turns it off.
+void set_game_idle(bool idle);
+bool game_idle();  // parked with no background asked for
+
 } // namespace blockplanet

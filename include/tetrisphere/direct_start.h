@@ -40,6 +40,10 @@ enum class Result { Started, Refused };
 // menus. Returns false if one is already waiting.
 bool request(const DirectStartRequest& request);
 bool pending();
+// Whether something waits to be done on the game's thread at its menu (a
+// start, a save switch, a title or intro restart): the game must not be
+// parked in the reset screen then (vortex_backdrop.h).
+bool game_thread_wanted();
 // The outcome of the last request, once (empty while it waits).
 std::optional<Result> take_result();
 // Gives up a request the game has not reached (refused), for example when the

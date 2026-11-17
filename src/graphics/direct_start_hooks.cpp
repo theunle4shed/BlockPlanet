@@ -447,6 +447,12 @@ bool pending() {
     return waiting.has_value();
 }
 
+bool game_thread_wanted() {
+    if (title_restart.load() || intro_restart.load()) return true;
+    std::lock_guard lock(mutex);
+    return waiting.has_value() || save_switch.has_value() || save_switch_reading;
+}
+
 std::optional<Result> take_result() {
     std::lock_guard lock(mutex);
     auto result = outcome;

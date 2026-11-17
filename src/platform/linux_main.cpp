@@ -5575,6 +5575,23 @@ bool handle_profile_command(const std::string& command) {
                     blockplanet::ui::request_open("profiles");
                 }
             }
+            // Step 4 (docs/ROADMAP.md): the game parked in its reset screen while
+            // BlockPlanet's menus are open over its menu, so its menu code does not
+            // run; left for anything to be done on its thread (a start, a save
+            // switch, a title restart: direct_start::game_thread_wanted).
+            {
+                const bool parts[] = {!original_menus, at_game_menu, blockplanet::ui::menus_open(), !launching(), !box_art_demo,
+                                      !continue_mode, !return_to_menu_chapter, !credits_pending, !title_restart_pending,
+                                      !tetrisphere::direct_start::game_thread_wanted()};
+                bool idle = true;
+                int why = 0;
+                for (int i = 0; i < 10; ++i) if (!parts[i] && idle) idle = false, why = i;
+                static bool last = false;
+                static const bool log = std::getenv("BLOCKPLANET_IDLE_LOG") != nullptr;  // research
+                if (log && idle != last) std::fprintf(stdout, "{\"event\":\"game_idle\",\"on\":%d,\"because\":%d}\n", idle, why);
+                last = idle;
+                blockplanet::set_game_idle(idle);
+            }
             // (Not while the jukebox's Vortex is shown: it is the game's own scene.)
             blockplanet::set_game_menu_hidden(!original_menus && at_game_menu && !blockplanet::vortex_backdrop_on() &&
                                               (blockplanet::ui::menus_open() || launching()));
