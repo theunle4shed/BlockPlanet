@@ -116,6 +116,15 @@ void enter(std::uint8_t* rdram) {
         saved_values.emplace_back();
         copy_out(rdram, from, to, saved_values.back());
     }
+    // Parked at the menu while its grid flies in (0x800DFF08 = 4): put back as
+    // shown (1), so a start can go ahead on the frame the game is let out
+    // (the direct start waits while the grid moves, and the menu code ran
+    // meanwhile). Not in play (the pause and end screens keep theirs).
+    if (load16(rdram, scene_row) >= 0 && load16(rdram, 0x800DFF08u) == 4) {
+        auto& fade = saved_values.front();  // 0x800DFEF0 onwards
+        const std::size_t at = 0x800DFF08u - 0x800DFEF0u;
+        if (fade.size() > at + 1) fade[at] = 0, fade[at + 1] = 1;
+    }
     store16(rdram, vortex_flag, 1);
     store32(rdram, timer_a, 0);
     store32(rdram, timer_b, 0);
