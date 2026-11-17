@@ -17,7 +17,9 @@
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -136,6 +138,41 @@ void leave(std::uint8_t* rdram, recomp_context* ctx) {
 
 } // namespace
 
+// Centring (the owner's request, 2026-11-17): the scene's camera looks a
+// little to one side, so on a wide screen the ring sat right of centre. Each
+// frame, at its first object, the camera matrix (scene +0xF8, double-buffered
+// by +0x3D; N64 fixed point, row vectors) is sheared: x' = x + k z in view
+// space, which moves the whole picture sideways by the same amount at every
+// depth. The game builds the camera afresh each frame, so nothing builds up.
+float vortex_shift() {
+    static const float shift = [] {
+        const char* v = std::getenv("BLOCKPLANET_VORTEX_SHIFT");  // research: tuning
+        return v != nullptr ? std::strtof(v, nullptr) : 0.27f;  // measured: the ring from 69% across a 16:9 screen to the middle
+    }();
+    return shift;
+}
+
+double mtx_get(const std::uint8_t* rdram, std::uint32_t at, int i, int j) {
+    const int k = i * 4 + j;
+    const std::int32_t fixed = static_cast<std::int32_t>(
+        (std::uint32_t(std::uint16_t(load16(rdram, at + 2u * k))) << 16) | std::uint16_t(load16(rdram, at + 32u + 2u * k)));
+    return fixed / 65536.0;
+}
+
+void mtx_set(std::uint8_t* rdram, std::uint32_t at, int i, int j, double value) {
+    const int k = i * 4 + j;
+    const auto fixed = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::llround(value * 65536.0)));
+    store16(rdram, at + 2u * k, static_cast<std::int16_t>(fixed >> 16));
+    store16(rdram, at + 32u + 2u * k, static_cast<std::int16_t>(fixed & 0xFFFFu));
+}
+
+// Wider than 16:9 the tunnel's ends show in the corners: the picture is
+// zoomed in by the extra width (about the middle, so the ring stays centred).
+std::atomic<float> window_aspect{16.0f / 9.0f};
+void set_vortex_aspect(float aspect) {
+    if (aspect > 0.1f && aspect < 10.0f) window_aspect.store(aspect, std::memory_order_relaxed);
+}
+
 void set_vortex_backdrop(bool on) {
     static const bool off = std::getenv("BLOCKPLANET_VORTEX_OFF") != nullptr;  // research: the jukebox side only
     wanted.store(on && !off);
@@ -188,5 +225,29 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         func_8007ADF8(rdram, ctx);
         *ctx = saved;
         song_stopped = true;
+    }
+}
+
+// From the scene object hook (pause_draw_hooks.cpp, blockplanet_scene_object),
+// before each object of a scene is drawn.
+extern "C" void blockplanet_vortex_object(std::uint8_t* rdram, std::uint32_t scene, int object) {
+    using namespace blockplanet;
+    using namespace tetrisphere::guest;
+    (void)object;
+    if (!showing.load(std::memory_order_relaxed) || scene == 0 || scene != load32(rdram, 0x800E1264u)) return;
+    const float k = vortex_shift();
+    // With a margin (8%) once wider: the camera turns, and a corner showed at 21:9 without it.
+    const float wider = window_aspect.load(std::memory_order_relaxed) / (16.0f / 9.0f);
+    const float zoom = wider > 1.01f ? wider * 1.08f : 1.0f;
+    // Once a frame: the scene's frame and the matrix buffer in use.
+    static std::uint32_t done_frame = 0xFFFFFFFFu, done_sel = 0xFFu;
+    const std::uint32_t frame = load32(rdram, scene + 0x24u);
+    const std::uint8_t sel = load8(rdram, scene + 0x3Du) & 1u;
+    if (frame == done_frame && sel == done_sel) return;
+    done_frame = frame, done_sel = sel;
+    const std::uint32_t cam = scene + 0xF8u + sel * 0x40u;
+    for (int i = 0; i < 4; ++i) {
+        mtx_set(rdram, cam, i, 0, zoom * (mtx_get(rdram, cam, i, 0) + k * mtx_get(rdram, cam, i, 2)));
+        if (zoom != 1.0f) mtx_set(rdram, cam, i, 1, zoom * mtx_get(rdram, cam, i, 1));
     }
 }

@@ -700,10 +700,12 @@ extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
 //   BLOCKPLANET_OBJECT_LOG=1           log each scene's highest object index as it grows
 //   BLOCKPLANET_OBJECT_ONLY=scene:i,j  in that scene draw only objects i, j (others in it skipped)
 //   BLOCKPLANET_OBJECT_CYCLE=scene:ms  in that scene draw one object at a time, the next every ms
+extern "C" void blockplanet_vortex_object(std::uint8_t* rdram, std::uint32_t scene, int object);
 extern "C" bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ctx) {
     const auto scene = static_cast<std::uint32_t>(ctx->r4);
     const int object = static_cast<int>(ctx->r7);
     if (blockplanet_title_object(rdram, scene, object, static_cast<std::uint32_t>(ctx->r6))) return true;
+    blockplanet_vortex_object(rdram, scene, object);  // the jukebox's Vortex, centred (vortex_backdrop.cpp)
     blockplanet_logo_object_draw(rdram, scene, object);  // the N64 logo's wordmark, straight on
     if (std::getenv("BLOCKPLANET_OBJECT_COUNT") != nullptr) {  // research: objects drawn per frame of a scene
         static std::uint32_t last_scene = 0, last_frame = 0;

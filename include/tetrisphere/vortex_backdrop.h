@@ -14,5 +14,7 @@ namespace blockplanet {
 void set_vortex_backdrop(bool wanted);
 // Whether the game is showing the vortex now (or entering it).
 bool vortex_backdrop_on();
+// The window's width over its height (from the main loop), to fill wide screens.
+void set_vortex_aspect(float aspect);
 
 } // namespace blockplanet

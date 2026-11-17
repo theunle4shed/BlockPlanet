@@ -5708,6 +5708,11 @@ bool handle_profile_command(const std::string& command) {
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             blockplanet::jukebox::tick();
+            if (window != nullptr) {
+                int w = 0, h = 0;
+                SDL_GetWindowSize(window, &w, &h);
+                if (h > 0) blockplanet::set_vortex_aspect(float(w) / float(h));
+            }
             const auto screen = blockplanet::ui::current_screen();
             if (grid_quit_at && ((blockplanet::ui::menus_open() && !screen.empty() && screen != "pause" && screen != "confirm" &&
                                   screen != "gameover" && screen != "episode_end" && screen != "start_card") ||
