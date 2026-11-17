@@ -12,9 +12,12 @@
 namespace blockplanet::ui {
 
 // The visualisers, after the grid's own (0 Water, 1 Pulse, 2 Bars).
-enum JukeboxVisual { vis_water = 0, vis_pulse, vis_bars, vis_spectrum, vis_scope, vis_pieces, vis_count };
-// Whether a visualiser replaces the menu grid (full screen, on black).
+enum JukeboxVisual { vis_water = 0, vis_pulse, vis_bars, vis_spectrum, vis_scope, vis_pieces, vis_vortex, vis_count };
+// Whether a visualiser replaces the menu grid (full screen, on black; the
+// Vortex is the game's own picture, src/graphics/vortex_backdrop.cpp, so its
+// layer stays clear).
 inline bool jukebox_full_screen(int mode) { return mode >= vis_spectrum; }
+inline bool jukebox_game_picture(int mode) { return mode == vis_vortex; }
 
 struct JukeboxSound {
     std::array<float, 16> bands{};  // bass to treble, 0 to 1

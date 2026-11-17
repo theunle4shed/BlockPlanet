@@ -36,6 +36,7 @@
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/jukebox.h"
+#include "tetrisphere/vortex_backdrop.h"
 #include "tetrisphere/relaunch.h"
 #include "tetrisphere/menu_input.h"
 #include "tetrisphere/mode_launcher.h"
@@ -5566,7 +5567,8 @@ bool handle_profile_command(const std::string& command) {
                     blockplanet::ui::request_open("profiles");
                 }
             }
-            blockplanet::set_game_menu_hidden(!original_menus && at_game_menu &&
+            // (Not while the jukebox's Vortex is shown: it is the game's own scene.)
+            blockplanet::set_game_menu_hidden(!original_menus && at_game_menu && !blockplanet::vortex_backdrop_on() &&
                                               (blockplanet::ui::menus_open() || launching()));
         }
         // The game's attract demo starts after its menu sits idle; behind
@@ -5574,7 +5576,7 @@ bool handle_profile_command(const std::string& command) {
         // (the owner's report). While BlockPlanet's menus are open over the
         // game's menu, its idle counters (frames on the page) are held at 10
         // seconds, past every page's own entrance timing.
-        if (guest_rdram != nullptr && blockplanet::ui::menus_open() && !launching() &&
+        if (guest_rdram != nullptr && blockplanet::ui::menus_open() && !launching() && !blockplanet::vortex_backdrop_on() &&
             guest::load16(guest_rdram, 0x800E121C) >= 0) {
             auto* rd = const_cast<std::uint8_t*>(guest_rdram);
             for (const std::uint32_t counter : {0x800E1208u, 0x800E120Cu})

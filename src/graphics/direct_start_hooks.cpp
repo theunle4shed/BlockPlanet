@@ -696,7 +696,9 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
 // the box art's loop (box art, hold, demo, box art) does not want. With the
 // box art on, outside play, the flag is cleared before that check and logged
 // (box_art_reset_signal), so its source can be traced.
-extern "C" void blockplanet_attract_guard(std::uint8_t* rdram, recomp_context*) {
+extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ctx);
+extern "C" void blockplanet_attract_guard(std::uint8_t* rdram, recomp_context* ctx) {
+    blockplanet_vortex_frame(rdram, ctx);  // the jukebox's Vortex background (vortex_backdrop.cpp)
     using namespace tetrisphere;
     using namespace tetrisphere::guest;
     constexpr std::uint32_t reset_signal = 0x800DF728u;

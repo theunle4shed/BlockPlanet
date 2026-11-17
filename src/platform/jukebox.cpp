@@ -6,6 +6,7 @@
 
 #include "tetrisphere/jukebox.h"
 #include "tetrisphere/audio_settings.h"
+#include "tetrisphere/vortex_backdrop.h"
 #include "../ui/ui_system.h"
 
 #include <chrono>
@@ -30,9 +31,14 @@ int shown_seconds = -2;
 
 // The backgrounds: the grid's own (Water, Pulse, Bars), then full-screen
 // Winamp-inspired ones built from the game's bricks (src/ui/ui_jukebox.cpp).
+// Last, the Vortex: the game's own scene (src/graphics/vortex_backdrop.cpp).
+// The Vortex is not offered yet: its draw crashed now and then in testing
+// (being fixed); research_vortex and jukebox_vortex still reach it.
 constexpr int visualiser_count = 6;
-const char* const visualiser_names[visualiser_count] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces"};
-const char* const visualiser_icons[visualiser_count] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF"};
+constexpr int visualiser_known = 7;
+constexpr int vortex = 6;
+const char* const visualiser_names[visualiser_known] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces", "Vortex"};
+const char* const visualiser_icons[visualiser_known] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF", "\uE499"};
 
 int elapsed_seconds() {
     if (!started) return -1;
@@ -137,6 +143,7 @@ bool command(const std::string& command, const unsigned char* rdram) {
     else if (command == "jukebox_shuffle") shuffle = !shuffle;
     else if (command == "jukebox_repeat") repeat = !repeat;
     else if (command == "jukebox_vis") visualiser = (visualiser + 1) % visualiser_count;
+    else if (command == "jukebox_vortex") visualiser = vortex;  // research, until it is offered
     else if (command == "jukebox_hide") {
         ui::set_jukebox_hidden(true);
         return true;
@@ -147,6 +154,9 @@ bool command(const std::string& command, const unsigned char* rdram) {
 }
 
 void tick() {
+    // The Vortex while a jukebox screen is on top and it is chosen.
+    const auto screen = ui::current_screen();
+    set_vortex_backdrop(visualiser == vortex && (screen == "jukebox" || screen == "jukebox_list"));
     const int seconds = elapsed_seconds();
     if (!repeat && !stopped && seconds >= 180 && track_override()) {
         play(shuffle ? random_other(track) : track + 1);
@@ -159,6 +169,7 @@ void tick() {
 }
 
 void on_launch() {
+    set_vortex_backdrop(false);
     if (stopped) set_music_muted(false);
     stopped = false;
     started.reset();

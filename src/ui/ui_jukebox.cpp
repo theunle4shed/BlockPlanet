@@ -103,7 +103,7 @@ void build(Rml::Element* layer, int mode) {
         }
     }
     layer->SetInnerRML(rml);
-    layer->SetClass("full", jukebox_full_screen(mode));
+    layer->SetClass("full", jukebox_full_screen(mode) && !jukebox_game_picture(mode));
     if (mode == vis_spectrum || mode == vis_scope) {
         const int count = mode == vis_spectrum ? columns * rows : scope_points * 2;
         for (int i = 0; i < count; ++i) state.bricks.push_back(layer->GetElementById("b" + std::to_string(i)));
