@@ -6,7 +6,7 @@ The owner's request (2026-11-17): "research missing elements and why some music 
 
 They are the game's bonus music. Its song routine (`func_8007F720`) refuses any track above a count at `0x800E28E4`, which is 13 until the G'MEBOY name code raises it to 22. The jukebox now raises the count just for its own call, and while a pause-menu choice of a bonus track lasts, so the game's Auto and Random music is unchanged. Details: docs/research/blockplanet-game-state.md, "The hidden music".
 
-**For the owner:** should the nine bonus tracks be marked "Bonus" in the playlist, or locked until something is done (as the name code did), or simply open as now?
+**The owner's note (2026-11-17):** the secret music might need to be added to the unlockables (docs/ROADMAP.md, Jukebox). Still open: should the nine bonus tracks be marked "Bonus" in the playlist, or locked until something is done (as the name code did), or simply open as now?
 
 ## Winamp's parts, and the jukebox's
 
