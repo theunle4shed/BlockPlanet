@@ -215,6 +215,13 @@ std::optional<int> single_lesson;
 std::atomic<bool> minefield_frozen{false};
 std::atomic<bool> minefield_end_chosen{false};  // a choice made on the game's end menu: no fallback panel
 std::atomic<bool> game_over_frozen{false};  // the shell closing before the game's game over
+// BlockPlanet's own pause (PauseBridge::set_parker): in play, Start is kept
+// from the game (own_pause_ready) and asks for BlockPlanet's pause instead
+// (own_pause_start); bp_paused while the game is parked for it.
+std::atomic<bool> own_pause_ready{false};
+std::atomic<bool> own_pause_mask{false};  // in play with BlockPlanet's pause on: Start never reaches the game
+std::atomic<bool> own_pause_start{false};
+std::atomic<bool> bp_paused{false};
 std::atomic<bool> hold_shell_on{false};     // the shell drawn while the game over is held
 float card_stick = 0.0f;  // the right stick's vertical position, scrolling the card panel
 // A mode to start once the game is back at its menu: after a Chapter 0, or
@@ -786,7 +793,7 @@ void update_hud() {
     // Story shows no score pop-ups (decided 2026-11-06); BLOCKPLANET_POPUPS=1
     // shows points for testing (score modes may use them later).
     static const bool popups_on = std::getenv("BLOCKPLANET_POPUPS") != nullptr;
-    const bool paused_now = story && guest::load16(guest_rdram, 0x800E1228) >= 0;
+    const bool paused_now = story && (guest::load16(guest_rdram, 0x800E1228) >= 0 || bp_paused.load());
     if (story && !paused_now) {
         const auto make = [&](const std::string& text, const std::string& note, float dx, float dy) {
             if (std::getenv("BLOCKPLANET_POPUP_LOG")) std::fprintf(stdout, "{\"event\":\"popup\",\"text\":\"%s\"}\n", text.c_str());
@@ -951,7 +958,7 @@ void update_hud() {
     update_magic_box();
     if (state.score < last_score || state.mode != 1) splits.reset();
     last_score = state.score;
-    const bool paused = guest::load16(guest_rdram, 0x800E1228) >= 0;
+    const bool paused = guest::load16(guest_rdram, 0x800E1228) >= 0 || bp_paused.load();
     auto& episode = profile_data.progress.episode_records[variant_records(play_variant == PlayVariant::ScoreAttack ? PlayVariant::Story : play_variant)];
     const auto best_of = [&](int chapter) {
         const auto it = episode.find(chapter);
@@ -2040,7 +2047,7 @@ std::uint16_t hide_and_seek_skips() {
         // card; it moves once play starts.
         clock_at_level = guest::load32(guest_rdram, 0x80110220u + 0x2B0C);
     }
-    if (guest::load16(guest_rdram, 0x800E1228) >= 0) return 0;  // paused
+    if (guest::load16(guest_rdram, 0x800E1228) >= 0 || bp_paused.load()) return 0;  // paused
     const auto box = blockplanet::recent_card_box();
     const bool card = box && box->kind == 1;
     const auto pulse = [&](clock::time_point from) -> std::uint16_t {
@@ -2975,6 +2982,10 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (minefield_frozen.load() || game_over_frozen.load()) {*buttons=0;*x=0;*y=0;return true;}
     *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons | mouse_bits) : mapped.buttons;
     note_start(mapped.buttons);
+    if (own_pause_mask.load() && (*buttons & 0x1000u)) {  // Start in play: BlockPlanet's pause, not the game's
+        *buttons = static_cast<std::uint16_t>(*buttons & ~0x1000u);
+        own_pause_start.store(true);
+    }
     *x = mapped.x;
     *y = mapped.y;
     // The game moves the cursor by the stick, so the mouse's steps go there too.
@@ -5160,6 +5171,44 @@ bool handle_profile_command(const std::string& command) {
             std::uint16_t hs_buttons = hide_and_seek_skips();
             if (const auto lines_buttons = lines_card_once()) hs_buttons = lines_buttons;
             track_puzzle_limits();
+            {
+                // BlockPlanet's own pause: in play (not paused, no menu on the game's row,
+                // not at a game over), Start asks for it.
+                static bool parker_set = false;
+                static const bool own_pause = [] {
+                    const char* v = std::getenv("BLOCKPLANET_OWN_PAUSE");
+                    return v == nullptr || v[0] != '0';
+                }();
+                if (own_pause && !parker_set) {
+                    parker_set = true;
+                    set_own_pause_keys(true);
+                    pause_bridge.set_parker([](bool park) { blockplanet::set_pause_park(park); },
+                                            [] { return blockplanet::pause_parked(); });
+                }
+                const bool in_play_now = guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                                         std::int16_t(guest::load16(guest_rdram, 0x800E1228)) < 0 &&
+                                         std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) != -1;
+                own_pause_ready.store(own_pause && in_play_now && !blockplanet::ui::menus_open() && !launching() &&
+                                      !pause_bridge.owned());
+                // Kept from the game the whole time in play (a key stays down
+                // for several reads: let through once paused, the game took it as
+                // its own pause, which started when it was let out).
+                own_pause_mask.store(own_pause && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                                     std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) != -1);
+                const bool start_now = own_pause_start.exchange(false);
+                static const bool log = std::getenv("BLOCKPLANET_IDLE_LOG") != nullptr;  // research
+                static int last_reasons = -1;
+                const int reasons = (own_pause ? 1 : 0) | (in_play_now ? 2 : 0) | (!blockplanet::ui::menus_open() ? 4 : 0) |
+                                    (!launching() ? 8 : 0) | (!pause_bridge.owned() ? 16 : 0);
+                if (log && (reasons != last_reasons || start_now))
+                    std::fprintf(stdout, "{\"event\":\"own_pause\",\"ready\":%d,\"bits\":%d,\"start\":%d,\"scene\":%d,\"row\":%d,\"hearts\":%d,\"t\":%lld}\n",
+                                 int(own_pause_ready.load()), reasons, int(start_now), guest::load16(guest_rdram, 0x800E121C),
+                                 guest::load16(guest_rdram, 0x800E1228), guest::load16(guest_rdram, 0x80112F9E),
+                                 (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+                last_reasons = reasons;
+                if (start_now && own_pause_ready.load()) pause_bridge.request_pause(std::chrono::steady_clock::now());
+                bp_paused.store(pause_bridge.owned());
+            }
             const auto pause = pause_bridge.update(const_cast<std::uint8_t*>(guest_rdram),
                                                    blockplanet::ui::menus_open(), std::chrono::steady_clock::now(),
                                                    start_pressed_recently());
@@ -5710,6 +5759,7 @@ bool handle_profile_command(const std::string& command) {
                 // episode's card sets it to 100: neither is a pause, whose
                 // rows are 0 to 3.)
                 paused = playing && row >= 0 && row <= 3 && !game_over && !end_menu.episode_end() && !end_menu.puzzle_failed();
+                if (bp_paused.load()) paused = true;  // BlockPlanet's own pause (the game parked)
                 // Resumed (BlockPlanet's pause screen was open in this pause
                 // and is closed now) and the game's fade back in done: counted
                 // as no longer paused, unless waiting for the row.

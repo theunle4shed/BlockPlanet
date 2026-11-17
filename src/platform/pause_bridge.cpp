@@ -87,8 +87,12 @@ bool PauseBridge::finish_resume(std::uint8_t* rdram) {
 }
 
 void PauseBridge::request_pause(Clock::time_point now) {
-    pause_requested_ = true;
     since_ = now;
+    if (park_ && !pending_action_) {
+        if (!owned_) owned_requested_ = true;
+        return;
+    }
+    pause_requested_ = true;
 }
 
 PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Clock::time_point now,
@@ -100,6 +104,54 @@ PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Cl
     // the hearts read -1; it is left as the game shows it.
     const bool game_over = load16(rdram, p1_hearts) == -1;
     const bool paused = playing && row >= 0 && !game_over;
+
+    // BlockPlanet's own pause (set_parker).
+    if (owned_requested_) {
+        if (!playing || game_over || row >= 0) {
+            owned_requested_ = false;  // not in play, or the game's row is in use (a scene)
+            park_(false);
+        } else {
+            park_(true);
+            if (parked_()) {
+                owned_requested_ = false;
+                owned_ = true;
+                showing_ = true;
+                out.open_menu = true;
+                out.items = pause_items(load16(rdram, mode), load16(rdram, 0x800E44ACu), load32(rdram, 0x8013D25Cu) != 0);
+            } else if (now - since_ > timeout) {
+                owned_requested_ = false;  // could not park: give up
+                park_(false);
+            }
+            return out;
+        }
+    }
+    if (owned_) {
+        // Closing the menus (Back) means Resume.
+        if (!choice_ && !menus_open) choose(Choice::Resume, now);
+        if (!playing || !choice_) return out;
+        // Resume: let the game out, play goes on. Quit, Skip: let it out,
+        // then pause it the game's way (unseen) and choose there. The game's
+        // own pause request cleared, in case a Start reached it.
+        if (*choice_ == Choice::Resume) store16(rdram, 0x8013FAD0u, 0);
+        park_(false);
+        owned_ = false;
+        showing_ = false;
+        out.close_menu = menus_open;
+        if (*choice_ != Choice::Resume) {
+            pending_action_ = *choice_;
+            pause_requested_ = true;
+            since_ = now;
+        }
+        choice_.reset();
+        return out;
+    }
+    if (pending_action_ && paused) {  // the game's pause, opened for a Quit or Skip
+        choice_ = *pending_action_;
+        pending_action_.reset();
+        since_ = now;
+    } else if (pending_action_ && !pause_requested_ && !paused) {
+        pending_action_.reset();  // the game never paused
+    }
 
     if (pause_requested_) {
         // F1 during play: press Start until the game pauses.

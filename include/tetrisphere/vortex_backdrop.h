@@ -30,5 +30,9 @@ void set_vortex_aspect(float aspect);
 // BLOCKPLANET_GAME_IDLE=0 turns it off.
 void set_game_idle(bool idle);
 bool game_idle();  // parked with no background asked for
+// BlockPlanet's own pause (PauseBridge::set_parker): the game parked in play,
+// play frozen where it is; and whether it is parked now.
+void set_pause_park(bool park);
+bool pause_parked();
 
 } // namespace blockplanet

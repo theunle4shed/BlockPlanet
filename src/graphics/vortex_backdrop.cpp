@@ -67,6 +67,7 @@ constexpr std::pair<std::uint32_t, std::uint32_t> saved_ranges[] = {
 enum class State { off, on };
 std::atomic<bool> wanted{false};       // the jukebox asks for a game-drawn background
 std::atomic<bool> idle_wanted{false};  // the game parked behind BlockPlanet's menus (step 4)
+std::atomic<bool> pause_wanted{false}; // the game parked for BlockPlanet's pause, in play
 std::atomic<int> wanted_stage{0};  // 0 the vortex, 1 to 25 a play background
 int shown_stage = 0;               // what the reset screen draws now (game thread)
 bool stage_built = false;
@@ -200,6 +201,8 @@ void set_game_idle(bool idle) {
     idle_wanted.store(idle && !off);
 }
 bool game_idle() { return showing.load() && !wanted.load(); }
+void set_pause_park(bool park) { pause_wanted.store(park); }
+bool pause_parked() { return pause_wanted.load() && showing.load(); }
 
 } // namespace blockplanet
 
@@ -208,11 +211,11 @@ bool game_idle() { return showing.load() && !wanted.load(); }
 extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ctx) {
     using namespace blockplanet;
     using namespace tetrisphere::guest;
-    const bool want = wanted.load() || idle_wanted.load();
+    const bool want = wanted.load() || idle_wanted.load() || pause_wanted.load();
     // Only the jukebox's choice keeps a stage background (else: the vortex, not drawn).
     if (!wanted.load()) wanted_stage.store(0);
     if (state == State::off) {
-        if (want && load16(rdram, reset_screen) == 0 && at_title_or_menus(rdram)) enter(rdram);
+        if (want && load16(rdram, reset_screen) == 0 && (at_title_or_menus(rdram) || pause_wanted.load())) enter(rdram);
         return;
     }
     if (!want || wanted_stage.load() != shown_stage) {

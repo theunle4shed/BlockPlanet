@@ -17,5 +17,7 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
 // Whether the game is in play: then F1 pauses it (BlockPlanet's pause menu)
 // instead of opening the main menu.
 void set_menu_play_state(bool in_play);
+// BlockPlanet's own pause on: Escape and Start in play send "pause".
+void set_own_pause_keys(bool on);
 
 } // namespace tetrisphere

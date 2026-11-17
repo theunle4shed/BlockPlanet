@@ -17,6 +17,7 @@
 #include "../../src/ui/ui_actions.h"
 
 #include <chrono>
+#include <functional>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -57,7 +58,27 @@ public:
     // which otherwise wrote it back to 0 too. Returns whether it did.
     bool finish_resume(std::uint8_t* rdram);
 
+    // BlockPlanet's own pause (the owner, 2026-11-17: "move the pause menu
+    // over"): with a parker set, a pause request parks the game (play frozen
+    // where it is, nothing of the game's drawn) instead of pressing Start for
+    // the game's own pause, and the pause screen opens once it is parked.
+    // Resume lets the game out. Quit and Skip let it out, then pause it the
+    // game's way unseen and choose, as before. Without a parker, the game's
+    // own pause is used, as before.
+    void set_parker(std::function<void(bool)> park, std::function<bool()> parked) {
+        park_ = std::move(park);
+        parked_ = std::move(parked);
+    }
+    // Whether play is paused by BlockPlanet now (the game parked for it).
+    bool owned() const { return owned_ || owned_requested_; }
+
 private:
+    std::function<void(bool)> park_;
+    std::function<bool()> parked_;
+    bool owned_ = false;            // the game parked for BlockPlanet's pause
+    bool owned_requested_ = false;  // asked for, not parked yet
+    std::optional<Choice> pending_action_;  // Quit or Skip, once the game's pause is open
+
     bool showing_ = false;
     bool not_a_pause_ = false;  // the row is in use by something else (a scene)
     std::optional<Choice> choice_;

@@ -24,6 +24,7 @@ SDL_GameControllerButton sdl_button(PhysicalButton button) {
 }
 
 std::atomic<bool> in_play{false};
+std::atomic<bool> own_pause{false};  // BlockPlanet's own pause: Escape and Start pause here too
 
 // Left stick direction per controller and axis, so a push counts once.
 std::map<std::pair<SDL_JoystickID, int>, int> stick;
@@ -41,6 +42,15 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         else if (in_play.load()) blockplanet::ui::send_command("pause");
         else blockplanet::ui::request_open("main");
         return true;
+    }
+    // BlockPlanet's own pause: Escape or a controller's Start in play pause even
+    // while the game's input is held (a Training card waiting to be scrolled);
+    // the game never sees them (linux_main.cpp masks Start in play).
+    if (own_pause.load() && in_play.load() && !blockplanet::ui::menus_open() &&
+        ((event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) ||
+         (event.type == SDL_CONTROLLERBUTTONDOWN && event.cbutton.button == SDL_CONTROLLER_BUTTON_START))) {
+        blockplanet::ui::send_command("pause");
+        return false;  // still passed on (the game's input mask keeps it from the game)
     }
     if (!blockplanet::ui::menus_open()) return false;
     // Follow the device in use: screens show controller-only parts (the
@@ -160,5 +170,6 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
 }
 
 void set_menu_play_state(bool playing) { in_play.store(playing); }
+void set_own_pause_keys(bool on) { own_pause.store(on); }
 
 } // namespace tetrisphere
