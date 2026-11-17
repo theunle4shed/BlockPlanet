@@ -16,6 +16,9 @@ namespace blockplanet {
 void set_vortex_backdrop(bool wanted, int stage = 0);
 // Whether the game is showing the vortex now (or entering it).
 bool vortex_backdrop_on();
+// Whether the chosen scene is on screen (until then the jukebox covers the
+// screen, so the game's menu does not show while it is being set up).
+bool vortex_backdrop_ready();
 // The window's width over its height (from the main loop), to fill wide screens.
 void set_vortex_aspect(float aspect);
 

@@ -179,6 +179,7 @@ void tick() {
     // The Vortex while a jukebox screen is on top and it is chosen.
     const auto screen = ui::current_screen();
     set_vortex_backdrop(visualiser >= vortex && (screen == "jukebox" || screen == "jukebox_list"), stage_of(visualiser));
+    ui::set_jukebox_cover(visualiser >= vortex && !vortex_backdrop_ready());
     const int seconds = elapsed_seconds();
     if (!repeat && !stopped && seconds >= 180 && track_override()) {
         play(shuffle ? random_other(track) : track + 1);

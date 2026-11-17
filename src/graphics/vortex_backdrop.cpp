@@ -70,6 +70,7 @@ std::atomic<int> wanted_stage{0};  // 0 the vortex, 1 to 25 a play background
 int shown_stage = 0;               // what the reset screen draws now (game thread)
 bool stage_built = false;
 std::atomic<bool> showing{false};
+std::atomic<bool> ready{false};   // the chosen scene is on screen (for the jukebox's cover)
 State state = State::off;
 bool song_stopped = false;
 int frames_on = 0;
@@ -120,6 +121,7 @@ void enter(std::uint8_t* rdram) {
     song_stopped = false;
     frames_on = 0;
     shown_stage = wanted_stage.load();
+    ready.store(false);
     stage_built = false;
     showing.store(true);
     std::fprintf(stdout, "{\"event\":\"vortex_backdrop\",\"on\":true,\"saved_bytes\":%zu,\"started\":%d,\"scene\":\"%08X\",\"fade\":%d,\"init\":%d}\n",
@@ -144,6 +146,7 @@ void leave(std::uint8_t* rdram, recomp_context* ctx) {
     saved_pool.shrink_to_fit();
     state = State::off;
     showing.store(false);
+    ready.store(false);
     std::fprintf(stdout, "{\"event\":\"vortex_backdrop\",\"on\":false}\n");
 }
 
@@ -190,6 +193,7 @@ void set_vortex_backdrop(bool on, int stage) {
     wanted.store(on && !off);
 }
 bool vortex_backdrop_on() { return showing.load(); }
+bool vortex_backdrop_ready() { return ready.load(); }
 
 } // namespace blockplanet
 
@@ -244,6 +248,14 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         // The reset screen took the jingle player from the jukebox's extra
         // song, if one was playing (audio_hooks.cpp): start it again.
         if (const int song = extra_song(); song >= 0) play_song(song);
+    }
+    // On screen: the vortex once built (its song stopped), a stage background
+    // once built; a few frames later, as the first draws go through.
+    {
+        static int settled = 0;
+        const bool built = song_stopped && (shown_stage == 0 || stage_built);
+        settled = built ? settled + 1 : 0;
+        ready.store(settled >= 4);
     }
     // A play background instead (the jukebox's Stage backgrounds): built once
     // the vortex is (the reset screen's pool and lights then set up), as the

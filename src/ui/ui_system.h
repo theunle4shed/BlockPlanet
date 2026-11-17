@@ -54,6 +54,8 @@ void set_text(const std::string& name, const std::string& text);
 void set_jukebox_visualiser(int mode);
 // The jukebox's Hide: the player is hidden until any button or a click.
 void set_jukebox_hidden(bool hidden);
+// Black behind the jukebox while a game-drawn background is being set up.
+void set_jukebox_cover(bool cover);
 // A full-screen loading cover over everything (0: none, 1: opaque), with the
 // mode being started ("Story · Stage 1:1"), while a mode is started through
 // the game's own menus behind it.

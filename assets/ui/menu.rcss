@@ -413,17 +413,17 @@ body.lab .item.slider .fill { height: 8dp; }
 }
 .player-number { color: #f5821f; margin-right: 16dp; }
 .player-info { display: block; font-size: 22dp; color: #9aa6c8; margin-top: 2dp; }
-.player-spectrum { display: block; height: 96dp; margin-top: 10dp; position: relative; }
+/* The bars stand on a fixed baseline and grow upwards. */
+.player-spectrum { display: flex; flex-direction: row; align-items: flex-end; height: 96dp; margin-top: 10dp; }
 .player-spectrum .band {
-    display: inline-block;
-    vertical-align: bottom;
+    display: block;
+    flex: 0 0 auto;
     width: 22dp;
     height: 4dp;
     margin-right: 6dp;
     background-color: #f5821f;
     border-radius: 3dp 3dp 0dp 0dp;
 }
-.player-spectrum .band { position: relative; }
 .player-modes { display: block; font-size: 20dp; color: #e8b818; margin-top: 4dp; }
 
 /* The transport buttons: a 4 by 2 grid of keys, icon over label; a lit key
@@ -438,7 +438,7 @@ body.lab .item.slider .fill { height: 8dp; }
     font-size: 20dp;
     background-color: #ffffff10;
 }
-.player-controls .item.player-button .icon { display: block; font-size: 40dp; margin: 0dp 0dp 4dp 0dp; }
+.player-controls .item.player-button .icon { display: block; width: auto; text-align: center; font-size: 40dp; margin: 0dp 0dp 4dp 0dp; }
 .player-controls .item.player-button.lit .icon { color: #e8b818; }
 .player-controls .item.player-button.focused { background-color: #ffffff2c; }
 .player-controls .item.player-button.focused .icon { color: #f8f8f8; }
@@ -451,6 +451,7 @@ body.jukebox .list { max-height: 60vh; }
 #jbvis { position: absolute; left: 0dp; top: 0dp; width: 100%; height: 100%; z-index: 0; }
 body.jukebox #panel { z-index: 1; }
 #jbvis.full { background-color: #03060f; }
+#jbvis.cover { background-color: #000000; }  /* while a game-drawn background is set up */
 #jbvis .jbbrick { position: absolute; }
 #jbvis .jbpiece { position: absolute; display: none; }
 #jbvis .jbpiece .jbbrick { width: 25%; height: 25%; }

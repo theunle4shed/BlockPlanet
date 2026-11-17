@@ -103,7 +103,8 @@ struct PadRequest {
 using Request = std::variant<OpenRequest, CloseRequest, PointerRequest, RestoreRequest, Action, SettingRequest, ListRequest, TextRequest, PadRequest,
                              AltButtonRequest>;
 std::mutex requests_mutex;
-std::atomic<bool> jukebox_hidden{false};  // the jukebox's Hide: only the visualiser shows
+std::atomic<bool> jukebox_hidden{false};
+std::atomic<bool> jukebox_cover{false};  // black while a game-drawn background is set up  // the jukebox's Hide: only the visualiser shows
 std::deque<Request> requests;
 std::deque<std::string> commands;
 std::vector<std::pair<std::string, std::size_t>> shown_path;  // the last open menus (under requests_mutex)
@@ -987,6 +988,7 @@ void update_jukebox() {
     if (document == nullptr) return;
     const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     update_jukebox_visual(document, mode, sound, now);
+    if (Rml::Element* layer = document->GetElementById("jbvis")) layer->SetClass("cover", jukebox_cover.load());
     document->SetClass("player-hidden", jukebox_hidden.load());
     if (screen != "jukebox") return;
     for (int i = 0; i < 16; ++i) {
@@ -1287,6 +1289,7 @@ void pointer(float x, float y, bool click) {
 
 void set_jukebox_visualiser(int mode) { jukebox_visualiser.store(mode); }
 void set_jukebox_hidden(bool hidden) { jukebox_hidden.store(hidden); }
+void set_jukebox_cover(bool cover) { jukebox_cover.store(cover); }
 
 void set_text(const std::string& name, const std::string& text) {
     std::lock_guard lock(requests_mutex);
