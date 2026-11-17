@@ -19,6 +19,13 @@ void set_music_random(bool random);
 // Pause menu: play this track now and keep choosing it (the game's CHOOSE),
 // until set_music_random ends the override.
 void play_track(int track);
+// Play one of the game's songs by its id now (0x100 and up: songs outside the
+// 23 tracks), leaving the game's music choice alone.
+void play_song(int song);
+// Stop the song play_song started (a game is starting).
+void stop_song();
+// The extra song playing (its id), or -1.
+int extra_song();
 // The track the game is set to (0..22), and whether an override is on.
 int current_track(const unsigned char* rdram);
 bool track_override();

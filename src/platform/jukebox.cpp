@@ -35,6 +35,15 @@ int shown_seconds = -2;
 constexpr int visualiser_count = 7;
 constexpr int visualiser_known = visualiser_count;
 constexpr int vortex = 6;
+// After the game's 23 tracks, three songs it plays outside them (started on
+// its jingle player there; ids from docs/research/jukebox.md): the intro's
+// (the N64 logo and the robots), the title's and the VORTEX scene's.
+struct ExtraSong { const char* name; int id; };
+constexpr ExtraSong extra_songs[] = {{"Intro", 0x129}, {"Title", 0x134}, {"Vortex", 0x143}};
+constexpr int song_total = track_count + int(sizeof extra_songs / sizeof extra_songs[0]);
+
+const char* song_name(int t) { return t < track_count ? track_name(t) : extra_songs[t - track_count].name; }
+
 const char* const visualiser_names[visualiser_known] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces", "Vortex"};
 const char* const visualiser_icons[visualiser_known] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF", "\uE499"};
 
@@ -52,13 +61,14 @@ std::string clock_text(int seconds) {
 
 int random_other(int not_this) {
     static std::mt19937 random{std::random_device{}()};
-    int pick = std::uniform_int_distribution<int>(0, track_count - 2)(random);
+    int pick = std::uniform_int_distribution<int>(0, song_total - 2)(random);
     return pick >= not_this && not_this >= 0 ? pick + 1 : pick;
 }
 
 void play(int t) {
-    track = (t % track_count + track_count) % track_count;
-    play_track(track);
+    track = (t % song_total + song_total) % song_total;
+    if (track < track_count) play_track(track);
+    else play_song(extra_songs[track - track_count].id);
     set_music_muted(false);
     stopped = false;
     started = clock::now();
@@ -77,8 +87,8 @@ void publish(const unsigned char* rdram) {
     char number[8];
     std::snprintf(number, sizeof number, "%02d", shown + 1);
     ui::set_text("jb_number", number);
-    ui::set_text("jb_track", track_name(shown));
-    std::string info = "Track " + std::to_string(shown + 1) + " of " + std::to_string(track_count);
+    ui::set_text("jb_track", song_name(shown));
+    std::string info = "Track " + std::to_string(shown + 1) + " of " + std::to_string(song_total);
     info += stopped ? " · Stopped" : track < 0 ? " · Menu music" : " · Playing";
     ui::set_text("jb_info", info);
     ui::set_text("jb_state", stopped ? "" : "");
@@ -96,16 +106,16 @@ void publish(const unsigned char* rdram) {
     controls.push_back(button("shuffle", "", "Shuffle", "jukebox_shuffle", "Next and Previous pick tracks at random", shuffle));
     controls.push_back(button("repeat", repeat ? "" : "", "Repeat", "jukebox_repeat",
                               "On: the track plays on and on, as in the game. Off: the next track after three minutes", repeat));
-    controls.push_back(button("playlist", "", "Playlist", "jukebox_list", "All 23 tracks"));
+    controls.push_back(button("playlist", "", "Playlist", "jukebox_list", "All 26 songs: the 23 tracks, then the intro's, the title's and the vortex's"));
     controls.push_back(button("visualiser", "", visualiser_names[visualiser], "jukebox_vis",
                               "The background: Water (still), Pulse (the grid lifts with the beat) or Bars (columns rise with the music)",
                               visualiser != 0));
     ui::set_list("jukebox_controls", controls);
 
     std::vector<ui::ListItem> tracks;
-    for (int t = 0; t < track_count; ++t) {
+    for (int t = 0; t < song_total; ++t) {
         char label[64];
-        std::snprintf(label, sizeof label, "%02d. %s", t + 1, track_name(t));
+        std::snprintf(label, sizeof label, "%02d. %s", t + 1, song_name(t));
         ui::ListItem item{"track" + std::to_string(t), label, t == shown && !stopped ? "Playing" : "",
                           "command:jukebox_play:" + std::to_string(t), true, 1, t == shown};
         item.icon = t == shown ? "" : "";
@@ -167,6 +177,7 @@ void tick() {
 }
 
 void on_launch() {
+    stop_song();  // an extra song would play on over the game's music
     set_vortex_backdrop(false);
     if (stopped) set_music_muted(false);
     stopped = false;

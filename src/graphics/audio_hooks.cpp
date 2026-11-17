@@ -36,6 +36,7 @@ void func_80079B80(std::uint8_t* rdram, recomp_context* ctx);
 void func_80079BD4(std::uint8_t* rdram, recomp_context* ctx);
 void func_8007F720(std::uint8_t* rdram, recomp_context* ctx);
 void func_8007ACFC(std::uint8_t* rdram, recomp_context* ctx);
+void func_8007ADF8(std::uint8_t* rdram, recomp_context* ctx);
 }
 
 namespace blockplanet {
@@ -63,6 +64,11 @@ std::atomic<bool> muted{false};          // the jukebox's Stop
 std::atomic<int> selection_wanted{-1};  // 0 auto, 1 random, -1 leave the game's
 std::atomic<int> override_track{-1};    // CHOOSE this track
 std::atomic<int> play_request{-1};      // play this track now
+std::atomic<int> song_request{-1};      // play this song id now (the jukebox's extra songs)
+std::atomic<bool> song_stop{false};     // stop the extra song
+bool song_playing = false;              // an extra song is on the jingle player (audio thread only)
+std::atomic<int> playing_song{-1};      // which, for other threads
+constexpr std::uint32_t jingle_player = 0x80109DC0u;  // the intro's, title's and vortex's player
 
 const char* const names[track_count] = {
     "Prophetic", "Azule Lux", "Martist", "Compliant Confuse", "Faze", "Flim Flam", "Manicdrummix", "Hallucid",
@@ -111,6 +117,10 @@ void play_track(int track) {
     play_request.store(track);
 }
 
+void play_song(int song) { song_request.store(song); }
+void stop_song() { song_stop.store(true); }
+int extra_song() { return playing_song.load(); }
+
 int current_track(const unsigned char* rdram) {
     return std::clamp(static_cast<int>(load32(rdram, track_address)), 0, track_count - 1);
 }
@@ -135,6 +145,7 @@ extern "C" void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx
         if (levels_changed.exchange(false)) {
             const auto music = static_cast<std::uint16_t>(load16(rdram, music_level_address));
             call(func_80079B80, rdram, ctx, music ? music : 0x4FFF, address(music_player));
+            if (song_playing) call(func_80079B80, rdram, ctx, 0x7FFF, address(jingle_player));
             call(func_80079BD4, rdram, ctx, effects_max);
         }
     }
@@ -156,6 +167,40 @@ extern "C" void blockplanet_audio_frame(std::uint8_t* rdram, recomp_context* ctx
         store32(rdram, selection_address, static_cast<std::uint32_t>(selection));
         save = true;
     }
+    // The jukebox's extra songs (ids 0x100 and up: the intro's, the title's,
+    // the vortex's) on the player the game plays them on, the jingle player:
+    // on the background music player they sounded only a few notes (its
+    // instruments are not theirs). The background music is stopped meanwhile,
+    // and the jingle player again when a track is played or a game starts.
+    const auto stop_jingle = [&] {
+        call(func_8007ADF8, rdram, ctx, address(jingle_player));
+        song_playing = false;
+        playing_song.store(-1);
+    };
+    if (song_stop.exchange(false) && song_playing) stop_jingle();
+    if (const int song = song_request.exchange(-1); song >= 0) {
+        call(func_8007ADF8, rdram, ctx, address(music_player));
+        // Its song forgotten: the song routine skips a track it thinks is
+        // already playing (player +0x157C), and the track after an extra
+        // song was silent when it was the one before.
+        store16(rdram, music_player + 0x157Cu, static_cast<std::int16_t>(0xFFFF));
+        if (song_playing) stop_jingle();
+        // As the reset screen sets the player before its vortex song
+        // (0x8005C8C0: +0x1581 = 1, +0x1594 = 0, +0x158A = 1, +0x157C = 0).
+        store8(rdram, jingle_player + 0x1581u, 1);
+        store8(rdram, jingle_player + 0x1594u, 0);
+        store8(rdram, jingle_player + 0x158Au, 1);
+        store16(rdram, jingle_player + 0x157Cu, 0);
+        call(func_8007F720, rdram, ctx, static_cast<gpr>(song), address(jingle_player));
+        call(func_8007ACFC, rdram, ctx, address(jingle_player));
+        call(func_80079B80, rdram, ctx, 0x7FFF, address(jingle_player));
+        song_playing = true;
+        playing_song.store(song);
+        static const bool log = std::getenv("BLOCKPLANET_MUSIC_LOG") != nullptr;
+        if (log) std::fprintf(stdout, "{\"event\":\"jukebox_song\",\"song\":%d,\"player_song\":%d}\n", song,
+                              static_cast<int>(static_cast<std::uint16_t>(load16(rdram, jingle_player + 0x157C))));
+    }
+    if (play_request.load() >= 0 && song_playing) stop_jingle();
     if (const int play = play_request.exchange(-1); play >= 0) {
         store32(rdram, track_address, static_cast<std::uint32_t>(play));
         store32(rdram, changing_track, 1);

@@ -14,6 +14,7 @@
 //   leaving   put everything back.
 
 #include "tetrisphere/vortex_backdrop.h"
+#include "tetrisphere/audio_settings.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
 
@@ -225,6 +226,9 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         func_8007ADF8(rdram, ctx);
         *ctx = saved;
         song_stopped = true;
+        // The reset screen took the jingle player from the jukebox's extra
+        // song, if one was playing (audio_hooks.cpp): start it again.
+        if (const int song = extra_song(); song >= 0) play_song(song);
     }
 }
 
