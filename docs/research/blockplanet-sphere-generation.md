@@ -142,6 +142,24 @@ This corrects the game-state notes, which guessed that IDs 3 and 4 were L shapes
 
 **What a new record needs** (for option 1 below): the header (value, material, cell count, box size, shape ID), the 3 × 3 layout, the 5 × 5 surround map, the box at `+0x742`, the list of fitting offsets, and the texture coordinates for every face of every cell. All but the last can be worked out from the layout; the texture coordinates follow the builder's pattern (edge tiles on outside faces, joining tiles between cells).
 
+**Face textures: the rule for a brick (worked out 2026-11-18).** Each face's entry comes down to two numbers: a tile of the brick texture (a strip of 16 tiles; the second set at `+0x3D8` holds the same choice for a half-size copy of the texture) and a number of quarter turns. Faces 0 to 3 are the cell's sides (called N, S, E and W here, after the layout's rows and columns), faces 4 and 5 its top and bottom, which are always the same. The rule below, applied to each kind's layout, reproduces every face of all six kinds exactly (126 of 126, both sets, byte for byte, checked against memory dumps):
+
+| Face | Situation | Tile, turns |
+| --- | --- | --- |
+| Side | Joins another cell of the piece | 14, 0 |
+| Side | Outside, no cell of the piece on either side along it | 5, 0 (an end cap) |
+| Side | Outside, a cell of the piece on one side along it | 4, 2 if that cell is to the W (for N and S faces) or N (for E and W faces); 4, 0 if E or S |
+| Side | Outside, cells on both sides along it | 3, 0 (the middle of a long side) |
+| Top, bottom | Joined on one side (an end cell) | 4; turns 0 if joined N, 1 W, 2 S, 3 E |
+| Top, bottom | Joined on two opposite sides | 3; turns 0 for N and S, 3 for E and W |
+| Top, bottom | Joined on two sides at a corner, the diagonal cell filled (as in the square) | 2; turns 0 NW, 1 SW, 2 SE, 3 NE |
+| Top, bottom | Corner, diagonal empty (as in the L and S) | 7; turns 0 SW, 1 SE, 3 NW (NE, 2, inferred) |
+| Top, bottom | Joined on three sides | 6; turns 2 when the open side is S (the T). Other directions inferred: 0 open N, 1 W, 3 E |
+
+**Not covered by any piece in the game:** a single-cell piece and a cell joined on all four sides (a cross); tiles 0, 1, 8 and 9 are never used by pieces and are the likely candidates. Single blocks are different: the filler, the special cell and Hide & Seek's single blocks (materials 1 to 7) each use one whole tile (10 to 15) on every face with a fixed turn, and the core and picture tiles (materials 8 to 25) use another mapping.
+
+**Material 38 is the "?" piece** (value 342, shape ID 7, tile 10 on every face), not a free material, so the seven materials the game accepts (32 to 38) are all used, and a new colour would need those range checks widened (or a piece to borrow an existing material's colour).
+
 **How pieces avoid overlapping.** Every piece fits a fixed 3 × 3 layout (nine halfwords from the record's `+0xA`), and every routine that places a piece walks exactly those nine cells, written out one by one:
 - **Building the sphere:** `func_8008DBF8` tests the nine layout cells against the board at the target layer and rejects the spot if any cell it would cover is filled; only then do `func_8008BB24` and its relatives write the nine cells (nine calls to the write helper `func_8008BE58`), after a check that the piece would lie flat (the ROM's messages about a piece's height and "breaking a piece" come from these routines).
 - **Dropping in play:** the landing layer is the top of the tallest column under the nine layout cells, plus one (`func_8008AB0C`), so a dropped piece always lands above everything under it and cannot overlap.
@@ -153,13 +171,13 @@ So any new shape that fits in 3 × 3 is checked correctly by the existing code. 
 | --- | --- | --- |
 | Footprint | the layout, the overlap test, placement, landing, the shadow | 3 × 3 |
 | Cells per piece | the block value is 9 × material + cell number | at most 9 |
-| Materials the game accepts | range checks in `func_8009423C`, `func_800CB6F4`, `func_800CD3B8` | 32 to 38 (six used, 38 free) |
+| Materials the game accepts | range checks in `func_8009423C`, `func_800CB6F4`, `func_800CD3B8` | 32 to 38 (32 to 37 the pieces, 38 the "?" piece) |
 | Kinds in one stage | the slot table (`func_8008A5F0`, 40 slots, 4 per kind) | 10 |
 | Kinds in the shape table before the fixed entries | `0x8014CBC8` | 22 |
 
 **What a new kind would take, smallest first:**
-1. **A new shape in an existing colour, within 3 × 3:** medium. Write one more shape record the way `func_800857E8` does (it could be BlockPlanet's own code after the game's builder runs), including the undecoded per-cell data, point a shape-table entry at it, raise the stage's kind count. Placement, overlap and landing work unchanged. The record's layout is now decoded (above), and there is no rotation to handle; still to work out are the exact texture tiles for each face, and BlockPlanet's HUD picture for the new shape ID.
-2. **A new colour:** medium to large. Material 38 already passes the game's checks, but how the drawing picks a material's look (texture, colour) has not been read yet; BlockPlanet's own sphere renderer hooks may be the easier place to give it a look.
+1. **A new shape in an existing colour, within 3 × 3:** medium. Write one more shape record the way `func_800857E8` does (it could be BlockPlanet's own code after the game's builder runs), including the undecoded per-cell data, point a shape-table entry at it, raise the stage's kind count. Placement, overlap and landing work unchanged. The record's layout is now decoded (above), and there is no rotation to handle; the face textures follow the rule above (a single-cell piece or a cross still needs its tile chosen), and BlockPlanet's HUD needs a picture for the new shape ID.
+2. **A new colour:** medium to large. All seven accepted materials are taken (38 is the "?" piece), so the range checks would need widening, and how the drawing picks a material's look (texture, colour) has not been read yet; BlockPlanet's own sphere renderer hooks may be the easier place to give it a look.
 3. **A shape larger than 3 × 3, or with more than 9 cells:** large. Every footprint routine is written out for nine cells and would need replacing, and the block-value scheme itself (9 per material) would run into the next material's numbers, so it needs a new encoding.
 
 ## What the cell values mean
@@ -177,7 +195,7 @@ Each cell is a 16-bit number; the values seen are all **9 × kind + part**:
 | 288 to 335 | 32 to 37 | Piece blocks: six kinds, one shape and colour each; the part (0 to 8) says which cell of the piece this is |
 | 423 | 47 | The stored Training and Puzzle layouts' blocks |
 
-**Why the values jump (9, then 63, then 72 and up).** Values go up in steps of 9 per type, so the gaps are other types that the stages built in this session simply did not contain. From the [game-state notes](blockplanet-game-state.md): types 2 and 5 (values 18 and 45 up) are Hide & Seek's drills (the tip on the top layer, the shaft below), type 31 (279 up) is its tower, and the core and picture tiles use types 8 to 25; types 3, 4 and 6 (27, 36 and 54 up) have not been identified, and type 38 (342 up) is the free piece material. 
+**Why the values jump (9, then 63, then 72 and up).** Values go up in steps of 9 per type, so the gaps are other types that the stages built in this session simply did not contain. From the [game-state notes](blockplanet-game-state.md): types 2 and 5 (values 18 and 45 up) are Hide & Seek's drills (the tip on the top layer, the shaft below), type 31 (279 up) is its tower, and the core and picture tiles use types 8 to 25; types 3, 4 and 6 (27, 36 and 54 up) have not been identified, and type 38 (342) is the "?" piece. 
 
 Confirmed for 0, 9, 90 to 93 and the piece kinds from screenshots (two colours of piece per stage, as the logs show; each colour is one shape). There is no layer 9: the block table holds 9 layers, 0 to 8 ([game-state notes](blockplanet-game-state.md#layers-core-size-and-stacking-2026-11-02)), and what the research log shows as "layer 9" is the end of that table and the start of the next one (the face masks).
 
