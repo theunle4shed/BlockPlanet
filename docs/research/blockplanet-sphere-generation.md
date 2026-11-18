@@ -102,6 +102,32 @@ Tested 2026-11-18 with `BLOCKPLANET_PLAY_LOG=1`, which logs player 1's hearts an
 
 These describe drops in Rescue with the heart rule as seen; the code that decides the heart loss (`drop.c` in the ROM's messages, around `func_8009423C`) is not read yet.
 
+## Piece kinds: how they are defined, and what a new one would take
+
+Investigated 2026-11-18 by reading the code only; nothing is changed.
+
+**How a kind is defined.** Each kind is a shape record (fields in the [game-state notes](blockplanet-game-state.md): block value, material, cell count, footprint size, shape ID, then layout data), and the level's shape table at `0x8014CBC8` points at the stage's records (entries 0 to n − 1, with fixed ones such as the "?" piece from entry 22). The records are not loaded as data: `func_800857E8` (about 3,100 instructions) writes every one in code, each kind in turn with its block value (288, 297, 306, 315, 324, 333) and material (32 to 37), its 3 × 3 cell layout, and per-cell data written by 192 calls to `func_800826D0` (not decoded; probably which sides of each cell join the next cell, for drawing the piece as one brick).
+
+**How pieces avoid overlapping.** Every piece fits a fixed 3 × 3 layout (nine halfwords from the record's `+0xA`), and every routine that places a piece walks exactly those nine cells, written out one by one:
+- **Building the sphere:** `func_8008DBF8` tests the nine layout cells against the board at the target layer and rejects the spot if any cell it would cover is filled; only then do `func_8008BB24` and its relatives write the nine cells (nine calls to the write helper `func_8008BE58`), after a check that the piece would lie flat (the ROM's messages about a piece's height and "breaking a piece" come from these routines).
+- **Dropping in play:** the landing layer is the top of the tallest column under the nine layout cells, plus one (`func_8008AB0C`), so a dropped piece always lands above everything under it and cannot overlap.
+
+So any new shape that fits in 3 × 3 is checked correctly by the existing code. A larger shape would not be: the checks would only see its first nine cells, and it could be written over other bricks, exactly the risk to avoid.
+
+**Limits built into the code:**
+| Limit | Where | Value |
+| --- | --- | --- |
+| Footprint | the layout, the overlap test, placement, landing, the shadow | 3 × 3 |
+| Cells per piece | the block value is 9 × material + cell number | at most 9 |
+| Materials the game accepts | range checks in `func_8009423C`, `func_800CB6F4`, `func_800CD3B8` | 32 to 38 (six used, 38 free) |
+| Kinds in one stage | the slot table (`func_8008A5F0`, 40 slots, 4 per kind) | 10 |
+| Kinds in the shape table before the fixed entries | `0x8014CBC8` | 22 |
+
+**What a new kind would take, smallest first:**
+1. **A new shape in an existing colour, within 3 × 3:** medium. Write one more shape record the way `func_800857E8` does (it could be BlockPlanet's own code after the game's builder runs), including the undecoded per-cell data, point a shape-table entry at it, raise the stage's kind count. Placement, overlap and landing work unchanged. Still to solve: the per-cell data, rotation (not yet read), and BlockPlanet's HUD picture for the new shape ID.
+2. **A new colour:** medium to large. Material 38 already passes the game's checks, but how the drawing picks a material's look (texture, colour) has not been read yet; BlockPlanet's own sphere renderer hooks may be the easier place to give it a look.
+3. **A shape larger than 3 × 3, or with more than 9 cells:** large. Every footprint routine is written out for nine cells and would need replacing, and the block-value scheme itself (9 per material) would run into the next material's numbers, so it needs a new encoding.
+
 ## What the cell values mean
 
 Each cell is a 16-bit number; the values seen are all **9 × kind + part**:
