@@ -531,3 +531,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Try Again (and a game over's other choices back into play) now starts BlockPlanet's loading cover as a start does, so the game's own fade back into the stage no longer shows its original HUD models for a moment. Checked in Rescue 1:3: the red grid, then black, then the stage fades in. Restart from the pause was checked too: the loading cover, then the episode from 1:1.
 - Roadmap: the Daily Challenge (the owner's idea): a new seed each day, the same for everyone, with an online leaderboard for score and time.
 - Roadmap, Escape (the owner's rule): every drop from the underside must make a combo. A drop that doesn't costs a life and fades away, and no brick ever stays under layer one, which settles the open support question.
+
+## 2026-11-10: Escape mode, step 1 (research)
+
+- A visual prototype of the Escape mode idea, off by default (`BLOCKPLANET_ESCAPE_VIEW=1`). The game's own board is drawn as seen from inside the sphere. Each brick shows its underside, through the game's own (never used) inner-face routine, so they are the real bricks. There is no core, and holes show where a column is dug to it. Play and the rules are unchanged; the cursor and pieces are still drawn from outside. Checked on the real game; step 2's rules research and an estimate are in `docs/research/blockplanet-escape-mode.md`.
+- The Escape prototype (the view from inside the sphere, `BLOCKPLANET_ESCAPE_VIEW=1`, from the `escape` branch) is merged into the main build, still off by default; BlockPlanet.bat's option E starts the game with it. Checked on the current build in Story 1:1.

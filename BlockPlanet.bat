@@ -34,6 +34,7 @@ echo   6  Quit
 echo   7  Play with developer tools (F1 opens them in the game)
 echo   8  Play classic: the game's own sphere drawing and HUD (to compare)
 echo   9  Developer tools, frozen at start (F7 a frame on, F6 run or freeze)
+echo   E  Escape prototype: the sphere seen from inside (the view only)
 echo.
 set CHOICE=
 set /p CHOICE=Choose 1-8: 
@@ -45,6 +46,7 @@ if "%CHOICE%"=="6" exit /b 0
 if "%CHOICE%"=="7" goto developer
 if "%CHOICE%"=="8" goto classic
 if "%CHOICE%"=="9" goto frozen
+if /i "%CHOICE%"=="E" goto escape
 goto menu
 
 :play
@@ -55,6 +57,12 @@ call :run --developer
 goto menu
 :frozen
 call :run --developer-frozen
+goto menu
+:escape
+rem The Escape mode's first step: the board seen from inside the sphere.
+set BLOCKPLANET_ESCAPE_VIEW=1
+call :run
+set BLOCKPLANET_ESCAPE_VIEW=
 goto menu
 :classic
 rem The game's own sphere drawing and HUD, for comparing with BlockPlanet's.
