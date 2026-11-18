@@ -469,7 +469,11 @@ void cancel() {
 }
 
 void request_intro_restart() { intro_restart.store(true); }
-void request_title_restart() { title_restart.store(true); }
+std::atomic<bool> hold_presses{false};  // see request_title_restart
+void request_title_restart() {
+    title_restart.store(true);
+    hold_presses.store(true);
+}
 std::atomic<int> title_left_count{0};
 int title_leaves() { return title_left_count.load(); }
 
@@ -680,7 +684,12 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
         store32(rdram, menu_timer_b, 0);
         direct_start::title_left_count.fetch_add(1);
     };
-    if ((pressed & (button_a | button_start)) != 0) {
+    // Back from "Who is playing?": presses wait until the title is in place.
+    // Pressing Back rapidly otherwise left the title again half a second into
+    // each restart, tearing it down and rebuilding it over and over (the
+    // owner, 2026-11-18: a flash of the game's own menu, then a crash).
+    if (in_place) direct_start::hold_presses.store(false);
+    if ((pressed & (button_a | button_start)) != 0 && !direct_start::hold_presses.load()) {
         leave_title();
         direct_start::log_event("{\"event\":\"box_art_press\"}");
         return;
