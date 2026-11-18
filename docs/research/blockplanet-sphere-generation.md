@@ -86,10 +86,15 @@ The list per stage stays in the private research logs, as AGENTS.md requires.
 
 Tested 2026-11-18 with `BLOCKPLANET_PLAY_LOG=1`, which logs player 1's hearts and each layer's fill whenever they change (`BLOCKPLANET_KEEP_HEARTS=1` keeps the hearts at 3 so that dropping can go on), on Episode 10 stage 1 with both seeds forced, pressing drop every few seconds.
 
-- **The most layers is 7.** Byte 0 = 7 builds seven full playfield layers, and the stage starts with a larger sphere. Byte 0 = 8 or 9 spends the extra layers' draws but leaves grid layer 8 empty, so the grid holds at most 7 (layer 9 is the game's flags, see above).
+- **The most layers is 7.** Byte 0 = 7 builds seven full playfield layers, and the stage starts with a larger sphere. Byte 0 = 8 or 9 spends the extra layers' draws but leaves grid layer 8 empty, so the grid holds at most 7 (layer 8 is the board's one layer of headroom, and there is no layer 9).
 - **A drop that makes no combo stays on top and costs a heart.** The piece lands one layer above what is under it and stays there, sticking out of the sphere; about 1 to 3 seconds later a heart is lost. Dropped again on the same spot, pieces stack higher (layers 2 to 6 seen on a one-layer stage). Three such drops on a new stage end the game. A drop that makes a combo (for example on a matching piece in the stack) clears and costs nothing; a drop that cannot land at all also costs a heart.
 - **The ceiling does not move.** Pieces sit in the same grid as the sphere, up to a fixed top, and no piece ever landed in layer 8. So the sphere's own layers use up the room: a normal stage (at most 6 layers) leaves room above for stacking, while on a 7-layer sphere no drop could land anywhere, and every drop cost a heart. A 7-layer sphere is therefore not playable by drops (sliding and magic were not tried). That is probably why the game itself stops at 6.
 - **Seen in passing:** after many lost hearts on the 7-layer sphere, the Next queue offered a "?" wildcard piece.
+
+**Raising the ceiling.** The board is 9 layers (0 to 8) by design, and its size is built into the code: the four tables (block values, face masks, entries, column map) are fixed-size, and about 20 functions compare layer numbers with 8 or 9 directly (about 60 places: the builder, the board helpers, the column-map builder, the landing and combo code, the layer-8 drawing pass) besides about 70 that go through the board helpers. What it would take, smallest first:
+
+1. **Let pieces rest in layer 8.** Pieces never stayed in layer 8 in these tests, although the board has it and the game draws it with its own pass (`func_8009FA20`). If one check in the landing code refuses it, a hook there gives one more layer of room. Small to medium; the landing check has to be found first (`drop.c` area).
+2. **A taller board.** Move the four tables to the free upper 4 MB (their pointers are set per player in `func_800AF294`, so they can point anywhere; about 7 KB per extra layer), change every layer bound (hooks cannot change a constant inside an instruction, so this means rewriting those spots in the generated code, as `tools/recomp/generate.py` already does for other patches, or replacing the board helpers with BlockPlanet's own), extend the mesh builder's layer steps, and pull the camera back (higher layers come closer to it). The column map's 4-bit layer numbers allow up to 15 layers. Large.
 
 These describe drops in Rescue with the heart rule as seen; the code that decides the heart loss (`drop.c` in the ROM's messages, around `func_8009423C`) is not read yet.
 
@@ -108,7 +113,7 @@ Each cell is a 16-bit number; the values seen are all **9 × kind + part**:
 | 288 to 335 | 32 to 37 | Piece blocks: six kinds, one shape and colour each; the part (0 to 8) says which cell of the piece this is |
 | 423 | 47 | The stored Training and Puzzle layouts' blocks |
 
-Confirmed for 0, 9, 90 to 93 and the piece kinds from screenshots (two colours of piece per stage, as the logs show; each colour is one shape). Layer 9 of the grid is not a layer of blocks: it holds bit flags the game keeps there.
+Confirmed for 0, 9, 90 to 93 and the piece kinds from screenshots (two colours of piece per stage, as the logs show; each colour is one shape). There is no layer 9: the block table holds 9 layers, 0 to 8 ([game-state notes](blockplanet-game-state.md#layers-core-size-and-stacking-2026-11-02)), and what the research log shows as "layer 9" is the end of that table and the start of the next one (the face masks).
 
 ## What it allows
 
