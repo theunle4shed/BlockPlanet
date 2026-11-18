@@ -6011,6 +6011,28 @@ bool handle_profile_command(const std::string& command) {
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             blockplanet::jukebox::tick(guest_rdram);
+            // Research: BLOCKPLANET_DROP_LOG=1 logs player 1's drop timer
+            // (+0x2408, its 0-600 form +0x2B10), the camera zoom (+0x2404 speed,
+            // +0x2414 target, +0x2416 eased) and hearts whenever they change,
+            // with the time, to find when the game drops the piece itself.
+            if (static const bool drop_log = std::getenv("BLOCKPLANET_DROP_LOG") != nullptr; drop_log && guest_rdram != nullptr) {
+                constexpr std::uint32_t c = 0x80110220u;
+                const std::uint32_t t = guest::load32(guest_rdram, c + 0x2408);
+                float timer;
+                std::memcpy(&timer, &t, 4);
+                const int shown = guest::load16(guest_rdram, c + 0x2B10), target = guest::load16(guest_rdram, c + 0x2414),
+                          eased = guest::load16(guest_rdram, c + 0x2416), hearts = guest::load16(guest_rdram, c + 0x2D7E);
+                const std::uint32_t speed = guest::load32(guest_rdram, c + 0x2404);
+                static int last[5] = {-9, -9, -9, -9, -9};
+                static std::uint32_t last_speed = 1;
+                if (shown != last[0] || target != last[1] || eased != last[2] || hearts != last[3] || speed != last_speed) {
+                    last[0] = shown, last[1] = target, last[2] = eased, last[3] = hearts, last_speed = speed;
+                    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+                    std::fprintf(stdout, "{\"event\":\"drop_log\",\"ms\":%lld,\"timer\":%.0f,\"shown\":%d,\"speed\":%u,\"target\":%d,\"eased\":%d,\"hearts\":%d}\n",
+                                 static_cast<long long>(ms), timer, shown, speed >> 16, target, eased, hearts);
+                    std::fflush(stdout);
+                }
+            }
             // Research: BLOCKPLANET_PLAYER_TRACE=path appends the music players
             // (0x80107290 and the jingle player 0x80109DC0, 0x1600 bytes each)
             // ten times a second, to find where a song loops.
