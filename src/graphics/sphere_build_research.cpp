@@ -107,8 +107,39 @@ void apply_layout(std::uint8_t* rdram) {
 // BLOCKPLANET_STAGE_RECORD_EDIT="2=1,0=5": changes bytes of the stage's settings
 // record (BYTE=VALUE, decimal or 0x hex) after the game reads it from the ROM and
 // before it unpacks it (func_8002A870, before its call to func_80088914).
+extern "C" void func_8002AB74(std::uint8_t* rdram, recomp_context* ctx);
+
+// BLOCKPLANET_RECORD_SURVEY=N: the first time a record is loaded, also loads
+// records 0 to N-1 with the game's own loader (as func_8002A870 does) and logs
+// each, then puts the stage's own record back. Research logs only.
+void survey_records(std::uint8_t* rdram, recomp_context* ctx) {
+    static bool done = false;
+    const char* setting = std::getenv("BLOCKPLANET_RECORD_SURVEY");
+    if (done || setting == nullptr) return;
+    done = true;
+    std::uint8_t saved[20];
+    for (std::uint32_t i = 0; i < 20; ++i) saved[i] = load8(rdram, settings_record + i);
+    const int count = std::atoi(setting);
+    for (int n = 0; n < count; ++n) {
+        recomp_context call = *ctx;
+        call.r4 = 0x007D4A70u;  // as func_8002A870 passes them: the table, the destination, the number
+        call.r5 = static_cast<gpr>(static_cast<std::int32_t>(settings_record));
+        call.r6 = static_cast<gpr>(n);
+        func_8002AB74(rdram, &call);
+        std::string record;
+        char hex[4];
+        for (std::uint32_t i = 0; i < 20; ++i) {
+            std::snprintf(hex, sizeof hex, "%02X", load8(rdram, settings_record + i));
+            record += hex;
+        }
+        std::fprintf(stdout, "{\"event\":\"record_survey\",\"n\":%d,\"record\":\"%s\"}\n", n, record.c_str());
+    }
+    for (std::uint32_t i = 0; i < 20; ++i) store8(rdram, settings_record + i, saved[i]);
+    std::fflush(stdout);
+}
+
 extern "C" void blockplanet_stage_record_edit(std::uint8_t* rdram, recomp_context* ctx) {
-    (void)ctx;
+    survey_records(rdram, ctx);
     const char* edits = std::getenv("BLOCKPLANET_STAGE_RECORD_EDIT");
     if (edits == nullptr) return;
     std::string list(edits), applied;

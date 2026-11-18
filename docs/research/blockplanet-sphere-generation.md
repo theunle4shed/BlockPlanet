@@ -60,12 +60,21 @@ There is a matrix of sorts: one table of settings records, one record for each s
 
 | Byte | Meaning | Status |
 | --- | --- | --- |
-| 0 | Number of playfield layers (1 to 5 seen: chapter 1 has 1, chapter 10 has 5). | Confirmed |
-| 2 | Number of piece kinds in play (copied to `0x800E44B8`; the piece draws use range 4 × this). 2 in every record seen. | Confirmed in the code |
+| 0 | Number of playfield layers (Rescue uses 1 to 6). | Confirmed |
+| 2 | Number of piece kinds in play (copied to `0x800E44B8`; the piece draws use range 4 × this). Rescue uses 2 to 4. | Confirmed |
 | 9 | Copied to the player (`+0x23E2`) and doubled into `+0x23E4` (kept within 2 to 10); in Rescue it grows with the level. Probably a speed or difficulty value. | Inferred |
 | 10 | Picks a value 1 to 11 from a list in the game's data. | Unknown |
-| 11 | A bit mask over six piece kinds: which kinds (shape and colour) the stage uses. Two bits set in every record seen. | Inferred (the exact bit-to-kind link is not yet clear) |
+| 11 | A bit mask over the six piece kinds: which kinds (shape and colour) the stage uses. In every Rescue record it has as many bits set as byte 2. | Inferred (the exact bit-to-kind link is not yet clear) |
 | 3 to 8, 12 | Further settings; byte 6 holds three on/off flags, byte 12 a count of entries that follow. Hide & Seek records use bytes 7 and 8. | Unknown |
+
+**Rescue's stages, all 100 (surveyed 2026-11-18).** `BLOCKPLANET_RECORD_SURVEY` loaded each record with the game's own loader (records 0 and 90 matched what chapter 1 and chapter 10 load in play):
+
+- **Piece kinds:** 2 in 37 stages, 3 in 61, 4 in 2. Episodes 1 and 2 always use 2. Kinds become 3 from Episode 3 (stages 5 and 8 first), and are always 3 in Episodes 5 to 9. Episode 10 starts with 2 and reaches **4, the most in Rescue, in its stages 8 and 10**. Stage 10-8 was started to check: its layers hold four kinds (33, 34, 35 and 37), drawn in four colours, and its piece draws use range 16.
+- **Layers:** 1 (only the first stage), 2 in 9 stages, 3 in 15, 4 in 41, 5 in 23 and 6 in 11 (Episode 7's stages 8 and 10, and Episode 10 from stage 2).
+
+The list per stage stays in the private research logs, as AGENTS.md requires.
+
+**How this links to the Next pieces.** The builder and the Next queue in play use the same piece generator: `func_8008A6E4` draws a slot from player 1's piece seed, `func_8008A63C` turns the slot into a kind using the stage's number of kinds (`0x800E44B8`, from byte 2), and `func_8008A2BC` pushes it onto the queue. Besides the builder, only `func_800CD3B8` calls it, which is the in-play path (inferred from the call list). So one setting controls both: editing byte 2 (and byte 11) changes the sphere's kinds and the pieces handed out in play together, as the one-kind and six-kind tests showed. And the piece seed carries on from the build into play, so the two seeds also fix the order of the pieces you are given (inferred, not yet compared piece by piece).
 
 **How many of one kind? There is a balancing rule.** A piece draw (range 8) does not pick the kind itself: it picks one of 8 slots (`func_8008A63C`), and each slot hands out the kinds in turn, then moves on to the next (the slots start staggered, `func_8008A5F0`). So the pieces drawn stay almost exactly half and half whatever the seed. Simulated for all 65,536 piece seeds over one layer's 2,075 draws: one kind is never more than 4 pieces ahead of the other, and never more than 8 come in a row (the longest run is 5 to 8, depending on the seed). The pieces *placed* are less even (one layer had 140 of one kind and 91 of the other), because a larger shape fails to fit more often. Pieces covered 66 % to 81 % of each of 75 measured layers; single filler blocks (and the special cells) the rest.
 
@@ -112,6 +121,7 @@ All are off by default and change nothing unless set (`src/graphics/sphere_build
 | `BLOCKPLANET_PIECE_SEED=n` | Uses *n* as player 1's piece seed (and its copy). |
 | `BLOCKPLANET_RNG_LOG=1` | Also logs every draw made during the build (range and state) and each layer's fill every 600 draws. |
 | `BLOCKPLANET_STAGE_RECORD_EDIT="2=1,…"` | Changes bytes of the stage's settings record (byte=value) after the game reads it and before it unpacks it (hook in `func_8002A870`). |
+| `BLOCKPLANET_RECORD_SURVEY=N` | The first time a record is loaded, also loads records 0 to N − 1 with the game's own loader and logs each (`record_survey`), then puts the stage's record back. |
 | `BLOCKPLANET_SPHERE_LAYOUT=file` | Writes hand-made layers over the built sphere. The file has `layer N` lines (1 to 8), each followed by 32 rows of 32 cells: `.` empty, `#` single block, `*` special cell, or 32 numbers (raw values). Lines starting with `;` are comments. |
 
 The research logs (records as read, every draw) go to the game's own console output under `.local/` and are never committed.
