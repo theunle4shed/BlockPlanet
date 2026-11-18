@@ -63,7 +63,11 @@ double view_scale();
 // Original: the game's own drawing code. Extended: BlockPlanet's renderer
 // with extended_detail_ring extra cells on every side.
 enum class Detail { Original, Extended };
-constexpr int extended_detail_ring = 2;
+// 4, the largest (the owner, 2026-11-18: blocks missing at the sphere's edges
+// in close views, such as a stage's clear, with 2). Measured in Rescue 3:10's
+// clear on the test machine: game frame rate and drawing time the same at 4
+// as at 2, within the noise.
+constexpr int extended_detail_ring = 4;
 // The most extra cells drawn on every side (BLOCKPLANET_SPHERE_RING's limit;
 // Minefield on the sphere uses it, so its cubes all round the ball are drawn).
 constexpr int largest_ring = 4;
