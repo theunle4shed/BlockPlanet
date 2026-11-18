@@ -128,7 +128,7 @@ std::vector<blockplanet::ui::ListItem> local_bonus_items(const MenuUnlocks& u) {
 
 std::vector<blockplanet::ui::ListItem> rescue_menu_items(const MenuUnlocks& u) {
     static const std::vector<Entry> entries{
-        {"campaign", "Campaign", "", "command:campaign", "Carry on from your next stage, episode by episode.", Status::Viable, 1},
+        {"campaign", "Campaign", "", "command:campaign", "The episodes in order. An episode left before its end starts again from its first stage.", Status::Viable, 1},
         {"score_attack", "Score Attack", "", "command:score_attack",
          "As many points as you can on Rescue's stages, against the clock. Combos add time, and time left becomes points.", Status::Viable, 1},
         {"time_attack", "Time Attack", "", "command:time_attack",
@@ -144,7 +144,7 @@ std::vector<blockplanet::ui::ListItem> lines_menu_items(const MenuUnlocks& u) {
     // Lines as Rescue (the owner, 2026-11-15): Campaign, Time Attack and
     // Score Attack on its five episodes.
     static const std::vector<Entry> entries{
-        {"lines_campaign", "Campaign", "", "command:lines_campaign", "Carry on from your next stage, episode by episode.", Status::Viable, 0},
+        {"lines_campaign", "Campaign", "", "command:lines_campaign", "The episodes in order. An episode left before its end starts again from its first stage.", Status::Viable, 0},
         {"lines_time_attack", "Time Attack", "", "command:lines_time_attack",
          "Lines' episodes as fast as you can, against your best time for every stage. A whole episode or one stage.", Status::InProgress, 0},
         {"lines_score_attack", "Score Attack", "", "command:lines_score_attack",

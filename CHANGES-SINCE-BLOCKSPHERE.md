@@ -544,7 +544,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Campaign's list: each entry is just "Episode N", with the one to carry on marked "continue" (or "next" for one not yet started) in the small yellow note, as "completed" is. The list comes back with that episode chosen.
 - Every "Exit to ..." now ends in Menu ("Exit to Rescue Menu", "Exit to Training Menu", "Exit to Puzzles Menu"; "Exit to Main Menu" is unchanged), from one helper (`menu_place`).
 - A Rescue game always exits to the Rescue menu, however it was started (the main menu's Continue included); Minefield keeps its own menus.
-- Episodes (the owner's rule): an episode left before its end is not completed and starts again from its first stage. Campaign always starts an episode at stage 1, and its note says "next" (no "continue"). The main menu's Continue starts the last episode from its first stage, rather than putting back the stage and score where it was left.
+- Episodes (the owner's rule): an episode left before its end is not completed and starts again from its first stage. Campaign always starts an episode at stage 1, and its note says "next" (no "continue"). The main menu's Continue was already this: the last episode from its first stage, with the score and hearts it began with. Campaign's description now says so ("The episodes in order. An episode left before its end starts again from its first stage.").
 
 ## 2026-11-18: How a stage's sphere is built (research)
 

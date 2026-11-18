@@ -4821,8 +4821,10 @@ bool handle_profile_command(const std::string& command) {
                     menu_variant = play_variant = last.submode == "casual" ? PlayVariant::Casual : PlayVariant::Story;
                     chapter_zero_lesson.clear();
                     // The episode from its first stage (the owner, 2026-11-18: an
-                    // episode left part-way starts again), not where it was left.
+                    // episode left part-way starts again), with the score and
+                    // hearts it began with (the checkpoint taken at its start).
                     game_option_applier->choose_start(last.chapter, 1);
+                    pending_restore = last;
                     launch_mode(LaunchMode::Rescue);
                 }
                 continue;
