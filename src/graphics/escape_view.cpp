@@ -66,13 +66,34 @@ bool write_camera(std::uint8_t* rdram, float fov_degrees, float distance) {
     const std::uint32_t mesh = load32(rdram, mesh_pointer);
     if (mesh < 0x80000000u || mesh >= 0x80800000u) return false;
     // From the centre (the mesh's origin) towards the patch's middle, its up
-    // along the patch's rows (row 0 at the top).
-    const Vec middle = base_point(rdram, mesh, 7, 7), middle2 = base_point(rdram, mesh, 8, 8);
-    const Vec forward = unit({(middle[0] + middle2[0]) / 2, (middle[1] + middle2[1]) / 2, (middle[2] + middle2[2]) / 2});
-    const float radius = std::max(1.0f, std::sqrt(dot(middle, middle)));
-    Vec up = sub(base_point(rdram, mesh, 0, 7), base_point(rdram, mesh, 15, 7));
-    const float along = dot(up, forward);
-    up = unit({up[0] - forward[0] * along, up[1] - forward[1] * along, up[2] - forward[2] * along});
+    // along the patch's rows (row 0 at the top). Taken once, at the stage's
+    // start (the sphere at rest), and then kept (the owner, 2026-11-18: left
+    // and right "kept bouncing back", and a drop threw the view down). The
+    // game turns the sphere by turning the patch's points and then rebuilding
+    // the patch round the new cell, so a camera following the patch's middle
+    // only saw the bricks shuffle and snap back; and a drop's animation moves
+    // the points too. Kept fixed, the patch is seen turning, as from outside.
+    struct Frame {
+        Vec forward, up;
+        float radius;
+    };
+    static Frame kept{};
+    static std::uint32_t kept_mesh = 0;
+    static int kept_frames = 0;  // a few frames in, once the stage's first patch is built
+    if (mesh != kept_mesh) kept_mesh = mesh, kept_frames = 0;
+    if (kept_frames < 30) {
+        ++kept_frames;
+        const Vec middle = base_point(rdram, mesh, 7, 7), middle2 = base_point(rdram, mesh, 8, 8);
+        kept.forward = unit({(middle[0] + middle2[0]) / 2, (middle[1] + middle2[1]) / 2, (middle[2] + middle2[2]) / 2});
+        kept.radius = std::max(1.0f, std::sqrt(dot(middle, middle)));
+        Vec u = sub(base_point(rdram, mesh, 0, 7), base_point(rdram, mesh, 15, 7));
+        const float a = dot(u, kept.forward);
+        kept.up = unit({u[0] - kept.forward[0] * a, u[1] - kept.forward[1] * a, u[2] - kept.forward[2] * a});
+    }
+    static const bool follow = std::getenv("BLOCKPLANET_ESCAPE_FOLLOW") != nullptr;  // research: the old camera
+    if (follow) kept_frames = 0;
+    const Vec forward = kept.forward, up = kept.up;
+    const float radius = kept.radius;
     const Vec back{-forward[0], -forward[1], -forward[2]};
     const Vec right = unit(cross(up, back));
     // The owner's framing (2026-11-10): "as far back inside the core as it
