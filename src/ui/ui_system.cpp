@@ -350,13 +350,28 @@ std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count,
     return rml;
 }
 
+// The drop timer (the owner's design, 2026-11-18: "a bar in thirds with a
+// gauge that moves across it", [---|---|---]): the time left to drop the piece
+// held, split where the game starts its warning ticks (189 and 389 of its
+// 600, so at 68.5% and 35.2% left), its fill green, then amber, then red as
+// it crosses into each part, and a marker at the fill's edge.
+std::string drop_bar(const char* id_attr, const char* classes, float left, bool inline_fill) {
+    left = std::clamp(left, 0.0f, 1.0f);
+    const int third = left > 0.685f ? 1 : left > 0.352f ? 2 : 3;
+    const std::string width = std::to_string(int(left * 100.0f)) + "%";
+    std::string rml = std::string("<div") + id_attr + " class='bar drop-bar " + classes + " third-" + std::to_string(third) + "'>";
+    rml += std::string("<div") + (inline_fill ? " class='fill' style='width: " + width + ";'" : " id='drop-fill' class='fill'") + "/>";
+    rml += "<div class='notch' style='left: 35.2%;'/><div class='notch' style='left: 68.5%;'/>";
+    rml += std::string("<div") + (inline_fill ? " class='needle' style='left: " + width + ";'" : " id='drop-needle' class='needle'") + "/>";
+    return rml + "</div>";
+}
+
 // One player's VS column: hearts and drop timer, X count, magic, next.
 std::string versus_column(const HudView::VersusPlayer& p, const char* id, const char* name) {
     std::string rml = std::string("<div id='") + id + "' class='side versus'>";
     rml += std::string("<div class='group'><div class='label'>") + name + "</div><div class='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < p.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
-    rml += std::string("</div><div class='bar vs-drop") + (p.drop_left < 0.35f ? " hurry" : "") +
-           "'><div class='fill' style='width: " + std::to_string(int(std::clamp(p.drop_left, 0.0f, 1.0f) * 100)) + "%;'/></div></div>";
+    rml += "</div>" + drop_bar("", "vs-drop", p.drop_left, true) + "</div>";
     rml += "<div class='rule'><div class='line'/></div>";
     rml += "<div class='group'><div class='label'>Attack</div><div class='count'>\u00D7" + std::to_string(p.multiplier) + "</div></div>";
     rml += "<div class='rule'><div class='line'/></div>";
@@ -518,8 +533,7 @@ std::string hud_rml_parts(const HudView& hud) {
         if (hud.show_lives) {
             std::string lives = std::string("<div id='lives' class='group") + glow("lives") + "'><div class='label'>Health</div><div id='hearts'>";
             for (int i = 0; i < 3; ++i) lives += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
-            lives += std::string("</div><div id='drop' class='bar") + (hud.drop_left < 0.35f ? " hurry" : "") +
-                     "'><div id='drop-fill' class='fill'/></div></div>";
+            lives += "</div>" + drop_bar(" id='drop'", "", hud.drop_left, false) + "</div>";
             parts.push_back(lives);
         }
         if (hud.show_magic) {
@@ -561,10 +575,9 @@ std::string hud_rml_parts(const HudView& hud) {
     rml += "<div id='lives' class='group'><div class='label'>Health</div><div id='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
     rml += "</div>";
-    const bool hurry = hud.drop_left < 0.35f;
     // Bar fills are set on the elements each frame (set_hud_fills), so the
-    // markup only changes when something else does.
-    rml += std::string("<div id='drop' class='bar") + (hurry ? " hurry" : "") + "'><div id='drop-fill' class='fill'/></div>";
+    // markup only changes when something else does (here, at each third).
+    rml += drop_bar(" id='drop'", "", hud.drop_left, false);
     // On portrait screens the clock sits here, under the hearts, so the top row stays one line.
     if (!hud.clock.empty())
         rml += std::string("<div class='clock-inline") + (hud.clock_low ? " low" : "") + "'>" + digits(escape(hud.clock)) + "</div>";
@@ -677,6 +690,7 @@ void set_hud_fills(const HudView& hud) {
         {"drop-fill", hud.drop_left}, {"meter-fill", hud.meter}, {"progress-fill", hud.progress}};
     for (const auto& [id, value] : fills)
         if (auto* e = hud_document->GetElementById(id)) e->SetProperty("width", percent(value));
+    if (auto* e = hud_document->GetElementById("drop-needle")) e->SetProperty("left", percent(hud.drop_left));
     // The portrait screens' column meter fills upwards.
     if (auto* e = hud_document->GetElementById("meter-v-fill")) e->SetProperty("height", percent(hud.meter));
 }

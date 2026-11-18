@@ -109,10 +109,16 @@ div { display: block; }
     background-color: #38c8f0;
 }
 
-/* The drop timer, below the hearts; it turns red when time is short. */
+/* The drop timer, below the hearts: a bar in thirds (split where the game's
+   warning ticks start), green, then amber, then red, with a marker at the
+   fill's edge (ui_system.cpp, drop_bar). */
 #drop { width: 150dp; margin-top: 12dp; }
-#drop .fill { background-color: #f5c21f; }
-#drop.hurry .fill { background-color: #f05a4a; }
+.drop-bar { position: relative; }
+.drop-bar .fill { background-color: #4cc860; }
+.drop-bar.third-2 .fill { background-color: #f5c21f; }
+.drop-bar.third-3 .fill { background-color: #f05a4a; }
+.drop-bar .notch { position: absolute; top: -2dp; width: 2dp; height: 20dp; margin-left: -1dp; background-color: #f0f0f0a0; }
+.drop-bar .needle { position: absolute; top: -5dp; width: 4dp; height: 26dp; margin-left: -2dp; border-radius: 2dp; background-color: #ffffff; }
 
 /* Magic: a clear window for the item (the game draws its 3D model there),
    framed by tinted bands, with the meter beneath. */
@@ -226,8 +232,6 @@ div { display: block; }
 #right.versus { text-align: right; }
 .vs-drop { width: 128dp; margin-top: 8dp; }
 #right .vs-drop { margin-left: auto; }
-.vs-drop .fill { background-color: #f5c21f; }
-.vs-drop.hurry .fill { background-color: #f05a4a; }
 .vs-item { display: block; height: 30dp; font-size: 24dp; font-weight: bold; color: #f5821f; }
 .vs-meter { margin-top: 8dp; }
 .vs-meter .fill { background-color: #9c5cf0; }
