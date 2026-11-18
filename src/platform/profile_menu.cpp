@@ -348,13 +348,14 @@ std::string next_profile_name(const ProfileStore& store) {
 }
 
 std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
-                                                   const std::vector<double>& best_moves, int count) {
+                                                   const std::vector<double>& best_moves, int count, bool all_open) {
     std::vector<blockplanet::ui::ListItem> items;
     int last = 1;
     for (int n : solved)
         if (n >= 1) last = std::max(last, n + 1);
     last = std::min(last, count);
-    for (int n = 1; n <= last; ++n) {
+    const int shown = all_open ? count : last;  // all_open: everything open (testing)
+    for (int n = 1; n <= shown; ++n) {
         const auto i = std::size_t(n - 1);
         std::string note;
         if (i < best_times.size() && best_times[i] > 0.0) {

@@ -162,7 +162,7 @@ std::vector<std::string> credit_lines(const std::vector<CreditEntry>& entries);
 // projects it is built on (the README's credits), in the same line format.
 std::vector<std::string> blockplanet_credit_lines();
 std::vector<blockplanet::ui::ListItem> puzzle_list(const std::set<int>& solved, const std::vector<double>& best_times,
-                                                   const std::vector<double>& best_moves, int count = 100);
+                                                   const std::vector<double>& best_moves, int count = 100, bool all_open = false);
 
 // "Player N" with the lowest N not already taken.
 std::string next_profile_name(const ProfileStore& store);

@@ -4756,11 +4756,14 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
-            if (*command == "campaign" || *command == "lines_campaign") {
-                // Campaign: on from the next stage not yet completed (the
-                // owner's plan; earlier stages are replayed in the attack modes).
-                // Rescue's, or Lines' (lines_campaign).
-                const bool lines = *command == "lines_campaign";
+            if (*command == "campaign" || *command == "lines_campaign" || command->rfind("campaign_episode:", 0) == 0 ||
+                command->rfind("lines_campaign_episode:", 0) == 0) {
+                // Campaign (the owner, 2026-11-18): a list of the episodes, in
+                // order, with the one to carry on chosen ("Continue Episode N"
+                // once some of its stages are done, "Play Episode N" before);
+                // the earlier ones can be played again from their start.
+                // Rescue's, or Lines' (lines_campaign). All open for testing.
+                const bool lines = command->rfind("lines_", 0) == 0;
                 menu_lines = lines;
                 const char* game = lines ? "lines" : "rescue";
                 const int episodes_in_game = lines ? lines_chapters : rescue_chapters;
@@ -4768,25 +4771,42 @@ bool handle_profile_command(const std::string& command) {
                 const auto& levels = profile_data.progress.levels_completed;
                 const auto& chapters = profile_data.progress.chapters_completed;
                 const auto episodes = chapters.find(game);
-                int episode = 1;
-                while (episode <= episodes_in_game && episodes != chapters.end() && episodes->second.count(episode)) ++episode;
-                if (episode > episodes_in_game) {
-                    // Every episode done: the episode list, to play any again.
-                    if (lines) {
-                        blockplanet::ui::set_text("chapters_title", "Lines Campaign");
-                        blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
-                        blockplanet::ui::set_list("chapters", story_chapters(episodes->second, lines_chapters, unlock_all_testing));
-                        blockplanet::ui::request_show("chapters");
-                    } else {
-                        blockplanet::ui::send_command("story");
-                    }
+                const auto completed = [&](int e) { return episodes != chapters.end() && episodes->second.count(e) != 0; };
+                const auto next_stage = [&](int e) {
+                    int stage = 1;
+                    if (const auto found = levels.find(game); found != levels.end())
+                        if (const auto c = found->second.find(e); c != found->second.end())
+                            while (stage < 10 && c->second.count(stage)) ++stage;
+                    return stage;
+                };
+                int resume = 1;
+                while (resume <= episodes_in_game && completed(resume)) ++resume;
+                const std::string prefix = lines ? "lines_campaign_episode:" : "campaign_episode:";
+                if (command->rfind(prefix, 0) == 0) {
+                    const int episode = std::clamp(std::atoi(command->c_str() + prefix.size()), 1, episodes_in_game);
+                    // The episode to carry on from its next stage; any other from its start.
+                    const int stage = episode == resume ? next_stage(episode) : 1;
+                    blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
                     continue;
                 }
-                int stage = 1;
-                if (const auto found = levels.find(game); found != levels.end())
-                    if (const auto c = found->second.find(episode); c != found->second.end())
-                        while (stage < 10 && c->second.count(stage)) ++stage;
-                blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
+                const int focus = std::min(resume, episodes_in_game);
+                const int shown = unlock_all_testing ? episodes_in_game : focus;
+                std::vector<blockplanet::ui::ListItem> items;
+                for (int e = 1; e <= shown; ++e) {
+                    const bool here = e == focus && !completed(e);
+                    const bool started_here = here && next_stage(e) > 1;
+                    const std::string name = std::string(here ? (started_here ? "Continue " : "Play ") : "") + "Episode " + std::to_string(e);
+                    blockplanet::ui::ListItem item{prefix + std::to_string(e), name, completed(e) ? "completed" : "",
+                                                   "command:" + prefix + std::to_string(e), true, 1, e == focus};
+                    item.description = completed(e) ? "Play this episode again from its first stage."
+                                       : started_here ? "Carry on from stage " + std::to_string(next_stage(e)) + "."
+                                       : here ? "Start this episode." : "Open for testing.";
+                    items.push_back(std::move(item));
+                }
+                blockplanet::ui::set_text("chapters_title", lines ? "Lines Campaign" : "Campaign");
+                blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
+                blockplanet::ui::set_list("chapters", items);
+                blockplanet::ui::request_show("chapters");
                 continue;
             }
             if (command->rfind("lesson:", 0) == 0 && game_option_applier) {
@@ -4937,7 +4957,7 @@ bool handle_profile_command(const std::string& command) {
                 const auto& moves = records["puzzle_moves"][0].best_levels;
                 blockplanet::ui::set_text("stages_title", stages_title_now = "Puzzles");
                 blockplanet::ui::set_text("stages_subtitle", "Choose a puzzle");
-                blockplanet::ui::set_list("stages", puzzle_list(profile_data.progress.puzzles_solved, times, moves));
+                blockplanet::ui::set_list("stages", puzzle_list(profile_data.progress.puzzles_solved, times, moves, 100, unlock_all_testing));
                 blockplanet::ui::request_show("stages");
                 continue;
             }
