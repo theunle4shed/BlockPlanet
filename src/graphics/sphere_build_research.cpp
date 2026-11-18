@@ -27,6 +27,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <chrono>
 #include <map>
 #include <string>
 
@@ -254,4 +255,45 @@ extern "C" void blockplanet_rng_draw(std::uint8_t* rdram, recomp_context* ctx) {
     if (log_each)
         std::fprintf(stdout, "{\"event\":\"rng_draw\",\"n\":%d,\"range\":%u,\"state\":\"0x%08X\"}\n",
                      draws, static_cast<unsigned>(ctx->r4) & 0xFFFFu, load32(rdram, rng_state));
+}
+
+// BLOCKPLANET_PLAY_LOG=1: during play, logs player 1's hearts, how full each
+// layer of the grid is (cells not 0) and the tallest column whenever any of them
+// changes (checked every frame), with the time since play began.
+// BLOCKPLANET_KEEP_HEARTS=1 also keeps the hearts at 3 (to keep dropping).
+extern "C" void blockplanet_sphere_play_log(std::uint8_t* rdram) {
+    static const bool on = std::getenv("BLOCKPLANET_PLAY_LOG") != nullptr;
+    static const bool keep = std::getenv("BLOCKPLANET_KEEP_HEARTS") != nullptr;
+    if (!on || rdram == nullptr) return;
+    static auto start = std::chrono::steady_clock::time_point{};
+    if (load16(rdram, 0x800E121Cu) != -1) {  // not in play
+        start = {};
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (start == std::chrono::steady_clock::time_point{}) start = now;
+    const std::uint32_t grid = load32(rdram, grid_pointer);
+    std::string filled;
+    int tallest = 0;
+    for (int layer = 1; layer < 10; ++layer) {
+        int n = 0;
+        for (std::uint32_t c = 0; c < 1024; ++c) {
+            if (load16(rdram, grid + 2u * (layer * 1024u + c)) != 0) {
+                ++n;
+                if (layer < 9) tallest = std::max(tallest, layer);
+            }
+        }
+        filled += (layer > 1 ? "," : "") + std::to_string(n);
+    }
+    const int hearts = load16(rdram, 0x80112F9Eu);
+    static std::string last;
+    const std::string state = std::to_string(hearts) + "|" + filled;
+    if (state != last) {
+        last = state;
+        std::fprintf(stdout, "{\"event\":\"play_log\",\"ms\":%lld,\"hearts\":%d,\"tallest\":%d,\"filled\":[%s]}\n",
+                     static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count()),
+                     hearts, tallest, filled.c_str());
+        std::fflush(stdout);
+    }
+    if (keep && hearts >= 0 && hearts < 3) store16(rdram, 0x80112F9Eu, 3);
 }

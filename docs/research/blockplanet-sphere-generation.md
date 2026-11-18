@@ -62,7 +62,7 @@ There is a matrix of sorts: one table of settings records, one record for each s
 | --- | --- | --- |
 | 0 | Number of playfield layers (Rescue uses 1 to 6). | Confirmed |
 | 2 | Number of piece kinds in play (copied to `0x800E44B8`; the piece draws use range 4 × this). Rescue uses 2 to 4. | Confirmed |
-| 9 | Copied to the player (`+0x23E2`) and doubled into `+0x23E4` (kept within 2 to 10); in Rescue it grows with the level. Probably a speed or difficulty value. | Inferred |
+| 9 | Half the side of the core square to uncover to win: doubled into the player's `+0x23E4` (kept within 2 to 10), the core opening ([level data](blockplanet-level-data.md)); Rescue 1-1 has 2, the 4 × 4 square its start card names. In Rescue it grows with the level. | Confirmed with the earlier notes |
 | 10 | Picks a value 1 to 11 from a list in the game's data. | Unknown |
 | 11 | A bit mask over the six piece kinds: which kinds (shape and colour) the stage uses. In every Rescue record it has as many bits set as byte 2. | Inferred (the exact bit-to-kind link is not yet clear) |
 | 3 to 8, 12 | Further settings; byte 6 holds three on/off flags, byte 12 a count of entries that follow. Hide & Seek records use bytes 7 and 8. | Unknown |
@@ -81,6 +81,17 @@ The list per stage stays in the private research logs, as AGENTS.md requires.
 **Can a seed give a sphere of one kind?** No. With two kinds in the settings, the slot rule hands out both, whatever the seeds. A one-kind sphere needs the settings changed: byte 2 of the record is the number of kinds (read into `0x800E44B8`), so a record with 1 there, or a hand-made layout, does it. **Tested (2026-11-18):** chapter 10 with both seeds forced and `BLOCKPLANET_STAGE_RECORD_EDIT=2=1` built five layers of one kind only (the first kind of the stage's pair, the green one), the piece draws used range 4 instead of 8, and the Next queue in play showed only that kind. With one shape only, more pieces fit: about 270 a layer instead of about 140 + 100, and about 200 single filler blocks a layer instead of about 270. The stage started and played normally for the 25 seconds watched.
 
 **All six kinds at once (tested 2026-11-18):** the same start with `BLOCKPLANET_STAGE_RECORD_EDIT=2=6,11=0x3F` built every layer from all six kinds (piece draws in range 24), drawn in six colours, and the Next queue in play mixed them. Kinds 32, 34 and 35 are 3-cell shapes and 33, 36 and 37 are 4-cell shapes; each layer held about 21 to 53 pieces of each kind (fewer of the 4-cell ones, which fit less often) and about 260 to 290 single filler blocks. It started and played normally for the 25 seconds watched. No piece seed degenerates either: all 65,536 keep using all 8 slots, with no short repeating cycle.
+
+## More layers, and what happens to drops that make no combo
+
+Tested 2026-11-18 with `BLOCKPLANET_PLAY_LOG=1`, which logs player 1's hearts and each layer's fill whenever they change (`BLOCKPLANET_KEEP_HEARTS=1` keeps the hearts at 3 so that dropping can go on), on Episode 10 stage 1 with both seeds forced, pressing drop every few seconds.
+
+- **The most layers is 7.** Byte 0 = 7 builds seven full playfield layers, and the stage starts with a larger sphere. Byte 0 = 8 or 9 spends the extra layers' draws but leaves grid layer 8 empty, so the grid holds at most 7 (layer 9 is the game's flags, see above).
+- **A drop that makes no combo stays on top and costs a heart.** The piece lands one layer above what is under it and stays there, sticking out of the sphere; about 1 to 3 seconds later a heart is lost. Dropped again on the same spot, pieces stack higher (layers 2 to 6 seen on a one-layer stage). Three such drops on a new stage end the game. A drop that makes a combo (for example on a matching piece in the stack) clears and costs nothing; a drop that cannot land at all also costs a heart.
+- **The ceiling does not move.** Pieces sit in the same grid as the sphere, up to a fixed top, and no piece ever landed in layer 8. So the sphere's own layers use up the room: a normal stage (at most 6 layers) leaves room above for stacking, while on a 7-layer sphere no drop could land anywhere, and every drop cost a heart. A 7-layer sphere is therefore not playable by drops (sliding and magic were not tried). That is probably why the game itself stops at 6.
+- **Seen in passing:** after many lost hearts on the 7-layer sphere, the Next queue offered a "?" wildcard piece.
+
+These describe drops in Rescue with the heart rule as seen; the code that decides the heart loss (`drop.c` in the ROM's messages, around `func_8009423C`) is not read yet.
 
 ## What the cell values mean
 
@@ -107,7 +118,7 @@ All of these are possible; none is built yet beyond the research switches.
 - **A daily stage.** Derive both seeds from the date; everyone gets the same sphere that day.
 - **Fair races.** Two players already get identical spheres in one game; seeds make that true across machines too.
 - **Designed spheres, layer by layer.** BlockPlanet can write cells straight into the grid once the game has built it, before the game derives its per-cell tables (that happens afterwards, in `func_800AF294`). `BLOCKPLANET_SPHERE_LAYOUT` does this today: a hand-drawn layer (a ring cut down to the core, single blocks elsewhere) was built and played. Single blocks (9), holes (0) and special cells (63) can go anywhere. Piece blocks need their parts placed in the piece's shape, which is not mapped yet.
-- **Unusual stage types from edited settings.** Editing the record before the build makes stages the game never had, still built by the game's own builder. `BLOCKPLANET_STAGE_RECORD_EDIT` does this (one kind and all six kinds at once are tested); more layers than the game uses are not tried yet.
+- **Unusual stage types from edited settings.** Editing the record before the build makes stages the game never had, still built by the game's own builder. `BLOCKPLANET_STAGE_RECORD_EDIT` does this (one kind and all six kinds at once are tested); more layers: see below.
 - **Per-layer seeds.** Because the number of draws per layer is fixed, BlockPlanet could restart the generator at each layer's first draw with a seed of its own, so each layer could be chosen or shared separately. Not built.
 
 ## Research switches
@@ -122,6 +133,7 @@ All are off by default and change nothing unless set (`src/graphics/sphere_build
 | `BLOCKPLANET_RNG_LOG=1` | Also logs every draw made during the build (range and state) and each layer's fill every 600 draws. |
 | `BLOCKPLANET_STAGE_RECORD_EDIT="2=1,…"` | Changes bytes of the stage's settings record (byte=value) after the game reads it and before it unpacks it (hook in `func_8002A870`). |
 | `BLOCKPLANET_RECORD_SURVEY=N` | The first time a record is loaded, also loads records 0 to N − 1 with the game's own loader and logs each (`record_survey`), then puts the stage's record back. |
+| `BLOCKPLANET_PLAY_LOG=1` | During play, logs player 1's hearts, each layer's fill and the tallest column whenever they change. `BLOCKPLANET_KEEP_HEARTS=1` also keeps the hearts at 3. |
 | `BLOCKPLANET_SPHERE_LAYOUT=file` | Writes hand-made layers over the built sphere. The file has `layer N` lines (1 to 8), each followed by 32 rows of 32 cells: `.` empty, `#` single block, `*` special cell, or 32 numbers (raw values). Lines starting with `;` are comments. |
 
 The research logs (records as read, every draw) go to the game's own console output under `.local/` and are never committed.
