@@ -31,7 +31,7 @@ Confirmed: a re-implementation of the step reproduced every one of the 20,505 sp
 
 1. **New stage (`func_800CC6E0`).** It draws the piece seed (range 65,536) and then the sphere seed (range 65,536). Then, **for each player**, it puts the sphere seed back into the generator state before building that player's sphere. So in VS CPU and two-player games both spheres are identical (seen in VS CPU: the two builds gave the same layers). It is the builder's only caller, so every stage start goes through it.
 2. **Settings (`func_800906E8`, the builder).** It reads the mode (`0x800E44A8`) and picks one of nine set-up routines (table below). Most of them load one 20-byte **settings record** from a single table in the ROM into `0x8013D270`, and `func_80088914` unpacks it.
-3. **The piece queue.** 25 piece draws (range 8: two piece kinds × four turns, inferred) fill the queue.
+3. **The piece queue.** 25 piece draws (range 8: one of 8 slots, see below) fill the queue.
 4. **Special cells.** 8 positions are drawn (16 draws, range 32 each). Two special cells (value 63) end up in each layer except the top one.
 5. **The layers, bottom up.** For each playfield layer, about 2,048 attempts: take the next piece from the queue, draw a column and a row (0 to 31 each), and drop the piece there (`func_8008B830` and its helpers; the ROM's debug messages name this part of the code after a level generator and piece dropping). A piece that would not fit flat on the layer, or would break another piece, is not placed. The number of attempts does not depend on the seed: chapter 1's one layer always took 6,173 draws, chapter 10's five layers 30,777.
 6. **Gap filling.** When a layer's attempts are used up, about three quarters of it is covered by pieces; every gap left is filled with a single block (value 9), so the layer is full.
@@ -61,13 +61,15 @@ There is a matrix of sorts: one table of settings records, one record for each s
 | Byte | Meaning | Status |
 | --- | --- | --- |
 | 0 | Number of playfield layers (1 to 5 seen: chapter 1 has 1, chapter 10 has 5). | Confirmed |
-| 2 | 2 in every record seen; probably the number of piece kinds in play (the piece draws use range 4 × this). | Inferred |
+| 2 | Number of piece kinds in play (copied to `0x800E44B8`; the piece draws use range 4 × this). 2 in every record seen. | Confirmed in the code |
 | 9 | Copied to the player (`+0x23E2`) and doubled into `+0x23E4` (kept within 2 to 10); in Rescue it grows with the level. Probably a speed or difficulty value. | Inferred |
 | 10 | Picks a value 1 to 11 from a list in the game's data. | Unknown |
 | 11 | A bit mask over six piece kinds: which kinds (shape and colour) the stage uses. Two bits set in every record seen. | Inferred (the exact bit-to-kind link is not yet clear) |
 | 3 to 8, 12 | Further settings; byte 6 holds three on/off flags, byte 12 a count of entries that follow. Hide & Seek records use bytes 7 and 8. | Unknown |
 
-**How many of one kind?** There is no rule for it in the builder. The two kinds are drawn at random for each piece, so a layer comes out roughly half and half, and how much of a layer the pieces cover depends only on the fixed number of attempts. Measured on 75 built layers (all the runs of this session): pieces covered 66 % to 81 % of a layer; single filler blocks (and the special cells) the rest.
+**How many of one kind? There is a balancing rule.** A piece draw (range 8) does not pick the kind itself: it picks one of 8 slots (`func_8008A63C`), and each slot hands out the kinds in turn, then moves on to the next (the slots start staggered, `func_8008A5F0`). So the pieces drawn stay almost exactly half and half whatever the seed. Simulated for all 65,536 piece seeds over one layer's 2,075 draws: one kind is never more than 4 pieces ahead of the other, and never more than 8 come in a row (the longest run is 5 to 8, depending on the seed). The pieces *placed* are less even (one layer had 140 of one kind and 91 of the other), because a larger shape fails to fit more often. Pieces covered 66 % to 81 % of each of 75 measured layers; single filler blocks (and the special cells) the rest.
+
+**Can a seed give a sphere of one kind?** No. With two kinds in the settings, the slot rule hands out both, whatever the seeds. A one-kind sphere needs the settings changed: byte 2 of the record is the number of kinds (read into `0x800E44B8`), so a record with 1 there, or a hand-made layout, would do it. No piece seed degenerates either: all 65,536 keep using all 8 slots, with no short repeating cycle.
 
 ## What the cell values mean
 
@@ -126,5 +128,6 @@ Runs on 2026-11-18, Linux build under Xvfb with lavapipe, started with the harne
 
 - What the special cells (63) are in play, and the bit-to-kind link of byte 11.
 - The meaning of record bytes 3 to 8, 10 and 12.
+- Which sphere seeds give an easier or harder sphere: that needs a measure of difficulty (for example, the cells to clear to reach the core) and either many builds in the game or a copy of the builder.
 - The part numbering of each piece shape (needed to draw piece blocks by hand).
 - Hide & Seek's extra draws and how it picks its records; modes 7, 11 and 12.
