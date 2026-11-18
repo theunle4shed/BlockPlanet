@@ -27,6 +27,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -80,6 +81,24 @@ bool stage_built = false;
 // it) and the vortex can be shown again without leaving.
 std::uint32_t vortex_scene = 0, vortex_top = 0;
 std::atomic<float> hue{0.0f};
+// The Vortex's lights as the game set them (address -> its colour words) and
+// as last turned, so each frame turns the game's own colours, not ours again.
+struct TurnedLight { std::uint32_t original[2], written[2]; };
+std::vector<std::pair<std::uint32_t, TurnedLight>> turned_lights;
+// Likewise its unlit vertices' colours (address -> original, written): the tunnel.
+std::unordered_map<std::uint32_t, std::pair<std::uint32_t, std::uint32_t>> turned_vertices;
+
+// A colour word (RGBA) turned `degrees` round the colour wheel (its alpha kept).
+std::uint32_t turn_colour(std::uint32_t c, float degrees) {
+    const float r = float(c >> 24) / 255.0f, g = float((c >> 16) & 0xFFu) / 255.0f, b = float((c >> 8) & 0xFFu) / 255.0f;
+    const float t = degrees * 3.14159265f / 180.0f, cs = std::cos(t), sn = std::sin(t);
+    const float k = (1.0f - cs) / 3.0f, q = sn * 0.57735027f;
+    const float nr = r * (cs + k) + g * (k - q) + b * (k + q);
+    const float ng = r * (k + q) + g * (cs + k) + b * (k - q);
+    const float nb = r * (k - q) + g * (k + q) + b * (cs + k);
+    const auto byte = [](float v) { return std::uint32_t(std::clamp(int(std::lround(v * 255.0f)), 0, 255)); };
+    return byte(nr) << 24 | byte(ng) << 16 | byte(nb) << 8 | (c & 0xFFu);
+}
 std::atomic<float> music_level{0.0f};  // the music's loudness (0 to 1), for the Sphere's turn
 std::atomic<bool> showing{false};
 std::atomic<bool> ready{false};   // the chosen scene is on screen (for the jukebox's cover)
@@ -145,6 +164,8 @@ void enter(std::uint8_t* rdram) {
     ready.store(false);
     stage_built = false;
     vortex_scene = vortex_top = 0;
+    turned_lights.clear();
+    turned_vertices.clear();
     showing.store(true);
     std::fprintf(stdout, "{\"event\":\"vortex_backdrop\",\"on\":true,\"saved_bytes\":%zu,\"started\":%d,\"scene\":\"%08X\",\"fade\":%d,\"init\":%d}\n",
                  saved_pool.size(), load16(rdram, vortex_started), load32(rdram, 0x800E1264u), load16(rdram, 0x800DFF08u), load16(rdram, 0x800DFD5Cu));
@@ -449,7 +470,9 @@ extern "C" bool blockplanet_vortex_draw(std::uint8_t* rdram, recomp_context* ctx
         ctx->r2 = 0;
         return true;
     }
-    if (shown_stage == 0 || !stage_built) return false;
+    const bool vortex = shown_stage == 0;
+    const float degrees = hue.load(std::memory_order_relaxed);
+    if (vortex ? degrees == 0.0f : !stage_built) return false;
     static bool inside = false;  // the draw below comes back through the filter
     if (inside) return false;
     constexpr std::uint32_t cursor = 0x800F22B4u;  // the game's next free display-list command
@@ -466,15 +489,73 @@ extern "C" bool blockplanet_vortex_draw(std::uint8_t* rdram, recomp_context* ctx
     ctx->r2 = result;
     const std::uint32_t to = load32(rdram, cursor);
     if (to < from || to - from > 0x10000u) return true;
+    if (vortex) {
+        // The Vortex's colour drift: its colours come mostly from its lights
+        // (orange, red-violet and a dark ambient, given with G_MOVEMEM 0x86
+        // onwards), so each light's colour is turned round the colour wheel,
+        // from the game's own colour each frame.
+        for (std::uint32_t a = from; a + 8u <= to; a += 8u) {
+            const std::uint32_t w0 = load32(rdram, a), at = load32(rdram, a + 4u);
+            const std::uint32_t index = (w0 >> 16) & 0xFFu;
+            if ((w0 >> 24) != 0x03u || index < 0x86u || index > 0x94u || (index & 1u) || (at >> 24) != 0x80u) continue;
+            TurnedLight* light = nullptr;
+            for (auto& [address, t] : turned_lights)
+                if (address == at) light = &t;
+            const std::uint32_t now[2] = {load32(rdram, at), load32(rdram, at + 4u)};
+            if (light == nullptr) {
+                if (turned_lights.size() >= 64) continue;
+                turned_lights.push_back({at, TurnedLight{{now[0], now[1]}, {now[0], now[1]}}});
+                light = &turned_lights.back().second;
+            } else if (now[0] != light->written[0] || now[1] != light->written[1]) {
+                light->original[0] = now[0], light->original[1] = now[1];  // the game set it again
+            }
+            for (int w = 0; w < 2; ++w) {
+                light->written[w] = turn_colour(light->original[w], degrees);
+                store32(rdram, at + 4u * std::uint32_t(w), light->written[w]);
+            }
+        }
+        // The unlit parts (the tunnel) take their colours from their
+        // vertices: those are turned too, from the game's own each frame.
+        // Walked through its sub-lists, following whether lighting is on (a
+        // lit vertex's colour bytes are its normal, left alone).
+        bool lit = true;
+        int budget = 20000;
+        const auto walk = [&](auto&& self, std::uint32_t start, std::uint32_t end, int depth) -> void {
+            for (std::uint32_t a = start; a + 8u <= end && budget-- > 0; a += 8u) {
+                const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+                const std::uint32_t op = w0 >> 24;
+                const std::uint32_t at = (w1 >> 24) == 0x80u || (w1 >> 24) == 0u ? (w1 & 0x00FFFFFFu) | 0x80000000u : 0u;
+                if (op == 0xB7u && (w1 & 0x00020000u)) lit = true;          // G_SETGEOMETRYMODE: lighting
+                else if (op == 0xB6u && (w1 & 0x00020000u)) lit = false;    // G_CLEARGEOMETRYMODE
+                else if (op == 0x04u && !lit && at != 0 && at < 0x80800000u) {  // G_VTX
+                    const std::uint32_t n = ((w0 >> 20) & 0xFu) + 1u;
+                    for (std::uint32_t v = 0; v < n; ++v) {
+                        const std::uint32_t c_at = at + 16u * v + 12u;
+                        const std::uint32_t now = load32(rdram, c_at);
+                        auto [it, added] = turned_vertices.try_emplace(c_at, now, now);
+                        if (!added && now != it->second.second) it->second.first = now;  // the game set it again
+                        it->second.second = turn_colour(it->second.first, degrees);
+                        store32(rdram, c_at, it->second.second);
+                    }
+                } else if (op == 0x06u && at != 0 && depth < 4) {  // G_DL
+                    self(self, at, at + 8u * 4000u, depth + 1);
+                    if (((w0 >> 16) & 0xFFu) == 1u) return;  // a branch: no return
+                } else if (op == 0xB8u && depth > 0) {
+                    return;  // G_ENDDL
+                }
+            }
+        };
+        if (turned_vertices.size() < 20000) walk(walk, from, to, 0);
+        return true;
+    }
     static const bool off = std::getenv("BLOCKPLANET_STAGE_LIGHT") != nullptr && std::getenv("BLOCKPLANET_STAGE_LIGHT")[0] == '0';
     if (off) return true;
     // The slow colour drift (the owner, 2026-11-18: hue changing over time):
-    // the brightening's ONE becomes the primitive colour, P, per channel:
+    // for the stage backgrounds, the brightening's ONE becomes the primitive colour, P, per channel:
     // (P - c) c + c, so a channel with P = 1 is lifted as before, c (2 - c),
     // and one with less is lifted less; P is a pale colour going round the
     // wheel, a cast that drifts. Set with a primitive-colour command in the
     // place of the pipe sync just before the mix (a no-op for the renderer).
-    const float degrees = hue.load(std::memory_order_relaxed);
     std::uint32_t prim = 0;
     if (degrees != 0.0f) {
         const float a = degrees * 3.14159265f / 180.0f;

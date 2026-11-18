@@ -17,6 +17,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <random>
 #include <string>
 #include <vector>
@@ -284,7 +285,11 @@ void set_jukebox_hue_running(bool open, double now) {
 float jukebox_hue(double now) {
     const double start = hue_start.load();
     if (start < 0.0) return 0.0f;
-    const double degrees = std::fmod(std::max(0.0, now - start) * 2.0, 360.0);  // 180 seconds round
+    static const double speed = [] {  // research: BLOCKPLANET_HUE_SPEED (degrees a second) to see it quickly
+        const char* v = std::getenv("BLOCKPLANET_HUE_SPEED");
+        return v != nullptr ? std::atof(v) : 2.0;  // 180 seconds round
+    }();
+    const double degrees = std::fmod(std::max(0.0, now - start) * speed, 360.0);
     return float(std::floor(degrees / 2.0) * 2.0);
 }
 
