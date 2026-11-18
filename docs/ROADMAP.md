@@ -264,7 +264,7 @@ A **seed number** for each level, so the same stage can be replayed exactly and 
 **The Daily Challenge (the owner, 2026-11-18).** Every day the game picks a new seed, and everyone playing that day gets the same sphere and pieces, with an online leaderboard for score and for time.
 - **The seed needs no server:** it can come from the date itself (the day in UTC, hashed), so every copy of the game picks the same one, even offline, and a day's seed can be replayed later.
 - **The leaderboard does need one:** a small online service that takes a run (profile name, the day, score, time) and returns the day's table. To decide: where it is hosted and who runs it; what a player's name is (a display name chosen for it, not the profile's real details); and cheating, which on PC cannot be stopped entirely. A run could send its seed and inputs so a result can be checked by replaying it, which needs play to be fully repeatable from the seed (the sphere research session is finding this out).
-- **Offline first:** the daily stage with a personal best per day works without any of that, and the online table can come later.
+- **Offline first:** the daily stage with a personal best per day works without any of that. **Online comes last** (the owner, 2026-11-18): the leaderboard, and anything else online, is the last thing worked on, after everything else.
 - Fits with Multiphasic and Endless Score Attack (a daily run of either), and with Time Attack's splits.
 
 ### New block types (idea, saved for later, 2026-11-05)
