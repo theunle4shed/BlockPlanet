@@ -5611,6 +5611,13 @@ bool handle_profile_command(const std::string& command) {
             // Only once the title has been shown: before it (the logo
             // animation) the menu row already reads as a menu.
             const bool title_now = blockplanet_title_recent(nullptr);
+            // Left by a press on the box art: seen, however soon it was pressed.
+            static int title_leaves_seen = 0;
+            if (const int leaves = tetrisphere::direct_start::title_leaves(); leaves != title_leaves_seen) {
+                title_leaves_seen = leaves;
+                title_seen = true;
+                title_restart_pending = false;
+            }
             if (title_restart_pending) {
                 if (!title_now) title_restart_pending = false;  // the old title has gone
             } else {

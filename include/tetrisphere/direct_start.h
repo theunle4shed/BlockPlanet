@@ -61,6 +61,11 @@ void request_intro_restart();
 // Back to the box art (Back from "Who is playing?", docs/UI.md): the title
 // from its start, without the intro. Done at the game's next frame in its menus.
 void request_title_restart();
+// How many times the title has been left by a press (or its timeout) so far:
+// the main loop takes a change as the title seen, even when it was left while
+// its letters were still flying in (the owner, 2026-11-18: Back twice quickly
+// from "Who is playing?" came to the game's own menu).
+int title_leaves();
 
 // The box art's flow events (box_art_*, title_restart, intro_restart and
 // changes of the game's reset flag 0x800DF728): printed on stdout and also

@@ -470,6 +470,8 @@ void cancel() {
 
 void request_intro_restart() { intro_restart.store(true); }
 void request_title_restart() { title_restart.store(true); }
+std::atomic<int> title_left_count{0};
+int title_leaves() { return title_left_count.load(); }
 
 namespace {
 std::atomic<void (*)(const std::string&)> event_sink{nullptr};
@@ -676,6 +678,7 @@ void box_art_frame(std::uint8_t* rdram, recomp_context* ctx) {
         store16(rdram, title_exits, static_cast<std::int16_t>(load16(rdram, title_exits) + 1));
         store32(rdram, menu_timer_a, 0);
         store32(rdram, menu_timer_b, 0);
+        direct_start::title_left_count.fetch_add(1);
     };
     if ((pressed & (button_a | button_start)) != 0) {
         leave_title();
