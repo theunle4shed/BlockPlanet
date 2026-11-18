@@ -23,6 +23,10 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 - **The game's own 3D Next pieces in BlockPlanet's HUD (final touches):** let the game draw its Next models again and move them onto the panel, as the held magic's model already is; check every screen shape, Training's row and two players.
 - **The flat cubes on the owner's PC:** the same graphics difference as the game over shell, probably; looked at with it.
 
+**HUD layout (the owner, 2026-11-18; not a priority, to be resolved at some point):**
+- **The sphere under the HUD:** now and then the sphere goes under the side panels. Find when (the sphere's size on screen against the panels' inner edges, each frame) and push the HUD out towards the sides, slowly, to keep clear of it.
+- **Fixed sizes:** the panels grow when Next pieces appear or a large score combo shows (the score's combo lines stretch it vertically). Work out each part's largest size and reserve it, so every part keeps its place: for example the score with room beneath it for the combo lines.
+
 **New profiles and the volume (the owner, 2026-11-16; done the same day: a new profile starts from the volume in use).** Creating a new profile switches to that profile's audio settings, which start at the defaults, so the music jumps up for a player who had it turned down. Not a bug, but a surprise. Options: a new profile starts from the audio settings in use when it is made (as the PC's controls are already copied), or the profile screen says the volume will change.
 
 **The owner's test notes (2026-11-16), lower priority:**

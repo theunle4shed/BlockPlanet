@@ -139,14 +139,25 @@ std::string launch_place;         // that heading when a game started from the s
 // Opens the launch path again (once a second at most: the request takes a
 // frame or two), refreshing the stage list's bests first. The path is kept:
 // the menus may close once more as play ends.
+// The Campaign list the launch path came from ("campaign" or "lines_campaign";
+// empty for other episode lists): rebuilt when the menus come back, so it
+// moves on to the episode to carry on.
+std::string campaign_source;
+// Carry on (the episode end's): the game's CONTINUE then shows its own card
+// for the next episode (the pause row at 100, "Congratulations ... Ready to
+// try the next one?"), waiting for A; BlockPlanet presses it, unseen under
+// the loading cover (its own panel has said the congratulations).
+std::optional<std::chrono::steady_clock::time_point> episode_card_skip;
 void restore_launch_path() {
     static auto last = std::chrono::steady_clock::time_point{};
     const auto now = std::chrono::steady_clock::now();
     if (now - last < std::chrono::seconds(1)) return;
     last = now;
-    for (const auto& [screen, focus] : launch_path)
+    for (const auto& [screen, focus] : launch_path) {
         if (screen == "stages" && launch_stages_chapter > 0)
             blockplanet::ui::send_command("stages:" + std::to_string(launch_stages_chapter) + ":refresh");
+        if (screen == "chapters" && !campaign_source.empty()) blockplanet::ui::send_command(campaign_source + "_refresh");
+    }
     blockplanet::ui::request_restore(launch_path);
 }
 std::string loading_title;
@@ -4679,6 +4690,21 @@ bool handle_profile_command(const std::string& command) {
                 // to the menus the game was started from, as Quit to menu does.
                 const int row = std::atoi(command->c_str() + 11);
                 minefield_end_chosen.store(true);
+                // Carry on to the next episode (the owner, 2026-11-18): the
+                // game's CONTINUE, which goes on into the next episode, but its
+                // own card for it ("Congratulations ... Ready to try the next
+                // one?") is pressed away unseen, under BlockPlanet's loading
+                // cover; the congratulations are on BlockPlanet's panel. (Leaving
+                // through Exit and starting the episode from the menus instead
+                // was tried: it left the game's card waiting now and then.)
+                if (end_menu.episode_end() && row != end_menu.exit_row() && guest_rdram != nullptr) {
+                    const bool lines = guest::load16(guest_rdram, 0x800E44A8) == 9;
+                    const int next = read_game_state(guest_rdram).chapter + 2;  // (0-based there)
+                    episode_card_skip = std::chrono::steady_clock::now();
+                    loading_title = std::string(lines ? "Lines" : variant_title(play_variant)) + " \u00B7 Episode " + std::to_string(next);
+                    loading_since = std::chrono::steady_clock::now();
+                    loading_active = true;
+                }
                 if (row == end_menu.exit_row())
                     end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(),
                     grid_quit_red = !end_menu.episode_end();
@@ -4713,6 +4739,7 @@ bool handle_profile_command(const std::string& command) {
                 menu_variant = *command == "story" ? PlayVariant::Story
                                : *command == "casual" ? PlayVariant::Casual
                                : *command == "time_attack" ? PlayVariant::TimeAttack : PlayVariant::ScoreAttack;
+                campaign_source.clear();
                 auto choices = chapter_choices();
                 blockplanet::ui::set_text("chapters_title", menu_variant == PlayVariant::Story ? "Campaign" : variant_title(menu_variant));
                 blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
@@ -4750,6 +4777,7 @@ bool handle_profile_command(const std::string& command) {
                 if (const auto found = profile_data.progress.chapters_completed.find("lines");
                     found != profile_data.progress.chapters_completed.end())
                     completed = found->second;
+                campaign_source.clear();
                 blockplanet::ui::set_text("chapters_title", std::string("Lines ") + variant_title(menu_variant));
                 blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
                 blockplanet::ui::set_list("chapters", story_chapters(completed, lines_chapters, unlock_all_testing));
@@ -4757,7 +4785,8 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (*command == "campaign" || *command == "lines_campaign" || command->rfind("campaign_episode:", 0) == 0 ||
-                command->rfind("lines_campaign_episode:", 0) == 0) {
+                command->rfind("lines_campaign_episode:", 0) == 0 || *command == "campaign_refresh" || *command == "lines_campaign_refresh") {
+                const bool refresh = command->size() > 8 && command->compare(command->size() - 8, 8, "_refresh") == 0;
                 // Campaign (the owner, 2026-11-18): a list of the episodes, in
                 // order, with the one to carry on chosen ("Continue Episode N"
                 // once some of its stages are done, "Play Episode N" before);
@@ -4806,7 +4835,8 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::set_text("chapters_title", lines ? "Lines Campaign" : "Campaign");
                 blockplanet::ui::set_text("chapters_subtitle", "Choose an episode");
                 blockplanet::ui::set_list("chapters", items);
-                blockplanet::ui::request_show("chapters");
+                campaign_source = lines ? "lines_campaign" : "campaign";
+                if (!refresh) blockplanet::ui::request_show("chapters");
                 continue;
             }
             if (command->rfind("lesson:", 0) == 0 && game_option_applier) {
@@ -5479,7 +5509,13 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::set_text("end_where", end.cleared ? std::string(lines_end ? "Lines" : variant_title(play_variant)) + " \u00B7 Episode " +
                                                                          std::to_string(read_game_state(guest_rdram).chapter + 1)
                                                                    : where_now());
-                blockplanet::ui::set_text("end_line", end.cleared ? episode_end_line : game_over_line());
+                {
+                    const int passed = read_game_state(guest_rdram).chapter + 1;
+                    if (end.cleared) blockplanet::ui::set_text("end_title", "Episode " + std::to_string(passed) + " Cleared");
+                    const std::string cheer = "Congratulations, you passed Episode " + std::to_string(passed) + ".";
+                    blockplanet::ui::set_text("end_line", end.cleared ? (episode_end_line.empty() ? cheer : cheer + "  " + episode_end_line)
+                                                                      : game_over_line());
+                }
                 auto end_items = end.items;
                 // Minefield: New Field (a new field in the same arena) and Exit; no Training.
                 if (!tetrisphere::minefield_sphere::arena_name().empty() && !end.cleared) {
@@ -5494,8 +5530,8 @@ bool handle_profile_command(const std::string& command) {
                     if (item.id == "exit") item.label = exit_label();
                     if (item.id == "continue" && end.cleared) {
                         const int next = read_game_state(guest_rdram).chapter + 2;  // (0-based there)
-                        item.label = "Next Episode";
-                        if (next <= rescue_chapters) item.note = "Episode " + std::to_string(next);
+                        item.label = "Carry on to Episode " + std::to_string(next);
+                        item.note.clear();
                     }
                 }
                 blockplanet::ui::set_list("end", end_items);
@@ -5503,9 +5539,23 @@ bool handle_profile_command(const std::string& command) {
             }
             // Only in play: back at the game's menu (after Quit), the menus shown are the launch path's.
             if ((pause.close_menu || end.close_menu) && guest::load16(guest_rdram, 0x800E121C) == -1) blockplanet::ui::request_close();
+            std::uint16_t card_buttons = 0;
+            if (episode_card_skip) {
+                const auto since = std::chrono::steady_clock::now() - *episode_card_skip;
+                static bool card_seen = false;
+                const bool card = guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E1228) == 100;
+                if (card) {
+                    if (!card_seen) std::fprintf(stdout, "{\"event\":\"episode_card_skip\"}\n"), std::fflush(stdout);
+                    card_seen = true;
+                    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(since).count();
+                    card_buttons = ms % 350 < 100 ? 0x8000 : 0;  // A, pressed and let go
+                }
+                if ((card_seen && !card) || since > std::chrono::seconds(30)) episode_card_skip.reset(), card_seen = false;
+            }
             launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons)
                                    : end.inject ? (0x10000u | end.buttons)
                                    : hs_buttons != 0 ? (0x10000u | hs_buttons)
+                                   : card_buttons != 0 ? (0x10000u | card_buttons)
                                                 : training_inject.load());
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original() || end_menu.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
@@ -5610,6 +5660,7 @@ bool handle_profile_command(const std::string& command) {
                 // stage list's bests first.
                 restore_launch_path();
                 show_stage_results();
+
             } else {
             blockplanet::ui::request_open("main");
             if (chapter > 0) {
@@ -5744,7 +5795,8 @@ bool handle_profile_command(const std::string& command) {
                 return text != nullptr ? std::max(0, std::atoi(text)) : 1200;
             }();
             if (loading_active) {
-                if (launching() || continue_mode || !in_play_now) playing_since.reset();
+                // (Held over the game's next-episode card while it is pressed away.)
+                if (launching() || continue_mode || !in_play_now || episode_card_skip) playing_since.reset();
                 else if (!playing_since) playing_since = now_l;
                 if (!playing_since || !faded_in) clear_since.reset();
                 else if (!clear_since) clear_since = now_l;
@@ -5753,7 +5805,7 @@ bool handle_profile_command(const std::string& command) {
                 // at most.
                 if ((clear_since && now_l - *clear_since > std::chrono::milliseconds(settle_ms)) ||
                     (playing_since && now_l - *playing_since > std::chrono::seconds(4)) ||
-                    now_l - loading_since > std::chrono::seconds(20))
+                    (now_l - loading_since > std::chrono::seconds(20) && !episode_card_skip))
                     loading_active = false;
             }
             opacity = loading_active ? std::min(1.0f, opacity + dt / 0.15f) : std::max(0.0f, opacity - dt / 0.5f);
@@ -5933,6 +5985,18 @@ bool handle_profile_command(const std::string& command) {
             const bool box_art_returning = box_art_returning_since && now_g - *box_art_returning_since < std::chrono::seconds(3);
             const bool to_demo = tetrisphere::box_art::phase().load() == tetrisphere::box_art::Phase::ToDemo;
             const bool box_art_grid = box_art || box_art_handover || box_art_returning || to_demo;
+            {
+                static const bool log = std::getenv("BLOCKPLANET_GRID_LOG") != nullptr;  // research: why the grid is up
+                static int last = -1;
+                const int key = (start_at ? 1 : 0) | (paused ? 2 : 0) | (unpaused_at ? 4 : 0) | (grid_quit_at ? 8 : 0) | (grid_quit_red ? 16 : 0) |
+                                (over_end ? 32 : 0) | (box_art_grid ? 64 : 0) | (launching() ? 128 : 0);
+                if (log && key != last) {
+                    last = key;
+                    std::fprintf(stdout, "{\"event\":\"grid_reason\",\"start_at\":%d,\"paused\":%d,\"unpaused_at\":%d,\"quit\":%d,\"red\":%d,\"end\":%d,\"box\":%d,\"launching\":%d}\n",
+                                 key & 1, (key >> 1) & 1, (key >> 2) & 1, (key >> 3) & 1, (key >> 4) & 1, (key >> 5) & 1, (key >> 6) & 1, (key >> 7) & 1);
+                    std::fflush(stdout);
+                }
+            }
             blockplanet::ui::set_grid_override(over_pause && !launching()            ? "pause"
                                                : over_end && !mode_launcher.active() ? "red"
                                                : end_menu_cleared && !mode_launcher.active() ? "green"
