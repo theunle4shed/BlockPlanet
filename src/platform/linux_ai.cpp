@@ -1,3 +1,4 @@
+#include "tetrisphere/frame_step.h"
 #include "tetrisphere/linux_platform.h"
 #include "tetrisphere/audio_length_pacer.h"
 #include "tetrisphere/perf_metrics.h"
@@ -63,6 +64,16 @@ void osAiSetFrequency_recomp(std::uint8_t* rdram, recomp_context* ctx) {
 }
 
 void osAiSetNextBuffer_recomp(std::uint8_t* rdram, recomp_context* ctx) {
+    // Developer tools, frozen (frame_step.h): the game's sound held too, so
+    // its music does not play on over the frozen picture.
+    if (tetrisphere::frame_step::frozen() && tetrisphere::frame_step::enabled()) {
+        std::fprintf(stdout, "{\"event\":\"audio_held\",\"on\":true}\n");
+        std::fflush(stdout);
+        while (tetrisphere::frame_step::frozen() && tetrisphere::frame_step::enabled())
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        std::fprintf(stdout, "{\"event\":\"audio_held\",\"on\":false}\n");
+        std::fflush(stdout);
+    }
     tetrisphere_ai_attempts.fetch_add(1, std::memory_order_relaxed);
     const auto byte_count = static_cast<std::uint32_t>(ctx->r5);
     if (audio_transition_probe_enabled()) {
