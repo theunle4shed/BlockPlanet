@@ -35,7 +35,6 @@ echo   7  Play with developer tools (F1 opens them in the game)
 echo   8  Play classic: the game's own sphere drawing and HUD (to compare)
 echo   9  Developer tools, frozen at start (F7 a frame on, F6 run or freeze)
 echo   E  Escape prototype: the sphere seen from inside (the view only)
-echo   E  Escape prototype: the sphere seen from inside (the view only)
 echo.
 set CHOICE=
 set /p CHOICE=Choose 1-8: 
