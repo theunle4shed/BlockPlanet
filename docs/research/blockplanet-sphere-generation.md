@@ -69,7 +69,7 @@ There is a matrix of sorts: one table of settings records, one record for each s
 
 **How many of one kind? There is a balancing rule.** A piece draw (range 8) does not pick the kind itself: it picks one of 8 slots (`func_8008A63C`), and each slot hands out the kinds in turn, then moves on to the next (the slots start staggered, `func_8008A5F0`). So the pieces drawn stay almost exactly half and half whatever the seed. Simulated for all 65,536 piece seeds over one layer's 2,075 draws: one kind is never more than 4 pieces ahead of the other, and never more than 8 come in a row (the longest run is 5 to 8, depending on the seed). The pieces *placed* are less even (one layer had 140 of one kind and 91 of the other), because a larger shape fails to fit more often. Pieces covered 66 % to 81 % of each of 75 measured layers; single filler blocks (and the special cells) the rest.
 
-**Can a seed give a sphere of one kind?** No. With two kinds in the settings, the slot rule hands out both, whatever the seeds. A one-kind sphere needs the settings changed: byte 2 of the record is the number of kinds (read into `0x800E44B8`), so a record with 1 there, or a hand-made layout, would do it. No piece seed degenerates either: all 65,536 keep using all 8 slots, with no short repeating cycle.
+**Can a seed give a sphere of one kind?** No. With two kinds in the settings, the slot rule hands out both, whatever the seeds. A one-kind sphere needs the settings changed: byte 2 of the record is the number of kinds (read into `0x800E44B8`), so a record with 1 there, or a hand-made layout, does it. **Tested (2026-11-18):** chapter 10 with both seeds forced and `BLOCKPLANET_STAGE_RECORD_EDIT=2=1` built five layers of one kind only (the first kind of the stage's pair, the green one), the piece draws used range 4 instead of 8, and the Next queue in play showed only that kind. With one shape only, more pieces fit: about 270 a layer instead of about 140 + 100, and about 200 single filler blocks a layer instead of about 270. The stage started and played normally for the 25 seconds watched. No piece seed degenerates either: all 65,536 keep using all 8 slots, with no short repeating cycle.
 
 ## What the cell values mean
 
@@ -96,7 +96,7 @@ All of these are possible; none is built yet beyond the research switches.
 - **A daily stage.** Derive both seeds from the date; everyone gets the same sphere that day.
 - **Fair races.** Two players already get identical spheres in one game; seeds make that true across machines too.
 - **Designed spheres, layer by layer.** BlockPlanet can write cells straight into the grid once the game has built it, before the game derives its per-cell tables (that happens afterwards, in `func_800AF294`). `BLOCKPLANET_SPHERE_LAYOUT` does this today: a hand-drawn layer (a ring cut down to the core, single blocks elsewhere) was built and played. Single blocks (9), holes (0) and special cells (63) can go anywhere. Piece blocks need their parts placed in the piece's shape, which is not mapped yet.
-- **Unusual stage types from edited settings.** Editing the record before the build (more layers than the game ever uses, other kinds of piece, all six kinds at once) would make stages the game never had, still built by the game's own builder. Not tried yet; the switch would go where the record is unpacked (`func_8002A870`, before its call to `func_80088914`).
+- **Unusual stage types from edited settings.** Editing the record before the build makes stages the game never had, still built by the game's own builder. `BLOCKPLANET_STAGE_RECORD_EDIT` does this (a one-kind sphere is tested); more layers than the game uses, or all six kinds at once, are not tried yet.
 - **Per-layer seeds.** Because the number of draws per layer is fixed, BlockPlanet could restart the generator at each layer's first draw with a seed of its own, so each layer could be chosen or shared separately. Not built.
 
 ## Research switches
@@ -109,6 +109,7 @@ All are off by default and change nothing unless set (`src/graphics/sphere_build
 | `BLOCKPLANET_SPHERE_SEED=n` | Uses *n* (0 to 65,535) as the sphere seed. |
 | `BLOCKPLANET_PIECE_SEED=n` | Uses *n* as player 1's piece seed (and its copy). |
 | `BLOCKPLANET_RNG_LOG=1` | Also logs every draw made during the build (range and state) and each layer's fill every 600 draws. |
+| `BLOCKPLANET_STAGE_RECORD_EDIT="2=1,…"` | Changes bytes of the stage's settings record (byte=value) after the game reads it and before it unpacks it (hook in `func_8002A870`). |
 | `BLOCKPLANET_SPHERE_LAYOUT=file` | Writes hand-made layers over the built sphere. The file has `layer N` lines (1 to 8), each followed by 32 rows of 32 cells: `.` empty, `#` single block, `*` special cell, or 32 numbers (raw values). Lines starting with `;` are comments. |
 
 The research logs (records as read, every draw) go to the game's own console output under `.local/` and are never committed.

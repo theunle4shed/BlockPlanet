@@ -785,3 +785,8 @@ text = "blockplanet_level_build_end(rdram, ctx);"
 [[patches.hook]]
 func = "func_80081E90"
 text = "blockplanet_rng_draw(rdram, ctx);"
+
+[[patches.hook]]
+func = "func_8002A870"
+before_vram = 0x8002A894
+text = "blockplanet_stage_record_edit(rdram, ctx);"

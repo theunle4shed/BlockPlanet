@@ -93,6 +93,7 @@ void blockplanet_sphere_seed(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_level_build_begin(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_level_build_end(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_rng_draw(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_stage_record_edit(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx);
 void tetrisphere_rescue_pause_snapshot_hook(std::uint8_t* rdram,
                                             recomp_context* ctx);

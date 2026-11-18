@@ -11,6 +11,8 @@
 //   blockplanet_rng_draw            - at the random-number routine (func_80081E90):
 //                                     with BLOCKPLANET_RNG_LOG=1, logs each draw made
 //                                     while a level is being built (range asked, state).
+//   blockplanet_stage_record_edit   - with BLOCKPLANET_STAGE_RECORD_EDIT="BYTE=VALUE,...",
+//                                     edits the settings record before it is unpacked.
 //   BLOCKPLANET_PIECE_SEED=n also replaces the piece seed drawn just before the
 //                                     sphere seed (player 1's piece generator), which
 //                                     the builder uses too.
@@ -24,6 +26,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 #include <map>
 #include <string>
 
@@ -42,6 +45,7 @@ bool enabled() {
                            std::getenv("BLOCKPLANET_SPHERE_SEED") != nullptr ||
                            std::getenv("BLOCKPLANET_PIECE_SEED") != nullptr ||
                            std::getenv("BLOCKPLANET_SPHERE_LAYOUT") != nullptr ||
+                           std::getenv("BLOCKPLANET_STAGE_RECORD_EDIT") != nullptr ||
                            std::getenv("BLOCKPLANET_RNG_LOG") != nullptr;
     return on;
 }
@@ -99,6 +103,33 @@ void apply_layout(std::uint8_t* rdram) {
 }
 
 }  // namespace
+
+// BLOCKPLANET_STAGE_RECORD_EDIT="2=1,0=5": changes bytes of the stage's settings
+// record (BYTE=VALUE, decimal or 0x hex) after the game reads it from the ROM and
+// before it unpacks it (func_8002A870, before its call to func_80088914).
+extern "C" void blockplanet_stage_record_edit(std::uint8_t* rdram, recomp_context* ctx) {
+    (void)ctx;
+    const char* edits = std::getenv("BLOCKPLANET_STAGE_RECORD_EDIT");
+    if (edits == nullptr) return;
+    std::string list(edits), applied;
+    std::size_t at = 0;
+    while (at < list.size()) {
+        const std::size_t end = std::min(list.find(',', at), list.size());
+        const std::string item = list.substr(at, end - at);
+        const std::size_t eq = item.find('=');
+        if (eq != std::string::npos) {
+            const unsigned index = static_cast<unsigned>(std::strtoul(item.c_str(), nullptr, 0));
+            const unsigned value = static_cast<unsigned>(std::strtoul(item.c_str() + eq + 1, nullptr, 0));
+            if (index < 20) {
+                store8(rdram, settings_record + index, static_cast<std::uint8_t>(value));
+                applied += (applied.empty() ? "" : ",") + std::to_string(index) + "=" + std::to_string(value & 0xFF);
+            }
+        }
+        at = end + 1;
+    }
+    std::fprintf(stdout, "{\"event\":\"stage_record_edit\",\"applied\":\"%s\"}\n", applied.c_str());
+    std::fflush(stdout);
+}
 
 extern "C" void blockplanet_sphere_seed(std::uint8_t* rdram, recomp_context* ctx) {
     if (!enabled()) return;
