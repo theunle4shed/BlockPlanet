@@ -133,6 +133,15 @@ PauseBridge::Output PauseBridge::update(std::uint8_t* rdram, bool menus_open, Cl
         // then pause it the game's way (unseen) and choose there. The game's
         // own pause request cleared, in case a Start reached it.
         if (*choice_ == Choice::Resume) store16(rdram, 0x8013FAD0u, 0);
+        if (*choice_ == Choice::Quit && quit_) {  // straight to the menu, as the game's EXIT ends
+            quit_();
+            park_(false);
+            owned_ = false;
+            showing_ = false;
+            out.close_menu = menus_open;
+            choice_.reset();
+            return out;
+        }
         park_(false);
         owned_ = false;
         showing_ = false;

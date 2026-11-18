@@ -5184,6 +5184,11 @@ bool handle_profile_command(const std::string& command) {
                     set_own_pause_keys(true);
                     pause_bridge.set_parker([](bool park) { blockplanet::set_pause_park(park); },
                                             [] { return blockplanet::pause_parked(); });
+                    static const bool direct_quit = [] {
+                        const char* v = std::getenv("BLOCKPLANET_DIRECT_QUIT");
+                        return v == nullptr || v[0] != '0';
+                    }();
+                    if (direct_quit) pause_bridge.set_direct_quit([] { blockplanet::request_direct_quit(); });
                     static const bool own_end = [] {
                         const char* v = std::getenv("BLOCKPLANET_OWN_END");
                         return v == nullptr || v[0] != '0';

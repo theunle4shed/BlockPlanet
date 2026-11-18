@@ -69,12 +69,16 @@ public:
         park_ = std::move(park);
         parked_ = std::move(parked);
     }
+    // Quit done directly (the game's pause not opened): called as the game
+    // is let out (vortex_backdrop.h, request_direct_quit).
+    void set_direct_quit(std::function<void()> quit) { quit_ = std::move(quit); }
     // Whether play is paused by BlockPlanet now (the game parked for it).
     bool owned() const { return owned_ || owned_requested_; }
 
 private:
     std::function<void(bool)> park_;
     std::function<bool()> parked_;
+    std::function<void()> quit_;
     bool owned_ = false;            // the game parked for BlockPlanet's pause
     bool owned_requested_ = false;  // asked for, not parked yet
     std::optional<Choice> pending_action_;  // Quit or Skip, once the game's pause is open

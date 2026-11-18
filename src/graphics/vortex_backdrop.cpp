@@ -69,6 +69,7 @@ std::atomic<bool> wanted{false};       // the jukebox asks for a game-drawn back
 std::atomic<bool> idle_wanted{false};  // the game parked behind BlockPlanet's menus (step 4)
 std::atomic<bool> pause_wanted{false}; // the game parked for BlockPlanet's pause, in play
 std::atomic<bool> end_wanted{false};   // the game parked behind BlockPlanet's end screens, in play
+std::atomic<bool> quit_wanted{false};  // leave play for the menu as the game's pause EXIT ends (direct quit)
 std::atomic<int> wanted_stage{0};  // 0 the vortex, 1 to 25 a play background
 int shown_stage = 0;               // what the reset screen draws now (game thread)
 bool stage_built = false;
@@ -214,6 +215,7 @@ bool game_idle() { return showing.load() && !wanted.load(); }
 void set_pause_park(bool park) { pause_wanted.store(park); }
 bool pause_parked() { return pause_wanted.load() && showing.load(); }
 void set_end_park(bool park) { end_wanted.store(park); }
+void request_direct_quit() { quit_wanted.store(true); }
 bool end_parked() { return end_wanted.load() && showing.load(); }
 
 } // namespace blockplanet
@@ -232,6 +234,24 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
     }
     if (!want || wanted_stage.load() != shown_stage) {
         leave(rdram, ctx);  // (a different background: entered again next frame)
+        // BlockPlanet's pause, Quit: play left for the game's menu at once, as
+        // the game's pause does at the end of its EXIT (func_8003FE3C at
+        // 0x800404D0: the scene row from the saved menu row 0x800E0754, the
+        // other menu rows -1, the menu timers 0; then the pause row -1),
+        // without its fade and page animation (about 4 s). Its EXIT saves
+        // nothing (the routine it calls, func_8003F8D8, only draws).
+        if (quit_wanted.exchange(false) && load16(rdram, scene_row) == -1) {
+            store16(rdram, scene_row, load16(rdram, 0x800E0754u));
+            store16(rdram, 0x800E1220u, -1);
+            store16(rdram, 0x800E1222u, -1);
+            store16(rdram, 0x800E1224u, -1);
+            store32(rdram, timer_a, 0);
+            store32(rdram, timer_b, 0);
+            store16(rdram, 0x800E1228u, -1);   // the pause row
+            store16(rdram, 0x8013FAD0u, 0);    // the pause request
+            std::fprintf(stdout, "{\"event\":\"direct_quit\",\"menu_row\":%d}\n", load16(rdram, scene_row));
+            std::fflush(stdout);
+        }
         return;
     }
     ++frames_on;

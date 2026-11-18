@@ -36,6 +36,9 @@ void set_pause_park(bool park);
 bool pause_parked();
 // The same behind BlockPlanet's end screens (EndMenuBridge::set_parker).
 void set_end_park(bool park);
+// BlockPlanet's pause, Quit (direct): as the parked game is let out, play
+// is left for the game's menu at once, as its pause EXIT does at its end.
+void request_direct_quit();
 bool end_parked();
 
 } // namespace blockplanet
