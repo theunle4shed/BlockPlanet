@@ -64,13 +64,15 @@ There is a matrix of sorts: one table of settings records, one record for each s
 | 2 | Number of piece kinds in play (copied to `0x800E44B8`; the piece draws use range 4 × this). Rescue uses 2 to 4. | Confirmed |
 | 9 | Half the side of the core square to uncover to win: doubled into the player's `+0x23E4` (kept within 2 to 10), the core opening ([level data](blockplanet-level-data.md)); Rescue 1-1 has 2, the 4 × 4 square its start card names. In Rescue it grows with the level. | Confirmed with the earlier notes |
 | 10 | Picks a value 1 to 11 from a list in the game's data. | Unknown |
-| 11 | A bit mask over the six piece kinds: which kinds (shape and colour) the stage uses. In every Rescue record it has as many bits set as byte 2. | Inferred (the exact bit-to-kind link is not yet clear) |
+| 11 | A bit mask over the six piece kinds, one bit each, in the order of the game's list of six records (`0x800E4508`): bit 0 the square (33), 1 the flat bar (32), 2 the standing bar (34), 3 the L (35), 4 the S (36), 5 the T (37). In every Rescue record it has as many bits set as byte 2. | Confirmed (matches the kinds seen in play at Rescue 1-1, 3-2, 10-1 and 10-8) |
 | 3 to 8, 12 | Further settings; byte 6 holds three on/off flags, byte 12 a count of entries that follow. Hide & Seek records use bytes 7 and 8. | Unknown |
 
 **Rescue's stages, all 100 (surveyed 2026-11-18).** `BLOCKPLANET_RECORD_SURVEY` loaded each record with the game's own loader (records 0 and 90 matched what chapter 1 and chapter 10 load in play):
 
 - **Piece kinds:** 2 in 37 stages, 3 in 61, 4 in 2. Episodes 1 and 2 always use 2. Kinds become 3 from Episode 3 (stages 5 and 8 first), and are always 3 in Episodes 5 to 9. Episode 10 starts with 2 and reaches **4, the most in Rescue, in its stages 8 and 10**. Stage 10-8 was started to check: its layers hold four kinds (33, 34, 35 and 37), drawn in four colours, and its piece draws use range 16.
 - **Layers:** 1 (only the first stage), 2 in 9 stages, 3 in 15, 4 in 41, 5 in 23 and 6 in 11 (Episode 7's stages 8 and 10, and Episode 10 from stage 2).
+
+- **How often each kind appears** (from byte 11): the flat bar in 52 stages, the standing bar in 45, the square in 44, the S in 43, the T in 42 and the L in 39 (first in Episode 1, stage 7).
 
 The list per stage stays in the private research logs, as AGENTS.md requires.
 
