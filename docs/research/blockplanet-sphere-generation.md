@@ -143,6 +143,8 @@ Each cell is a 16-bit number; the values seen are all **9 × kind + part**:
 | 288 to 335 | 32 to 37 | Piece blocks: six kinds, one shape and colour each; the part (0 to 8) says which cell of the piece this is |
 | 423 | 47 | The stored Training and Puzzle layouts' blocks |
 
+**Why the values jump (9, then 63, then 72 and up).** Values go up in steps of 9 per type, so the gaps are other types that the stages built in this session simply did not contain. From the [game-state notes](blockplanet-game-state.md): types 2 and 5 (values 18 and 45 up) are Hide & Seek's drills (the tip on the top layer, the shaft below), type 31 (279 up) is its tower, and the core and picture tiles use types 8 to 25; types 3, 4 and 6 (27, 36 and 54 up) have not been identified, and type 38 (342 up) is the free piece material. 
+
 Confirmed for 0, 9, 90 to 93 and the piece kinds from screenshots (two colours of piece per stage, as the logs show; each colour is one shape). There is no layer 9: the block table holds 9 layers, 0 to 8 ([game-state notes](blockplanet-game-state.md#layers-core-size-and-stacking-2026-11-02)), and what the research log shows as "layer 9" is the end of that table and the start of the next one (the face masks).
 
 ## What it allows
