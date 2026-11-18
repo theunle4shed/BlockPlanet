@@ -118,6 +118,11 @@ RunOptions parse_run_options(int argc, const char* const argv[]) {
             result.developer = true;
             continue;
         }
+        if (argument == "--developer-frozen") {
+            result.developer = true;
+            result.developer_frozen = true;
+            continue;
+        }
         if (argument == "--casual") {
             result.casual = true;
             continue;
@@ -176,7 +181,10 @@ const char* run_options_help() {
            "  --start-chapter=N                Start Rescue at chapter N (testing). Trophies are paused\n"
            "  --unlock-all                     Every Story episode and stage open in the menus (testing)\n"
            "  --developer                      RT64's developer inspector: F1 opens it (draw calls,\n"
-           "                                   a free camera to look behind things)\n"
+           "                                   a free camera to look behind things); F6 freezes the\n"
+           "                                   game, F7 steps it a frame at a time\n"
+           "  --developer-frozen               As --developer, starting frozen on the first frame\n"
+           "                                   with the inspector open (to step through the intro)\n"
            "  --perf-log                       Report frame timings every 5 seconds\n"
            "  --help                           Show this help\n"
            "Examples: tetrisphere --fullscreen --msaa4x\n"

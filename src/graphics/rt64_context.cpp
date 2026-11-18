@@ -1,4 +1,5 @@
 #include "tetrisphere/rt64_context.h"
+#include "tetrisphere/frame_step.h"
 #include "tetrisphere/data_directory.h"
 #include "ui_system.h"
 #include "tetrisphere/diagnostic_log.h"
@@ -346,12 +347,18 @@ public:
             app_.reset();
         } else {
             diagnostic_log().gpu(app_->device->getDescription().name);
+            // Developer tools: the game's frame steps pause RT64's picture on
+            // each frame (frame_step.h), as its own Pause (F4) does.
+            RT64::Application* app = app_.get();
+            frame_step::set_picture_pauser([app](bool pause) { app->state->debuggerInspector.paused = pause; });
             std::fprintf(stdout,
                          "{\"event\":\"rt64_device_ready\",\"run_id\":\"%s\",\"api\":\"vulkan\"}\n",
                          run_id());
             std::fflush(stdout);
         }
     }
+
+    ~Context() { frame_step::set_picture_pauser(nullptr); }
 
     bool valid() override { return app_ != nullptr; }
     bool update_config(const ultramodern::renderer::GraphicsConfig& old_config,
@@ -482,6 +489,7 @@ public:
                 }
             }
             ui_current_tag = 0;
+            frame_step::gate();  // developer tools: frozen, or a frame at a time
             {
                 ScopedPerfTimer rt64_timer(perf_metrics().display_list_rt64);
                 app_->processDisplayLists(app_->core.RDRAM,

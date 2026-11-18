@@ -47,6 +47,9 @@ struct RunOptions {
     bool casual = false;
     // RT64's developer inspector (F1): frames, draw calls, a free camera.
     bool developer = false;
+    // With it: the game frozen on its first frame and the inspector open
+    // (F6 carry on or freeze again, F7 a frame on; frame_step.h).
+    bool developer_frozen = false;
     // Start Rescue at this chapter (1-based), for testing. Trophies are paused.
     std::optional<int> start_chapter;
     // Every Story episode and stage open in the menus, for testing.

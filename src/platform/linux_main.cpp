@@ -33,6 +33,7 @@
 #include "tetrisphere/pause_draw.h"
 #include "tetrisphere/story_hud.h"
 #include "tetrisphere/developer_records.h"
+#include "tetrisphere/frame_step.h"
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/jukebox.h"
@@ -2919,6 +2920,7 @@ bool launching() { return mode_launcher.active() || direct_wait.has_value(); }
 // menus then wait for the title as at boot: first for the old title to go,
 // then for it to be shown again.
 bool title_seen = false;
+bool developer_frozen_start = false;  // --developer-frozen: open the inspector on the first held frame
 bool title_restart_pending = false;
 // Profile changes in place (no relaunch, the owner's request 2026-11-10).
 std::filesystem::path trophy_definitions_path;
@@ -3425,6 +3427,9 @@ void initialize_linux_platform(std::uint8_t* rdram, const char* rom_sha256,
 
     ultramodern::renderer::GraphicsConfig graphics{};
     graphics.developer_mode = run_options.developer;
+    tetrisphere::frame_step::set_enabled(run_options.developer);
+    if (run_options.developer_frozen) tetrisphere::frame_step::set_frozen(true);
+    developer_frozen_start = run_options.developer_frozen;
     graphics.res_option = ultramodern::renderer::Resolution::Auto;
     graphics.wm_option = fullscreen_requested
         ? ultramodern::renderer::WindowMode::Fullscreen
@@ -5806,6 +5811,22 @@ bool handle_profile_command(const std::string& command) {
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             blockplanet::jukebox::tick();
+            // --developer-frozen: the inspector opened on the first held frame,
+            // as F1 would (RT64 watches the key through its event filter).
+            if (developer_frozen_start && tetrisphere::frame_step::waiting()) {
+                static bool opened = false;
+                if (!opened) {
+                    opened = true;
+                    SDL_Event f1{};
+                    f1.type = SDL_KEYDOWN;
+                    f1.key.type = SDL_KEYDOWN;
+                    f1.key.state = SDL_PRESSED;
+                    f1.key.keysym.scancode = SDL_SCANCODE_F1;
+                    f1.key.keysym.sym = SDLK_F1;
+                    f1.key.windowID = window != nullptr ? SDL_GetWindowID(window) : 0;
+                    SDL_PushEvent(&f1);
+                }
+            }
             if (window != nullptr) {
                 int w = 0, h = 0;
                 SDL_GetWindowSize(window, &w, &h);

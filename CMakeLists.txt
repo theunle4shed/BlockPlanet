@@ -321,6 +321,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/audio_hooks.cpp
     src/graphics/direct_start_hooks.cpp
     src/graphics/vortex_backdrop.cpp
+    src/graphics/frame_step.cpp
     src/graphics/intro_logo_hooks.cpp
     src/graphics/box_art_hooks.cpp
     src/platform/game_options.cpp
@@ -483,6 +484,7 @@ add_executable(tetrisphere_diag
     src/graphics/audio_hooks.cpp
     src/graphics/direct_start_hooks.cpp
     src/graphics/vortex_backdrop.cpp
+    src/graphics/frame_step.cpp
     src/graphics/intro_logo_hooks.cpp
     src/graphics/box_art_hooks.cpp
     src/platform/input_mapping.cpp
@@ -1219,6 +1221,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/audio_hooks.cpp
         src/graphics/direct_start_hooks.cpp
         src/graphics/vortex_backdrop.cpp
+        src/graphics/frame_step.cpp
         src/graphics/intro_logo_hooks.cpp
         src/graphics/box_art_hooks.cpp
             src/graphics/f3d_flat_shade.cpp

@@ -1,3 +1,4 @@
+#include "tetrisphere/frame_step.h"
 #include "tetrisphere/menu_input.h"
 
 #include "ui_system.h"
@@ -32,6 +33,18 @@ std::map<std::pair<SDL_JoystickID, int>, int> stick;
 } // namespace
 
 bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBindings& bindings) {
+    // Developer tools (frame_step.h): F6 freezes the game or lets it carry on,
+    // F7 lets one frame through (held: one after another).
+    if (tetrisphere::frame_step::enabled() && event.type == SDL_KEYDOWN) {
+        if (event.key.keysym.scancode == SDL_SCANCODE_F6 && !event.key.repeat) {
+            tetrisphere::frame_step::set_frozen(!tetrisphere::frame_step::frozen());
+            return true;
+        }
+        if (event.key.keysym.scancode == SDL_SCANCODE_F7) {
+            tetrisphere::frame_step::step();
+            return true;
+        }
+    }
     // F5: restart the game from the title (for testing, when stuck).
     if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_F5) {
         blockplanet::ui::send_command("reset");
