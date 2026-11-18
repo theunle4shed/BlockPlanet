@@ -37,7 +37,7 @@ echo   9  Developer tools, frozen at start (F7 a frame on, F6 run or freeze)
 echo   E  Escape prototype: the sphere seen from inside (the view only)
 echo.
 set CHOICE=
-set /p CHOICE=Choose 1-8: 
+set /p CHOICE=Choose 1-9 or E: 
 if "%CHOICE%"=="1" goto play
 if "%CHOICE%"=="3" goto update
 if "%CHOICE%"=="4" goto branch
