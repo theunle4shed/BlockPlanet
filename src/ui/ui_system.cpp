@@ -787,8 +787,11 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
     if (std::getenv("BLOCKPLANET_HUD_LAYOUT_LOG") != nullptr && logged++ % 120 == 0)
         std::fprintf(stdout, "{\"event\":\"hud_layout\",\"lw\":%g,\"lh\":%g,\"rw\":%g,\"rh\":%g,\"w\":%g,\"h\":%g}\n", lw, lh, rw, rh, width, height);
     const float ph = hud.picture_h * height;
-    // From the centre, keeping clear of the sphere (Follow the sphere only).
-    const float clear = hud.distance_mode == 2 ? hud.sphere_radius * ph + margin : 0.0f;
+    // From the centre, keeping clear of the sphere: Near (the default) and
+    // Follow both push out as the sphere grows on screen (the drop timer's
+    // zoom, a close camera), and come back as it shrinks (the owner,
+    // 2026-11-18); Screen edges stays at the edges.
+    const float clear = hud.distance_mode != 1 ? hud.sphere_radius * ph + margin : 0.0f;
     if (width >= height) {
         // Half a 4:3 frame's width; Screen edges: the window's.
         const float frame = hud.distance_mode == 1 ? width : ph * 2.0f / 3.0f;
