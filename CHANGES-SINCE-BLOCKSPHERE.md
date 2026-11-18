@@ -559,3 +559,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Roadmap: the sphere research section now has the findings and what they open (shared seeds, a daily stage, designed spheres).
 
 - The sphere research (session "how a stage's sphere is built", branch `claude/sphere-build-research`) merged into the main build: its research switches (all off by default) and `docs/research/blockplanet-sphere-generation.md`. The roadmap now says what it means for seeded stages, the Daily Challenge, new stage types, designed spheres, Escape, Multiphasic and new pieces. Checked on the merged build: Rescue plays normally, and the forced seeds take effect at each stage start.
+- HUD (the owner's requests):
+  - **Fixed height:** the panels no longer grow and shrink in play. Story keeps the combo's place from the start, with room for its "+ Magic" and Best lines. The score's list of gains has a fixed space for five, with the kind (Gravity combo, + Magic) under the newest one only. The Next column always keeps room for three pieces, each slot three rows tall, with the piece centred in it.
+  - **Hearts:** lives are heart shapes, red with a white border, and a lost one dark with a grey outline, in place of the square tiles. They're BlockPlanet's own pictures, drawn by `tools/art/hearts.py`.
+  - **Magic box:** solid rather than see-through. The game draws the box's tint behind a held magic's model, now at full strength, and the empty box matches. `BLOCKPLANET_MAGIC_TINT` still sets the strength.

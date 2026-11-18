@@ -141,7 +141,7 @@ void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, flo
     if (w <= 0.0f || h <= 0.0f) return;
     static const int alpha = [] {  // research: BLOCKPLANET_MAGIC_TINT (0 to 255)
         const char* v = std::getenv("BLOCKPLANET_MAGIC_TINT");
-        return v ? std::atoi(v) : 0xB0;
+        return v ? std::atoi(v) : 0xFF;  // solid (the owner, 2026-11-18: the box was see-through); was 0xB0
     }();
     if (alpha <= 0) return;
     // Picture heights to the 320 x 240 frame (240 units per picture height).

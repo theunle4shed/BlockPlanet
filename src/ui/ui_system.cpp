@@ -315,26 +315,37 @@ std::string escape(const std::string& text) {
 // The HUD's markup for these values (placeholder art): one tinted container
 // per side, its groups separated by dividers. The magic group leaves the item
 // box clear, so the game's 3D model drawn under the HUD shows through.
-std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count);
+std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count, std::size_t room = 0);
 
-std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count) {
+// `room`: slots kept for pieces not yet in the queue (the side panels: 3).
+std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count, std::size_t room) {
     std::string rml;
     for (std::size_t i = 0; i < std::min(count, next.size()); ++i) {
         const auto& piece = next[i];
         const int cell = i == 0 ? 34 : 26;
         int width = 1, height = 1;
         for (const auto& [x, y] : piece.cells) width = std::max(width, x + 1), height = std::max(height, y + 1);
+        // Every piece takes the room of the tallest (three rows), centred in
+        // it, so the panel keeps one height whatever comes next (the owner,
+        // 2026-11-18: the HUD grew and shrank during play).
+        const int rows = std::max(3, height), top = (rows - height) * cell / 2;
         rml += "<div class='piece' style='width: " + std::to_string(width * cell) + "dp; height: " +
-               std::to_string(height * cell) + "dp;'>";
+               std::to_string(rows * cell) + "dp;'>";
         if (piece.random_block) {
             rml += "<div class='random-block'>?</div>";
         } else {
             for (const auto& [x, y] : piece.cells)
                 rml += "<div class='cell' style='left: " + std::to_string(x * cell) + "dp; top: " +
-                       std::to_string(y * cell) + "dp; width: " + std::to_string(cell - 3) + "dp; height: " +
+                       std::to_string(y * cell + top) + "dp; width: " + std::to_string(cell - 3) + "dp; height: " +
                        std::to_string(cell - 3) + "dp; background-color: " + piece.colour + ";'/>";
         }
         rml += "</div>";
+    }
+    // Room for three pieces always, empty until they come (the owner,
+    // 2026-11-18: the panel started with two and grew to three).
+    for (std::size_t i = std::min(count, next.size()); i < room; ++i) {
+        const int cell = i == 0 ? 34 : 26;
+        rml += "<div class='piece' style='width: " + std::to_string(cell) + "dp; height: " + std::to_string(3 * cell) + "dp;'></div>";
     }
     return rml;
 }
@@ -503,7 +514,7 @@ std::string hud_rml_parts(const HudView& hud) {
         std::vector<std::string> parts;
         if (hud.show_next)
             parts.push_back(std::string("<div id='next' class='group") + glow("next") + "'><div class='label'>Next</div>" +
-                            pieces_rml(hud.next, hud.next.size()) + "</div>");
+                            pieces_rml(hud.next, hud.next.size(), 3) + "</div>");
         if (hud.show_lives) {
             std::string lives = std::string("<div id='lives' class='group") + glow("lives") + "'><div class='label'>Health</div><div id='hearts'>";
             for (int i = 0; i < 3; ++i) lives += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
@@ -577,7 +588,7 @@ std::string hud_rml_parts(const HudView& hud) {
     if (hud.show_next) {
     rml += "<div class='rule'><div class='line'/></div>";
     rml += "<div id='next' class='group'><div class='label'>Next</div>";
-    rml += pieces_rml(hud.next, hud.next.size());
+    rml += pieces_rml(hud.next, hud.next.size(), 3);
     rml += "</div>";
     }
     rml += "</div>";
@@ -628,13 +639,19 @@ std::string hud_rml_parts(const HudView& hud) {
         }
         rml += "</div></div>";
     }
-    if (hud.combo > 0) {
+    // Story keeps the combo's place from the start, with its "+ Magic" and
+    // Best lines' room kept while empty, so nothing below it moves (the owner,
+    // 2026-11-18: the HUD grew and shrank, above all with large combos).
+    const bool keep_room = !hud.story_score.empty();
+    if (hud.combo > 0 || keep_room) {
         const bool magic = hud.combo >= 20;  // 20 or more gives magic
+        const char* hidden = " style='visibility: hidden;'";
         rml += std::string("<div class='rule'><div class='line'/></div><div id='combo-group' class='group") + (hud.combo_live ? " live" : "") +
-               (magic ? " magic" : "") + "'><div class='label'>" + (hud.combo_live ? "Combo" : "Last combo") + "</div><div id='combo'>" +
-               digits(std::to_string(hud.combo)) + "</div>";
-        if (magic) rml += "<div id='combo-magic'>+ Magic</div>";
-        if (hud.combo_best > 0) rml += "<div id='combo-best'>Best " + std::to_string(hud.combo_best) + "</div>";
+               (magic ? " magic" : "") + "'><div class='label'>" + (hud.combo_live ? "Combo" : "Last combo") + "</div><div id='combo'" +
+               (hud.combo > 0 ? "" : hidden) + ">" + digits(std::to_string(std::max(0, hud.combo))) + "</div>";
+        if (magic || keep_room) rml += std::string("<div id='combo-magic'") + (magic ? "" : hidden) + ">+ Magic</div>";
+        if (hud.combo_best > 0 || keep_room)
+            rml += std::string("<div id='combo-best'") + (hud.combo_best > 0 ? "" : hidden) + ">Best " + std::to_string(std::max(0, hud.combo_best)) + "</div>";
         rml += "</div>";
     }
     if (!hud.story_score.empty()) {
@@ -644,8 +661,10 @@ std::string hud_rml_parts(const HudView& hud) {
         {
             const auto& g = hud.story_gains[k];
             const auto tab = g.find('\t');
+            // The kind (Gravity combo, + Magic) under the newest gain only, so
+            // the list's room stays one height.
             rml += std::string("<div class='gain") + (k == 0 ? " newest" : "") + "'>" + escape(g.substr(0, tab)) +
-                   (tab == std::string::npos ? std::string() : "<div class='gain-kind'>" + escape(g.substr(tab + 1)) + "</div>") + "</div>";
+                   (tab == std::string::npos || k != 0 ? std::string() : "<div class='gain-kind'>" + escape(g.substr(tab + 1)) + "</div>") + "</div>";
         }
         rml += "</div></div>";
     }

@@ -81,18 +81,18 @@ div { display: block; }
 .rule { padding: 10dp 18dp; }
 .rule .line { height: 2dp; background-color: #3a4260; }
 
-/* Hearts: three red tiles, a lost one dark. */
+/* Hearts: three red hearts with a white border, a lost one dark (the owner,
+   2026-11-18: hearts like the original's, in place of square tiles; drawn by
+   tools/art/hearts.py). */
 #hearts, .hearts { height: 48dp; }
 .heart {
     display: inline-block;
-    width: 40dp;
-    height: 40dp;
-    margin-right: 10dp;
-    border-radius: 12dp;
-    background-color: #e02838;
-    border: 3dp #f8f8f8;
+    width: 44dp;
+    height: 44dp;
+    margin-right: 8dp;
+    decorator: image(/blockplanet-ui/hearts/heart.png);
 }
-.heart.lost { background-color: #20202880; border-color: #808080; }
+.heart.lost { decorator: image(/blockplanet-ui/hearts/heart-lost.png); }
 
 /* Bars: a dark track with a fill. */
 .bar {
@@ -131,7 +131,7 @@ div { display: block; }
     height: 132dp;
     border: 2dp #f0f0f040;
     border-radius: 4dp;
-    background-color: #0b1020b0;
+    background-color: #0b1020ff;  /* solid, as the game-drawn tint behind a held magic */
 }
 #item.held { background-color: transparent; }
 #item .name {
@@ -193,6 +193,9 @@ div { display: block; }
 #combo-best { display: block; font-size: 20dp; color: #9aa6c8; margin-top: 2dp; }
 /* Story: the last five points added, under the score, newest first. */
 #gains { display: block; margin-top: 6dp; }
+/* Story: room for the last five gains and the newest one's kind line, always,
+   so the panel keeps one height (the owner, 2026-11-18). */
+#story-score #gains { height: 144dp; overflow: hidden; }
 #gains .gain { display: block; font-size: 20dp; color: #9aa6c8; }
 #gains .gain.newest { font-size: 20dp; color: #e8b818; }
 #gains .gain-kind { display: block; font-size: 15dp; color: #86d8ff; margin-bottom: 2dp; }
@@ -216,7 +219,7 @@ div { display: block; }
 .side.versus { width: 176dp; }
 .versus .group { padding: 12dp 18dp 14dp 18dp; }
 .versus .label { font-size: 20dp; margin-bottom: 6dp; }
-.versus .heart { width: 32dp; height: 32dp; margin-right: 8dp; border-radius: 10dp; }
+.versus .heart { width: 34dp; height: 34dp; margin-right: 6dp; }
 .versus .hearts { height: 38dp; }
 .versus .count { font-size: 44dp; line-height: 48dp; }
 .versus .rule { padding: 6dp 14dp; }
