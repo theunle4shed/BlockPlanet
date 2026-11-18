@@ -26,6 +26,10 @@ void set_original_hud_keep_models(bool keep);
 // While BlockPlanet's menus are open over the game's own menus: skip the
 // original menu's 2D drawing.
 void set_game_menu_hidden(bool hidden);
+// For a moment, on the way back to the menus (an episode end's Exit, run by
+// the game's own routine): nothing the game draws is shown, its menu's grid
+// background included, so only BlockPlanet's grid and menus are seen.
+void set_game_hidden_all(bool hidden);
 
 // The game's text in BlockPlanet's font (docs/ROADMAP.md, every screen in
 // BlockPlanet's style): strings the game draws with its text routine

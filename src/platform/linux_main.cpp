@@ -148,6 +148,11 @@ std::string campaign_source;
 // try the next one?"), waiting for A; BlockPlanet presses it, unseen under
 // the loading cover (its own panel has said the congratulations).
 std::optional<std::chrono::steady_clock::time_point> episode_card_skip;
+// An end screen's Exit: the game hidden until it is parked behind the menus
+// again (4 s at most), so its own menu (the episode end's Exit runs through
+// the game's routine) does not show for a moment (the owner, 2026-11-18).
+std::optional<std::chrono::steady_clock::time_point> exit_hide_since;
+bool exit_hide_let_out = false;
 void restore_launch_path() {
     static auto last = std::chrono::steady_clock::time_point{};
     const auto now = std::chrono::steady_clock::now();
@@ -4705,6 +4710,7 @@ bool handle_profile_command(const std::string& command) {
                     loading_since = std::chrono::steady_clock::now();
                     loading_active = true;
                 }
+                if (row == end_menu.exit_row()) exit_hide_since = std::chrono::steady_clock::now(), exit_hide_let_out = false;
                 if (row == end_menu.exit_row())
                     end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(),
                     grid_quit_red = !end_menu.episode_end();
@@ -5749,6 +5755,14 @@ bool handle_profile_command(const std::string& command) {
                 last = idle;
                 blockplanet::set_game_idle(idle);
             }
+            if (exit_hide_since) {
+                if (!blockplanet::vortex_backdrop_on()) exit_hide_let_out = true;
+                if ((exit_hide_let_out && blockplanet::vortex_backdrop_on()) ||
+                    std::chrono::steady_clock::now() - *exit_hide_since > std::chrono::seconds(4))
+                    exit_hide_since.reset();
+            }
+            static const bool exit_hide_off = std::getenv("BLOCKPLANET_EXIT_HIDE") != nullptr && std::getenv("BLOCKPLANET_EXIT_HIDE")[0] == '0';  // research
+            blockplanet::set_game_hidden_all(exit_hide_since.has_value() && !exit_hide_off);
             // (Not while the jukebox's Vortex is shown: it is the game's own scene.)
             blockplanet::set_game_menu_hidden(!original_menus && at_game_menu && !blockplanet::vortex_backdrop_on() &&
                                               (blockplanet::ui::menus_open() || launching()));

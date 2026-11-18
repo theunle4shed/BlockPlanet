@@ -95,6 +95,7 @@ std::atomic<bool> hud_keep_models{false};
 // While BlockPlanet's menus are open over the game's own menus: their 2D
 // drawing (frame, lines, logo, hints, text) is skipped.
 std::atomic<bool> game_menu_hidden{false};
+std::atomic<bool> game_hidden_all{false};
 // Set while func_80075CD8 runs (game thread only).
 bool in_hud = false;
 
@@ -140,6 +141,7 @@ void set_pause_exit_hidden(bool hidden) { exit_hidden.store(hidden); }
 void set_original_hud_hidden(bool hidden) { hud_hidden.store(hidden); }
 void set_original_hud_keep_models(bool keep) { hud_keep_models.store(keep); }
 void set_game_menu_hidden(bool hidden) { game_menu_hidden.store(hidden); }
+void set_game_hidden_all(bool hidden) { game_hidden_all.store(hidden); }
 }
 
 namespace {
@@ -214,6 +216,12 @@ void log_background_dl(const std::uint8_t* rdram, std::uint32_t from, std::uint3
 } // namespace
 
 extern "C" bool blockplanet_draw_filter(std::uint8_t* rdram, recomp_context* ctx, std::uint32_t helper) {
+    // Hidden for a moment on the way back to the menus (set_game_hidden_all):
+    // its scenes (as "animation not finished") and its 2D drawing skipped.
+    if (game_hidden_all.load(std::memory_order_relaxed) && (helper == 0x8002D93Cu || is_2d_helper(helper))) {
+        if (helper == 0x8002D93Cu) ctx->r2 = 0;
+        return true;
+    }
     // The N64 logo's held wordmark and short start (intro_logo_hooks.cpp), also
     // before each of its draws: the hook after the scene's step is not reached
     // on its first draws (no frame elapsed), which showed the N alone.
@@ -733,6 +741,7 @@ extern "C" bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ct
     // menu scenes (the ring with its character, the MENU sign) are not drawn:
     // only the grid background stays (the owner's choice, 2026-11-08).
     if (game_menu_hidden.load(std::memory_order_relaxed) && guest16(rdram, 0x800E121Cu) >= 0) return true;
+    if (game_hidden_all.load(std::memory_order_relaxed)) return true;
     static const bool log = std::getenv("BLOCKPLANET_OBJECT_LOG") != nullptr;
     if (log) {
         static std::mutex mutex;
