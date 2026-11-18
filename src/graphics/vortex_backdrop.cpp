@@ -15,6 +15,7 @@
 
 #include "tetrisphere/vortex_backdrop.h"
 #include "tetrisphere/audio_settings.h"
+#include "tetrisphere/brick_sky.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
 
@@ -74,6 +75,12 @@ std::atomic<bool> quit_game_over{false};  // ...from the game over menu: its EXI
 std::atomic<int> wanted_stage{0};  // 0 the vortex, 1 to 25 a play background
 int shown_stage = 0;               // what the reset screen draws now (game thread)
 bool stage_built = false;
+// Once the vortex is built: its scene and the pool's top after it, so another
+// background is built in place of the last (the stage backgrounds go above
+// it) and the vortex can be shown again without leaving.
+std::uint32_t vortex_scene = 0, vortex_top = 0;
+std::atomic<float> hue{0.0f};
+std::atomic<float> music_level{0.0f};  // the music's loudness (0 to 1), for the Sphere's turn
 std::atomic<bool> showing{false};
 std::atomic<bool> ready{false};   // the chosen scene is on screen (for the jukebox's cover)
 State state = State::off;
@@ -137,6 +144,7 @@ void enter(std::uint8_t* rdram) {
     shown_stage = wanted_stage.load();
     ready.store(false);
     stage_built = false;
+    vortex_scene = vortex_top = 0;
     showing.store(true);
     std::fprintf(stdout, "{\"event\":\"vortex_backdrop\",\"on\":true,\"saved_bytes\":%zu,\"started\":%d,\"scene\":\"%08X\",\"fade\":%d,\"init\":%d}\n",
                  saved_pool.size(), load16(rdram, vortex_started), load32(rdram, 0x800E1264u), load16(rdram, 0x800DFF08u), load16(rdram, 0x800DFD5Cu));
@@ -166,16 +174,18 @@ void leave(std::uint8_t* rdram, recomp_context* ctx) {
 
 } // namespace
 
-// Centring (the owner's request, 2026-11-17): the scene's camera looks a
-// little to one side, so on a wide screen the ring sat right of centre. Each
-// frame, at its first object, the camera matrix (scene +0xF8, double-buffered
-// by +0x3D; N64 fixed point, row vectors) is sheared: x' = x + k z in view
-// space, which moves the whole picture sideways by the same amount at every
-// depth. The game builds the camera afresh each frame, so nothing builds up.
+// Placing (the owner's requests: centred, 2026-11-17; then "positioned to the
+// right of screen", 2026-11-18): the scene's camera looks a little to one
+// side, so on a wide screen the ring sits at 69% across. Each frame, at its
+// first object, the camera matrix (scene +0xF8, double-buffered by +0x3D; N64
+// fixed point, row vectors) is sheared: x' = x + k z in view space, which
+// moves the whole picture sideways by the same amount at every depth (k 0.27
+// put it in the middle; negative moves it right). The game builds the camera
+// afresh each frame, so nothing builds up.
 float vortex_shift() {
     static const float shift = [] {
         const char* v = std::getenv("BLOCKPLANET_VORTEX_SHIFT");  // research: tuning
-        return v != nullptr ? std::strtof(v, nullptr) : 0.27f;  // measured: the ring from 69% across a 16:9 screen to the middle
+        return v != nullptr ? std::strtof(v, nullptr) : -0.08f;  // the ring about three quarters across
     }();
     return shift;
 }
@@ -203,8 +213,12 @@ void set_vortex_aspect(float aspect) {
 
 void set_vortex_backdrop(bool on, int stage) {
     static const bool off = std::getenv("BLOCKPLANET_VORTEX_OFF") != nullptr;  // research: the jukebox side only
-    wanted_stage.store(stage >= 1 && stage <= 25 ? stage : 0);
+    wanted_stage.store(stage >= 1 && stage <= sky_backdrop ? stage : 0);
     wanted.store(on && !off);
+}
+void set_backdrop_hue(float degrees, float level) {
+    hue.store(degrees, std::memory_order_relaxed);
+    music_level.store(level, std::memory_order_relaxed);
 }
 bool vortex_backdrop_on() { return showing.load(); }
 bool vortex_backdrop_ready() { return ready.load(); }
@@ -235,6 +249,20 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
     if (state == State::off) {
         if (want && load16(rdram, reset_screen) == 0 && (at_title_or_menus(rdram) || pause_wanted.load() || end_wanted.load())) enter(rdram);
         return;
+    }
+    // Another of the jukebox's backgrounds once the vortex is built: changed
+    // in place (the owner, 2026-11-18: "any way to close the gap"). Leaving
+    // and entering again rebuilt the vortex first (about a second under the
+    // cover); now the pool is wound back to just after the vortex, the
+    // reset screen pointed at it again, and a stage background built there.
+    static const bool in_place = std::getenv("BLOCKPLANET_BACKDROP_RELEAVE") == nullptr;  // research: the old way
+    if (want && wanted.load() && in_place && wanted_stage.load() != shown_stage && song_stopped && vortex_scene != 0) {
+        store32(rdram, pool_top, vortex_top);
+        store32(rdram, 0x800E1264u, vortex_scene);
+        shown_stage = wanted_stage.load();
+        stage_built = false;
+        std::fprintf(stdout, "{\"event\":\"vortex_backdrop_switch\",\"stage\":%d}\n", shown_stage);
+        std::fflush(stdout);
     }
     if (!want || wanted_stage.load() != shown_stage) {
         leave(rdram, ctx);  // (a different background: entered again next frame)
@@ -301,6 +329,8 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         func_8007ADF8(rdram, ctx);
         *ctx = saved;
         song_stopped = true;
+        vortex_scene = load32(rdram, 0x800E1264u);
+        vortex_top = load32(rdram, pool_top);
         // The reset screen took the jingle player from the jukebox's extra
         // song, if one was playing (audio_hooks.cpp): start it again.
         if (const int song = extra_song(); song >= 0) play_song(song);
@@ -309,7 +339,7 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
     // once built; a few frames later, as the first draws go through.
     {
         static int settled = 0;
-        const bool built = song_stopped && (shown_stage == 0 || stage_built);
+        const bool built = song_stopped && (shown_stage == 0 || shown_stage == sky_backdrop || stage_built);
         settled = built ? settled + 1 : 0;
         ready.store(settled >= 4);
     }
@@ -319,7 +349,7 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
     // tables at 0x800E2262 and 0x800E2296, one object, the pool aligned to 16,
     // the built scene's byte +0x49 cleared), and put where the reset screen
     // draws its scene from (0x800E1264).
-    if (shown_stage > 0 && !stage_built && song_stopped) {
+    if (shown_stage > 0 && shown_stage < sky_backdrop && !stage_built && song_stopped) {
         stage_built = true;
         const auto scene_id = static_cast<std::uint16_t>(load16(rdram, 0x800E2262u + 2u * std::uint32_t(shown_stage)));
         const auto object_id = static_cast<std::uint16_t>(load16(rdram, 0x800E2296u + 2u * std::uint32_t(shown_stage)));
@@ -412,6 +442,13 @@ extern "C" bool blockplanet_vortex_draw(std::uint8_t* rdram, recomp_context* ctx
         ctx->r2 = 0;  // "animation finished": no
         return true;
     }
+    // The Sphere: the brick sky in the scene's place (the vortex's built and
+    // running behind, not drawn).
+    if (shown_stage == sky_backdrop) {
+        tetrisphere::brick_sky::draw_jukebox(rdram, music_level.load(std::memory_order_relaxed), hue.load(std::memory_order_relaxed));
+        ctx->r2 = 0;
+        return true;
+    }
     if (shown_stage == 0 || !stage_built) return false;
     static bool inside = false;  // the draw below comes back through the filter
     if (inside) return false;
@@ -431,10 +468,39 @@ extern "C" bool blockplanet_vortex_draw(std::uint8_t* rdram, recomp_context* ctx
     if (to < from || to - from > 0x10000u) return true;
     static const bool off = std::getenv("BLOCKPLANET_STAGE_LIGHT") != nullptr && std::getenv("BLOCKPLANET_STAGE_LIGHT")[0] == '0';
     if (off) return true;
+    // The slow colour drift (the owner, 2026-11-18: hue changing over time):
+    // the brightening's ONE becomes the primitive colour, P, per channel:
+    // (P - c) c + c, so a channel with P = 1 is lifted as before, c (2 - c),
+    // and one with less is lifted less; P is a pale colour going round the
+    // wheel, a cast that drifts. Set with a primitive-colour command in the
+    // place of the pipe sync just before the mix (a no-op for the renderer).
+    const float degrees = hue.load(std::memory_order_relaxed);
+    std::uint32_t prim = 0;
+    if (degrees != 0.0f) {
+        const float a = degrees * 3.14159265f / 180.0f;
+        float rgb[3];
+        for (int c = 0; c < 3; ++c) {
+            // A pure hue (0 to 1 per channel), then paled: 1 - 0.5 (1 - h).
+            const float h = 0.5f + 0.5f * std::cos(a - float(c) * 2.0943951f);
+            rgb[c] = 1.0f - 0.5f * (1.0f - h);
+        }
+        prim = std::uint32_t(std::lround(rgb[0] * 255.0f)) << 24 | std::uint32_t(std::lround(rgb[1] * 255.0f)) << 16 |
+               std::uint32_t(std::lround(rgb[2] * 255.0f)) << 8 | 0xFFu;
+    }
     for (std::uint32_t a = from; a + 8u <= to; a += 8u) {
         const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
         if (w0 == 0xFC26A004u && w1 == 0x1F0C93FFu) {
-            store32(rdram, a, 0xFC1220C0u);
+            bool tinted = false;
+            if (prim != 0)
+                for (std::uint32_t back = a; back >= from + 8u && back + 64u > a; back -= 8u) {
+                    if (load32(rdram, back - 8u) == 0xE7000000u && load32(rdram, back - 4u) == 0) {
+                        store32(rdram, back - 8u, 0xFA000000u);  // G_SETPRIMCOLOR
+                        store32(rdram, back - 4u, prim);
+                        tinted = true;
+                        break;
+                    }
+                }
+            store32(rdram, a, tinted ? 0xFC122060u : 0xFC1220C0u);  // cycle 2's A: PRIMITIVE, or ONE
             store32(rdram, a + 4u, 0xF00F923Fu);
         }
     }

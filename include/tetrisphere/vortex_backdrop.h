@@ -12,8 +12,15 @@ namespace blockplanet {
 // Asked for by the jukebox (any thread); applied on the game's thread at the
 // top of its next frame, and only while the game shows its title or menus.
 // `stage` 1 to 25: one of the game's play backgrounds instead of the vortex
-// (drawn by the same reset screen); 0: the vortex.
+// (drawn by the same reset screen); 0: the vortex; sky_backdrop: the brick
+// sky (src/graphics/brick_sky.cpp) in the scene's place. Changing between
+// them once one is showing is done in place, without leaving: no gap.
+constexpr int sky_backdrop = 26;
 void set_vortex_backdrop(bool wanted, int stage = 0);
+// The slow colour drift (degrees round the colour wheel; the jukebox's, so
+// the game's pictures turn with its other visualisers), and the music's
+// loudness (0 to 1; the Sphere turns faster when it is loud).
+void set_backdrop_hue(float degrees, float level);
 // Whether the game is showing the vortex now (or entering it).
 bool vortex_backdrop_on();
 // Whether the chosen scene is on screen (until then the jukebox covers the

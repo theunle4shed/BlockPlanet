@@ -978,7 +978,9 @@ void update_jukebox() {
     for (std::size_t i = 0; i < sound.bands.size() && i < bands.size(); ++i) sound.bands[i] = bands[i];
     sound.level = tetrisphere::audio_spectrum::level();
     if (open && jukebox_full_screen(mode)) sound.wave = tetrisphere::audio_spectrum::waveform();
-    set_grid_music(open && !jukebox_full_screen(mode) ? mode : 0, sound.bands, sound.level);
+    const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    set_jukebox_hue_running(open, now);
+    set_grid_music(open && !jukebox_full_screen(mode) ? mode : 0, sound.bands, sound.level, jukebox_hue(now));
     jukebox_vis_full = open && jukebox_full_screen(mode);
     if (!open) {
         jukebox_hidden.store(false);
@@ -986,7 +988,6 @@ void update_jukebox() {
     }
     Rml::ElementDocument* document = navigator->top_document();
     if (document == nullptr) return;
-    const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     update_jukebox_visual(document, mode, sound, now);
     if (Rml::Element* layer = document->GetElementById("jbvis")) layer->SetClass("cover", jukebox_cover.load());
     document->SetClass("player-hidden", jukebox_hidden.load());

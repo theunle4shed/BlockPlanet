@@ -507,3 +507,11 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - A game over's Exit is direct too: BlockPlanet makes the game's own Exit steps (its music stopped, its flag set, the hand-back to the menu) as it lets the parked game out, so the game's game over menu never runs. Save check (a game over and Exit, then a lesson, both ways): every saved file identical. The episode end's and Versus' Exits still go through the game's menus (other routines, one touching level progress).
 - Fixed: BlockPlanet's new pause opened when Start was pressed during the attract demo; Start ends the demo again, as in the game.
 - Looked into, kept as it is: the episode end's Exit writes the game's save (the episode's completion and the save's check value), so it still goes through the game's own menu, hidden, and Versus' end the same way; only the game over's Exit is done directly.
+
+## 2026-11-18: Jukebox visualisations, second round
+
+- Pieces now uses the game's own piece shapes, as its next-piece display shows them (the three-brick bar, the square, the S and the T), in the game's brick colours. The pieces are sized by the window's height on both sides, so they stay square at any window shape (they were squashed). Pale colours keep their hue (they showed grey before).
+- New Sphere background: BlockPlanet's brick sky (the inside of a sphere of bricks), drawn behind the jukebox by the game in the Vortex's place. It turns on its own, faster when the music is loud.
+- All the visualisations now change colour slowly (once round the colour wheel every three minutes, starting from their own colours each time the jukebox opens). The grid modes, Spectrum, Scope, Pieces and Sphere turn their colours. The stage backgrounds get a slowly changing colour cast instead, made in their brightening step. The Vortex is not tinted yet.
+- The Vortex now sits right of centre, about three quarters across the screen.
+- Changing between the Vortex, Sphere and stage backgrounds is now instant: the new one is built in place of the last, without going back through the Vortex (which took about a second under a black cover). `BLOCKPLANET_BACKDROP_RELEAVE=1` brings back the old way for research.

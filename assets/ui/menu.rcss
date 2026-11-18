@@ -454,7 +454,7 @@ body.jukebox #panel { z-index: 1; }
 #jbvis.cover { background-color: #000000; }  /* while a game-drawn background is set up */
 #jbvis .jbbrick { position: absolute; }
 #jbvis .jbpiece { position: absolute; display: none; }
-#jbvis .jbpiece .jbbrick { width: 25%; height: 25%; }
+#jbvis .jbpiece .jbbrick { width: 33.3%; height: 33.3%; }
 /* Hide: only the background, with a hint that fades out. */
 .player-hint { display: none; }
 body.player-hidden #panel { visibility: hidden; }

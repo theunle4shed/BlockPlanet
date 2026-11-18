@@ -1,4 +1,5 @@
 #include "ui_grid.h"
+#include "ui_jukebox.h"
 
 #include "grid_texture.h"
 
@@ -422,10 +423,15 @@ namespace {
 int music_mode = 0;
 std::array<float, 16> music_bands{};
 float music_level = 0.0f;
+float music_hue = 0.0f;
+GridRgb turned(GridRgb c) {
+    hue_rotate(c.r, c.g, c.b, music_hue);
+    return c;
+}
 } // namespace
 
-void set_grid_music(int mode, const std::array<float, 16>& bands, float level) {
-    music_mode = mode, music_bands = bands, music_level = level;
+void set_grid_music(int mode, const std::array<float, 16>& bands, float level, float hue) {
+    music_mode = mode, music_bands = bands, music_level = level, music_hue = hue;
 }
 
 void MenuGrid::place(double now) {
@@ -517,7 +523,7 @@ void MenuGrid::place(double now) {
             transform = text;
         }
         // The texture's middle grey is half white: twice the colour gives the colour.
-        std::string colour = css(shown, 2.0f * shade);
+        std::string colour = css(turned(shown), 2.0f * shade);
         if (tile.element == nullptr) continue;
         if (tile.transform != transform) {
             tile.transform = transform;
@@ -539,7 +545,7 @@ void MenuGrid::place(double now) {
     const float present = std::clamp((presence() - 0.4f) / 0.35f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
     far_alpha_ = show_far_ ? far_alpha : 0.0f;
-    std::string far = css(mix(far_from_, far_to_, ease_in_out(fade)), 1.0f);
+    std::string far = css(turned(mix(far_from_, far_to_, ease_in_out(fade))), 1.0f);
     far.insert(3, "a");  // rgb( -> rgba(
     far.back() = ',';
     far += std::to_string(int(std::lround(far_alpha_ * 255.0f))) + ")";

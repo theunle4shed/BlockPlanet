@@ -116,6 +116,13 @@ std::uint32_t build(std::uint8_t* rdram, const Settings& s, const Motion& m, std
 // game's display list and returns true (skip the game's background).
 bool draw(std::uint8_t* rdram);
 
+// The jukebox's Sphere background (src/graphics/vortex_backdrop.cpp): the
+// sky added to the game's display list in the reset screen's scene's place,
+// whatever the settings say about play, turning slowly on its own (faster
+// with `level`, the music's loudness, 0 to 1), its colours turned `hue`
+// degrees round the colour wheel. Returns whether it was added.
+bool draw_jukebox(std::uint8_t* rdram, float level, float hue);
+
 // Mixed: whether a stage shows the brick sky instead of its own background.
 // Fixed and repeatable for a stage: one stage in four, chosen by a hash of
 // the mode (0x800E44A8), the level's background index (0x8013D264) and the

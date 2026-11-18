@@ -96,7 +96,23 @@ void put_matrix(std::uint8_t* rdram, std::uint32_t address, const float (&m)[4][
         }
 }
 
-void put_vertex(std::uint8_t* rdram, std::uint32_t at, const Vertex& v) {
+float vertex_hue = 0.0f;  // the jukebox's colour drift (degrees), 0 in play
+
+// A colour turned round the colour wheel about the grey axis (as the
+// jukebox's other visualisers, ui_jukebox.cpp).
+void turn_hue(std::uint8_t& r, std::uint8_t& g, std::uint8_t& b, float degrees) {
+    const float a = degrees * 3.14159265f / 180.0f, c = std::cos(a), sn = std::sin(a);
+    const float k = (1.0f - c) / 3.0f, q = sn * 0.57735027f;
+    const float fr = r, fg = g, fb = b;
+    const auto out = [](float v) { return std::uint8_t(std::clamp(int(std::lround(v)), 0, 255)); };
+    r = out(fr * (c + k) + fg * (k - q) + fb * (k + q));
+    g = out(fr * (k + q) + fg * (c + k) + fb * (k - q));
+    b = out(fr * (k - q) + fg * (k + q) + fb * (c + k));
+}
+
+void put_vertex(std::uint8_t* rdram, std::uint32_t at, const Vertex& given) {
+    Vertex v = given;
+    if (vertex_hue != 0.0f) turn_hue(v.r, v.g, v.b, vertex_hue);
     store16(rdram, at + 0, v.x);
     store16(rdram, at + 2, v.y);
     store16(rdram, at + 4, v.z);
@@ -608,6 +624,42 @@ bool draw(std::uint8_t* rdram) {
                      motion.yaw, motion.pitch, motion.yaw_speed, motion.pitch_speed, motion.last_x, motion.last_y);
         std::fflush(stdout);
     }
+    return true;
+}
+
+bool draw_jukebox(std::uint8_t* rdram, float level, float hue) {
+    Settings s = settings();
+    s.backgrounds = "only";
+    if (s.spin == "still") s.spin = "gentle";  // the sphere's turn drives it: here there is none
+    s.stage_types.clear();                     // no stage: all six colours
+    std::uint32_t dl = load32(rdram, display_list_pointer);
+    if (dl < 0x80000000u || dl >= 0x80400000u) return false;
+    // No play sphere to follow: a turn of its own, quicker when the music is loud.
+    static Motion motion;
+    static float sphere_x = 0.0f, sphere_y = 0.0f;
+    static auto last = std::chrono::steady_clock::now();
+    const auto now = std::chrono::steady_clock::now();
+    const float seconds = std::clamp(std::chrono::duration<float>(now - last).count(), 0.0f, 0.1f);
+    last = now;
+    sphere_x += seconds * (60.0f + 500.0f * std::clamp(level, 0.0f, 1.0f));
+    sphere_y += seconds * 18.0f;
+    motion.step(std::int16_t(int(sphere_x) & 0xFFFF), std::int16_t(int(sphere_y) & 0xFFFF), seconds, s);
+    std::uint32_t projection = 0;
+    for (std::uint32_t at = dl - 8u, n = 0; n < 4096 && at >= 0x80000000u; at -= 8u, ++n) {
+        const std::uint32_t w0 = load32(rdram, at);
+        if ((w0 >> 24) == 0x01u && (w0 >> 16 & 0x01u) != 0) {
+            projection = load32(rdram, at + 4u);
+            break;
+        }
+    }
+    vertex_hue = hue;
+    static int frame = 0;
+    const std::uint32_t list = build(rdram, s, motion, projection, frame++, picture_aspect.load());
+    vertex_hue = 0.0f;
+    if (list == 0) return false;
+    store32(rdram, dl, 0x06000000u);
+    store32(rdram, dl + 4u, list);
+    store32(rdram, display_list_pointer, dl + 8u);
     return true;
 }
 

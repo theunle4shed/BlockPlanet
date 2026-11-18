@@ -6,7 +6,9 @@
 
 #include "tetrisphere/jukebox.h"
 #include "tetrisphere/audio_settings.h"
+#include "tetrisphere/audio_spectrum.h"
 #include "tetrisphere/vortex_backdrop.h"
+#include "../ui/ui_jukebox.h"
 #include "../ui/ui_system.h"
 
 #include <algorithm>
@@ -32,16 +34,20 @@ int shown_seconds = -2;
 
 // The backgrounds: the grid's own (Water, Pulse, Bars), then full-screen
 // Winamp-inspired ones built from the game's bricks (src/ui/ui_jukebox.cpp).
-// Last, the Vortex: the game's own scene (src/graphics/vortex_backdrop.cpp).
+// Then the Vortex: the game's own scene (src/graphics/vortex_backdrop.cpp),
+// and the Sphere: BlockPlanet's brick sky, the inside of a sphere of bricks
+// (src/graphics/brick_sky.cpp; the owner, 2026-11-18: "our inside the sphere
+// background tests"), drawn by the same means.
 // Then the game's 25 play backgrounds ("Stage 1" to "Stage 25"), drawn by the
 // same means (vortex_backdrop.cpp). All open for now (the owner, 2026-11-17:
 // everything unlocked for testing; how they are earned is for later).
-constexpr int visualiser_known = 7;
+constexpr int visualiser_known = 8;
 constexpr int stage_backgrounds = 25;
 constexpr int visualiser_count = visualiser_known + stage_backgrounds;
-int stage_of(int v) { return v >= visualiser_known ? v - visualiser_known + 1 : 0; }
-
-constexpr int vortex = 6;
+constexpr int vortex = 6, sphere = 7;
+// What the game's picture shows (set_vortex_backdrop): 0 the vortex, 1 to 25
+// a stage background, 26 the brick sky.
+int stage_of(int v) { return v == sphere ? sky_backdrop : v >= visualiser_known ? v - visualiser_known + 1 : 0; }
 // After the game's 23 tracks, three songs it plays outside them (started on
 // its jingle player there; ids from docs/research/jukebox.md): the intro's
 // (the N64 logo and the robots), the title's and the VORTEX scene's.
@@ -51,8 +57,8 @@ constexpr int song_total = track_count + int(sizeof extra_songs / sizeof extra_s
 
 const char* song_name(int t) { return t < track_count ? track_name(t) : extra_songs[t - track_count].name; }
 
-const char* const visualiser_names[visualiser_known] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces", "Vortex"};
-const char* const visualiser_icons[visualiser_known] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF", "\uE499"};
+const char* const visualiser_names[visualiser_known] = {"Water", "Pulse", "Bars", "Spectrum", "Scope", "Pieces", "Vortex", "Sphere"};
+const char* const visualiser_icons[visualiser_known] = {"\uE283", "\uE560", "\uE105", "\uE2A3", "\uE038", "\uE4FF", "\uE499", "\uE0EB"};
 std::string visualiser_name(int v) {
     return v < visualiser_known ? visualiser_names[v] : "Stage " + std::to_string(stage_of(v));
 }
@@ -164,6 +170,7 @@ bool command(const std::string& command, const unsigned char* rdram) {
     else if (command == "jukebox_repeat") repeat = !repeat;
     else if (command == "jukebox_vis") visualiser = (visualiser + 1) % visualiser_count;
     else if (command == "jukebox_vortex") visualiser = vortex;  // for testing
+    else if (command == "jukebox_sphere") visualiser = sphere;  // for testing
     else if (command.rfind("jukebox_stage:", 0) == 0)  // for testing: a stage background
         visualiser = visualiser_known - 1 + std::clamp(std::atoi(command.c_str() + 14), 1, stage_backgrounds);
     else if (command == "jukebox_hide") {
@@ -180,6 +187,8 @@ void tick() {
     const auto screen = ui::current_screen();
     set_vortex_backdrop(visualiser >= vortex && (screen == "jukebox" || screen == "jukebox_list"), stage_of(visualiser));
     ui::set_jukebox_cover(visualiser >= vortex && !vortex_backdrop_ready());
+    set_backdrop_hue(ui::jukebox_hue(std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count()),
+                     tetrisphere::audio_spectrum::level());
     const int seconds = elapsed_seconds();
     if (!repeat && !stopped && seconds >= 180 && track_override()) {
         play(shuffle ? random_other(track) : track + 1);

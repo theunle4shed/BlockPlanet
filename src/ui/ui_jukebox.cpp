@@ -6,12 +6,15 @@
 //             each with a white peak brick that falls back slowly.
 //   Scope     Winamp's oscilloscope: the sound wave traced in bricks, with a
 //             fainter trace of the frame before.
-//   Pieces    the game's pieces (in its brick colours) dropping through the
-//             dark, a new one on each beat, faster when the music is loud.
+//   Pieces    the game's own pieces, as its next-piece display showed them
+//             (the three-brick bar, the square, the S and the T, in the
+//             game's brick colours), dropping through the dark, a new one on
+//             each beat, faster when the music is loud.
 
 #include "ui_jukebox.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <random>
@@ -44,8 +47,15 @@ std::string colour(int r, int g, int b, int a = 255) {
     return text;
 }
 
-// The texture's middle grey is half white, so a tint of twice a colour shows it.
-std::string tint(int r, int g, int b, int a = 255) { return colour(r * 2, g * 2, b * 2, a); }
+float drift = 0.0f;  // this frame's jukebox_hue
+
+// The texture's middle grey is half white, so a tint of twice a colour shows
+// it, turned by the slow colour drift.
+std::string tint(int r, int g, int b, int a = 255) {
+    float fr = float(r) / 255.0f, fg = float(g) / 255.0f, fb = float(b) / 255.0f;
+    hue_rotate(fr, fg, fb, drift);
+    return colour(int(std::lround(fr * 510.0f)), int(std::lround(fg * 510.0f)), int(std::lround(fb * 510.0f)), a);
+}
 
 // Row colours, bottom to top, in the menus' palette.
 void row_colour(int row, int& r, int& g, int& b) {
@@ -58,12 +68,19 @@ void row_colour(int row, int& r, int& g, int& b) {
     b = int(stops[i][2] + (stops[i + 1][2] - stops[i][2]) * f);
 }
 
-// The game's piece colours (bright versions of its bricks).
-const int piece_colours[6][3] = {{220, 50, 50}, {50, 110, 230}, {60, 190, 80}, {235, 200, 40}, {170, 70, 210}, {240, 130, 30}};
-// Four-brick shapes (x, y), as in the game's piece set.
-const int shapes[7][4][2] = {{{0, 0}, {1, 0}, {2, 0}, {3, 0}}, {{0, 0}, {1, 0}, {0, 1}, {1, 1}}, {{0, 0}, {1, 0}, {2, 0}, {1, 1}},
-                             {{0, 0}, {1, 0}, {1, 1}, {2, 1}}, {{1, 0}, {2, 0}, {0, 1}, {1, 1}}, {{0, 0}, {0, 1}, {1, 1}, {2, 1}},
-                             {{2, 0}, {0, 1}, {1, 1}, {2, 1}}};
+// The game's brick colours, as the HUD's next pieces show them
+// (hud_material_colour in linux_main.cpp).
+const int piece_colours[6][3] = {{232, 192, 32}, {48, 80, 216}, {48, 176, 72}, {200, 56, 192}, {152, 128, 224}, {216, 56, 56}};
+// The game's piece shapes (x, y), as the HUD's next pieces show them
+// (hud_piece_cells in linux_main.cpp): the bar, the square, the S, the T.
+struct Shape {
+    int count;
+    int cells[4][2];
+};
+const Shape shapes[4] = {{3, {{0, 0}, {1, 0}, {2, 0}}},
+                         {4, {{0, 0}, {1, 0}, {0, 1}, {1, 1}}},
+                         {4, {{1, 0}, {1, 1}, {0, 1}, {0, 2}}},
+                         {4, {{0, 0}, {1, 0}, {2, 0}, {1, 1}}}};
 
 struct Piece {
     bool live = false;
@@ -191,22 +208,32 @@ void draw_pieces(const JukeboxSound& sound, float dt, double now) {
             if (piece.live) continue;
             std::uniform_real_distribution<float> u(0.0f, 1.0f);
             piece.live = true;
-            piece.size = 2.2f + u(state.random) * 2.4f;  // brick size, percent of the width
+            piece.size = 4.0f + u(state.random) * 4.0f;  // brick size, percent of the height
             piece.x = 4.0f + u(state.random) * 88.0f;
             piece.y = -15.0f;
             piece.speed = 14.0f + u(state.random) * 10.0f;
             piece.angle = u(state.random) * 360.0f;
             piece.spin = (u(state.random) - 0.5f) * 90.0f;
-            const int shape = int(u(state.random) * 7) % 7;
+            const Shape& shape = shapes[int(u(state.random) * 4) % 4];
             const int* c = piece_colours[int(u(state.random) * 6) % 6];
             Rml::Element* e = state.pieces[p];
             if (e != nullptr) {
+                // Centred in a box three bricks square, so it spins about its middle.
+                int w = 0, h = 0;
+                for (int k = 0; k < shape.count; ++k) w = std::max(w, shape.cells[k][0] + 1), h = std::max(h, shape.cells[k][1] + 1);
                 for (int k = 0; k < 4; ++k) {
                     Rml::Element* b = e->GetChild(k);
                     if (b == nullptr) continue;
-                    b->SetProperty("left", pct(25.0f * float(shapes[shape][k][0])));
-                    b->SetProperty("top", pct(25.0f * float(shapes[shape][k][1]) + 25.0f));
-                    b->SetProperty("image-color", tint(c[0], c[1], c[2]));
+                    b->SetProperty("display", k < shape.count ? "block" : "none");
+                    if (k >= shape.count) continue;
+                    const float third = 100.0f / 3.0f;
+                    b->SetProperty("left", pct(third * (float(shape.cells[k][0]) + (3 - w) * 0.5f)));
+                    b->SetProperty("top", pct(third * (float(shape.cells[k][1]) + (3 - h) * 0.5f)));
+                    // Scaled so the brightest channel just reaches white when
+                    // doubled: the pale ones (lavender, yellow) went grey otherwise.
+                    const float top = float(std::max({c[0], c[1], c[2]}));
+                    const float scale = 127.0f / std::max(1.0f, top);
+                    b->SetProperty("image-color", tint(int(c[0] * scale), int(c[1] * scale), int(c[2] * scale)));
                 }
             }
             state.last_spawn = now;
@@ -232,8 +259,11 @@ void draw_pieces(const JukeboxSound& sound, float dt, double now) {
         e->SetProperty("display", "block");
         e->SetProperty("left", pct(piece.x));
         e->SetProperty("top", pct(piece.y));
-        e->SetProperty("width", pct(piece.size * 4.0f));
-        e->SetProperty("height", pct(piece.size * 4.0f * 16.0f / 9.0f));
+        // Sized by the height on both sides, so square at any window shape.
+        char side[32];
+        std::snprintf(side, sizeof side, "%.3fvh", piece.size * 3.0f);
+        e->SetProperty("width", side);
+        e->SetProperty("height", side);
         char transform[48];
         std::snprintf(transform, sizeof transform, "rotate(%.1fdeg)", piece.angle);
         e->SetProperty("transform", transform);
@@ -242,6 +272,22 @@ void draw_pieces(const JukeboxSound& sound, float dt, double now) {
 
 } // namespace
 
+namespace {
+std::atomic<double> hue_start{-1.0};  // when the jukebox opened (seconds), -1 while closed
+} // namespace
+
+void set_jukebox_hue_running(bool open, double now) {
+    if (!open) hue_start.store(-1.0);
+    else if (hue_start.load() < 0.0) hue_start.store(now);
+}
+
+float jukebox_hue(double now) {
+    const double start = hue_start.load();
+    if (start < 0.0) return 0.0f;
+    const double degrees = std::fmod(std::max(0.0, now - start) * 2.0, 360.0);  // 180 seconds round
+    return float(std::floor(degrees / 2.0) * 2.0);
+}
+
 void update_jukebox_visual(Rml::ElementDocument* document, int mode, const JukeboxSound& sound, double now) {
     if (document == nullptr) return;
     Rml::Element* layer = document->GetElementById("jbvis");
@@ -249,6 +295,7 @@ void update_jukebox_visual(Rml::ElementDocument* document, int mode, const Jukeb
     if (layer != state.layer || mode != state.built) build(layer, mode);
     const float dt = state.last > 0.0 ? float(std::clamp(now - state.last, 0.0, 0.1)) : 0.016f;
     state.last = now;
+    drift = jukebox_hue(now);
     if (mode == vis_spectrum) draw_spectrum(sound, dt);
     else if (mode == vis_scope) draw_scope(sound);
     else if (mode == vis_pieces) draw_pieces(sound, dt, now);
