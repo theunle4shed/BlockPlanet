@@ -134,14 +134,11 @@ Direction: a modern, simple, TV-like menu (large focus states, few items per scr
 
 ### How a stage's sphere is built (research session, M; the owner, 2026-11-18)
 
-The question: is there one seed for the whole sphere, one per layer, or is each block chosen at random as it is placed? Known so far (docs/research/blockplanet-level-data.md, blockplanet-game-state.md): each stage has a settings record (layers, colours, the core square's size, special blocks), not a stored design; the core layer is a fixed pattern; the playfield layers are random on every start (two starts of chapter 1 differed in 887 of 1,024 cells of layer 1). Not known: where the randomness comes from, the order the sphere is built in, and what each cell value means.
+The question: is there one seed for the whole sphere, one per layer, or is each block chosen at random as it is placed? Known so far (docs/research/blockplanet-level-data.md, blockplanet-game-state.md): each stage has a settings record (layers, colours, the core square's size, special blocks), not a stored design; the core layer is a fixed pattern; the playfield layers are random on every start (two starts of chapter 1 differed in 887 of 1,024 cells of layer 1).
 
-Steps, in a session that has the player's ROM and the built game (`.local`, never in Git):
-1. Find the code that fills P1's block grid (`0x80116BF0`, 32 × 32 cells of 16 bits a layer) when a stage starts: a memory watch on the grid from the stage's load, and the function probe (`BLOCKPLANET_FN_PROBE=1`) on candidates; the ROM's debug messages naming `generatelevel.c` and `drop.c` point to the area (read at research time only, not committed).
-2. Find the random-number routine it calls and its state (an address or two in memory): its formula, and what sets its starting value (a fixed number, the frame counter, the time a button was pressed).
-3. Test: the same stage started twice with that state set to the same value. The same sphere both times means one seed per sphere; then whether a layer's cells change alone when only part of the state is changed.
-4. Map the cell values (brick type, colour, the special blocks) from what is drawn where.
-5. Write it up in a research note; what it opens: repeatable stages, shared seeds, a daily stage, designed spheres (custom stages, Practice).
+**Found (2026-11-18, [research](research/blockplanet-sphere-generation.md)):** one sphere, one seed. At a stage's start the game draws a 16-bit sphere seed and restarts its generator (`0x800E2AA0`, `func_80081E90`) from it for each player, so both players get the same sphere; player 1's piece seed (`0x801125BC`) is the second input. Forcing both gives the same sphere every time. Not one seed per layer: layers are built bottom up from one stream, each by about 2,048 random piece drops, then their gaps are filled with single blocks. Each mode loads its own settings record (layers, piece kinds and more) from one table; Training and Puzzle use stored layouts. Research switches can force the seeds and write hand-made layers.
+
+Next, if wanted: shared stage codes (chapter, stage and the two seeds), a daily stage, a layout editor for designed spheres (the piece shapes' part numbering still to map), and edited settings records for unusual stages.
 
 ### Background animations: understand them (research M)
 

@@ -528,3 +528,10 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Research: `BLOCKPLANET_GRID_LOG=1` logs why BlockPlanet's grid is held over the game (pause, quit, end screens, launch).
 - The end screens' Exit (an episode's end, which runs through the game's own routine to record the episode): from the moment Exit is chosen until the game is parked behind BlockPlanet's menus again (4 s at most), nothing the game draws is shown, its menu's grid background included, so its old menu no longer shows for a moment on the way back to Campaign. `BLOCKPLANET_EXIT_HIDE=0` turns this off, for research.
 - Roadmap: a research session planned on how a stage's sphere is built (one seed for the sphere, one per layer, or each block at random), with its steps.
+
+## 2026-11-18: How a stage's sphere is built (research)
+
+- Added [docs/research/blockplanet-sphere-generation.md](docs/research/blockplanet-sphere-generation.md), the answer to the owner's question: a stage's sphere comes from one seed (the sphere seed, with player 1's piece seed), not one per layer and not block by block. Layers are built bottom up from one stream of random numbers by dropping pieces at random spots, then filling the gaps with single blocks. Each mode loads its own settings record from one table; Training and Puzzle use stored layouts. Both players in a game get the same sphere.
+- Research switches (off by default, `src/graphics/sphere_build_research.cpp`, four hooks in `config/recomp/tetrisphere.us.rev0.toml`): `BLOCKPLANET_SPHERE_RESEARCH=1` logs each build, `BLOCKPLANET_SPHERE_SEED` and `BLOCKPLANET_PIECE_SEED` force the seeds (the same sphere every time), `BLOCKPLANET_RNG_LOG=1` logs every draw, and `BLOCKPLANET_SPHERE_LAYOUT=file` writes hand-made layers over the built sphere.
+- Roadmap: the sphere research section now has the findings and what they open (shared seeds, a daily stage, designed spheres).
+

@@ -89,6 +89,10 @@ bool blockplanet_title_skip_object(std::uint32_t scene, int object);
 bool blockplanet_title_object(std::uint8_t* rdram, std::uint32_t scene, int object, std::uint32_t parts);
 void blockplanet_title_watch(std::uint8_t* rdram);
 void blockplanet_fn_probe(std::uint8_t* rdram, recomp_context* ctx, uint32_t fn);
+void blockplanet_sphere_seed(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_level_build_begin(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_level_build_end(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_rng_draw(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx);
 void tetrisphere_rescue_pause_snapshot_hook(std::uint8_t* rdram,
                                             recomp_context* ctx);

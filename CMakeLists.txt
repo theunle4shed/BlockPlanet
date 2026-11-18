@@ -314,6 +314,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/sphere_grid.cpp
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
+    src/graphics/sphere_build_research.cpp
     src/graphics/pause_draw_hooks.cpp
     src/graphics/brick_sky.cpp
     src/graphics/magic_hooks.cpp
@@ -477,6 +478,7 @@ add_executable(tetrisphere_diag
     src/graphics/sphere_grid.cpp
     src/graphics/sphere_extended.cpp
     src/graphics/sphere_hooks.cpp
+    src/graphics/sphere_build_research.cpp
     src/graphics/pause_draw_hooks.cpp
     src/graphics/brick_sky.cpp
     src/graphics/magic_hooks.cpp
@@ -1214,6 +1216,8 @@ if(TETRISPHERE_GAME_ENABLED)
     src/graphics/sphere_grid.cpp
     src/graphics/sphere_extended.cpp
         src/graphics/sphere_hooks.cpp
+        src/graphics/sphere_build_research.cpp
+    src/graphics/sphere_build_research.cpp
         src/graphics/pause_draw_hooks.cpp
         src/graphics/brick_sky.cpp
         src/graphics/magic_hooks.cpp
