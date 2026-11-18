@@ -1351,9 +1351,20 @@ std::string screen_title(const std::string& screen) {
     return out;
 }
 
+std::string menu_place(const std::string& place) {
+    // "Rescue" -> "Rescue Menu" (the owner, 2026-11-18: the word Menu at the
+    // end of every "Exit to ..."), but "Main Menu" stays as it is.
+    if (place.size() >= 4) {
+        std::string tail = place.substr(place.size() - 4);
+        for (auto& c : tail) c = char(std::tolower(static_cast<unsigned char>(c)));
+        if (tail == "menu") return place.substr(0, place.size() - 4) + "Menu";
+    }
+    return place + " Menu";
+}
+
 std::string exit_to_label(const std::string& screen) {
     const std::string place = screen_title(screen.empty() ? "main" : screen);
-    return place.empty() ? "Exit" : "Exit to " + place;
+    return place.empty() ? "Exit" : "Exit to " + menu_place(place);
 }
 
 std::string current_screen() {

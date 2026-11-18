@@ -3774,6 +3774,16 @@ void begin_launch_presentation(LaunchMode mode) {
             return s.first == "pause" || s.first == "gameover" || s.first == "episode_end" || s.first == "puzzle_results";
         }))
         launch_path = path, launch_place = path.back().first == "stages" ? stages_title_now : std::string();
+    // A Rescue game always goes back to the Rescue menu (the owner,
+    // 2026-11-18), even when started from elsewhere (the main menu's
+    // Continue): Main Menu, Solo, Rescue. (Not Minefield, which plays in
+    // Rescue's mode from its own menus.)
+    if (mode == LaunchMode::Rescue && !tetrisphere::minefield_sphere::armed() &&
+        std::none_of(launch_path.begin(), launch_path.end(), [](const auto& s) { return s.first == "story"; })) {
+        launch_path = {{"main", 0}, {"solo", 0}, {"story", 0}};
+        launch_place.clear();
+        campaign_source.clear();
+    }
     loading_since = std::chrono::steady_clock::now();
     loading_active = true;
 }
@@ -4807,8 +4817,9 @@ bool handle_profile_command(const std::string& command) {
                     single_stage_result.reset();
                     menu_variant = play_variant = last.submode == "casual" ? PlayVariant::Casual : PlayVariant::Story;
                     chapter_zero_lesson.clear();
+                    // The episode from its first stage (the owner, 2026-11-18: an
+                    // episode left part-way starts again), not where it was left.
                     game_option_applier->choose_start(last.chapter, 1);
-                    pending_restore = last;
                     launch_mode(LaunchMode::Rescue);
                 }
                 continue;
@@ -4880,20 +4891,14 @@ bool handle_profile_command(const std::string& command) {
                 const auto& chapters = profile_data.progress.chapters_completed;
                 const auto episodes = chapters.find(game);
                 const auto completed = [&](int e) { return episodes != chapters.end() && episodes->second.count(e) != 0; };
-                const auto next_stage = [&](int e) {
-                    int stage = 1;
-                    if (const auto found = levels.find(game); found != levels.end())
-                        if (const auto c = found->second.find(e); c != found->second.end())
-                            while (stage < 10 && c->second.count(stage)) ++stage;
-                    return stage;
-                };
                 int resume = 1;
                 while (resume <= episodes_in_game && completed(resume)) ++resume;
                 const std::string prefix = lines ? "lines_campaign_episode:" : "campaign_episode:";
                 if (command->rfind(prefix, 0) == 0) {
                     const int episode = std::clamp(std::atoi(command->c_str() + prefix.size()), 1, episodes_in_game);
-                    // The episode to carry on from its next stage; any other from its start.
-                    const int stage = episode == resume ? next_stage(episode) : 1;
+                    // Always from the episode's first stage (the owner, 2026-11-18):
+                    // an episode left part-way is not completed, and starts again.
+                    const int stage = 1;
                     blockplanet::ui::send_command("chapter:" + std::to_string(episode) + ":" + std::to_string(stage));
                     continue;
                 }
@@ -4902,15 +4907,13 @@ bool handle_profile_command(const std::string& command) {
                 std::vector<blockplanet::ui::ListItem> items;
                 for (int e = 1; e <= shown; ++e) {
                     const bool here = e == focus && !completed(e);
-                    const bool started_here = here && next_stage(e) > 1;
                     // The one to carry on marked in the note, as "completed" is (the owner, 2026-11-18).
                     const std::string name = "Episode " + std::to_string(e);
                     blockplanet::ui::ListItem item{prefix + std::to_string(e), name,
-                                                   completed(e) ? "completed" : started_here ? "continue" : here ? "next" : "",
+                                                   completed(e) ? "completed" : here ? "next" : "",
                                                    "command:" + prefix + std::to_string(e), true, 1, e == focus};
                     item.description = completed(e) ? "Play this episode again from its first stage."
-                                       : started_here ? "Carry on from stage " + std::to_string(next_stage(e)) + "."
-                                       : here ? "Start this episode." : "Open for testing.";
+                                       : here ? "Start this episode, from its first stage." : "Open for testing.";
                     items.push_back(std::move(item));
                 }
                 blockplanet::ui::set_text("chapters_title", lines ? "Lines Campaign" : "Campaign");
@@ -5407,8 +5410,8 @@ bool handle_profile_command(const std::string& command) {
             const auto exit_label = [&]() -> std::string {
                 // Training's lessons go back to Training's menu (its screen's file title is another mode's).
                 if (guest::load16(guest_rdram, 0x800E44A8) == 3 && !launch_path.empty() && launch_path.back().first == "chapters")
-                    return "Exit to Training";
-                if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + launch_place;
+                    return "Exit to Training Menu";
+                if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + blockplanet::ui::menu_place(launch_place);
                 return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
             };
             // A lost Minefield (the owner, 2026-11-15): after its mines are shown,

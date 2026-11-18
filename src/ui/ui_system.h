@@ -90,6 +90,8 @@ std::string current_screen();
 std::string screen_title(const std::string& screen);
 // "Exit to <place>" for the screen a way out returns to ("Exit to Main Menu"
 // when none), or plain "Exit" when its title is not known (docs/STYLE.md).
+// A place's name as a menu: "Rescue Menu", "Main Menu" (not "Main Menu Menu").
+std::string menu_place(const std::string& place);
 std::string exit_to_label(const std::string& screen);
 
 // BlockPlanet's in-game HUD (docs/HUD_DESIGN.md), drawn over the game while
