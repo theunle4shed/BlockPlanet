@@ -2974,7 +2974,13 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
         cycle.keys = keyboard_snapshot;
         cycle.valid = true;
     }
-    const auto& controller = cycle.controllers[port];
+    auto controller = cycle.controllers[port];
+    // The free camera on the sticks (frame_step.h): the game's directions from
+    // the D-pad only, and the triggers (the camera's down and up) not the game's.
+    if (port == 0 && tetrisphere::frame_step::camera_has_sticks()) {
+        controller.sample.left_x = controller.sample.left_y = 0;
+        controller.sample.trigger_left = controller.sample.trigger_right = 0;
+    }
     const auto keys = cycle.keys;
     if (port == 1) cycle.valid = false;
     if (port == 1 && !controller.connected) return false;
@@ -3784,6 +3790,9 @@ void stop_game() {
 
 // Saves everything, stops the game and closes its devices and window.
 void shut_down() {
+    // Frozen by the developer tools: let the game go, or it never stops.
+    tetrisphere::frame_step::set_frozen(false);
+    tetrisphere::frame_step::set_enabled(false);
     save_window_placement();
     stop_game();
     // RT64's event-filter userdata dies with its rendering thread. Controller
@@ -5811,6 +5820,43 @@ bool handle_profile_command(const std::string& command) {
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             blockplanet::jukebox::tick();
+            // Developer tools: the free camera on player 1's sticks and triggers.
+            if (tetrisphere::frame_step::enabled()) {
+                static auto last_move = std::chrono::steady_clock::now();
+                const auto now_move = std::chrono::steady_clock::now();
+                const float dt = std::clamp(std::chrono::duration<float>(now_move - last_move).count(), 0.0f, 0.1f);
+                last_move = now_move;
+                ControllerSample pad{};
+                {
+                    std::lock_guard lock(input_snapshot_mutex);
+                    if (input_snapshot[0].connected) pad = input_snapshot[0].sample;
+                }
+                const auto axis = [](int v) {  // -1 to 1, with a dead zone
+                    const float f = std::clamp(float(v) / 32767.0f, -1.0f, 1.0f);
+                    return std::abs(f) < 0.2f ? 0.0f : (f - std::copysign(0.2f, f)) / 0.8f;
+                };
+                tetrisphere::frame_step::CameraMove move;
+                static bool left_click = false, right_click = false;
+                if (pad.right_stick && !right_click) move.scene = 1;
+                if (pad.left_stick && !left_click) move.scene = -1;
+                left_click = pad.left_stick, right_click = pad.right_stick;
+                move.right = axis(pad.left_x) * dt;
+                move.forward = -axis(pad.left_y) * dt;
+                move.up = (axis(pad.trigger_right) - axis(pad.trigger_left)) * dt;
+                move.yaw = axis(pad.right_x) * 1.5f * dt;
+                move.pitch = axis(pad.right_y) * 1.5f * dt;
+                // Research (no sticks on the test harness's virtual pad):
+                // BLOCKPLANET_QA_CAMERA="right up forward yaw pitch", held.
+                static const std::array<float, 5> qa_stick = [] {
+                    std::array<float, 5> v{};
+                    if (const char* e = std::getenv("BLOCKPLANET_QA_CAMERA"))
+                        std::sscanf(e, "%f %f %f %f %f", &v[0], &v[1], &v[2], &v[3], &v[4]);
+                    return v;
+                }();
+                move.right += qa_stick[0] * dt, move.up += qa_stick[1] * dt, move.forward += qa_stick[2] * dt;
+                move.yaw += qa_stick[3] * 1.5f * dt, move.pitch += qa_stick[4] * 1.5f * dt;
+                tetrisphere::frame_step::drive_camera(move);
+            }
             // --developer-frozen: the inspector opened on the first held frame,
             // as F1 would (RT64 watches the key through its event filter).
             if (developer_frozen_start && tetrisphere::frame_step::waiting()) {

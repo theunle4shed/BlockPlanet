@@ -351,6 +351,39 @@ public:
             // each frame (frame_step.h), as its own Pause (F4) does.
             RT64::Application* app = app_.get();
             frame_step::set_picture_pauser([app](bool pause) { app->state->debuggerInspector.paused = pause; });
+            // ...and the free camera moved by a joypad, as RT64's own mouse
+            // controls move it (rt64_camera_controller.cpp): its speed a fifth
+            // of the scene's depth a second.
+            frame_step::set_camera_driver([app](const frame_step::CameraMove& m) {
+                auto& camera = app->state->debuggerInspector.camera;
+                if (m.scene < 0) camera.enabled = false;
+                if (m.scene > 0) {
+                    // On, or the next 3D scene of the frame on screen: its view
+                    // taken over from its first projection, as RT64's checkbox
+                    // does for the first scene (enableFreeCamera).
+                    auto& queue = *app->workloadQueue;
+                    const auto& frame = queue.gameFrames[queue.curFrameIndex % queue.gameFrames.size()];
+                    const std::size_t count = frame.perspectiveScenes.size();
+                    if (count > 0) {
+                        const std::uint32_t next = camera.enabled ? (camera.sceneIndex + 1) % count : 0;
+                        const auto& scene = frame.perspectiveScenes[next];
+                        if (!scene.projections.empty()) {
+                            const auto& p = scene.projections.front();
+                            app->state->debuggerInspector.enableFreeCamera(queue.workloads[p.workloadIndex], p.fbPairIndex, p.projectionIndex);
+                            camera.sceneIndex = next;
+                        }
+                    }
+                    std::fprintf(stdout, "{\"event\":\"free_camera_scene\",\"scene\":%u,\"scenes\":%zu,\"on\":%s}\n", camera.sceneIndex, count,
+                                 camera.enabled ? "true" : "false");
+                    std::fflush(stdout);
+                }
+                if (!camera.enabled) return false;
+                const float speed = (camera.farPlane - camera.nearPlane) / 5.0f;
+                if (m.right != 0.0f || m.up != 0.0f || m.forward != 0.0f)
+                    app->state->cameraController.movePerspective(camera, {m.right * speed, m.up * speed, -m.forward * speed});
+                if (m.yaw != 0.0f || m.pitch != 0.0f) app->state->cameraController.rotatePerspective(camera, m.yaw, m.pitch);
+                return true;
+            });
             std::fprintf(stdout,
                          "{\"event\":\"rt64_device_ready\",\"run_id\":\"%s\",\"api\":\"vulkan\"}\n",
                          run_id());
@@ -358,7 +391,10 @@ public:
         }
     }
 
-    ~Context() { frame_step::set_picture_pauser(nullptr); }
+    ~Context() {
+        frame_step::set_picture_pauser(nullptr);
+        frame_step::set_camera_driver(nullptr);
+    }
 
     bool valid() override { return app_ != nullptr; }
     bool update_config(const ultramodern::renderer::GraphicsConfig& old_config,
@@ -489,7 +525,7 @@ public:
                 }
             }
             ui_current_tag = 0;
-            frame_step::gate();  // developer tools: frozen, or a frame at a time
+            frame_step::gate([this] { update_screen(); });  // developer tools: frozen, or a frame at a time
             {
                 ScopedPerfTimer rt64_timer(perf_metrics().display_list_rt64);
                 app_->processDisplayLists(app_->core.RDRAM,

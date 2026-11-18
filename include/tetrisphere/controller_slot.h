@@ -21,8 +21,11 @@ struct ControllerSample {
     bool dpad_right = false;
     bool left_shoulder = false;
     bool right_shoulder = false;
+    bool left_stick = false, right_stick = false;  // the sticks' clicks (the free camera's on and off)
     std::int16_t left_x = 0;
     std::int16_t left_y = 0;
+    std::int16_t right_x = 0;  // the game does not use it (the developer tools' free camera does)
+    std::int16_t right_y = 0;
     std::int16_t trigger_left = 0;
     std::int16_t trigger_right = 0;
 };

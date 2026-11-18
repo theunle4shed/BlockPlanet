@@ -22,8 +22,12 @@ ControllerSample read_sample(SDL_GameController* controller) {
     result.dpad_right = button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
     result.left_shoulder = button(SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
     result.right_shoulder = button(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+    result.left_stick = button(SDL_CONTROLLER_BUTTON_LEFTSTICK);
+    result.right_stick = button(SDL_CONTROLLER_BUTTON_RIGHTSTICK);
     result.left_x = SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTX);
     result.left_y = SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_LEFTY);
+    result.right_x = SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTX);
+    result.right_y = SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_RIGHTY);
     result.trigger_left = SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
     result.trigger_right = SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
     return result;

@@ -34,7 +34,8 @@ std::map<std::pair<SDL_JoystickID, int>, int> stick;
 
 bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBindings& bindings) {
     // Developer tools (frame_step.h): F6 freezes the game or lets it carry on,
-    // F7 lets one frame through (held: one after another).
+    // F7 lets one frame through (held: one after another), F8 turns the free
+    // camera on or moves it to the next 3D scene, F9 turns it off.
     if (tetrisphere::frame_step::enabled() && event.type == SDL_KEYDOWN) {
         if (event.key.keysym.scancode == SDL_SCANCODE_F6 && !event.key.repeat) {
             tetrisphere::frame_step::set_frozen(!tetrisphere::frame_step::frozen());
@@ -42,6 +43,14 @@ bool handle_menu_event(const SDL_Event& event, bool assigned, const ControllerBi
         }
         if (event.key.keysym.scancode == SDL_SCANCODE_F7) {
             tetrisphere::frame_step::step();
+            return true;
+        }
+        if (event.key.keysym.scancode == SDL_SCANCODE_F8 && !event.key.repeat) {
+            tetrisphere::frame_step::request_scene(1);
+            return true;
+        }
+        if (event.key.keysym.scancode == SDL_SCANCODE_F9 && !event.key.repeat) {
+            tetrisphere::frame_step::request_scene(-1);
             return true;
         }
     }

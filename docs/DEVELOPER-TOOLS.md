@@ -15,7 +15,19 @@ For finding out what the game draws and where: behind the sphere, the tunnel, th
 | **F6** | Freezes the game, or lets it carry on. |
 | **F7** | One frame on (hold it for frame after frame). Freezes first if it was running. |
 
-While frozen, RT64's picture is paused on the last frame, so the free camera and the draw-call list work on it. The first frames after start are black (the console starting up): hold F7 to reach the N64 logo. If the inspector window has the keyboard (its text box or list was clicked), click the game picture first so F6 and F7 reach the game.
+While frozen, RT64's picture is paused on the last frame, so the draw-call list works on it. A paused picture is not drawn again from a moved free camera (RT64's own Pause, F4, is the same): move the camera, then press F7, and the next frame is drawn from it.
+
+**The free camera on a joypad (with developer tools on):** player 1's controller.
+
+| Control | What it does |
+| --- | --- |
+| **Right stick click** or **F8** | Turns the free camera on, or moves it to the frame's next 3D scene (the game draws several: the background, the sphere, the pieces; RT64's checkbox always takes the first). |
+| **Left stick click** or **F9** | Turns it off. |
+| **Left stick** | Moves the camera (sideways, forwards and back). |
+| **Right stick** | Turns it. |
+| **Triggers** | Lower (left) and raise (right) it. |
+
+While the free camera is on, the game takes its directions from the D-pad only (the cursor in the menus and in play), and not the triggers, so you can fly about and play at once. `BLOCKPLANET_QA_CAMERA="right up forward yaw pitch"` holds a stick position, for testing without a pad; `BLOCKPLANET_FREE_CAMERA_LOG=1` logs the camera's moves. The first frames after start are black (the console starting up): hold F7 to reach the N64 logo. If the inspector window has the keyboard (its text box or list was clicked), click the game picture first so F6 and F7 reach the game.
 
 **In the game:**
 
