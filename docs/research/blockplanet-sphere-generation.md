@@ -119,13 +119,14 @@ Investigated 2026-11-18 by reading the code only; nothing is changed.
 | `+0x4` | s16 | Number of cells | Confirmed |
 | `+0x6`, `+0x7` | u8 × 2 | Size of the layout box the builder uses (2 × 2 or 3 × 3) | Confirmed |
 | `+0x8` | u8 | Shape ID, 1 to 6 | Confirmed |
-| `+0x9` | u8 | 0 in every record | Unknown |
+| `+0x9` | u8 | 128 for the square, 0 for the other five kinds; probably a flag (perhaps for a piece that looks the same from every side) | Unknown |
 | `+0xA` | s16 × 9 | The 3 × 3 layout: entry *x* × 3 + *y* holds the cell's number (1 to *n*), 0 where the piece has no cell. A cell's block value is the record's value plus its number minus one | Confirmed (layouts match the shapes on screen) |
 | `+0x1C` | s16 × 25 | A 5 × 5 map, one cell larger than the layout on every side, marking the cells around the piece (sides and corners) | Confirmed as data; its use (probably finding the bricks a piece touches) is inferred |
 | `+0x78` | 9 × 96 bytes | For each cell, 6 faces × 4 corners of texture coordinates: which tile of the brick texture each face shows, and turned which way, so a piece's cells join into one brick with edges only on its outside (`func_800826D0`, 192 calls in the builder) | Confirmed in the code |
+| `+0x738` | u8 × 9 | One byte per layout cell (*x* × 3 + *y*), 0 where the piece has no cell: 16 plus the cell's open (unjoined) sides, N 1, S 2, W 4, E 8. One exception: the T's centre (open only to the S) has 19, not 18. Read by `func_800A3894`, `func_800AA20C`, `func_800B3668`, `func_800BFDA4` (use not read) | Confirmed as data |
 | `+0x742` to `+0x748` | s16 × 4 | The piece's own box inside the layout: width, height, then the column and row it starts at (the flat bar: 3, 1, 0, 1). Read by `func_800B3DEC`, `func_800BC850`, `func_800BCB50`, `func_800C8E24` | Confirmed as data |
 | `+0x74A` | s16 | Number of entries in the list that follows: 4 to 12 | Confirmed as data |
-| `+0x74C` | byte pairs | Offsets (column, row) at which a second piece of the same shape fits exactly against this one: for the square (±2, 0) and (0, ±2), for the T twelve. Read by the combo code (`func_800C8210` to `func_800C9184`) and `func_800B0B30` | Data confirmed; use inferred |
+| `+0x74C` | byte pairs | The positions (column, row, stored with the column mirrored) at which a second piece of the same shape counts as fitting against this one, **which is what decides a combo**. For the L, S and T it is every position where the second piece touches without overlapping; for the square and the two bars only the lined-up ones (end to end, side by side). Up to 14 fit in the record. Read by the combo code (`func_800C8210` to `func_800C9184`) and `func_800B0B30` | Confirmed (rule matches all six kinds; the combo role was shown with the cross, below) |
 
 **The six kinds:**
 
@@ -161,6 +162,14 @@ This corrects the game-state notes, which guessed that IDs 3 and 4 were L shapes
 **Not covered by any piece in the game:** a single-cell piece and a cell joined on all four sides (a cross); tiles 0, 1, 8 and 9 are never used by pieces and are the likely candidates. Single blocks are different: the filler, the special cell and Hide & Seek's single blocks (materials 1 to 7) each use one whole tile (10 to 15) on every face with a fixed turn, and the core and picture tiles (materials 8 to 25) use another mapping.
 
 **Material 38 is the "?" piece** (value 342, shape ID 7, tile 10 on every face), not a free material, so the seven materials the game accepts (32 to 38) are all used, and a new colour would need those range checks widened (or a piece to borrow an existing material's colour).
+
+**Building a whole record from a layout.** Every field above can be generated from the 3 × 3 layout alone. Generated that way, the six kinds' records match the game's byte for byte (all 1,896 bytes, apart from the square's flag at `+0x9` and the T centre's byte at `+0x738`).
+
+**Experiment: a five-cell cross (2026-11-18, temporary code, not committed).** Every material the game accepts is taken, and a cell's block value and drawing come from its material, so the cross replaced the T's record (material 37, red) at the start of the stage, built from its layout as above. On Rescue 1-1 with the kinds set to the square and the cross (`BLOCKPLANET_STAGE_RECORD_EDIT=11=0x21`):
+- **It builds and draws.** The builder placed 60 crosses in the layer (values 333 to 337, five cells each); fewer fit than other shapes, so more single filler blocks were left. They were drawn as joined red crosses; the stage played normally.
+- **The centre cell (joined on all four sides)** has no tile in the game's rule. Tiles 0 and 1 give a clean centre; tiles 8 and 9 show a mark, so they are meant for something else.
+- **The fitting list decides combos.** With every piece a cross (`2=1,11=0x20`) and 16 drops at moving spots: with only the four tip-to-tip positions listed (like the bars, a design the owner suggested), no drop made a combo (16 hearts lost); with all 12 touching positions, 5 drops made combos, and the stage was won and the next one built. So "ends only" works as a rule but makes a random sphere very hard, because the builder seldom leaves crosses tip to tip.
+- **Still to do for a real new piece:** its own colour (all seven materials are taken), its byte at `+0x738` for the centre (16 was used), BlockPlanet's Next picture (it showed the T, since the shape ID was kept), and a choice of combo rule.
 
 **How pieces avoid overlapping.** Every piece fits a fixed 3 × 3 layout (nine halfwords from the record's `+0xA`), and every routine that places a piece walks exactly those nine cells, written out one by one:
 - **Building the sphere:** `func_8008DBF8` tests the nine layout cells against the board at the target layer and rejects the spot if any cell it would cover is filled; only then do `func_8008BB24` and its relatives write the nine cells (nine calls to the write helper `func_8008BE58`), after a check that the piece would lie flat (the ROM's messages about a piece's height and "breaking a piece" come from these routines).
