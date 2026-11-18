@@ -38,7 +38,7 @@ bool pause_parked();
 void set_end_park(bool park);
 // BlockPlanet's pause, Quit (direct): as the parked game is let out, play
 // is left for the game's menu at once, as its pause EXIT does at its end.
-void request_direct_quit();
+void request_direct_quit(bool from_game_over = false);
 bool end_parked();
 
 } // namespace blockplanet

@@ -140,10 +140,16 @@ public:
         park_ = std::move(park);
         parked_ = std::move(parked);
     }
+    // A game over's Exit done directly (its menu not let run): called as the
+    // game is let out (vortex_backdrop.h, request_direct_quit). Only a game
+    // over's; the episode end's and Versus' Exits go through their menus.
+    void set_direct_exit(std::function<void()> exit) { exit_ = std::move(exit); }
 
 private:
     std::function<void(bool)> park_;
     std::function<bool()> parked_;
+    std::function<void()> exit_;
+    bool game_over_ = false;  // the menu shown is a game over's
     bool parking_ = false;
     void park(bool on) {
         if (!park_) return;

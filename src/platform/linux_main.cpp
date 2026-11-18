@@ -5181,7 +5181,6 @@ bool handle_profile_command(const std::string& command) {
                 }();
                 if (own_pause && !parker_set) {
                     parker_set = true;
-                    set_own_pause_keys(true);
                     pause_bridge.set_parker([](bool park) { blockplanet::set_pause_park(park); },
                                             [] { return blockplanet::pause_parked(); });
                     static const bool direct_quit = [] {
@@ -5189,6 +5188,7 @@ bool handle_profile_command(const std::string& command) {
                         return v == nullptr || v[0] != '0';
                     }();
                     if (direct_quit) pause_bridge.set_direct_quit([] { blockplanet::request_direct_quit(); });
+                    if (direct_quit) end_menu.set_direct_exit([] { blockplanet::request_direct_quit(true); });
                     static const bool own_end = [] {
                         const char* v = std::getenv("BLOCKPLANET_OWN_END");
                         return v == nullptr || v[0] != '0';
@@ -5197,15 +5197,19 @@ bool handle_profile_command(const std::string& command) {
                         end_menu.set_parker([](bool park) { blockplanet::set_end_park(park); },
                                             [] { return blockplanet::end_parked(); });
                 }
-                const bool in_play_now = guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                // (Not the attract demo, mode 10, nor the box art's: Start ends it, as in the game.)
+                const bool demo_now = guest::load16(guest_rdram, 0x800E44A8) == 10 ||
+                                      tetrisphere::box_art::phase().load() == tetrisphere::box_art::Phase::Demo;
+                const bool in_play_now = !demo_now && guest::load16(guest_rdram, 0x800E121C) == -1 &&
                                          std::int16_t(guest::load16(guest_rdram, 0x800E1228)) < 0 &&
                                          std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) != -1;
+                set_own_pause_keys(own_pause && !demo_now);
                 own_pause_ready.store(own_pause && in_play_now && !blockplanet::ui::menus_open() && !launching() &&
                                       !pause_bridge.owned());
                 // Kept from the game the whole time in play (a key stays down
                 // for several reads: let through once paused, the game took it as
                 // its own pause, which started when it was let out).
-                own_pause_mask.store(own_pause && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                own_pause_mask.store(own_pause && !demo_now && guest::load16(guest_rdram, 0x800E121C) == -1 &&
                                      std::int16_t(guest::load16(guest_rdram, 0x80112F9E)) != -1);
                 const bool start_now = own_pause_start.exchange(false);
                 static const bool log = std::getenv("BLOCKPLANET_IDLE_LOG") != nullptr;  // research

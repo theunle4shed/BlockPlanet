@@ -277,6 +277,16 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
     }
     out.active = game_over || episode_end_ || showing_ || choice_;
     if (choice_) {
+        // A game over's Exit, directly (set_direct_exit).
+        if (exit_ && game_over_ && !episode_end_ && !versus && *choice_ == exit_row_ && exit_row_ >= 0) {
+            exit_();
+            park(false);
+            choice_.reset();
+            showing_ = false;
+            items_.clear();
+            out.close_menu = menus_open;
+            return out;
+        }
         // Parked: let the game out first; its row and A once it is out.
         if (parking_ || (parked_ && parked_())) {
             park(false);
@@ -303,6 +313,7 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
         if (items.empty()) return out;
         items_ = std::move(items);
         title_ = game_over ? "Game Over" : episode_end_ ? "Episode Cleared" : "Match Over";
+        game_over_ = game_over;
         showing_ = true;
         out.active = true;
     }

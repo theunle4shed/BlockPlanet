@@ -70,6 +70,7 @@ std::atomic<bool> idle_wanted{false};  // the game parked behind BlockPlanet's m
 std::atomic<bool> pause_wanted{false}; // the game parked for BlockPlanet's pause, in play
 std::atomic<bool> end_wanted{false};   // the game parked behind BlockPlanet's end screens, in play
 std::atomic<bool> quit_wanted{false};  // leave play for the menu as the game's pause EXIT ends (direct quit)
+std::atomic<bool> quit_game_over{false};  // ...from the game over menu: its EXIT's own steps too
 std::atomic<int> wanted_stage{0};  // 0 the vortex, 1 to 25 a play background
 int shown_stage = 0;               // what the reset screen draws now (game thread)
 bool stage_built = false;
@@ -215,7 +216,10 @@ bool game_idle() { return showing.load() && !wanted.load(); }
 void set_pause_park(bool park) { pause_wanted.store(park); }
 bool pause_parked() { return pause_wanted.load() && showing.load(); }
 void set_end_park(bool park) { end_wanted.store(park); }
-void request_direct_quit() { quit_wanted.store(true); }
+void request_direct_quit(bool from_game_over) {
+    quit_game_over.store(from_game_over);
+    quit_wanted.store(true);
+}
 bool end_parked() { return end_wanted.load() && showing.load(); }
 
 } // namespace blockplanet
@@ -241,6 +245,15 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         // without its fade and page animation (about 4 s). Its EXIT saves
         // nothing (the routine it calls, func_8003F8D8, only draws).
         if (quit_wanted.exchange(false) && load16(rdram, scene_row) == -1) {
+            // From the game over menu, as its EXIT does first (func_80058100 at
+            // 0x80058E50): its music player stopped, its "chosen" flag set.
+            if (quit_game_over.exchange(false)) {
+                const recomp_context saved = *ctx;
+                ctx->r4 = address(0x80108828u);
+                func_8007ADF8(rdram, ctx);
+                *ctx = saved;
+                store32(rdram, 0x800E0780u, 1);
+            }
             store16(rdram, scene_row, load16(rdram, 0x800E0754u));
             store16(rdram, 0x800E1220u, -1);
             store16(rdram, 0x800E1222u, -1);
