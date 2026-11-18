@@ -766,3 +766,27 @@ text = "blockplanet_game_over_camera(rdram, ctx);"
 [[patches.hook]]
 func = "func_800BB3D0"
 text = "if (blockplanet_game_over_hide_bricks(rdram, ctx)) return;"
+
+# Research: how a stage's sphere is built (src/graphics/sphere_build_research.cpp).
+[[patches.hook]]
+func = "func_800CC6E0"
+before_vram = 0x800CC7C4
+text = "blockplanet_sphere_seed(rdram, ctx);"
+
+[[patches.hook]]
+func = "func_800906E8"
+text = "blockplanet_level_build_begin(rdram, ctx);"
+
+[[patches.hook]]
+func = "func_800906E8"
+before_vram = 0x800920D0
+text = "blockplanet_level_build_end(rdram, ctx);"
+
+[[patches.hook]]
+func = "func_80081E90"
+text = "blockplanet_rng_draw(rdram, ctx);"
+
+[[patches.hook]]
+func = "func_8002A870"
+before_vram = 0x8002A894
+text = "blockplanet_stage_record_edit(rdram, ctx);"

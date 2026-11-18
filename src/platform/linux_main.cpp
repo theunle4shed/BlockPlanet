@@ -1608,6 +1608,8 @@ void poll_type47_experiment() {
     std::fflush(stdout);
 }
 
+extern "C" void blockplanet_sphere_play_log(std::uint8_t* rdram);  // src/graphics/sphere_build_research.cpp
+
 // Research aid: with BLOCKPLANET_POKE_FILE set, lines "0xADDRESS:SIZE=VALUE"
 // written to that file are stored into guest memory, and lines "cmd:NAME" run
 // a menu command, then the file is removed.
@@ -1745,6 +1747,7 @@ void poll_game_events() {
     if (game_option_applier) game_option_applier->apply(const_cast<std::uint8_t*>(guest_rdram));
     tetrisphere::minefield_sphere::poll(const_cast<std::uint8_t*>(guest_rdram));
     research_hole(const_cast<std::uint8_t*>(guest_rdram));
+    blockplanet_sphere_play_log(const_cast<std::uint8_t*>(guest_rdram));
     const auto state = read_game_state(guest_rdram);
     const auto now = std::chrono::steady_clock::now();
     if (profile_recording && state.scene == -1 && last_play_poll != std::chrono::steady_clock::time_point{}) {
