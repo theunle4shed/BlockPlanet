@@ -285,7 +285,13 @@ extern "C" void blockplanet_vortex_frame(std::uint8_t* rdram, recomp_context* ct
         std::fprintf(stdout, "{\"event\":\"vortex_backdrop_switch\",\"stage\":%d}\n", shown_stage);
         std::fflush(stdout);
     }
-    if (!want || wanted_stage.load() != shown_stage) {
+    // Leaving: when nothing wants the game parked any more, or the jukebox
+    // wants another background that cannot be built in place. The jukebox
+    // going back to a grid mode while the game stays parked behind the menus
+    // (idle) is not a leaving: the game just stops being drawn. Leaving and
+    // parking again showed the game's own menu for a moment (the owner,
+    // 2026-11-18: from the last background back to Water).
+    if (!want || (wanted.load() && wanted_stage.load() != shown_stage)) {
         leave(rdram, ctx);  // (a different background: entered again next frame)
         // BlockPlanet's pause, Quit: play left for the game's menu at once, as
         // the game's pause does at the end of its EXIT (func_8003FE3C at

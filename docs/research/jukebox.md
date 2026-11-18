@@ -15,6 +15,7 @@ They are the game's bonus music. Its song routine (`func_8007F720`) refuses any 
 | Play, Stop, Previous, Next | Built | Previous restarts the track after its first few seconds, as Winamp does |
 | Pause | Not yet | Stop silences the music; the song runs on underneath. A true pause needs the game's song player held still (its sequence player at `0x80107290`; candidates: stop its tick, or set its tempo to nothing). Research. |
 | Time played | Built | Unknown ("-:--") for the menus' own music until a track is chosen |
+| Moving on at a loop | Built (2026-11-18) | The music players' place in the song is a 32-bit count at player `+0x1568` (the background player `0x80107290`, the jingle player `0x80109DC0`): it counts up through the sequence and goes back to near zero where the song loops (found by tracing the player ten times a second, `BLOCKPLANET_PLAYER_TRACE=path`; Prophetic, track 1, loops about 3:48 after it starts). With Repeat off (now the default), a track moves on at the first loop after five minutes (ten at most); the Intro, Title and Vortex songs after one play. |
 | Time left, seek bar | Not yet | Needs each song's length: the songs are sequences that loop, so the length is the position of the loop point. Chris Gilmore's song-format research (`dcm2xm`, credited in the README) is the place to start. With lengths, Repeat off could move on at the real end instead of after three minutes. |
 | Shuffle, Repeat | Built | |
 | Playlist | Built | All 23 tracks |

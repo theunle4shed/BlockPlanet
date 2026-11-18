@@ -5819,7 +5819,23 @@ bool handle_profile_command(const std::string& command) {
             if (was_paused && !paused) unpaused_at = now_g;
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
-            blockplanet::jukebox::tick();
+            blockplanet::jukebox::tick(guest_rdram);
+            // Research: BLOCKPLANET_PLAYER_TRACE=path appends the music players
+            // (0x80107290 and the jingle player 0x80109DC0, 0x1600 bytes each)
+            // ten times a second, to find where a song loops.
+            if (static const char* trace = std::getenv("BLOCKPLANET_PLAYER_TRACE"); trace != nullptr && guest_rdram != nullptr) {
+                static auto next_trace = std::chrono::steady_clock::now();
+                static std::ofstream out(trace, std::ios::binary);
+                if (std::chrono::steady_clock::now() >= next_trace) {
+                    next_trace += std::chrono::milliseconds(100);
+                    for (const std::uint32_t base : {0x80107290u, 0x80109DC0u})
+                        for (std::uint32_t a = base; a < base + 0x1600u; a += 2) {
+                            const std::uint16_t v = static_cast<std::uint16_t>(guest::load16(guest_rdram, a));
+                            out.write(reinterpret_cast<const char*>(&v), 2);
+                        }
+                    out.flush();
+                }
+            }
             // Developer tools: the free camera on player 1's sticks and triggers.
             if (tetrisphere::frame_step::enabled()) {
                 static auto last_move = std::chrono::steady_clock::now();

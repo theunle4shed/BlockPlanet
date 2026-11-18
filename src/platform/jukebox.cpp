@@ -7,6 +7,7 @@
 #include "tetrisphere/jukebox.h"
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/audio_spectrum.h"
+#include "tetrisphere/guest_memory.h"
 #include "tetrisphere/vortex_backdrop.h"
 #include "../ui/ui_jukebox.h"
 #include "../ui/ui_system.h"
@@ -24,11 +25,18 @@ namespace {
 
 using clock = std::chrono::steady_clock;
 
+// The song's loops, counted from the player's place in its sequence
+// (player +0x1568, 32 bits: it counts up through the song and goes back to
+// near zero where the song loops; found by tracing the background music
+// player, docs/research/jukebox.md).
+int loops = 0;
+int loops_at_five = 0;  // the loops counted by five minutes
+std::uint32_t last_position = 0;
 int track = -1;                       // the track the jukebox last played (-1: none yet)
 std::optional<clock::time_point> started;  // when it started (none: stopped, or not known)
 bool stopped = false;
 bool shuffle = false;
-bool repeat = true;
+bool repeat = false;  // the owner (2026-11-18): move on eventually, at the end of a loop
 int visualiser = 1;                   // 0 Water, 1 Pulse, 2 Bars
 int shown_seconds = -2;
 
@@ -89,6 +97,10 @@ void play(int t) {
     set_music_muted(false);
     stopped = false;
     started = clock::now();
+    loops = 0;
+    last_position = 0;
+    std::fprintf(stdout, "{\"event\":\"jukebox_play\",\"track\":%d,\"name\":\"%s\"}\n", track, song_name(track));
+    std::fflush(stdout);
 }
 
 ui::ListItem button(const std::string& id, const char* icon, const std::string& label, const std::string& action,
@@ -113,7 +125,7 @@ void publish(const unsigned char* rdram) {
                         " · " + visualiser_name(visualiser);
     ui::set_text("jb_modes", modes);
     shown_seconds = -2;
-    tick();
+    tick(nullptr);
 
     std::vector<ui::ListItem> controls;
     controls.push_back(button("prev", "", "Previous", "jukebox_prev", "The track before (or this one again, once it has played a few seconds)"));
@@ -122,7 +134,7 @@ void publish(const unsigned char* rdram) {
     controls.push_back(button("next", "", "Next", "jukebox_next", shuffle ? "A random track" : "The next track"));
     controls.push_back(button("shuffle", "", "Shuffle", "jukebox_shuffle", "Next and Previous pick tracks at random", shuffle));
     controls.push_back(button("repeat", repeat ? "" : "", "Repeat", "jukebox_repeat",
-                              "On: the track plays on and on, as in the game. Off: the next track after three minutes", repeat));
+                              "On: the track plays on and on, as in the game. Off: the next track once a loop ends after five minutes (the short Intro, Title and Vortex songs after one play)", repeat));
     controls.push_back(button("playlist", "", "Playlist", "jukebox_list", "All 26 songs: the 23 tracks, then the intro's, the title's and the vortex's"));
     controls.push_back(button("visualiser", visualiser_icon(visualiser), visualiser_name(visualiser), "jukebox_vis",
                               "The background: Water, Pulse and Bars on the tiles; Spectrum, Scope and Pieces full screen, "
@@ -182,7 +194,7 @@ bool command(const std::string& command, const unsigned char* rdram) {
     return true;
 }
 
-void tick() {
+void tick(const unsigned char* rdram) {
     // The Vortex while a jukebox screen is on top and it is chosen.
     const auto screen = ui::current_screen();
     set_vortex_backdrop(visualiser >= vortex && (screen == "jukebox" || screen == "jukebox_list"), stage_of(visualiser));
@@ -190,7 +202,21 @@ void tick() {
     set_backdrop_hue(ui::jukebox_hue(std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count()),
                      tetrisphere::audio_spectrum::level());
     const int seconds = elapsed_seconds();
-    if (!repeat && !stopped && seconds >= 180 && track_override()) {
+    // A loop: the song's place jumps back (to under a quarter of where it was).
+    if (rdram != nullptr && track >= 0 && started) {
+        const std::uint32_t player = track < track_count ? 0x80107290u : 0x80109DC0u;
+        const std::uint32_t position = tetrisphere::guest::load32(rdram, player + 0x1568u);
+        if (last_position > 200 && position < last_position / 4) ++loops;
+        last_position = position;
+    }
+    // Moving on (Repeat off): a track at the end of a loop once it has played
+    // five minutes (ten at the most, if no loop is seen); the short extra songs
+    // after one play (or 40 seconds).
+    const bool extra = track >= track_count;
+    const bool done = extra ? (loops >= 1 && seconds >= 3) || seconds >= 40
+                            : seconds >= 600 || (seconds >= 300 && loops > loops_at_five);
+    if (seconds < 300) loops_at_five = loops;
+    if (!repeat && !stopped && seconds >= 0 && done && (track_override() || extra_song() >= 0)) {
         play(shuffle ? random_other(track) : track + 1);
         publish(nullptr);
         return;
