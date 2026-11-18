@@ -874,6 +874,12 @@ extern "C" void blockplanet_direct_start(std::uint8_t* rdram, recomp_context* ct
         store32(rdram, menu_timer_b, 0);
         log("note", request, "from_title");
     }
+    // The pause row left over from an end menu (an episode end's Exit, run by
+    // the game's own routine, leaves it at its Exit row, 1): the game's own
+    // menus clear it before play, this start must too, or the new game opens
+    // as if its pause menu were up (the owner, 2026-11-18: after Exit, the next
+    // episode started unseen and could not be paused).
+    store16(rdram, pause_row, -1);
     bool started = false;
     switch (request.mode) {
     case DirectMode::Rescue: started = start_single(rdram, ctx, request, mode_rescue); break;

@@ -148,11 +148,13 @@ std::string campaign_source;
 // try the next one?"), waiting for A; BlockPlanet presses it, unseen under
 // the loading cover (its own panel has said the congratulations).
 std::optional<std::chrono::steady_clock::time_point> episode_card_skip;
+bool episode_card_up = false;  // the card is on screen now (the loading cover holds over it)
 // An end screen's Exit: the game hidden until it is parked behind the menus
 // again (4 s at most), so its own menu (the episode end's Exit runs through
 // the game's routine) does not show for a moment (the owner, 2026-11-18).
 std::optional<std::chrono::steady_clock::time_point> exit_hide_since;
 bool exit_hide_let_out = false;
+std::size_t campaign_resume_index(bool lines);  // (below) the Campaign list's place of the episode to carry on
 void restore_launch_path() {
     static auto last = std::chrono::steady_clock::time_point{};
     const auto now = std::chrono::steady_clock::now();
@@ -163,7 +165,12 @@ void restore_launch_path() {
             blockplanet::ui::send_command("stages:" + std::to_string(launch_stages_chapter) + ":refresh");
         if (screen == "chapters" && !campaign_source.empty()) blockplanet::ui::send_command(campaign_source + "_refresh");
     }
-    blockplanet::ui::request_restore(launch_path);
+    // Back on the Campaign list: the episode to carry on chosen, not the one
+    // last started (after clearing an episode, the next one).
+    auto path = launch_path;
+    for (auto& [screen, focus] : path)
+        if (screen == "chapters" && !campaign_source.empty()) focus = campaign_resume_index(campaign_source == "lines_campaign");
+    blockplanet::ui::request_restore(path);
 }
 std::string loading_title;
 // Quit to menu was chosen from the pause: the menu grid stays up until the
@@ -279,6 +286,15 @@ PlayVariant menu_variant = PlayVariant::Story;  // the chapter list on screen
 // (menu_lines), and the run in play is Lines (play_lines).
 bool menu_lines = false, play_lines = false;
 constexpr int lines_chapters = 5;  // the game's final Lines ending follows episode 5
+std::size_t campaign_resume_index(bool lines) {
+    const char* game = lines ? "lines" : "rescue";
+    const int count = lines ? lines_chapters : 10;  // (Rescue: rescue_chapters, below)
+    const auto& chapters = profile_data.progress.chapters_completed;
+    const auto done = chapters.find(game);
+    int resume = 1;
+    while (resume < count && done != chapters.end() && done->second.count(resume)) ++resume;
+    return std::size_t(resume - 1);  // the list starts at Episode 1
+}
 const char* variant_records(PlayVariant v) {
     return v == PlayVariant::TimeAttack ? "time_attack" : v == PlayVariant::ScoreAttack ? "score_attack" : "rescue";
 }
@@ -3785,6 +3801,12 @@ void launch_mode(LaunchMode mode, bool keep_music = false) {
     start_card_pending.reset();
     if (mode == LaunchMode::HideAndSeek && !keep_music) hide_and_seek_new_run = true;
     lines_time_reset = true;
+    // A Rescue or Lines start after an episode end's Exit: the game still
+    // shows its card for the next episode first (the pause row at 100),
+    // waiting for A, unseen under the loading cover (the owner, 2026-11-18:
+    // "our custom tiles were remaining on screen. And I couldn't pause").
+    // Pressed away as after Carry on.
+    if (mode == LaunchMode::Rescue || mode == LaunchMode::Lines) episode_card_skip = std::chrono::steady_clock::now();
     if ((mode == LaunchMode::Rescue || mode == LaunchMode::Puzzle) && !keep_music && start_cards) {
         start_card_pending = std::chrono::steady_clock::now();
         start_card_mode = mode == LaunchMode::Puzzle ? 4 : 1;
@@ -4881,8 +4903,10 @@ bool handle_profile_command(const std::string& command) {
                 for (int e = 1; e <= shown; ++e) {
                     const bool here = e == focus && !completed(e);
                     const bool started_here = here && next_stage(e) > 1;
-                    const std::string name = std::string(here ? (started_here ? "Continue " : "Play ") : "") + "Episode " + std::to_string(e);
-                    blockplanet::ui::ListItem item{prefix + std::to_string(e), name, completed(e) ? "completed" : "",
+                    // The one to carry on marked in the note, as "completed" is (the owner, 2026-11-18).
+                    const std::string name = "Episode " + std::to_string(e);
+                    blockplanet::ui::ListItem item{prefix + std::to_string(e), name,
+                                                   completed(e) ? "completed" : started_here ? "continue" : here ? "next" : "",
                                                    "command:" + prefix + std::to_string(e), true, 1, e == focus};
                     item.description = completed(e) ? "Play this episode again from its first stage."
                                        : started_here ? "Carry on from stage " + std::to_string(next_stage(e)) + "."
@@ -5568,6 +5592,22 @@ bool handle_profile_command(const std::string& command) {
                                                                    : where_now());
                 {
                     const int passed = read_game_state(guest_rdram).chapter + 1;
+                    // The episode recorded as cleared now, in the profile (the
+                    // owner, 2026-11-18: after Exit, Rescue still said Continue
+                    // Episode 2). The game's own record of it is written as it
+                    // leaves, but BlockPlanet counted an episode cleared only
+                    // when play moved on to the next one, which Exit never does.
+                    if (end.cleared && profile_save) {
+                        const char* game = lines_end ? "lines" : "rescue";
+                        auto& progress = profile_data.progress;
+                        if (progress.chapters_completed[game].insert(passed).second) {
+                            progress.levels_completed[game][passed].insert(read_game_state(guest_rdram).level + 1);
+                            profile_dirty = true;
+                            save_profile();
+                            std::fprintf(stdout, "{\"event\":\"episode_recorded\",\"game\":\"%s\",\"episode\":%d}\n", game, passed);
+                            std::fflush(stdout);
+                        }
+                    }
                     if (end.cleared) blockplanet::ui::set_text("end_title", "Episode " + std::to_string(passed) + " Cleared");
                     const std::string cheer = "Congratulations, you passed Episode " + std::to_string(passed) + ".";
                     blockplanet::ui::set_text("end_line", end.cleared ? (episode_end_line.empty() ? cheer : cheer + "  " + episode_end_line)
@@ -5600,14 +5640,19 @@ bool handle_profile_command(const std::string& command) {
             if (episode_card_skip) {
                 const auto since = std::chrono::steady_clock::now() - *episode_card_skip;
                 static bool card_seen = false;
-                const bool card = guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E1228) == 100;
+                const int card_mode = guest::load16(guest_rdram, 0x800E44A8);
+                const bool card = guest::load16(guest_rdram, 0x800E121C) == -1 && guest::load16(guest_rdram, 0x800E1228) == 100 &&
+                                  (card_mode == 1 || card_mode == 9);  // Rescue, Lines (Hide & Seek's card has its own panel)
                 if (card) {
                     if (!card_seen) std::fprintf(stdout, "{\"event\":\"episode_card_skip\"}\n"), std::fflush(stdout);
                     card_seen = true;
                     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(since).count();
                     card_buttons = ms % 350 < 100 ? 0x8000 : 0;  // A, pressed and let go
                 }
+                episode_card_up = card;
                 if ((card_seen && !card) || since > std::chrono::seconds(30)) episode_card_skip.reset(), card_seen = false;
+            } else {
+                episode_card_up = false;
             }
             launcher_buttons.store(pause.inject ? (0x10000u | pause.buttons)
                                    : end.inject ? (0x10000u | end.buttons)
@@ -5861,7 +5906,7 @@ bool handle_profile_command(const std::string& command) {
             }();
             if (loading_active) {
                 // (Held over the game's next-episode card while it is pressed away.)
-                if (launching() || continue_mode || !in_play_now || episode_card_skip) playing_since.reset();
+                if (launching() || continue_mode || !in_play_now || episode_card_up) playing_since.reset();
                 else if (!playing_since) playing_since = now_l;
                 if (!playing_since || !faded_in) clear_since.reset();
                 else if (!clear_since) clear_since = now_l;
@@ -5870,7 +5915,7 @@ bool handle_profile_command(const std::string& command) {
                 // at most.
                 if ((clear_since && now_l - *clear_since > std::chrono::milliseconds(settle_ms)) ||
                     (playing_since && now_l - *playing_since > std::chrono::seconds(4)) ||
-                    (now_l - loading_since > std::chrono::seconds(20) && !episode_card_skip))
+                    (now_l - loading_since > std::chrono::seconds(20) && !episode_card_up))
                     loading_active = false;
             }
             opacity = loading_active ? std::min(1.0f, opacity + dt / 0.15f) : std::max(0.0f, opacity - dt / 0.5f);
