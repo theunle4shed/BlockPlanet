@@ -1308,6 +1308,7 @@ void update_hud() {
         while (gains.size() > 5) gains.pop_back();
         last_score = score;
         view.story_score = hud_number(score);
+        view.story_gain_live = !gains.empty() && gains.front().live;
         for (const auto& g : gains) {
             if (g.points <= 0 && !g.live) continue;
             std::string line = "+" + hud_number(g.points) + (g.blocks >= 2 ? " \u00D7" + std::to_string(g.blocks) : "");

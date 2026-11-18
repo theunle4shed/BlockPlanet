@@ -204,6 +204,9 @@ div { display: block; }
 #story-score #gains { height: 144dp; overflow: hidden; }
 #gains .gain { display: block; font-size: 20dp; color: #9aa6c8; }
 #gains .gain.newest { font-size: 20dp; color: #e8b818; }
+/* A combo still building (Story's merged combo and score): larger, glowing. */
+#gains .gain.newest.live { font-size: 24dp; font-weight: bold; color: #ffd23c; font-effect: glow(1dp 6dp 0dp 0dp #ffb01899); }
+#story-score #combo-best { display: block; font-size: 17dp; color: #9aa6c8; margin-top: 4dp; }
 #gains .gain-kind { display: block; font-size: 15dp; color: #86d8ff; margin-bottom: 2dp; }
 #best { display: block; font-size: 20dp; color: #c8d0e8; margin-top: 6dp; }
 #net { display: block; font-size: 26dp; font-weight: bold; margin-top: -2dp; }

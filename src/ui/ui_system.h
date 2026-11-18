@@ -126,6 +126,7 @@ struct HudView {
     // ("+2,800"), newest first (empty: not shown).
     std::string story_score;
     std::vector<std::string> story_gains;
+    bool story_gain_live = false;  // the newest gain is a combo still building
     // Story: the combo counter (the owner's choice, 2026-11-08): the combo
     // building now (live), else the last one; and the stage's best.
     int combo = 0;             // 0: no combo yet this stage (not shown)

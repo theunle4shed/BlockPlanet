@@ -652,19 +652,16 @@ std::string hud_rml_parts(const HudView& hud) {
         }
         rml += "</div></div>";
     }
-    // Story keeps the combo's place from the start, with its "+ Magic" and
-    // Best lines' room kept while empty, so nothing below it moves (the owner,
-    // 2026-11-18: the HUD grew and shrank, above all with large combos).
-    const bool keep_room = !hud.story_score.empty();
-    if (hud.combo > 0 || keep_room) {
+    // The combo's own section, outside Story. In Story it is part of the score
+    // (the owner, 2026-11-18: the two repeated each other): the newest gain
+    // line is the combo, with its kind beneath, and the best combo below.
+    if (hud.combo > 0 && hud.story_score.empty()) {
         const bool magic = hud.combo >= 20;  // 20 or more gives magic
-        const char* hidden = " style='visibility: hidden;'";
         rml += std::string("<div class='rule'><div class='line'/></div><div id='combo-group' class='group") + (hud.combo_live ? " live" : "") +
-               (magic ? " magic" : "") + "'><div class='label'>" + (hud.combo_live ? "Combo" : "Last combo") + "</div><div id='combo'" +
-               (hud.combo > 0 ? "" : hidden) + ">" + digits(std::to_string(std::max(0, hud.combo))) + "</div>";
-        if (magic || keep_room) rml += std::string("<div id='combo-magic'") + (magic ? "" : hidden) + ">+ Magic</div>";
-        if (hud.combo_best > 0 || keep_room)
-            rml += std::string("<div id='combo-best'") + (hud.combo_best > 0 ? "" : hidden) + ">Best " + std::to_string(std::max(0, hud.combo_best)) + "</div>";
+               (magic ? " magic" : "") + "'><div class='label'>" + (hud.combo_live ? "Combo" : "Last combo") + "</div><div id='combo'>" +
+               digits(std::to_string(hud.combo)) + "</div>";
+        if (magic) rml += "<div id='combo-magic'>+ Magic</div>";
+        if (hud.combo_best > 0) rml += "<div id='combo-best'>Best " + std::to_string(hud.combo_best) + "</div>";
         rml += "</div>";
     }
     if (!hud.story_score.empty()) {
@@ -676,10 +673,14 @@ std::string hud_rml_parts(const HudView& hud) {
             const auto tab = g.find('\t');
             // The kind (Gravity combo, + Magic) under the newest gain only, so
             // the list's room stays one height.
-            rml += std::string("<div class='gain") + (k == 0 ? " newest" : "") + "'>" + escape(g.substr(0, tab)) +
+            rml += std::string("<div class='gain") + (k == 0 ? (hud.story_gain_live ? " newest live" : " newest") : "") + "'>" + escape(g.substr(0, tab)) +
                    (tab == std::string::npos || k != 0 ? std::string() : "<div class='gain-kind'>" + escape(g.substr(tab + 1)) + "</div>") + "</div>";
         }
-        rml += "</div></div>";
+        rml += "</div>";
+        // The best combo, its room kept while there is none yet.
+        rml += std::string("<div id='combo-best'") + (hud.combo_best > 0 ? "" : " style='visibility: hidden;'") + ">Best combo " +
+               std::to_string(std::max(0, hud.combo_best)) + "</div>";
+        rml += "</div>";
     }
     rml += "</div>";
     return rml;
