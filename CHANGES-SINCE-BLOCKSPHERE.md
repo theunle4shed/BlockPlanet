@@ -530,3 +530,4 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - Roadmap: a research session planned on how a stage's sphere is built (one seed for the sphere, one per layer, or each block at random), with its steps.
 - Try Again (and a game over's other choices back into play) now starts BlockPlanet's loading cover as a start does, so the game's own fade back into the stage no longer shows its original HUD models for a moment. Checked in Rescue 1:3: the red grid, then black, then the stage fades in. Restart from the pause was checked too: the loading cover, then the episode from 1:1.
 - Roadmap: the Daily Challenge (the owner's idea): a new seed each day, the same for everyone, with an online leaderboard for score and time.
+- Roadmap, Escape (the owner's rule): every drop from the underside must make a combo. A drop that doesn't costs a life and fades away, and no brick ever stays under layer one, which settles the open support question.
