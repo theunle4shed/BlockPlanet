@@ -4711,6 +4711,18 @@ bool handle_profile_command(const std::string& command) {
                     loading_active = true;
                 }
                 if (row == end_menu.exit_row()) exit_hide_since = std::chrono::steady_clock::now(), exit_hide_let_out = false;
+                // Try Again (and a game over's other choices back into play):
+                // under BlockPlanet's loading cover, as a start is, until the
+                // stage has faded in; the game's own fade showed for a moment
+                // with its original HUD models.
+                if (row != end_menu.exit_row() && !end_menu.episode_end() && guest_rdram != nullptr) {
+                    const auto state = read_game_state(guest_rdram);
+                    loading_title = state.mode == 1 ? std::string(variant_title(play_variant)) + " \u00B7 " + std::to_string(state.chapter + 1) + ":" +
+                                                          std::to_string(state.level + 1)
+                                                    : std::string();
+                    loading_since = std::chrono::steady_clock::now();
+                    loading_active = true;
+                }
                 if (row == end_menu.exit_row())
                     end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now(),
                     grid_quit_red = !end_menu.episode_end();
