@@ -31,6 +31,7 @@
 #include "tetrisphere/recomp_support.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -38,6 +39,20 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
+// The six magics' centres from the turn's pivot, in model units (x right,
+// y up, z towards the camera at angle 0): 0 Firecracker to 5 Ray Gun.
+// Measured 2026-11-19 in Rescue 1:1 at 1280 x 720 (the turn held at 0, 90,
+// 180 and 270 degrees, BLOCKPLANET_MAGIC_ANGLE; 100 units moved the model 25
+// pixels, BLOCKPLANET_MAGIC_PIVOT).
+constexpr std::array<std::array<float, 3>, 6> magic_model_centres{{
+    {21.0f, -20.0f, -109.0f},   // Firecracker
+    {39.0f, -12.0f, -37.0f},    // Bundle O' Dynamite
+    {-8.0f, 24.0f, 42.0f},      // Electro Magnet
+    {116.0f, -84.0f, -160.0f},  // Atom
+    {-5.0f, 19.0f, 84.0f},      // Bomb
+    {5.0f, 1.0f, 56.0f},        // Ray Gun
+}};
 
 namespace {
 
@@ -87,7 +102,8 @@ std::atomic<float> anchor_shift{0.0f};
 std::atomic<float> box_w{0.0f}, box_h{0.0f}, shift_2d{0.0f};
 std::atomic<float> charge{0.0f};  // the magic meter, 0 to 1 (set_magic_charge)
 // The held model sits this much right of where the numbers put it (measured).
-constexpr float box_correction = 0.0f;
+// Every model sat 3 pixels of 720 left of the box's middle (2026-11-19).
+constexpr float box_correction = -3.0f / 720.0f;
 std::atomic<bool> enabled{false};
 
 // The flight: when the held magic is used, the offset from the bowl's spot to
@@ -227,7 +243,25 @@ extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context*
         const char* v = std::getenv("BLOCKPLANET_MAGIC_ANGLE");
         return v ? std::strtof(v, nullptr) : NAN;
     }();
-    const float px = bowl_x * units_per_height, py = -bowl_y * units_per_height;
+    // Each model's own centre (model units, from the turn's pivot), so it
+    // turns about its middle in the middle of the box (the owner, 2026-11-19:
+    // the Firecracker sat in the box's corner). Measured from screenshots at
+    // four quarter turns (docs/HUD_DESIGN.md). BLOCKPLANET_MAGIC_PIVOT="x,y,z"
+    // replaces them all, for measuring.
+    static const std::array<std::array<float, 3>, 6> centres = [] {
+        std::array<std::array<float, 3>, 6> c{};
+        if (const char* v = std::getenv("BLOCKPLANET_MAGIC_PIVOT")) {
+            float x = 0, y = 0, z = 0;
+            if (std::sscanf(v, "%f,%f,%f", &x, &y, &z) == 3)
+                for (auto& e : c) e = {x, y, z};
+            return c;
+        }
+        c = magic_model_centres;
+        return c;
+    }();
+    const std::int8_t which = held(rdram);
+    const auto& centre = centres[std::size_t(std::clamp<int>(which, 0, 5))];
+    const float px = bowl_x * units_per_height + centre[0], py = -bowl_y * units_per_height + centre[1];
     // Drawn nearer the camera (a fifth of the distance) and smaller in the
     // same proportion, so it looks the same but sits in front of the tunnel,
     // whose walls near the screen's edges are nearer than the bowl's spot.
@@ -238,7 +272,13 @@ extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context*
     constexpr float camera_distance = 1609.0f;
     const float s = box_scale.load() * near;
     const double t = std::chrono::duration<double>(Clock::now().time_since_epoch()).count();
-    const float angle = std::isnan(fixed_angle) ? static_cast<float>(std::fmod(t * 1.2, 6.283185307179586)) : fixed_angle;
+    // Research: BLOCKPLANET_MAGIC_QUARTERS steps the turn a quarter every two
+    // seconds of the system clock (quarter = whole seconds / 2, mod 4).
+    static const bool quarters = std::getenv("BLOCKPLANET_MAGIC_QUARTERS") != nullptr;
+    const double wall = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+    float angle = std::isnan(fixed_angle) ? static_cast<float>(std::fmod(t * 1.2, 6.283185307179586)) : fixed_angle;
+    if (quarters) angle = static_cast<float>(int(std::fmod(wall / 2.0, 4.0))) * 1.5707963f;
+    const float pzc = pz + centre[2];
     const float c = std::cos(angle) * s, sn = std::sin(angle) * s;
     // Row-vector matrix (v * M): v' = ((v - p) * S * R_y) + target.
     const float tx = bx * units_per_height * near, ty = -by * units_per_height * near;
@@ -247,7 +287,7 @@ extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context*
         {c, 0, -sn, 0},
         {0, s, 0, 0},
         {sn, 0, c, 0},
-        {-(px * c + pz * sn) + tx, -py * s + ty, -(-px * sn + pz * c) + tz, 1},
+        {-(px * c + pzc * sn) + tx, -py * s + ty, -(-px * sn + pzc * c) + tz, 1},
     };
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j) store_float(rdram, m + std::uint32_t(4 * (4 * i + j)), row[i][j]);
