@@ -614,8 +614,8 @@ public:
             if (!bricks_done_.insert(hash).second) return;
             // The style's version is in the name, so a changed style is made
             // again rather than an older file reused (Crafted 2: square, bevelled; 3:
-            // the rubble drawn as a block with circles).
-            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? 3 : 1;
+            // the rubble drawn as a block with circles; 4: the circles without rims).
+            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? 4 : 1;
             char name[48];
             std::snprintf(name, sizeof name, "%016llx-v%d.dds", static_cast<unsigned long long>(hash), version);
             const auto path = bricks_dir_ / name;

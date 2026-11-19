@@ -277,12 +277,10 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
                                 for (const Circle& o : circles) {
                                     const double dx = (px - o.x) / o.r, dy = (py - o.y) / o.r, d = std::sqrt(dx * dx + dy * dy);
                                     if (d > 1.0) continue;
-                                    if (d > 1.0 - 2.5 / o.r) {  // a dark rim
-                                        c = scaled(dark, 0.9);
-                                    } else {  // a dome lit from the top left
-                                        const double lit = std::clamp(0.55 - 0.5 * (0.7 * dx + 0.7 * dy) + 0.25 * (1.0 - d * d), 0.0, 1.0);
-                                        c = lit < 0.5 ? mix(dark, common, lit * 2.0) : mix(common, light, (lit - 0.5) * 2.0);
-                                    }
+                                    // A dome lit from the top left, sitting on the block (no rim:
+                                    // the owner, 2026-11-19).
+                                    const double lit = std::clamp(0.55 - 0.5 * (0.7 * dx + 0.7 * dy) + 0.25 * (1.0 - d * d), 0.0, 1.0);
+                                    c = lit < 0.5 ? mix(dark, common, lit * 2.0) : mix(common, light, (lit - 0.5) * 2.0);
                                     break;
                                 }
                             }
