@@ -1171,7 +1171,8 @@ void update_hud() {
             // (No whole run timed, as when started part-way: the menus all the same.)
             if (!attack_episode_results)
                 attack_episode_results = StageResults{state.chapter, 10, play_variant == PlayVariant::ScoreAttack, 0.0, 0.0,
-                                                      std::string(variant_title(play_variant)) + " \u00B7 Episode " +
+                                                      std::string(state.mode == 9 ? "Lines " : "") + variant_title(play_variant) +
+                                                          " \u00B7 Episode " +
                                                           std::to_string(state.chapter), true};
         }
         if (state.level < 10) cleared_episode_key = -1;
@@ -1447,8 +1448,9 @@ void update_hud() {
         }
         if (!paused && elapsed < 1.0 && state.progress < 1.0f) stage_time += elapsed;
         // Lines' episode ends as Rescue's (CONTINUE, EXIT on the pause row,
-        // then the next episode's card): the end menu bridge is told.
-        {
+        // then the next episode's card): the end menu bridge is told. (Not
+        // in the attack modes, which go back to the menus with their results.)
+        if (!variant_competes(play_variant) && !single_stage) {
             static bool last_cleared = false;
             const bool last_cleared_now = state.level >= 10 && state.progress >= 1.0f;
             if (last_cleared_now && !last_cleared) episode_end_expected = 1;
@@ -5552,11 +5554,14 @@ bool handle_profile_command(const std::string& command) {
             // From the stage list, its heading, which is what the player sees
             // there ("Exit to Chapter 2", "Exit to Puzzles"), rather than the
             // screen's name, Stages.
+            const int state_mode_now = guest::load16(guest_rdram, 0x800E44A8);
             const auto exit_label = [&]() -> std::string {
                 // Training's lessons go back to Training's menu (its screen's file title is another mode's).
                 if (guest::load16(guest_rdram, 0x800E44A8) == 3 && !launch_path.empty() && launch_path.back().first == "chapters")
                     return "Exit to Training Menu";
                 if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + blockplanet::ui::menu_place(launch_place);
+                // Lines' Campaign list is the same screen as Rescue's (titled Rescue).
+                if (state_mode_now == 9 && (launch_path.empty() || launch_path.back().first == "chapters")) return "Exit to Lines Menu";
                 return blockplanet::ui::exit_to_label(launch_path.empty() ? std::string() : launch_path.back().first);
             };
             // A lost Minefield (the owner, 2026-11-15): after its mines are shown,
