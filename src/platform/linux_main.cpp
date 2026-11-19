@@ -749,10 +749,17 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     view.hearts = state.hearts;
     view.drop_left = state.drop_left;
     if (state.drop_steps > 0) {
-        // The warnings' places on the bar, rounded so the markup changes only per piece.
-        const auto at = [&](int step) { return step >= 0 ? std::round(100.0f * (1.0f - float(step) / float(state.drop_steps))) / 100.0f : -1.0f; };
-        view.drop_warn_first = at(state.drop_warn_first);
-        view.drop_warn_second = state.drop_warn_second >= 0 && state.drop_warn_second < state.drop_steps ? at(state.drop_warn_second) : -1.0f;
+        // The two-stage bar: the calm stretch, then the fall with a count.
+        view.drop_left = state.drop_stage_left;
+        view.drop_phase = state.drop_phase;
+        view.drop_seconds = state.drop_seconds;
+        view.drop_notch = state.drop_fall_notch >= 0.0f ? std::round(100.0f * state.drop_fall_notch) / 100.0f : -1.0f;
+        // A blink as each warning comes (into the fall, then fast).
+        static int last_phase = 0;
+        static std::chrono::steady_clock::time_point blink_at{};
+        if (state.drop_phase > last_phase) blink_at = std::chrono::steady_clock::now();
+        last_phase = state.drop_phase;
+        view.drop_blink = std::chrono::steady_clock::now() - blink_at < std::chrono::milliseconds(700);
     }
     if (static const bool drop_log = std::getenv("BLOCKPLANET_DROP_LOG") != nullptr; drop_log) {
         static float logged = -1.0f;
@@ -1057,10 +1064,17 @@ void update_hud() {
     view.hearts = state.hearts;
     view.drop_left = state.drop_left;
     if (state.drop_steps > 0) {
-        // The warnings' places on the bar, rounded so the markup changes only per piece.
-        const auto at = [&](int step) { return step >= 0 ? std::round(100.0f * (1.0f - float(step) / float(state.drop_steps))) / 100.0f : -1.0f; };
-        view.drop_warn_first = at(state.drop_warn_first);
-        view.drop_warn_second = state.drop_warn_second >= 0 && state.drop_warn_second < state.drop_steps ? at(state.drop_warn_second) : -1.0f;
+        // The two-stage bar: the calm stretch, then the fall with a count.
+        view.drop_left = state.drop_stage_left;
+        view.drop_phase = state.drop_phase;
+        view.drop_seconds = state.drop_seconds;
+        view.drop_notch = state.drop_fall_notch >= 0.0f ? std::round(100.0f * state.drop_fall_notch) / 100.0f : -1.0f;
+        // A blink as each warning comes (into the fall, then fast).
+        static int last_phase = 0;
+        static std::chrono::steady_clock::time_point blink_at{};
+        if (state.drop_phase > last_phase) blink_at = std::chrono::steady_clock::now();
+        last_phase = state.drop_phase;
+        view.drop_blink = std::chrono::steady_clock::now() - blink_at < std::chrono::milliseconds(700);
     }
     if (static const bool drop_log = std::getenv("BLOCKPLANET_DROP_LOG") != nullptr; drop_log) {
         static float logged = -1.0f;

@@ -39,6 +39,13 @@ struct StoryHudState {
     // The piece's whole time to the drop in 60 Hz steps, and the steps from
     // its start to the two warnings (the fall starting, then speeding up).
     int drop_steps = 0, drop_warn_first = -1, drop_warn_second = -1;
+    // The bar in two stages (the owner's choice, 2026-11-19): 0 calm (the
+    // time to the first warning), 1 falling (the time to the drop), 2 falling
+    // fast (after the second warning, or the last 2 seconds where the piece
+    // drops before it). The stage's time left (1 to 0), the seconds to the
+    // drop, and where the second warning falls on the falling stage (-1 none).
+    int drop_phase = 0;
+    float drop_stage_left = 1.0f, drop_seconds = 0.0f, drop_fall_notch = -1.0f;
 };
 
 // The time left until the game drops the piece itself (found 2026-11-19,
@@ -64,6 +71,10 @@ public:
     bool zoom() const { return zoom_; }
     // The piece's whole time and where its warnings fall (from its start).
     const DropRun& whole() const { return whole_; }
+    int phase() const { return phase_; }
+    float stage_left() const { return stage_left_; }
+    float seconds() const { return seconds_; }
+    float fall_notch() const { return fall_notch_; }
 
 private:
     float last_timer_ = -1.0f;
@@ -72,6 +83,8 @@ private:
     DropRun whole_{};
     bool zoom_ = false;
     bool dropped_ = false;   // the piece has gone; empty until the next
+    int phase_ = 0;
+    float stage_left_ = 1.0f, seconds_ = 0.0f, fall_notch_ = -1.0f;
 };
 
 

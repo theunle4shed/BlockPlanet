@@ -107,6 +107,11 @@ struct HudView {
     // Where the drop timer's two warnings fall on its bar (the time left at
     // each, 1 to 0), or -1: the first starts the fall, the second speeds it up.
     float drop_warn_first = -1.0f, drop_warn_second = -1.0f;
+    // The two-stage bar (story_hud.h): -1 phase for the old single bar (VS).
+    int drop_phase = -1;
+    float drop_seconds = 0.0f;   // to the drop, shown while falling
+    float drop_notch = -1.0f;    // the second warning on the falling stage
+    bool drop_blink = false;     // a warning just came: the bar flashes white
     int magic = -1;            // -1 none, 0 to 5
     bool magic_model = false;  // the game draws the magic's model in the box
     float meter = 0.0f;        // the magic meter, 0 to 1

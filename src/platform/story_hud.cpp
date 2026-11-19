@@ -87,6 +87,10 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
         out.drop_steps = clock.whole().steps;
         out.drop_warn_first = clock.whole().warn_first;
         out.drop_warn_second = clock.whole().warn_second;
+        out.drop_phase = clock.phase();
+        out.drop_stage_left = clock.stage_left();
+        out.drop_seconds = clock.seconds();
+        out.drop_fall_notch = clock.fall_notch();
         out.drop_zoom = clock.zoom();
     }
     out.magic = static_cast<std::int8_t>(load8(rdram, player1 + 0x702));
@@ -380,10 +384,28 @@ float DropClock::update(float timer, float speed_per_step, int fall, int eased) 
     last_timer_ = timer;
     last_fall_ = fall;
     zoom_ = eased > base_ + 25;
-    if (timer < 1.0f) return 1.0f;
-    if (dropped_) return 0.0f;
-    const int left = drop_run(timer, speed_per_step, fall, eased).steps;
-    return std::clamp(float(left) / float(std::max(1, whole_.steps)), 0.0f, 1.0f);
+    const int fall_steps = std::max(1, whole_.steps - std::max(0, whole_.warn_first));
+    fall_notch_ = whole_.warn_second >= 0 && whole_.warn_second < whole_.steps
+                      ? float(whole_.steps - whole_.warn_second) / float(fall_steps) : -1.0f;
+    if (timer < 1.0f || dropped_) {
+        phase_ = 0;
+        stage_left_ = dropped_ && timer >= 1.0f ? 0.0f : 1.0f;
+        seconds_ = 0.0f;
+        return stage_left_;
+    }
+    const DropRun now = drop_run(timer, speed_per_step, fall, eased);
+    seconds_ = float(now.steps) / 60.0f;
+    if (now.warn_first > 0 && whole_.warn_first > 0) {
+        phase_ = 0;
+        stage_left_ = std::clamp(float(now.warn_first) / float(whole_.warn_first), 0.0f, 1.0f);
+    } else {
+        // Falling: red after the second warning, or in the last 2 seconds
+        // where the piece drops before it.
+        const bool fast = fall_notch_ >= 0.0f ? now.warn_second <= 0 : now.steps <= 120;
+        phase_ = fast ? 2 : 1;
+        stage_left_ = std::clamp(float(now.steps) / float(fall_steps), 0.0f, 1.0f);
+    }
+    return std::clamp(float(now.steps) / float(std::max(1, whole_.steps)), 0.0f, 1.0f);
 }
 
 } // namespace tetrisphere
