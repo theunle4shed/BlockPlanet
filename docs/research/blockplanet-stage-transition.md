@@ -24,7 +24,7 @@ A stage started from the menus takes about 250 ms, nearly all of it the song loa
 
 ## Also seen
 
-- **The episode's time keeps running through the stage-end sequence** (the HUD's Time went from 0:11 to 0:23 across 1:1's ending). For Time Attack every run includes the same sequence, so times stay comparable, but about 10 seconds a stage (about 100 s an episode) is the celebration, not play.
+- **Fixed (2026-11-19, the owner's request):** the episode's clock now stops when the core opens and runs again with the next stage. Before, **the episode's time kept running through the stage-end sequence** (the HUD's Time went from 0:11 to 0:23 across 1:1's ending). For Time Attack every run includes the same sequence, so times stay comparable, but about 10 seconds a stage (about 100 s an episode) is the celebration, not play.
 
 ## If the transition is to be shorter
 

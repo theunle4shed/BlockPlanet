@@ -1023,8 +1023,13 @@ void update_hud() {
         return it == episode.end() ? std::vector<double>{} : it->second.best_levels;
     };
     if (state.mode != 1) {
-    } else if (const auto finished = splits.update(state.chapter, state.level, !paused && elapsed < 1.0 ? elapsed : 0.0,
-                                            best_of(state.chapter))) {
+    // The clock stops once the core is open (the owner, 2026-11-19): the
+    // stage-end sequence (the core and the friend, NICE JOB, the fade, about
+    // 10 s) is not play, so a stage's time ends as it is cleared, as Lines'
+    // already does. It runs again when the next stage begins.
+    } else if (const auto finished = splits.update(state.chapter, state.level,
+                                                   !paused && elapsed < 1.0 && state.progress < 1.0f ? elapsed : 0.0,
+                                                   best_of(state.chapter))) {
         auto& record = episode[finished->chapter];
         if (record.best_levels.size() < 10) record.best_levels.resize(10, 0.0);
         const auto i = std::size_t(std::clamp(finished->level, 1, 10) - 1);
