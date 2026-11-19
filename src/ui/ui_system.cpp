@@ -351,17 +351,17 @@ std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count,
 }
 
 // The drop timer (the owner's design, 2026-11-18: "a bar in thirds with a
-// gauge that moves across it", [---|---|---]): the time left to drop the piece
-// held, split where the game starts its warning ticks (189 and 389 of its
-// 600, so at 68.5% and 35.2% left), its fill green, then amber, then red as
-// it crosses into each part, and a marker at the fill's edge.
+// gauge that moves across it", [---|---|---]): the time left until the game
+// drops the piece itself (tetrisphere::DropClock, which empties it at the
+// drop, 2026-11-19), in equal thirds, its fill green, then amber, then red as
+// it crosses into each, and a marker at the fill's edge.
 std::string drop_bar(const char* id_attr, const char* classes, float left, bool inline_fill) {
     left = std::clamp(left, 0.0f, 1.0f);
-    const int third = left > 0.685f ? 1 : left > 0.352f ? 2 : 3;
+    const int third = left > 2.0f / 3.0f ? 1 : left > 1.0f / 3.0f ? 2 : 3;
     const std::string width = std::to_string(int(left * 100.0f)) + "%";
     std::string rml = std::string("<div") + id_attr + " class='bar drop-bar " + classes + " third-" + std::to_string(third) + "'>";
     rml += std::string("<div") + (inline_fill ? " class='fill' style='width: " + width + ";'" : " id='drop-fill' class='fill'") + "/>";
-    rml += "<div class='notch' style='left: 35.2%;'/><div class='notch' style='left: 68.5%;'/>";
+    rml += "<div class='notch' style='left: 33.3%;'/><div class='notch' style='left: 66.7%;'/>";
     rml += std::string("<div") + (inline_fill ? " class='needle' style='left: " + width + ";'" : " id='drop-needle' class='needle'") + "/>";
     return rml + "</div>";
 }

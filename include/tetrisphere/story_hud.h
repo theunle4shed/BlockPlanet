@@ -35,7 +35,39 @@ struct StoryHudState {
     std::uint32_t score = 0;          // player context +0x2AF8 (shown x 10)
     int combo = 0;                    // the running combo count (+0x2AE0)
     int cursor_x = 0, cursor_y = 0;   // the drop cursor (+0x2B2A, +0x2B2E)
+    bool drop_zoom = false;           // the drop timer's fall is pulling the view in (or springing back)
 };
+
+// The time left until the game drops the piece itself (measured 2026-11-19,
+// docs/research/blockplanet-game-state.md). The game does not drop at the
+// timer's end: the timer (+0x2408, 0 to 6,000) starts a fall at 2,000 and
+// speeds it up at 4,000; the fall (+0x2414) climbs 25, then 75, a frame from
+// where the piece started (17,050 for a stage's first piece, about 20,450
+// after) to the cap at 30,845, the eased value (+0x2416) follows an eighth of
+// the gap a frame, and the piece drops when that reaches 30,690. Where the
+// piece would land makes no difference (tested with a dug hole). The timer's
+// own speed per frame is set by the episode; it is measured during each fall.
+class DropClock {
+public:
+    // Returns the time left, 1 (a new piece) to 0 (the drop).
+    float update(float timer, int fall, int eased, int speed, int chapter);
+    // While the fall pulls the view in, and until it has sprung back.
+    bool zoom() const { return zoom_; }
+    float rate() const { return rate_; }
+    // Frames until the drop from timer `t` with the fall at `fall`.
+    float frames_left(float t, float fall) const;
+
+private:
+    float rate_ = 0.0f;      // timer units a frame (0: not known yet)
+    int rate_chapter_ = -1;
+    float last_timer_ = -1.0f;
+    int last_fall_ = 0;
+    int base_ = 0;           // the fall's value when the piece came
+    float total_ = 0.0f;     // frames from the piece's start to the drop
+    bool zoom_ = false;
+    bool dropped_ = false;  // the piece has gone; empty until the next
+};
+
 
 // A finished combo, for the floating numbers (docs/HUD_DESIGN.md): the points
 // it earned (as shown, x 10), how many blocks it cleared, and where its

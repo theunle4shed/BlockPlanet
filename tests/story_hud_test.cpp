@@ -1,3 +1,5 @@
+#include <cstring>
+#include <algorithm>
 #include "tetrisphere/story_hud.h"
 
 #include "tetrisphere/guest_memory.h"
@@ -172,6 +174,14 @@ int main() {
     const std::uint32_t p1 = 0x80110220u;
     store16(m, p1 + 0x2D7E, 2);
     store16(m, p1 + 0x2B10, 150);
+    {  // the drop timer, 1,500 of 6,000 (Episode 1: 1 a frame), the fall not started
+        const float t = 1500.0f;
+        std::uint32_t bits;
+        std::memcpy(&bits, &t, 4);
+        store32(m, p1 + 0x2408, bits);
+        store16(m, p1 + 0x2414, 17050);
+        store16(m, p1 + 0x2416, 17050);
+    }
     store8(m, p1 + 0x702, 0xFF);
     store16(m, p1 + 0x2AEC, 7);
     store16(m, p1 + 0x2AEE, 14);
@@ -191,7 +201,7 @@ int main() {
     store32(m, 0x800E44D0, 0x80116BF0u);
     store16(m, p1 + 0x23E4, 4);
     assert(read_story_hud(m, progress, state));
-    assert(state.hearts == 2 && state.drop_left == 0.75f && state.magic == -1 && state.meter == 0.5f);
+    assert(state.hearts == 2 && std::fabs(state.drop_left - (500.0f + 552.0f + 10.0f) / (2000.0f + 552.0f + 10.0f)) < 0.01f && state.magic == -1 && state.meter == 0.5f);
     assert(state.next.size() == 3);
     assert(state.next[0].shape == 2 && state.next[0].material == 33 && state.next[0].cells == 4 && !state.next[0].random_block);
     assert(state.next[1].random_block);
@@ -199,5 +209,25 @@ int main() {
     assert(state.chapter == 1 && state.level == 3);
     store8(m, p1 + 0x702, 3);
     assert(read_story_hud(m, progress, state) && state.magic == 3);
+    // The drop clock: Episode 10's first piece (timer about 6 a frame).
+    {
+        tetrisphere::DropClock clock;
+        assert(clock.update(0.0f, 17050, 17050, 0, 10) == 1.0f);
+        float timer = 0.0f, fall = 17050.0f, eased = 17050.0f, last = 1.0f;
+        int frames = 0;
+        for (; frames < 3000; ++frames) {
+            timer += 5.95f;
+            const int speed = timer >= 4000.0f ? 75 : timer >= 2000.0f ? 25 : 0;
+            fall = std::min(30845.0f, fall + float(speed));
+            eased += (fall - eased) / 8.0f;
+            if (eased >= 30690.0f) break;  // the game's drop
+            const float left = clock.update(timer, int(fall), int(eased), speed, 10);
+            assert(left <= last + 0.02f);  // empties steadily
+            last = left;
+        }
+        assert(frames > 600 && frames < 900);
+        assert(last < 0.03f);  // empty, or nearly, at the drop
+        assert(clock.zoom());
+    }
     return 0;
 }

@@ -748,6 +748,17 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     }
     view.hearts = state.hearts;
     view.drop_left = state.drop_left;
+    if (static const bool drop_log = std::getenv("BLOCKPLANET_DROP_LOG") != nullptr; drop_log) {
+        static float logged = -1.0f;
+        static bool zoom = false;
+        if (std::fabs(state.drop_left - logged) >= 0.05f || state.drop_zoom != zoom || (state.drop_left == 0.0f) != (logged == 0.0f)) {
+            logged = state.drop_left, zoom = state.drop_zoom;
+            std::fprintf(stdout, "{\"event\":\"drop_bar\",\"ms\":%lld,\"left\":%.3f,\"zoom\":%d,\"hearts\":%d}\n",
+                         static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()),
+                         state.drop_left, int(state.drop_zoom), state.hearts);
+            std::fflush(stdout);
+        }
+    }
     view.magic = state.magic;
     view.magic_model = view.show_magic && blockplanet::magic_box_active();
     view.meter = state.meter;
@@ -1039,6 +1050,17 @@ void update_hud() {
     blockplanet::ui::HudView view;
     view.hearts = state.hearts;
     view.drop_left = state.drop_left;
+    if (static const bool drop_log = std::getenv("BLOCKPLANET_DROP_LOG") != nullptr; drop_log) {
+        static float logged = -1.0f;
+        static bool zoom = false;
+        if (std::fabs(state.drop_left - logged) >= 0.05f || state.drop_zoom != zoom || (state.drop_left == 0.0f) != (logged == 0.0f)) {
+            logged = state.drop_left, zoom = state.drop_zoom;
+            std::fprintf(stdout, "{\"event\":\"drop_bar\",\"ms\":%lld,\"left\":%.3f,\"zoom\":%d,\"hearts\":%d}\n",
+                         static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()),
+                         state.drop_left, int(state.drop_zoom), state.hearts);
+            std::fflush(stdout);
+        }
+    }
     view.magic = state.magic;
     view.magic_model = blockplanet::magic_box_active();
     view.meter = state.meter;
@@ -2800,8 +2822,14 @@ void update_magic_box() {
 // layer and the camera distance (the core's surface is at a third of the
 // grid's length and each layer adds 0.0875; calibrated so stage 1:1 at rest
 // fills 55% of the picture's height).
+// For placing the HUD: only the drop timer's zoom counts (the owner,
+// 2026-11-19: the panels moved out and back during combos, as blocks cleared
+// and the camera moved), so the panels move aside only while the timer pulls
+// the view in, and the stage's own depth stands for the sphere's size.
 float hud_sphere_radius(const tetrisphere::StoryHudState& state) {
-    return 1584.0f * (1.0f / 3.0f + 0.0875f * float(state.top_layer)) / state.camera_distance;
+    const int layers = state.layers > 0 ? state.layers : state.top_layer;
+    const float distance = state.drop_zoom ? std::min(state.camera_distance, 2424.0f) : 2424.0f;
+    return 1584.0f * (1.0f / 3.0f + 0.0875f * float(layers)) / distance;
 }
 
 void place_hud(blockplanet::ui::HudView& view, const tetrisphere::StoryHudState& state) {
@@ -6031,13 +6059,54 @@ bool handle_profile_command(const std::string& command) {
                 const int shown = guest::load16(guest_rdram, c + 0x2B10), target = guest::load16(guest_rdram, c + 0x2414),
                           eased = guest::load16(guest_rdram, c + 0x2416), hearts = guest::load16(guest_rdram, c + 0x2D7E);
                 const std::uint32_t speed = guest::load32(guest_rdram, c + 0x2404);
+                // Research: BLOCKPLANET_DROP_TEST_KEEP=n empties every layer
+                // above layer n in a 5 x 5 patch round the cursor each time a
+                // piece comes into hand (the timer back to 0), to see whether a
+                // deeper landing spot changes the fall and the time to drop.
+                if (static const char* keep = std::getenv("BLOCKPLANET_DROP_TEST_KEEP"); keep != nullptr) {
+                    static int last_shown = -1;
+                    if (shown == 0 && last_shown != 0) {
+                        auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                        const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u), masks = guest::load32(guest_rdram, 0x800E44D4u),
+                                            entries = guest::load32(guest_rdram, 0x800E44D8u);
+                        const int k = std::atoi(keep);
+                        const int x0 = 8 + guest::load16(guest_rdram, c + 0x2B2A), y0 = 8 + guest::load16(guest_rdram, c + 0x2B2E);
+                        if (values != 0 && masks != 0 && entries != 0)
+                            for (int dy = -2; dy <= 2; ++dy)
+                                for (int dx = -2; dx <= 2; ++dx) {
+                                    const std::uint32_t cell = std::uint32_t((((y0 + dy) % 32 + 32) % 32) * 32 + (((x0 + dx) % 32 + 32) % 32));
+                                    for (int layer = k + 1; layer <= 8; ++layer) {
+                                        const std::uint32_t at = std::uint32_t(layer) * 1024u + cell;
+                                        guest::store16(rd, values + 2u * at, 0);
+                                        guest::store8(rd, masks + at, 0);
+                                        guest::store32(rd, entries + 4u * at, 0);
+                                    }
+                                    const std::uint32_t top = std::uint32_t(k) * 1024u + cell;
+                                    guest::store8(rd, masks + top, static_cast<std::uint8_t>(guest::load8(guest_rdram, masks + top) | 16));
+                                }
+                        std::fprintf(stdout, "{\"event\":\"drop_test_dig\",\"at\":[%d,%d],\"values\":\"0x%08X\",\"layer2\":%d}\n", x0, y0, values,
+                                     values ? guest::load16(guest_rdram, values + 2u * std::uint32_t(2 * 1024 + ((y0 & 31) * 32 + (x0 & 31)))) : -1);
+                        std::fflush(stdout);
+                    }
+                    last_shown = shown;
+                }
                 static int last[5] = {-9, -9, -9, -9, -9};
                 static std::uint32_t last_speed = 1;
                 if (shown != last[0] || target != last[1] || eased != last[2] || hearts != last[3] || speed != last_speed) {
                     last[0] = shown, last[1] = target, last[2] = eased, last[3] = hearts, last_speed = speed;
                     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-                    std::fprintf(stdout, "{\"event\":\"drop_log\",\"ms\":%lld,\"timer\":%.0f,\"shown\":%d,\"speed\":%u,\"target\":%d,\"eased\":%d,\"hearts\":%d}\n",
-                                 static_cast<long long>(ms), timer, shown, speed >> 16, target, eased, hearts);
+                    // The column under the cursor: each layer's block value
+                    // (0 empty) and the column map byte (height, kind).
+                    const int cx = ((8 + guest::load16(guest_rdram, c + 0x2B2A)) % 32 + 32) % 32,
+                              cy = ((8 + guest::load16(guest_rdram, c + 0x2B2E)) % 32 + 32) % 32;
+                    const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u), columns = guest::load32(guest_rdram, 0x800E44DCu);
+                    std::string column;
+                    if (values != 0)
+                        for (int layer = 0; layer < 8; ++layer)
+                            column += (layer ? "," : "") + std::to_string(guest::load16(guest_rdram, values + 2u * std::uint32_t(layer * 1024 + cy * 32 + cx)));
+                    const int map = columns != 0 ? guest::load8(guest_rdram, columns + std::uint32_t(cy * 32 + cx)) : -1;
+                    std::fprintf(stdout, "{\"event\":\"drop_log\",\"ms\":%lld,\"timer\":%.0f,\"shown\":%d,\"speed\":%u,\"target\":%d,\"eased\":%d,\"hearts\":%d,\"cell\":[%d,%d],\"column\":[%s],\"map\":%d}\n",
+                                 static_cast<long long>(ms), timer, shown, speed >> 16, target, eased, hearts, cx, cy, column.c_str(), map);
                     std::fflush(stdout);
                 }
             }
