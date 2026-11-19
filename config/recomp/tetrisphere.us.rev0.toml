@@ -455,6 +455,14 @@ func = "func_80075CD8"
 before_vram = 0x8007850C
 text = "blockplanet_hud_end(rdram, ctx);"
 
+# The original timer orb's light effects (func_800699B4, from the per-player
+# update): drawn straight into the display list, behind the sphere, at the
+# orb's place (a white burst at each drop warning and at the drop). Skipped
+# while BlockPlanet's HUD is shown (pause_draw_hooks.cpp).
+[[patches.hook]]
+func = "func_800699B4"
+text = "if (blockplanet_skip_orb_effects(rdram, ctx)) return;"
+
 # The 3D piece queue models (one call per slot).
 [[patches.hook]]
 func = "func_800A3E6C"

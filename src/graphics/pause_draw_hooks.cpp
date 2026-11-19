@@ -706,6 +706,18 @@ extern "C" void blockplanet_hud_end(std::uint8_t* rdram, recomp_context*) {
     tetrisphere::guest::store32(rdram, cursor, dl);
 }
 
+// The original orb's and bowl's light effects (func_800699B4, from the
+// per-player update; its own record at 0x80102C54, set by the drop warnings,
+// the drop and others): a white burst at the orb's place by the old magic
+// bowl, drawn straight into the display list behind the sphere. The orb and
+// bowl are hidden while BlockPlanet's HUD shows, so their light is too (the
+// owner, 2026-11-19: it still flashed at each warning; BlockPlanet's bar
+// flashes instead). BLOCKPLANET_ORB_FX=1 keeps it, for comparison.
+extern "C" bool blockplanet_skip_orb_effects(std::uint8_t*, recomp_context*) {
+    static const bool keep = std::getenv("BLOCKPLANET_ORB_FX") != nullptr;
+    return !keep && hud_hidden.load(std::memory_order_relaxed);
+}
+
 extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
     // With models kept (the GAME OVER scene), only the HUD routine's own
     // models (the next pieces, the bowl) stay hidden.

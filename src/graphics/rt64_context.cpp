@@ -1,4 +1,6 @@
 #include "tetrisphere/rt64_context.h"
+#include <tuple>
+#include <set>
 #include "tetrisphere/frame_step.h"
 #include "tetrisphere/data_directory.h"
 #include "ui_system.h"
@@ -230,6 +232,7 @@ public:
         core.checkInterrupts = check_interrupts;
         core.HEADER = rom_header.data();
         core.RDRAM = rdram;
+        research_rdram_ = rdram;
         core.DMEM = dmem.data();
         core.IMEM = imem.data();
         core.MI_INTR_REG = &mi_intr;
@@ -434,8 +437,53 @@ public:
             RT64::EnhancementConfiguration::Presentation::Mode::PresentEarly;
         app_->updateEnhancementConfig();
     }
+    // Research: BLOCKPLANET_DL_RECT_LOG="x0,y0,x1,y1" (the 320 x 240 frame)
+    // logs each texture rectangle and each textured triangle batch's texture
+    // drawn in the frame's display list whose rectangle overlaps that area,
+    // with the texture's address and the list address of the command, once
+    // per distinct (texture, place). To find a 2D or 3D draw by where it is.
+    std::uint8_t* research_rdram_ = nullptr;
+    void research_rect_log(const OSTask* task) {
+        static const std::array<int, 4> area = [] {
+            std::array<int, 4> a{-1, -1, -1, -1};
+            if (const char* v = std::getenv("BLOCKPLANET_DL_RECT_LOG")) std::sscanf(v, "%d,%d,%d,%d", &a[0], &a[1], &a[2], &a[3]);
+            return a;
+        }();
+        if (area[0] < 0 || research_rdram_ == nullptr) return;
+        const std::uint8_t* m = research_rdram_;
+        auto word = [&](std::uint32_t at) { std::uint32_t v; std::memcpy(&v, m + (at & 0x007FFFFCu), 4); return v; };
+        static std::set<std::tuple<std::uint32_t, int, int>> seen;
+        std::uint32_t image = 0;
+        int budget = 200000;
+        const auto walk = [&](auto&& self, std::uint32_t at, int depth) -> void {
+            for (; budget-- > 0; at += 8u) {
+                const std::uint32_t w0 = word(at), w1 = word(at + 4u);
+                const std::uint32_t op = w0 >> 24;
+                if (op == 0xFDu) image = w1;
+                if (op == 0xE4u || op == 0xE5u) {
+                    const int x1 = int((w0 >> 12) & 0xFFFu) / 4, y1 = int(w0 & 0xFFFu) / 4;
+                    const int x0 = int((w1 >> 12) & 0xFFFu) / 4, y0 = int(w1 & 0xFFFu) / 4;
+                    if (x1 >= area[0] && x0 <= area[2] && y1 >= area[1] && y0 <= area[3] &&
+                        seen.insert({image, x0 / 8, y0 / 8}).second)
+                        std::fprintf(stdout, "{\"event\":\"dl_rect\",\"frame\":%llu,\"image\":\"0x%08X\",\"at\":\"0x%08X\",\"depth\":%d,\"x0\":%d,\"y0\":%d,\"x1\":%d,\"y1\":%d}\n",
+                                     (unsigned long long)display_list_count.load(), image, at | 0x80000000u, depth, x0, y0, x1, y1);
+                    at += 8u;  // the texture coordinates follow (two more words)
+                    if (op == 0xE4u && (word(at) >> 24) == 0xB4u) at += 8u;
+                }
+                if (op == 0x06u && depth < 8) {
+                    self(self, w1 & 0x00FFFFFFu, depth + 1);
+                    if (((w0 >> 16) & 0xFFu) == 1u) return;
+                }
+                if (op == 0xB8u) return;
+            }
+        };
+        walk(walk, task->t.data_ptr & 0x00FFFFFFu, 0);
+        std::fflush(stdout);
+    }
+
     void send_dl(const OSTask* task) override {
         ScopedPerfTimer frame_timer(perf_metrics().display_list);
+        research_rect_log(task);
         // Only this render thread mutates RT64's configuration.
         std::optional<PresentationFilter> filter;
         std::optional<bool> texture;
