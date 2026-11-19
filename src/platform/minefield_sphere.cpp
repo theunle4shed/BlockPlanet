@@ -135,7 +135,9 @@ void build_board(std::uint8_t* rdram) {
     write_smooth_table(rdram);
     for (int c = 0; c < layer_cells; ++c) {
         const bool in_play = field_at(c % board, c / board) >= 0;
-        guest::store32(rdram, entries + 4u * std::uint32_t(layer_cells + c), in_play ? smooth_table : wall_table);
+        // Research: BLOCKPLANET_MINEFIELD_OLD_WALL=1 gives the walls the play cells' table (as before 2026-11-19).
+        static const bool old_wall = std::getenv("BLOCKPLANET_MINEFIELD_OLD_WALL") != nullptr;
+        guest::store32(rdram, entries + 4u * std::uint32_t(layer_cells + c), in_play || old_wall ? smooth_table : wall_table);
         field_cells()[c].store(in_play, std::memory_order_relaxed);
         guest::store16(rdram, values + 2u * std::uint32_t(layer_cells + c), inert);
         guest::store8(rdram, masks + std::uint32_t(layer_cells + c), top_face);
@@ -514,6 +516,16 @@ void poll(std::uint8_t* rdram) {
     }
     const int x = cursor_x(rdram), y = cursor_y(rdram);
     if (in_bounds(x, y) >= 0) inside_x = x, inside_y = y, inside_known = true;
+    // Research: BLOCKPLANET_MINEFIELD_CURSOR_LOG=1 logs the cursor's cell as it changes.
+    if (static const bool cursor_log = std::getenv("BLOCKPLANET_MINEFIELD_CURSOR_LOG") != nullptr; cursor_log) {
+        static int last = -1;
+        if (x * 100 + y != last) {
+            last = x * 100 + y;
+            std::fprintf(stdout, "{\"event\":\"minefield_cursor\",\"x\":%d,\"y\":%d,\"field\":%d,\"bounds\":%d}\n", x, y,
+                         field_at(x, y), in_bounds(x, y));
+            std::fflush(stdout);
+        }
+    }
     // Moving right lowers x; up raises y.
     edges = ended ? 0
                   : (in_bounds(x - 1, y) < 0 ? edge_right : 0) | (in_bounds(x + 1, y) < 0 ? edge_left : 0) |
