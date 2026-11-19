@@ -57,6 +57,8 @@ int draws = 0;
 std::map<unsigned, int> draws_by_range;  // how many draws asked for each range
 // The pieces' kinds handed out during a build (BLOCKPLANET_PIECE_BALANCE).
 std::vector<int> build_kinds;
+std::chrono::steady_clock::time_point build_started;  // for the build's time
+std::chrono::steady_clock::time_point first_draw, last_draw;  // the placing: first to last random draw
 
 // BLOCKPLANET_SPHERE_LAYOUT=file: replaces layers of the built grid by hand.
 // The file holds "layer N" lines, each followed by 32 rows of 32 cells, either
@@ -194,6 +196,7 @@ extern "C" void blockplanet_level_build_begin(std::uint8_t* rdram, recomp_contex
     draws = 0;
     draws_by_range.clear();
     build_kinds.clear();
+    build_started = std::chrono::steady_clock::now();
     std::fprintf(stdout, "{\"event\":\"level_build_begin\",\"mode\":%d,\"level\":%d,\"rng\":\"0x%08X\"}\n",
                  load16(rdram, mode), load16(rdram, level_counter), load32(rdram, rng_state));
     std::fflush(stdout);
@@ -273,14 +276,18 @@ extern "C" void blockplanet_level_build_end(std::uint8_t* rdram, recomp_context*
     }
     std::fprintf(stdout,
                  "{\"event\":\"level_build_end\",\"mode\":%d,\"level\":%d,\"draws\":%d,\"rng\":\"0x%08X\","
-                 "\"record\":\"%s\",\"ranges\":{%s},\"pieces\":%s,\"layers\":[%s]}\n",
+                 "\"record\":\"%s\",\"ranges\":{%s},\"pieces\":%s,\"build_ms\":%.2f,\"placing_ms\":%.2f,\"layers\":[%s]}\n",
                  load16(rdram, mode), load16(rdram, level_counter), draws, load32(rdram, rng_state), record.c_str(),
-                 callers.c_str(), pieces.c_str(), layers.c_str());
+                 callers.c_str(), pieces.c_str(),
+                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - build_started).count(),
+                 draws > 0 ? std::chrono::duration<double, std::milli>(last_draw - first_draw).count() : 0.0, layers.c_str());
     std::fflush(stdout);
 }
 
 extern "C" void blockplanet_rng_draw(std::uint8_t* rdram, recomp_context* ctx) {
     if (!building) return;
+    last_draw = std::chrono::steady_clock::now();
+    if (draws == 0) first_draw = last_draw;
     ++draws;
     ++draws_by_range[static_cast<unsigned>(ctx->r4) & 0xFFFFu];
     static const bool log_each = std::getenv("BLOCKPLANET_RNG_LOG") != nullptr;

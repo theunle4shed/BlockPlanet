@@ -95,6 +95,8 @@ The list per stage stays in the private research logs, as AGENTS.md requires.
 
 So the balancing barely shapes the sphere: with about 2,000 placement attempts a layer and the pieces that do not fit thrown away, the order of the kinds matters little, and a balanced and an unbalanced build look alike (somewhat larger patches without it). It matters in play: the same generator deals the Next pieces, so without it runs of up to 14 of one piece come instead of at most 7. Odd spheres need the kinds uneven, not only unbalanced: with a 75 % bias the sphere is mostly one colour, with the other in scattered strips.
 
+**How long a build takes (measured 2026-11-19, the owner's question about the thrown-away pieces).** `level_build_end` now logs `build_ms` (the whole set-up) and `placing_ms` (first random draw to last: the piece placing, rejected attempts included). On the test machine (software Vulkan, Linux): Rescue 1:1, 6,173 draws, placing 9.1 ms of a 242 ms build; 10:1, 30,777 draws, 12.6 of 246 ms; 10:10, 36,928 draws, 14.8 of 266 ms. So the thousands of rejected attempts cost about 10 to 15 ms, once per stage start, behind the loading cover; the generator itself is a few arithmetic steps a draw. The other 230 ms or so of the set-up is elsewhere (its time does not grow with the layers), still to break down. The thrown-away pieces are never drawn: drawing (each frame) works from the finished board only.
+
 ## More layers, and what happens to drops that make no combo
 
 Tested 2026-11-18 with `BLOCKPLANET_PLAY_LOG=1`, which logs player 1's hearts and each layer's fill whenever they change (`BLOCKPLANET_KEEP_HEARTS=1` keeps the hearts at 3 so that dropping can go on), on Episode 10 stage 1 with both seeds forced, pressing drop every few seconds.
