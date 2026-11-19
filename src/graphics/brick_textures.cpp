@@ -201,6 +201,21 @@ std::vector<std::uint8_t> dds(const std::vector<std::uint8_t>& rgba, int width, 
     return out;
 }
 
+// A texel's palette index, and a palette entry as RGBA8 (as decode reads them).
+std::uint32_t texel_index(const Draw& d, std::uint32_t x, std::uint32_t y) {
+    std::uint32_t at = std::uint32_t(d.tile.tmem) * 8u + y * std::uint32_t(d.tile.line) * 8u + x / 2u;
+    if (y & 1u) at ^= 4u;
+    const std::uint8_t b = d.tmem[at & tmem_mask];
+    return (x & 1u) ? (b & 0xFu) : (b >> 4);
+}
+
+std::uint32_t palette_colour(const Draw& d, std::uint32_t index) {
+    const std::uint32_t p = 0x800u + std::uint32_t(d.tile.palette) * 0x80u + index * 8u;
+    const std::uint16_t c = std::uint16_t(d.tmem[p & tmem_mask] << 8 | d.tmem[(p + 1u) & tmem_mask]);
+    const auto five = [](std::uint32_t v) { return std::uint32_t((v << 3) | (v >> 2)); };
+    return five((c >> 11) & 31u) | five((c >> 6) & 31u) << 8 | five((c >> 1) & 31u) << 16 | ((c & 1u) ? 0xFF000000u : 0u);
+}
+
 std::vector<std::uint8_t> crafted(const Draw& d) {
     const std::vector<std::uint8_t> source = decode(d);
     const int sw = d.width, sh = d.height, scale = 8, tile = 16, big = tile * scale;
@@ -292,7 +307,8 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
                 }
             continue;
         }
-        if (colours.size() > 3 || sh != tile) {
+        const bool piece_tile = t < 8 && sh == tile && sw >= 6 * tile;
+        if (!piece_tile && (colours.size() > 3 || sh != tile)) {
             for (int y = 0; y < h; ++y)
                 std::memcpy(&out[(std::size_t(y) * w + tx * scale) * 4u], &sharp[(std::size_t(y) * w + tx * scale) * 4u], std::size_t(big) * 4u);
             continue;
@@ -300,13 +316,20 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
         // A piece tile: the darkest colour is the outline, the rest is the
         // brick (the original's mid-tone ring inside the outline, its own
         // bevel, becomes brick too). Square: each texel is an 8 x 8 block.
-        std::sort(colours.begin(), colours.end(), [&](std::uint32_t a, std::uint32_t b) { return tone(a) < tone(b); });
-        const std::uint32_t dark = colours.front(), base = colours.back();
-        const bool has_outline = colours.size() > 1 && tone(base) - tone(dark) > 30.0;
+        // The roles come from the palette indices, not the colours: some
+        // palettes give the outline the brick's own colour (the green bricks:
+        // the owner, 2026-11-19, "an edge problem"), but the tile still marks
+        // it with its own index. The single cube (the 6th tile) shows which
+        // index is the outline (its corner) and which the brick (its middle).
+        const std::uint32_t outline_index = texel_index(d, 5 * tile, 0), base_index = texel_index(d, 5 * tile + 8, 8);
+        const std::uint32_t base = palette_colour(d, base_index);
+        std::uint32_t dark = palette_colour(d, outline_index);
+        // Where the palette gives no darker outline, one is made from the brick.
+        if (tone(base) - tone(dark) <= 30.0) dark = scaled(base, 0.45);
         std::vector<std::uint8_t> outline(std::size_t(big) * big);
         for (int y = 0; y < big; ++y)
             for (int x = 0; x < big; ++x)
-                outline[std::size_t(y) * big + x] = has_outline && colour(tx + x / scale, y / scale) == dark;
+                outline[std::size_t(y) * big + x] = outline_index != base_index && texel_index(d, tx + x / scale, y / scale) == outline_index;
         const auto is_outline = [&](int x, int y) {
             return x >= 0 && y >= 0 && x < big && y < big && outline[std::size_t(y) * big + x] != 0;
         };

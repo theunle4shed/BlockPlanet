@@ -776,6 +776,11 @@ func = "func_800BB3D0"
 text = "if (blockplanet_game_over_hide_bricks(rdram, ctx)) return;"
 
 # Research: how a stage's sphere is built (src/graphics/sphere_build_research.cpp).
+# A piece's kind from its slot (the balancing rule); BLOCKPLANET_PIECE_BALANCE.
+[[patches.hook]]
+func = "func_8008A63C"
+text = "if (blockplanet_piece_kind(rdram, ctx)) return;"
+
 [[patches.hook]]
 func = "func_800CC6E0"
 before_vram = 0x800CC7C4

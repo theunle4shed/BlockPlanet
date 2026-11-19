@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <chrono>
 #include <map>
+#include <vector>
 #include <string>
 
 namespace {
@@ -54,6 +55,8 @@ bool enabled() {
 bool building = false;
 int draws = 0;
 std::map<unsigned, int> draws_by_range;  // how many draws asked for each range
+// The pieces' kinds handed out during a build (BLOCKPLANET_PIECE_BALANCE).
+std::vector<int> build_kinds;
 
 // BLOCKPLANET_SPHERE_LAYOUT=file: replaces layers of the built grid by hand.
 // The file holds "layer N" lines, each followed by 32 rows of 32 cells, either
@@ -190,6 +193,7 @@ extern "C" void blockplanet_level_build_begin(std::uint8_t* rdram, recomp_contex
     building = true;
     draws = 0;
     draws_by_range.clear();
+    build_kinds.clear();
     std::fprintf(stdout, "{\"event\":\"level_build_begin\",\"mode\":%d,\"level\":%d,\"rng\":\"0x%08X\"}\n",
                  load16(rdram, mode), load16(rdram, level_counter), load32(rdram, rng_state));
     std::fflush(stdout);
@@ -222,6 +226,45 @@ extern "C" void blockplanet_level_build_end(std::uint8_t* rdram, recomp_context*
         layers += std::string(layers.empty() ? "" : ",") + "{\"layer\":" + std::to_string(layer) + ",\"hash\":\"" +
                   std::to_string(hash) + "\",\"values\":\"" + values + "\"}";
     }
+    // The kinds handed out: how many of each, the longest run of one kind,
+    // and the most one kind got ahead of another.
+    std::string pieces = "{}";
+    if (!build_kinds.empty()) {
+        std::map<int, int> by_kind;
+        int longest = 0, run = 0, last = -1, lead = 0;
+        for (const int k : build_kinds) {
+            ++by_kind[k];
+            run = k == last ? run + 1 : 1;
+            last = k;
+            longest = std::max(longest, run);
+            int lo = 1 << 30, hi = 0;
+            for (const auto& [kind, n] : by_kind) lo = std::min(lo, n), hi = std::max(hi, n);
+            if (by_kind.size() > 1) lead = std::max(lead, hi - lo);
+        }
+        std::string kinds;
+        for (const auto& [kind, n] : by_kind) kinds += (kinds.empty() ? "" : ",") + std::string("\"") + std::to_string(kind) + "\":" + std::to_string(n);
+        pieces = "{\"count\":" + std::to_string(build_kinds.size()) + ",\"by_kind\":{" + kinds + "},\"longest_run\":" +
+                 std::to_string(longest) + ",\"max_lead\":" + std::to_string(lead) + "}";
+    }
+    // Research: BLOCKPLANET_LAYER_MAP=1 logs each layer as 32 rows of 32
+    // characters: '.' empty, '#' a single filler block, '*' special, else
+    // 'a' + the block's kind - 32 (a square, b flat bar, c standing bar...).
+    if (std::getenv("BLOCKPLANET_LAYER_MAP") != nullptr) {
+        for (int layer = 1; layer < 8; ++layer) {
+            std::string rows;
+            bool any = false;
+            for (std::uint32_t c = 0; c < 1024; ++c) {
+                const int v = static_cast<std::uint16_t>(load16(rdram, grid + 2u * (layer * 1024u + c)));
+                char ch = '.';
+                if (v == 9) ch = '#';
+                else if (v == 63) ch = '*';
+                else if (v != 0) ch = char('a' + std::clamp(v / 9 - 32, 0, 20));
+                any = any || v != 0;
+                rows += ch;
+            }
+            if (any) std::fprintf(stdout, "{\"event\":\"layer_map\",\"layer\":%d,\"cells\":\"%s\"}\n", layer, rows.c_str());
+        }
+    }
     std::string callers;
     for (const auto& [range, n] : draws_by_range) {
         char item[32];
@@ -230,9 +273,9 @@ extern "C" void blockplanet_level_build_end(std::uint8_t* rdram, recomp_context*
     }
     std::fprintf(stdout,
                  "{\"event\":\"level_build_end\",\"mode\":%d,\"level\":%d,\"draws\":%d,\"rng\":\"0x%08X\","
-                 "\"record\":\"%s\",\"ranges\":{%s},\"layers\":[%s]}\n",
+                 "\"record\":\"%s\",\"ranges\":{%s},\"pieces\":%s,\"layers\":[%s]}\n",
                  load16(rdram, mode), load16(rdram, level_counter), draws, load32(rdram, rng_state), record.c_str(),
-                 callers.c_str(), layers.c_str());
+                 callers.c_str(), pieces.c_str(), layers.c_str());
     std::fflush(stdout);
 }
 
@@ -296,4 +339,29 @@ extern "C" void blockplanet_sphere_play_log(std::uint8_t* rdram) {
         std::fflush(stdout);
     }
     if (keep && hearts >= 0 && hearts < 3) store16(rdram, 0x80112F9Eu, 3);
+}
+
+// Research: BLOCKPLANET_PIECE_BALANCE=on|off (func_8008A63C, a piece's kind
+// from the slot drawn). The game's own rule ("on"): each of the 4 x kinds
+// slots hands out the kinds in turn (its counter at the player context's
+// +0x2C1E + 2 x slot), which keeps the kinds even. "off": the kind is the
+// slot's own, slot % kinds, so each piece is an independent draw. Either way
+// the kinds are recorded for the build's summary. Unset: the original runs.
+extern "C" bool blockplanet_piece_kind(std::uint8_t* rdram, recomp_context* ctx) {
+    static const char* setting = std::getenv("BLOCKPLANET_PIECE_BALANCE");
+    if (setting == nullptr) return false;
+    const int slot = static_cast<std::int16_t>(ctx->r4);
+    const int kinds = std::max<int>(1, load16(rdram, 0x800E44B8u));
+    int kind;
+    if (std::string(setting) == "off") {
+        kind = ((slot % kinds) + kinds) % kinds;
+    } else {
+        const std::uint32_t at = load32(rdram, 0x8013DD00u) + 0x2C1Eu + 2u * std::uint32_t(slot);
+        const int counter = load16(rdram, at);
+        store16(rdram, at, static_cast<std::int16_t>((counter + 1) % kinds));
+        kind = counter % kinds;
+    }
+    if (building) build_kinds.push_back(kind);
+    ctx->r2 = static_cast<gpr>(static_cast<std::int16_t>(kind));
+    return true;
 }

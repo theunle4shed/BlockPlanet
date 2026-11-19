@@ -25,6 +25,8 @@ Cost: walking the display list every frame cost 0.46 ms a frame on average on th
 
 Each style has its own folder in the data folder (`texture-packs/sharp-bricks`, `texture-packs/crafted-bricks`); the choice is saved in the profile and applied by the renderer on its next frame, so it can be changed in play.
 
+**Palettes without a darker outline (version 5).** Some brick colours (the green ones, for example) map the outline's palette index to the brick's own colour, so the original has no drawn outline there. Crafted reads a tile's structure from its palette indices (the single-cube tile, the 6th, gives the outline index at its corner and the brick's at its middle) and, where the outline colour is not at least 30 levels darker, darkens the brick's colour to 45 % for it. **Cycling palettes:** in some stages the rubble's palette (bank 4) changes over time, so each step is a different texture with its own hash and gets its own replacement (12 in a short run of Rescue 10:1); they are made once and kept.
+
 ## Switches
 
 - `BLOCKPLANET_BRICKS=original|sharp|crafted`: overrides the setting.
