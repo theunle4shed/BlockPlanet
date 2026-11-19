@@ -187,6 +187,12 @@ bool end_menu_cleared = false;  // the end menu is an episode's end (not a game 
 // seen; "we need to kill the original credits").
 bool final_stage_cleared = false;
 bool final_credits_open = false;
+bool final_stage_cleared_seen = false;  // research (BLOCKPLANET_FINAL_RAW)
+// Rescue's finale after 10:10 (the owner, 2026-11-19: "it would be a shame to
+// hide it away"): the game's curtain call plays with no HUD and no cover;
+// any button skips it; then BlockPlanet's credits, to Sappy.
+bool final_finale = false;
+bool final_skip = false;
 // An episode's last stage just cleared in a whole-episode Rescue run (1), or
 // a stage before the last in play (-1): told to the end menu bridge.
 int episode_end_expected = 0;
@@ -607,6 +613,7 @@ std::optional<blockplanet::ui::HudView> last_hud_view;  // what update_hud last 
 // itself is hidden once the game is over).
 std::optional<blockplanet::ui::HudView> last_play_hud;
 void show_hud(std::optional<blockplanet::ui::HudView> view) {
+    if (final_finale) view.reset();  // the finale plays with no HUD
     if (view) last_play_hud = view;
     last_hud_view = std::move(view);
 }
@@ -4662,6 +4669,12 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::send_command("research_win");
                 continue;
             }
+            // The finale after 10:10: any key or button skips to the credits.
+            if (final_finale && ((event.type == SDL_KEYDOWN && !event.key.repeat) || event.type == SDL_CONTROLLERBUTTONDOWN ||
+                                 event.type == SDL_JOYBUTTONDOWN)) {
+                final_skip = true;
+                continue;
+            }
             // The card panel's scrolling (when its text is taller than the screen
             // allows): the right stick (the game does not use it), Page Up /
             // Page Down and the mouse wheel. Outside the menus only.
@@ -5819,11 +5832,33 @@ bool handle_profile_command(const std::string& command) {
                                     guest::load16(guest_rdram, 0x800E1228) >= 0 && !blockplanet::ui::menus_open();
                 // (The end bridge counts this as an episode's end waiting for
                 // the game's menu, which never comes; its panel never opens.)
-                if (!at_end) final_since.reset();
+                static const bool final_raw_c = std::getenv("BLOCKPLANET_FINAL_RAW") != nullptr;
+                if (final_stage_cleared) final_stage_cleared_seen = true;
+                if (!at_end || final_raw_c) final_since.reset();
                 else if (!final_since) final_since = std::chrono::steady_clock::now();
-                if (!final_credits_open && final_since && std::chrono::steady_clock::now() - *final_since > std::chrono::seconds(2)) {
+                static std::optional<std::chrono::steady_clock::time_point> finale_at;
+                if (!final_finale && !final_credits_open && final_since &&
+                    std::chrono::steady_clock::now() - *final_since > std::chrono::milliseconds(1500)) {
+                    // The curtain call: the game's own, seen (its grid and the HUD off).
+                    final_finale = true;
+                    final_skip = false;
+                    finale_at = std::chrono::steady_clock::now();
+                    final_since.reset();
+                    show_hud(std::nullopt);
+                    std::fprintf(stdout, "{\"event\":\"final_finale\",\"on\":true}\n");
+                    std::fflush(stdout);
+                }
+                // Its end: the game's row moves to 1 as its own credits begin
+                // (about 114 s in); or a button skipped it.
+                if (final_finale && (final_skip || guest::load16(guest_rdram, 0x800E1228) == 1 ||
+                                     std::chrono::steady_clock::now() - *finale_at > std::chrono::seconds(180))) {
+                    final_finale = false;
+                    std::fprintf(stdout, "{\"event\":\"final_finale\",\"on\":false,\"skipped\":%d}\n", final_skip);
+                    std::fflush(stdout);
+                    final_skip = false;
                     final_credits_open = true;
                     final_stage_cleared = false;
+                    blockplanet::play_track(20);  // Sappy (the owner's choice), for the credits
                     if (profile_save) {
                         auto& progress = profile_data.progress;
                         if (progress.chapters_completed["rescue"].insert(10).second) {
@@ -6501,6 +6536,11 @@ bool handle_profile_command(const std::string& command) {
                     std::fflush(stdout);
                 }
             }
+            // Research: BLOCKPLANET_FINAL_RAW=1 shows what the game draws after
+            // Rescue's final episode (no grid there, no credits).
+            static const bool final_raw = std::getenv("BLOCKPLANET_FINAL_RAW") != nullptr;
+            if ((final_raw && final_stage_cleared_seen) || final_finale) blockplanet::ui::set_grid_override("");
+            else
             blockplanet::ui::set_grid_override(over_pause && !launching()            ? "pause"
                                                : over_end && !mode_launcher.active() ? "red"
                                                : end_menu_cleared && !mode_launcher.active() ? "green"
