@@ -45,6 +45,9 @@ struct MeshInputs {
     // layer step = v / 10). Other values keep the top of layer 8 (base + 7
     // steps) where the game has it, so a bigger core means thinner layers.
     double core_scale = 1.0;
+    // The blocks' height relative to the game's (1.0), the core kept as it is
+    // (Minefield on the sphere: one layer of shorter cubes).
+    double layer_scale = 1.0;
 };
 
 // Fill `out` (rows x columns entries) exactly as func_800ADD6C does.

@@ -63,7 +63,8 @@ void build_mesh(const MeshInputs& in, std::vector<MeshEntry>& out) {
             MeshEntry& e = out[index++];
             for (int axis = 0; axis < 3; ++axis) {
                 if (in.core_scale == 1.0) {
-                    e.inner[axis] = s16(v[axis] / 10);
+                    e.inner[axis] = in.layer_scale == 1.0 ? s16(v[axis] / 10)
+                                                          : s16(static_cast<std::int32_t>(std::lround(v[axis] * in.layer_scale / 10.0)));
                     e.outer[axis] = s16(v[axis] / 3);
                 } else {
                     // Top of layer 8 stays at v x (1/3 + 7/10).

@@ -1601,7 +1601,17 @@ void poll_board_log() {
     const long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
     constexpr int cells = 9 * 1024;
     const bool first = last.size() != std::size_t(cells);
-    if (first) last.assign(std::size_t(cells), 0);
+    if (first) {
+        last.assign(std::size_t(cells), 0);
+        // The values in each layer, counted, once (what a stage is built from).
+        for (int layer = 0; layer < 3; ++layer) {
+            std::map<int, int> counts;
+            for (int c = 0; c < 1024; ++c) ++counts[guest::load16(guest_rdram, values + 2u * std::uint32_t(layer * 1024 + c))];
+            std::string text;
+            for (const auto& [v, n] : counts) text += (text.empty() ? "" : ",") + std::string("\"") + std::to_string(v) + "\":" + std::to_string(n);
+            std::fprintf(stdout, "{\"event\":\"board_counts\",\"layer\":%d,\"counts\":{%s}}\n", layer, text.c_str());
+        }
+    }
     int logged = 0;
     for (int i = 0; i < cells; ++i) {
         const std::int16_t v = guest::load16(guest_rdram, values + 2u * std::uint32_t(i));

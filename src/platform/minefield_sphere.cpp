@@ -107,6 +107,10 @@ int cursor_y(const std::uint8_t* rdram) { return 8 + guest::load16(rdram, player
 // Research: BLOCKPLANET_MINEFIELD_TILE=x picks another tile's left texel.
 constexpr std::uint32_t smooth_table = 0x807F8000u;
 constexpr int smooth_table_halves = 48;  // 0x60 bytes, like the game's
+// The wall outside the field (and an arena's walls inside it): the sheet's
+// flat first tile, so its cells join into one smooth surface, as Training's
+// and Puzzle's walls (the owner, 2026-11-19).
+constexpr std::uint32_t wall_table = smooth_table + 2u * smooth_table_halves;
 
 void write_smooth_table(std::uint8_t* rdram) {
     static const int left = [] {
@@ -118,6 +122,9 @@ void write_smooth_table(std::uint8_t* rdram) {
     const std::int16_t corners[8] = {a, 14, b, 14, a, 1, b, 1};
     for (int i = 0; i < smooth_table_halves; ++i)
         guest::store16(rdram, smooth_table + 2u * std::uint32_t(i), corners[i % 8]);
+    const std::int16_t flat[8] = {1, 14, 14, 14, 1, 1, 14, 1};
+    for (int i = 0; i < smooth_table_halves; ++i)
+        guest::store16(rdram, wall_table + 2u * std::uint32_t(i), flat[i % 8]);
 }
 
 void build_board(std::uint8_t* rdram) {
@@ -127,8 +134,9 @@ void build_board(std::uint8_t* rdram) {
     const std::uint32_t columns = guest::load32(rdram, columns_pointer);
     write_smooth_table(rdram);
     for (int c = 0; c < layer_cells; ++c) {
-        guest::store32(rdram, entries + 4u * std::uint32_t(layer_cells + c), smooth_table);
-        field_cells()[c].store(field_at(c % board, c / board) >= 0, std::memory_order_relaxed);
+        const bool in_play = field_at(c % board, c / board) >= 0;
+        guest::store32(rdram, entries + 4u * std::uint32_t(layer_cells + c), in_play ? smooth_table : wall_table);
+        field_cells()[c].store(in_play, std::memory_order_relaxed);
         guest::store16(rdram, values + 2u * std::uint32_t(layer_cells + c), inert);
         guest::store8(rdram, masks + std::uint32_t(layer_cells + c), top_face);
         guest::store8(rdram, masks + std::uint32_t(c), 0);  // the core, covered

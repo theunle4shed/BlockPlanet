@@ -37,6 +37,7 @@
 #include "tetrisphere/sphere_faces.h"
 #include "tetrisphere/game_over_shell.h"
 #include "tetrisphere/sphere_grid.h"
+#include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/sphere_quadrants.h"
 
@@ -530,6 +531,14 @@ extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_contex
     }();
     MeshInputs inputs = gather(rdram, ctx, true);
     inputs.core_scale = core_scale;
+    // Minefield on the sphere: shorter cubes over the core (the owner,
+    // 2026-11-19). BLOCKPLANET_MINEFIELD_HEIGHT sets the factor for testing.
+    static const double minefield_height = [] {
+        const char* value = std::getenv("BLOCKPLANET_MINEFIELD_HEIGHT");
+        const double v = value != nullptr ? std::atof(value) : 0.6;
+        return v >= 0.2 && v <= 1.0 ? v : 0.6;
+    }();
+    if (tetrisphere::minefield_sphere::blue_field().load(std::memory_order_relaxed)) inputs.layer_scale = minefield_height;
     std::vector<MeshEntry> mesh;
     build_mesh(inputs, mesh);
     store_mesh(rdram, mesh);
