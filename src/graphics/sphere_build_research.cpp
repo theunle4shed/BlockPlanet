@@ -59,6 +59,8 @@ std::map<unsigned, int> draws_by_range;  // how many draws asked for each range
 std::vector<int> build_kinds;
 std::chrono::steady_clock::time_point build_started;  // for the build's time
 std::chrono::steady_clock::time_point first_draw, last_draw;  // the placing: first to last random draw
+// Timing marks through the builder (address, time), in the order passed.
+std::vector<std::pair<std::uint32_t, std::chrono::steady_clock::time_point>> build_marks;
 
 // BLOCKPLANET_SPHERE_LAYOUT=file: replaces layers of the built grid by hand.
 // The file holds "layer N" lines, each followed by 32 rows of 32 cells, either
@@ -197,6 +199,7 @@ extern "C" void blockplanet_level_build_begin(std::uint8_t* rdram, recomp_contex
     draws_by_range.clear();
     build_kinds.clear();
     build_started = std::chrono::steady_clock::now();
+    build_marks.clear();
     std::fprintf(stdout, "{\"event\":\"level_build_begin\",\"mode\":%d,\"level\":%d,\"rng\":\"0x%08X\"}\n",
                  load16(rdram, mode), load16(rdram, level_counter), load32(rdram, rng_state));
     std::fflush(stdout);
@@ -268,6 +271,24 @@ extern "C" void blockplanet_level_build_end(std::uint8_t* rdram, recomp_context*
             if (any) std::fprintf(stdout, "{\"event\":\"layer_map\",\"layer\":%d,\"cells\":\"%s\"}\n", layer, rows.c_str());
         }
     }
+    // The time from each mark to the next (the last to the build's end), in ms.
+    // Summed per mark (some are inside loops), with how often each was passed.
+    std::map<std::uint32_t, std::pair<double, int>> per_mark;
+    for (std::size_t i = 0; i < build_marks.size(); ++i) {
+        const auto next = i + 1 < build_marks.size() ? build_marks[i + 1].second : std::chrono::steady_clock::now();
+        auto& entry = per_mark[build_marks[i].first];
+        entry.first += std::chrono::duration<double, std::milli>(next - build_marks[i].second).count();
+        ++entry.second;
+    }
+    std::string marks;
+    for (const auto& [at, entry] : per_mark) {
+        char item[80];
+        std::snprintf(item, sizeof item, "%s\"0x%08X\":[%.2f,%d]", marks.empty() ? "" : ",", at, entry.first, entry.second);
+        marks += item;
+    }
+    if (!build_marks.empty())
+        std::fprintf(stdout, "{\"event\":\"build_marks\",\"first_ms\":%.2f,\"marks\":{%s}}\n",
+                     std::chrono::duration<double, std::milli>(build_marks.front().second - build_started).count(), marks.c_str());
     std::string callers;
     for (const auto& [range, n] : draws_by_range) {
         char item[32];
@@ -378,4 +399,10 @@ extern "C" bool blockplanet_piece_kind(std::uint8_t* rdram, recomp_context* ctx)
     if (building) build_kinds.push_back(kind);
     ctx->r2 = static_cast<gpr>(static_cast<std::int16_t>(kind));
     return true;
+}
+
+// Research: a timing mark in the builder (BLOCKPLANET_SPHERE_RESEARCH).
+extern "C" void blockplanet_build_mark(std::uint8_t*, std::uint32_t at) {
+    if (!building) return;
+    build_marks.emplace_back(at, std::chrono::steady_clock::now());
 }
