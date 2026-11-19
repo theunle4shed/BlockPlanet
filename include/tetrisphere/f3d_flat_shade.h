@@ -6,6 +6,10 @@
 
 namespace tetrisphere {
 
+// Graphics > Lighting: Smooth (true, the default) keeps smooth shading on in
+// the display lists, so lit faces blend instead of one shade per face.
+void set_smooth_shading(bool on);
+
 // RT64 ignores the F3D TRI1 flat-shading vertex selector. Rotate each
 // triangle so Vulkan's first vertex receives the same shade as the N64 flag.
 class F3DFlatShadePatch {

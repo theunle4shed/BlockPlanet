@@ -46,6 +46,7 @@ nlohmann::json to_json(const ProfileSaveData& data) {
     if (data.preferences.hud_distance) preferences["hud"] = {{"distance", *data.preferences.hud_distance}};
     if (data.preferences.text_size) preferences["text"] = {{"size", *data.preferences.text_size}};
     if (data.preferences.bricks) preferences["bricks"] = {{"style", *data.preferences.bricks}};
+    if (data.preferences.lighting) preferences["lighting"] = {{"style", *data.preferences.lighting}};
     nlohmann::json levels = nlohmann::json::object();
     for (const auto& [mode, chapters] : data.progress.levels_completed) {
         nlohmann::json by_chapter = nlohmann::json::object();
@@ -133,6 +134,10 @@ bool from_json(const std::string& text, ProfileSaveData& data) {
         if (preferences.contains("bricks")) {
             const auto style = preferences.at("bricks").value("style", std::string("crafted"));
             if (style == "original" || style == "sharp" || style == "crafted") result.preferences.bricks = style;
+        }
+        if (preferences.contains("lighting")) {
+            const auto style = preferences.at("lighting").value("style", std::string("smooth"));
+            if (style == "smooth" || style == "original") result.preferences.lighting = style;
         }
         if (preferences.contains("text")) {
             const auto size = preferences.at("text").value("size", std::string("default"));

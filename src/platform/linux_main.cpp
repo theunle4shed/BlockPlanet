@@ -17,6 +17,7 @@
 #include "tetrisphere/text_rewrites.h"
 
 #include "tetrisphere/rt64_context.h"
+#include "tetrisphere/f3d_flat_shade.h"
 #include "tetrisphere/run_options.h"
 #include "tetrisphere/run_identity.h"
 #include "tetrisphere/runtime.h"
@@ -3785,6 +3786,11 @@ void publish_hud_settings() {
         blockplanet::ui::set_setting("bricks", last_bricks = bricks);
         tetrisphere::set_rt64_brick_style(bricks);
     }
+    static std::string last_lighting;
+    if (const auto lighting = profile_data.preferences.lighting.value_or("smooth"); lighting != last_lighting) {
+        blockplanet::ui::set_setting("lighting", last_lighting = lighting);
+        tetrisphere::set_smooth_shading(lighting == "smooth");
+    }
     if (text != last_text) blockplanet::ui::set_setting("text_size", last_text = text);
     if (value == last) return;
     last = value;
@@ -3803,6 +3809,20 @@ bool handle_bricks_setting(const std::string& command) {
     save_profile();
     blockplanet::ui::set_setting("bricks", value);
     tetrisphere::set_rt64_brick_style(value);
+    return true;
+}
+
+// Graphics > Lighting: smooth or the original's flat shading, saved in the profile.
+bool handle_lighting_setting(const std::string& command) {
+    const std::string prefix = "setting:lighting=";
+    if (command.rfind(prefix, 0) != 0) return false;
+    const auto value = command.substr(prefix.size());
+    if (value != "smooth" && value != "original") return true;
+    profile_data.preferences.lighting = value;
+    profile_dirty = true;
+    save_profile();
+    blockplanet::ui::set_setting("lighting", value);
+    tetrisphere::set_smooth_shading(value == "smooth");
     return true;
 }
 
@@ -4633,6 +4653,15 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
                 continue;
             }
+            // Testing (the owner, 2026-11-19): W in play (not an F key: the owner's keyboard needs Fn for those) wins the stage at
+            // once (the core opened), as the harness's research_win. On for
+            // every build while BlockPlanet is being tested; to be put behind a
+            // developer switch before a release.
+            if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode == SDL_SCANCODE_W &&
+                !blockplanet::ui::menus_open()) {
+                blockplanet::ui::send_command("research_win");
+                continue;
+            }
             // The card panel's scrolling (when its text is taller than the screen
             // allows): the right stick (the game does not use it), Page Up /
             // Page Down and the mouse wheel. Outside the menus only.
@@ -4766,6 +4795,7 @@ bool handle_profile_command(const std::string& command) {
             if (handle_hud_setting(*command)) continue;
             if (handle_text_setting(*command)) continue;
             if (handle_bricks_setting(*command)) continue;
+            if (handle_lighting_setting(*command)) continue;
             if (handle_sky_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;
@@ -5753,6 +5783,31 @@ bool handle_profile_command(const std::string& command) {
                                              std::chrono::steady_clock::now(), pause_bridge.hide_original());
             end_menu_active = end.active;
             end_menu_cleared = end.cleared;
+            // The episode end's steps, in the diagnostics file too (the
+            // owner's Carry On loop after Episode 2, 2026-11-19, not seen in
+            // the harness): each change of the game's row, its grid, the
+            // panel and the presses while an end menu or card is up.
+            {
+                static std::string last_flow;
+                const bool flow = end.active || episode_card_skip.has_value() || end_menu.hide_original();
+                char line[256];
+                std::snprintf(line, sizeof line,
+                              "{\"event\":\"end_flow\",\"row\":%d,\"grid\":%d,\"showing\":%d,\"hide\":%d,\"inject\":%d,\"a\":%d,"
+                              "\"card_skip\":%d,\"cleared\":%d,\"menus\":%d,\"screen\":\"%s\"}",
+                              guest::load16(guest_rdram, 0x800E1228), guest::load16(guest_rdram, 0x800DFF08u), end_menu.showing(),
+                              end_menu.hide_original(), end.inject, end.buttons != 0, episode_card_skip.has_value(), end.cleared,
+                              blockplanet::ui::menus_open(), blockplanet::ui::current_screen().c_str());
+                // (The A press itself flickers: left out of the comparison.)
+                std::string key = line;
+                if (const auto at = key.find("\"a\":"); at != std::string::npos) key.erase(at, 6);
+                if (flow && key != last_flow) {
+                    last_flow = key;
+                    diagnostic_log().perf(line);
+                    if (std::getenv("BLOCKPLANET_END_MENU_LOG") != nullptr) std::fprintf(stdout, "%s\n", line), std::fflush(stdout);
+                } else if (!flow) {
+                    last_flow.clear();
+                }
+            }
             // After Rescue's final episode the game shows no end menu but goes
             // on to its own credits, with nothing seen. Once it gets there (the
             // pause row set a moment after the last stage is cleared), the game

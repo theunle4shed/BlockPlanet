@@ -46,6 +46,7 @@ struct ProfilePreferences {
     // The size of the game's card and speech text (Graphics > Text size, an
     // accessibility choice): "small", "default", "large" or "larger". Unset: "default".
     std::optional<std::string> text_size;
+    std::optional<std::string> lighting;  // Graphics > Lighting: smooth (the default) or original
     std::optional<std::string> bricks;  // Graphics > Bricks: crafted (the default), sharp or original
 };
 

@@ -1,9 +1,17 @@
 #include "tetrisphere/f3d_flat_shade.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace tetrisphere {
+
+namespace {
+std::atomic<bool> smooth_shading{true};
+}
+void set_smooth_shading(bool on) { smooth_shading.store(on); }
 
 F3DFlatShadePatch::F3DFlatShadePatch(std::uint8_t* rdram,
                                      std::size_t rdram_bytes,
@@ -17,6 +25,9 @@ F3DFlatShadePatch::F3DFlatShadePatch(std::uint8_t* rdram,
     if (rdram_ == nullptr || start >= rdram_bytes) {
         return;
     }
+    // BLOCKPLANET_SMOOTH_SHADE=0 or 1 overrides the setting.
+    static const char* forced = std::getenv("BLOCKPLANET_SMOOTH_SHADE");
+    const bool smooth = forced != nullptr ? forced[0] != '0' : smooth_shading.load();
     const std::size_t bytes = std::min({display_list_bytes,
                                         max_display_list_bytes,
                                         rdram_bytes - start});
@@ -26,6 +37,22 @@ F3DFlatShadePatch::F3DFlatShadePatch(std::uint8_t* rdram,
         const std::uint8_t opcode = command >> 24;
         if (opcode == end_dl) {
             break;
+        }
+        // Graphics > Lighting, Smooth: smooth shading kept on (the game's
+        // G_CLEARGEOMETRYMODE of G_SHADING_SMOOTH dropped), so lit vertices
+        // blend across each face instead of one shade per face: the sphere's
+        // squares no longer step in tone (the owner, 2026-11-19).
+        if (smooth && opcode == 0xB6) {
+            std::uint32_t bits = 0;
+            std::memcpy(&bits, rdram_ + offset + 4, sizeof(bits));
+            if (bits & 0x200u) {
+                changes_.push_back({offset + 4, bits});
+                static int logged = 0;
+                if (logged < 3) ++logged, std::fprintf(stdout, "{\"event\":\"smooth_shade\",\"bits\":\"%08X\"}\n", bits), std::fflush(stdout);
+                const std::uint32_t kept = bits & ~0x200u;
+                std::memcpy(rdram_ + offset + 4, &kept, sizeof(kept));
+            }
+            continue;
         }
         if (opcode != tri1) {
             continue;

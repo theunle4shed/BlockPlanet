@@ -15,6 +15,8 @@
              data-options="windowed:Window,fullscreen:Full screen">Display<span class="value"></span></div>
         <div class="item value" id="bricks" data-description="How the bricks look up close: Crafted redraws them square with bevelled edges and a solid outline, Sharp keeps the original's look with crisp edges, Original is the N64's own." data-setting="bricks"
              data-options="crafted:Crafted,sharp:Sharp,original:Original">Bricks<span class="value"></span></div>
+        <div class="item value" id="lighting" data-description="Smooth blends the light across the sphere. Original lights each square on its own, so long bricks step in tone." data-setting="lighting"
+             data-options="smooth:Smooth,original:Original">Lighting<span class="value"></span></div>
         <div class="item value" id="texture_filter" data-description="Three-point smooths textures the way the N64 did. Linear is the usual PC smoothing." data-setting="texture_filter"
              data-options="three-point:Three-point,linear:Linear">Textures<span class="value"></span></div>
         <div class="item value" id="presentation_filter" data-description="How the finished picture is scaled to your screen: Pixel keeps edges crisp and even, Smooth softens them, Sharp uses the nearest pixels." data-setting="presentation_filter"

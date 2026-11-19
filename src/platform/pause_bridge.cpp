@@ -294,7 +294,7 @@ EndMenuBridge::Output EndMenuBridge::update(std::uint8_t* rdram, const std::vect
             out.close_menu = menus_open;
             return out;
         }
-        if (now - since_ > std::chrono::seconds(4)) {  // give up; show the panel again
+        if (now - since_ > std::chrono::seconds(10)) {  // give up; show the panel again
             choice_.reset();
             showing_ = false;
             return out;
