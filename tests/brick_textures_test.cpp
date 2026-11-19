@@ -45,10 +45,14 @@ int main() {
     assert(big[3] == 255 && big[(3 * 4 + 3) * 4 + 3] == 0);  // a lone pixel is rounded off, its far corner stays clear
 
     // Crafted: 8 times larger, opaque where the sheet is.
-    const auto drawn = crafted(seen);
+    // (A sheet of one colour: index 1, green, from the loaded bank 0.)
+    Draw flat = seen;
+    flat.tile.palette = 0;
+    for (int i = 0; i < 2048; ++i) flat.tmem[std::size_t(i)] = 0x11;
+    const auto drawn = crafted(flat);
     assert(drawn.size() == std::size_t(256 * 8) * (16 * 8) * 4);
-    assert(drawn[3] == 255);  // the first texel's colour (index 1, red) is opaque
-    assert(drawn[0] > 150 && drawn[1] < 80);  // and red
+    assert(drawn[3] == 255);
+    assert(drawn[1] > 150 && drawn[0] < 80);
 
     // DDS: 148 bytes of header, then the levels.
     const auto file = dds(std::vector<std::uint8_t>(8 * 4 * 4, 7), 8, 4, 3);
