@@ -1,8 +1,12 @@
 #include "tetrisphere/rt64_context.h"
 #include <tuple>
+#include <filesystem>
+#include <fstream>
 #include <set>
+#include <string>
 #include "tetrisphere/frame_step.h"
 #include "tetrisphere/data_directory.h"
+#include "tetrisphere/brick_textures.h"
 #include "ui_system.h"
 #include "tetrisphere/diagnostic_log.h"
 #include "tetrisphere/dl_ui_tags.h"
@@ -24,6 +28,7 @@
 #endif
 
 #include "hle/rt64_application.h"
+#include "common/rt64_tmem_hasher.h"
 #include "ultramodern/config.hpp"
 #include "ultramodern/ultramodern.hpp"
 
@@ -322,6 +327,14 @@ public:
         app_->emulatorConfig.framebuffer.renderToRAM =
             run_options.framebuffer_readback.value_or(true);
         setup_result = ::tetrisphere::setup_result(app_->setup(0));
+        if (setup_result == ultramodern::renderer::SetupResult::Success) sharp_bricks_init();
+        // Research: BLOCKPLANET_TEXTURE_DUMP=dir has RT64 dump each texture's
+        // TMEM under its replacement hash (for the sharp bricks).
+        if (const char* dump = std::getenv("BLOCKPLANET_TEXTURE_DUMP");
+            dump != nullptr && setup_result == ultramodern::renderer::SetupResult::Success) {
+            std::filesystem::create_directories(dump);
+            app_->state->dumpingTexturesDirectory = std::filesystem::u8path(dump);
+        }
         if (setup_result == ultramodern::renderer::SetupResult::Success) {
             const unsigned requested_samples = run_options.msaa_samples
                 ? static_cast<unsigned>(*run_options.msaa_samples == 0
@@ -481,9 +494,130 @@ public:
         std::fflush(stdout);
     }
 
+    // Research: BLOCKPLANET_DL_TEX_LOG=1 logs each distinct texture set-up
+    // used for triangles in a frame (the image, its load, the render tile and
+    // its size, the palette), once each: to find the bricks' textures and
+    // rebuild their TMEM for RT64's replacement hashes.
+    void research_tex_log(const OSTask* task) {
+        static const bool on = std::getenv("BLOCKPLANET_DL_TEX_LOG") != nullptr;
+        if (!on || research_rdram_ == nullptr) return;
+        const std::uint8_t* m = research_rdram_;
+        auto word = [&](std::uint32_t at) { std::uint32_t v; std::memcpy(&v, m + (at & 0x007FFFFCu), 4); return v; };
+        static std::set<std::string> seen;
+        std::uint32_t timg0 = 0, timg1 = 0, load0 = 0, load1 = 0, tile0 = 0, tile1 = 0, size0 = 0, size1 = 0, tlut0 = 0, tlut1 = 0, tlut_img = 0, other = 0;
+        std::uint32_t load_img = 0, load_settile0 = 0, load_settile1 = 0;
+        int budget = 300000;
+        std::uint32_t segments[16] = {};
+        auto resolve = [&](std::uint32_t a) { return (segments[(a >> 24) & 0xFu] + (a & 0x00FFFFFFu)) & 0x00FFFFFFu; };
+        const auto walk = [&](auto&& self, std::uint32_t at, int depth) -> void {
+            for (; budget-- > 0; at += 8u) {
+                const std::uint32_t w0 = word(at), w1 = word(at + 4u);
+                const std::uint32_t op = w0 >> 24;
+                switch (op) {
+                case 0xBC:  // G_MOVEWORD: a segment's base
+                    if ((w0 & 0xFFu) == 6u) segments[((w0 >> 8) & 0xFFFFu) / 4u & 0xFu] = w1 & 0x00FFFFFFu;
+                    break;
+                case 0xFD: timg0 = w0, timg1 = resolve(w1) | 0x80000000u; break;
+                case 0xF5:
+                    if (((w1 >> 24) & 7u) == 7u) load_settile0 = w0, load_settile1 = w1;  // the load tile
+                    else if (((w1 >> 24) & 7u) == 0u) tile0 = w0, tile1 = w1;
+                    break;
+                case 0xF3: case 0xF4: load0 = w0, load1 = w1, load_img = timg1; break;
+                case 0xF0: tlut0 = w0, tlut1 = w1, tlut_img = timg1; break;
+                case 0xF2: if (((w1 >> 24) & 7u) == 0u) size0 = w0, size1 = w1; break;
+                case 0xBF: case 0xB1: {
+                    char key[300];
+                    std::snprintf(key, sizeof key, "%08X %08X|%08X %08X|%08X %08X|%08X %08X|%08X %08X|%08X %08X %08X|%08X %08X",
+                                  timg0, load_img, load_settile0, load_settile1, load0, load1, tile0, tile1, size0, size1,
+                                  tlut0, tlut1, tlut_img, other, 0u);
+                    if (seen.insert(key).second)
+                        std::fprintf(stdout, "{\"event\":\"dl_tex\",\"frame\":%llu,\"key\":\"%s\"}\n",
+                                     (unsigned long long)display_list_count.load(), key);
+                    break;
+                }
+                default: break;
+                }
+                if (op == 0x06u && depth < 8) {
+                    self(self, resolve(w1), depth + 1);
+                    if (((w0 >> 16) & 0xFFu) == 1u) return;
+                }
+                if (op == 0xB8u) return;
+            }
+        };
+        walk(walk, task->t.data_ptr & 0x00FFFFFFu, 0);
+        std::fflush(stdout);
+    }
+
+    // Sharp bricks (include/tetrisphere/brick_textures.h): a replacement pack
+    // in the data folder, filled as the bricks are first drawn. Off with
+    // BLOCKPLANET_BRICKS=original.
+    bool bricks_ready_ = false;
+    std::filesystem::path bricks_dir_;
+    std::set<std::uint64_t> bricks_done_;
+    void sharp_bricks_init() {
+        const char* setting = std::getenv("BLOCKPLANET_BRICKS");
+        if (setting != nullptr && std::string(setting) == "original") return;
+        std::error_code error;
+        bricks_dir_ = ::tetrisphere::application_data_directory() / "texture-packs" / "sharp-bricks";
+        std::filesystem::create_directories(bricks_dir_, error);
+        if (error) return;
+        const auto database = bricks_dir_ / "rt64.json";
+        if (!std::filesystem::exists(database)) {
+            std::ofstream out(database);
+            out << "{\"configuration\": {\"configurationVersion\": 3, \"hashVersion\": 5}, \"textures\": []}\n";
+        }
+        bricks_ready_ = app_->textureCache->loadReplacementDirectory(RT64::ReplacementDirectory(bricks_dir_));
+        std::fprintf(stdout, "{\"event\":\"sharp_bricks\",\"ready\":%s}\n", bricks_ready_ ? "true" : "false");
+        std::fflush(stdout);
+    }
+    void sharp_bricks_frame(const OSTask* task) {
+        if (!bricks_ready_ || research_rdram_ == nullptr) return;
+        // Every 15th frame: new brick colours come with a stage or a new
+        // piece, and are sharpened within a quarter of a second. Walking every
+        // frame cost 0.46 ms a frame on the test machine (Rescue 1:1).
+        static unsigned frame = 0;
+        if (frame++ % 15u != 0u) return;
+        const std::uint8_t* m = research_rdram_;
+        const auto read32 = [m](std::uint32_t at) { std::uint32_t v; std::memcpy(&v, m + (at & 0x007FFFFCu), 4); return v; };
+        ::tetrisphere::bricks::find_draws(read32, task->t.data_ptr, [&](const ::tetrisphere::bricks::Draw& d) {
+            RT64::LoadTile tile{};
+            tile.fmt = d.tile.fmt;
+            tile.siz = d.tile.siz;
+            tile.line = d.tile.line;
+            tile.tmem = d.tile.tmem;
+            tile.palette = d.tile.palette;
+            const std::uint64_t hash = RT64::TMEMHasher::hash(d.tmem.data(), tile, d.width, d.height, d.tlut, RT64::TMEMHasher::CurrentHashVersion);
+            if (!bricks_done_.insert(hash).second) return;
+            char name[40];
+            std::snprintf(name, sizeof name, "%016llx.dds", static_cast<unsigned long long>(hash));
+            const auto path = bricks_dir_ / name;
+            const bool made = !std::filesystem::exists(path);
+            if (made) {
+                const auto bytes = ::tetrisphere::bricks::replacement(d);
+                std::ofstream out(path, std::ios::binary);
+                out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            }
+            const bool added = app_->textureCache->addReplacement(hash, name, RT64::ReplacementShift::Auto);
+            std::fprintf(stdout, "{\"event\":\"sharp_brick\",\"hash\":\"%016llx\",\"palette\":%u,\"made\":%s,\"added\":%s}\n",
+                         static_cast<unsigned long long>(hash), unsigned(d.tile.palette), made ? "true" : "false", added ? "true" : "false");
+            std::fflush(stdout);
+        });
+    }
+
     void send_dl(const OSTask* task) override {
         ScopedPerfTimer frame_timer(perf_metrics().display_list);
+        {
+            // The walk's cost, logged once after 600 frames (sharp bricks).
+            const auto start = std::chrono::steady_clock::now();
+            sharp_bricks_frame(task);
+            static double total_us = 0;
+            static int frames = 0;
+            total_us += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count();
+            if (bricks_ready_ && ++frames == 600)
+                std::fprintf(stdout, "{\"event\":\"sharp_bricks_cost\",\"frames\":600,\"average_us\":%.1f}\n", total_us / 600.0);
+        }
         research_rect_log(task);
+        research_tex_log(task);
         // Only this render thread mutates RT64's configuration.
         std::optional<PresentationFilter> filter;
         std::optional<bool> texture;

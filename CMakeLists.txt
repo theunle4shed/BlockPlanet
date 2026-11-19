@@ -642,6 +642,15 @@ else()
 endif()
 add_test(NAME escape_view COMMAND escape_view_test)
 
+add_executable(brick_textures_test tests/brick_textures_test.cpp src/graphics/brick_textures.cpp)
+target_include_directories(brick_textures_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
+if(MSVC)
+    target_compile_options(brick_textures_test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(brick_textures_test PRIVATE -UNDEBUG)
+endif()
+add_test(NAME brick_textures COMMAND brick_textures_test)
+
 add_executable(story_hud_test tests/story_hud_test.cpp src/platform/story_hud.cpp)
 target_include_directories(story_hud_test PRIVATE "${CMAKE_SOURCE_DIR}/include")
 if(MSVC)
@@ -1212,6 +1221,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/platform/game_options.cpp
         src/platform/input_mapping.cpp
         src/graphics/rt64_context.cpp
+        src/graphics/brick_textures.cpp
         src/graphics/sphere_mesh.cpp
         src/graphics/sphere_cell.cpp
         src/graphics/sphere_quadrants.cpp
