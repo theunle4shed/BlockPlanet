@@ -29,3 +29,8 @@ A stage started from the menus takes about 250 ms, nearly all of it the song loa
 ## If the transition is to be shorter
 
 The places with time to save are the game's own: the core and friend sequence (about 7 s), "NICE JOB" (about 2 s) and the fade (about 1.5 s). Options, for the owner to choose: a button to skip the sequence, a shorter version, or leaving it as the original. Time Attack could also stop its clock during the sequence.
+
+## After the final episode (Rescue 10:10; seen 2026-11-19, to investigate)
+
+The owner asked what follows the last episode. The game's message table has nine entries, after Episodes 1 to 9, and the endings (cutscenes) come after Episodes 5 and 8, so nothing is known to follow Episode 10. Winning 10:10 in the harness: the core and the friend, NICE JOB, then the game sets its pause row to 0 (as for an episode's end menu) and starts track 11 on the main player, but draws **no menu text** (`BLOCKPLANET_END_MENU_LOG=1`: no text for 90 s, the grid state `0x800DFF08` at 0, not 1) and the screen shows only a dim tiled sphere whose tint changes, for at least 90 seconds, with BlockPlanet's HUD or the original's. So BlockPlanet's episode-end panel never opens (it waits for the game's CONTINUE and EXIT), and the player is left on that screen. Still to find: what the game shows there on its own (an ending or credits sequence that BlockPlanet hides, or a screen waiting for a button), and then what BlockPlanet should show after the final episode.
+

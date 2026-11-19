@@ -5693,6 +5693,23 @@ bool handle_profile_command(const std::string& command) {
             std::vector<EndMenuBridge::Label> end_labels;
             for (const auto& t : blockplanet::recent_game_text())
                 if (t.font == 0) end_labels.push_back({t.text, t.y});
+            // Research: BLOCKPLANET_END_MENU_LOG=1 logs, once a second while
+            // the pause row is set in play, the game's menu text, the grid's
+            // state (0x800DFF08) and the mode, to see why an end panel opens or not.
+            if (static const bool end_log = std::getenv("BLOCKPLANET_END_MENU_LOG") != nullptr;
+                end_log && guest::load16(guest_rdram, 0x800E1228) >= 0) {
+                static auto last_log = std::chrono::steady_clock::time_point{};
+                if (std::chrono::steady_clock::now() - last_log > std::chrono::seconds(1)) {
+                    last_log = std::chrono::steady_clock::now();
+                    std::string texts;
+                    for (const auto& t : blockplanet::recent_game_text())
+                        texts += (texts.empty() ? "" : "|") + t.text + "@" + std::to_string(t.font) + "," + std::to_string(t.y);
+                    std::fprintf(stdout, "{\"event\":\"end_menu_state\",\"menu\":%d,\"row\":%d,\"grid\":%d,\"mode\":%d,\"expected\":%d,\"texts\":\"%s\"}\n",
+                                 guest::load16(guest_rdram, 0x800E121C), guest::load16(guest_rdram, 0x800E1228),
+                                 guest::load16(guest_rdram, 0x800DFF08u), guest::load16(guest_rdram, 0x800E44A8), episode_end_expected, texts.c_str());
+                    std::fflush(stdout);
+                }
+            }
             if (episode_end_expected != 0) end_menu.expect_episode_end(episode_end_expected > 0), episode_end_expected = 0;
             const auto end = end_menu.update(const_cast<std::uint8_t*>(guest_rdram), end_labels, blockplanet::ui::menus_open(),
                                              std::chrono::steady_clock::now(), pause_bridge.hide_original());
