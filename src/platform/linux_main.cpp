@@ -318,8 +318,13 @@ struct StageResults {
     bool points = false;  // Score Attack: points, not a time
     double value = 0.0, best_before = 0.0;
     std::string where;
+    bool episode = false;  // a whole episode (the attack modes)
 };
 std::optional<StageResults> pending_results;
+// A whole episode in an attack mode, its last stage cleared: shown once play
+// is left (the owner, 2026-11-19: after the "well dones", back to the menu,
+// no carrying on to the next episode).
+std::optional<StageResults> attack_episode_results;
 std::optional<std::chrono::steady_clock::time_point> single_stage_quit_at;
 bool single_stage_quitting = false;
 // After leaving play from BlockPlanet (a single stage done, or Quit to menu),
@@ -420,7 +425,8 @@ void show_stage_results() {
     const auto r = *pending_results;
     pending_results.reset();
     std::string line;
-    if (r.points) {
+    if (r.value <= 0.0) {
+    } else if (r.points) {
         line = hud_number(static_cast<long long>(r.value)) + " points";
         if (r.best_before <= 0.0 || r.value > r.best_before) line += "  \u00B7  New best";
         else line += "  \u00B7  Best " + hud_number(static_cast<long long>(r.best_before));
@@ -429,16 +435,17 @@ void show_stage_results() {
         if (r.best_before <= 0.0 || r.value < r.best_before) line += "  \u00B7  New best";
         else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.value - r.best_before) + ")";
     }
-    blockplanet::ui::set_text("results_title", "Stage Cleared");
+    blockplanet::ui::set_text("results_title", r.episode ? "Episode " + std::to_string(r.chapter) + " Cleared" : "Stage Cleared");
     blockplanet::ui::set_text("results_where", r.where);
     blockplanet::ui::set_text("results_line", line);
+    // No Next Stage: a stage or episode chosen from the menus is played on
+    // its own, then back to them (the owner, 2026-11-19).
     std::vector<blockplanet::ui::ListItem> items;
-    if (r.level < 10)
-        items.push_back({"next", "Next Stage", "Stage " + std::to_string(r.chapter) + ":" + std::to_string(r.level + 1),
-                         "command:stage:" + std::to_string(r.chapter) + ":" + std::to_string(r.level + 1), true, 1, true});
-    items.push_back({"again", "Try Again", "", "command:stage:" + std::to_string(r.chapter) + ":" + std::to_string(r.level), true, 1,
-                     r.level >= 10});
-    items.push_back({"back", "Back to Episode " + std::to_string(r.chapter), "", "back", true});
+    items.push_back({"again", "Try Again", "",
+                     r.episode ? "command:chapter:" + std::to_string(r.chapter)
+                               : "command:stage:" + std::to_string(r.chapter) + ":" + std::to_string(r.level),
+                     true, 1, true});
+    items.push_back({"back", r.episode ? std::string("Back to Episodes") : "Back to Episode " + std::to_string(r.chapter), "", "back", true});
     blockplanet::ui::set_list("results", items);
     blockplanet::ui::request_show("results");
 }
@@ -1061,6 +1068,9 @@ void update_hud() {
                                     hud_delta(finished->episode_total - best_total_before) + ")";
             }
         }
+        if (play_variant == PlayVariant::TimeAttack && !single_stage && finished->episode_done && finished->episode_total > 0.5)
+            attack_episode_results = StageResults{finished->chapter, 10, false, finished->episode_total, best_total_before,
+                                                  "Time Attack \u00B7 Episode " + std::to_string(finished->chapter), true};
         if (play_variant == PlayVariant::TimeAttack && finished->time > 0.5)
             attack_stage_done("time_attack", finished->chapter, finished->level, finished->time);
         // A single stage: done; back to the menu shortly.
@@ -1144,7 +1154,7 @@ void update_hud() {
     // cleared (the core opened; the final episode has no next one to start).
     // Rescue's episode-end menu follows the last stage of a whole-episode
     // run (Story and Casual; the attack modes leave by themselves).
-    final_stage_cleared = state.mode == 1 && !single_stage && state.chapter == 10 && state.level >= 10 && state.progress >= 1.0f;
+    final_stage_cleared = state.mode == 1 && !single_stage && !variant_competes(play_variant) && state.chapter == 10 && state.level >= 10 && state.progress >= 1.0f;
     if (state.mode == 1 && !single_stage && (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual)) {
         static bool last_cleared = false;  // told once, as it becomes so
         const bool last_cleared_now = state.level >= 10 && state.progress >= 1.0f;
@@ -1158,6 +1168,11 @@ void update_hud() {
             cleared_episode_key != state.chapter) {
             cleared_episode_key = state.chapter;
             attack_episode_done(variant_records(play_variant), state.chapter);
+            // (No whole run timed, as when started part-way: the menus all the same.)
+            if (!attack_episode_results)
+                attack_episode_results = StageResults{state.chapter, 10, play_variant == PlayVariant::ScoreAttack, 0.0, 0.0,
+                                                      std::string(variant_title(play_variant)) + " \u00B7 Episode " +
+                                                          std::to_string(state.chapter), true};
         }
         if (state.level < 10) cleared_episode_key = -1;
     }
@@ -1222,6 +1237,15 @@ void update_hud() {
             const bool next = !(single_stage && f->stage == single_stage->second) && f->stage < 10;
             f->points += bank(next);
             save_stage(state.chapter, *f);
+            if (!single_stage && f->stage >= 10) {
+                // The episode's points, against its best.
+                const auto total = score_splits.view().total;
+                auto& r = records[state.chapter];
+                const double before = r.best_total;
+                if (double(total) > before) r.best_total = double(total), profile_dirty = true, save_profile();
+                attack_episode_results = StageResults{state.chapter, 10, true, double(total), before,
+                                                      "Score Attack \u00B7 Episode " + std::to_string(state.chapter), true};
+            }
         }
         // The clock runs in play, stops once the stage is cleared, and gains
         // time for combos; at zero the run ends (a game over, as in Story).
@@ -5286,6 +5310,7 @@ bool handle_profile_command(const std::string& command) {
                 const int level = colon == std::string::npos ? 1 : std::atoi(command->c_str() + colon + 1);
                 if (chapter >= 1 && chapter <= (menu_lines ? lines_chapters : rescue_chapters) && level >= 1 && game_option_applier) {
                     continue_mode.reset();
+                    attack_episode_results.reset();
                     single_stage = std::pair{chapter, level};
                     play_variant = menu_variant;
                     single_stage_quit_at.reset();
@@ -5297,6 +5322,7 @@ bool handle_profile_command(const std::string& command) {
             }
             if (command->rfind("chapter:", 0) == 0) {
                 single_stage.reset();
+                attack_episode_results.reset();
                 play_variant = menu_variant;
                 const int chapter = std::atoi(command->c_str() + 8);
                 chapter_zero_lesson = chapter == 0 ? "basics" : "";
@@ -5751,6 +5777,33 @@ bool handle_profile_command(const std::string& command) {
                     blockplanet::ui::send_command("credits");
                     std::fprintf(stdout, "{\"event\":\"final_credits\",\"open\":true}\n");
                     std::fflush(stdout);
+                }
+                // An attack mode's whole episode: the same state after its last
+                // stage (the game waits with no menu); play is left at once for
+                // the menus, with the episode's results.
+                static std::optional<std::chrono::steady_clock::time_point> attack_since;
+                static bool attack_leaving = false;
+                const bool attack_end = attack_episode_results && variant_competes(play_variant) && !single_stage &&
+                                        guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                                        guest::load16(guest_rdram, 0x800E1228) >= 0 && !blockplanet::ui::menus_open();
+                if (!attack_end) attack_since.reset();
+                else if (!attack_since) attack_since = std::chrono::steady_clock::now();
+                else if (std::chrono::steady_clock::now() - *attack_since > std::chrono::milliseconds(1500)) {
+                    attack_since.reset();
+                    pending_results = attack_episode_results;
+                    attack_episode_results.reset();
+                    std::fprintf(stdout, "{\"event\":\"attack_episode_end\",\"chapter\":%d}\n", pending_results->chapter);
+                    std::fflush(stdout);
+                    if (launch_path.empty()) launch_path = {{"main", 0}, {"solo", 0}, {"story", 0}}, campaign_source.clear();
+                    blockplanet::set_end_park(true);  // the quit leaves from the parked game
+                    attack_leaving = true;
+                    end_track_override(), grid_quit_at = std::chrono::steady_clock::now();
+                }
+                if (attack_leaving && blockplanet::end_parked()) {
+                    attack_leaving = false;
+                    return_to_menu_chapter = pending_results ? pending_results->chapter : 0;
+                    blockplanet::request_direct_quit(false);
+                    blockplanet::set_end_park(false);
                 }
                 static std::optional<std::chrono::steady_clock::time_point> credits_seen;
                 if (final_credits_open) {
