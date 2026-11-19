@@ -33,13 +33,13 @@ Started 2026-11-19 (the owner's request: the score formula and what each magic d
 | --- | --- | --- | --- | --- |
 | 0 | Firecracker | 108 cells, through to the core: the stage won | 34 + 70 cells from the top two layers | A target marker at the cursor, then a burst of fireworks |
 | 1 | Dynamite | 146 cells: the stage won | 28 + 136 from the top two layers | The sticks fly in; a wide area of bricks flashes white and breaks |
-| 2 | Magnet | 25 cells, a small hole at the cursor | Not used (see below) | The magnet pulls bricks out at the cursor |
-| 3 | Atom | Every brick: the whole sphere cleared, the stage won | Not used | The bricks change colour, then all break together |
+| 2 | Magnet | 25 cells, a small hole at the cursor | Bricks from every layer (17 to 57 a layer over 4 uses) | The magnet stays and peels bricks off under the cursor, which the player moves (the owner, 2026-11-19), so it digs exactly where wanted |
+| 3 | Atom | Every brick: the whole sphere cleared, the stage won | The top two layers gone entirely (1,024 cells each, over 3 uses) | The bricks change colour, then all break together: it wipes out whole layers rather than digging a hole |
 | 4 | Bomb | 259 cells: the stage won | 22 + 32 + 69 + 130 from the top four layers | A target at the cursor, then a large blast that digs down several layers |
-| 5 | Ray Gun | 15 cells | Not used | A beam on a small patch at the cursor |
+| 5 | Ray Gun | 15 cells | A few bricks from all seven layers, the bottom one included (8 to 59 a layer over 3 uses) | A narrow beam at the cursor that drills straight down to the core |
 
-So far the Bomb is the only one seen digging deeper than two layers; the Firecracker and Dynamite clear wide patches of the top layers; the Atom cleared a whole 1:1 sphere.
+In short: the Firecracker and Dynamite clear wide patches of the top layers; the Bomb blasts down several layers; the Magnet digs wherever the player steers it; the Ray Gun drills a narrow hole to the core; the Atom wipes out whole layers.
 
-**Not used on 10:5:** the Magnet, Atom and Ray Gun stayed held (`+0x702` kept its value) and the piece in hand was dropped by the drop timer instead; in 1:1 all three worked. Whether they need a condition (a brick of some kind under the cursor, the piece in hand, a lower layer count) or the harness's press missed is still to find.
+**A press while a magic is still working is ignored.** Retried 2026-11-19 (the press repeated at four cursor places): the Magnet, Atom and Ray Gun all worked on 10:5; about one press in four did nothing and the magic stayed held, so the single press of the first run was such a miss.
 
-**Still to find:** each magic's area in cells by design (from the code), the points each scores, why three were not used on 10:5, and the Atom on a deep stage.
+**Still to find:** each magic's area and depth by design (from the code), how long the Magnet lasts, whether the Atom always takes the top layers or one kind of brick, and the points each scores.
