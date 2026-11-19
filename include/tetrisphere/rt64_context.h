@@ -5,6 +5,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <string>
 
 namespace tetrisphere {
 
@@ -12,6 +13,9 @@ struct RunOptions;
 enum class PresentationFilter;
 void set_rt64_live_filters(std::optional<PresentationFilter> filter,
                            std::optional<bool> three_point);
+// Graphics > Bricks: "original", "sharp" or "crafted" (brick_textures.h),
+// applied by the renderer on its next frame.
+void set_rt64_brick_style(const std::string& style);
 
 // Apply only options represented by RT64's current user configuration. This
 // deliberately leaves window mode, HUD layout, VSync and backend unchanged.

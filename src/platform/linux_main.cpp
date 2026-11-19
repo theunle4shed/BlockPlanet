@@ -3742,10 +3742,30 @@ void publish_hud_settings() {
     static std::string last, last_text;
     const auto value = profile_data.preferences.hud_distance.value_or("near");
     const auto text = profile_data.preferences.text_size.value_or("default");
+    static std::string last_bricks;
+    if (const auto bricks = profile_data.preferences.bricks.value_or("sharp"); bricks != last_bricks) {
+        blockplanet::ui::set_setting("bricks", last_bricks = bricks);
+        tetrisphere::set_rt64_brick_style(bricks);
+    }
     if (text != last_text) blockplanet::ui::set_setting("text_size", last_text = text);
     if (value == last) return;
     last = value;
     blockplanet::ui::set_setting("hud_distance", value);
+}
+
+// Graphics > Bricks: the bricks' look (sharp_bricks in rt64_context.cpp),
+// saved in the profile.
+bool handle_bricks_setting(const std::string& command) {
+    const std::string prefix = "setting:bricks=";
+    if (command.rfind(prefix, 0) != 0) return false;
+    const auto value = command.substr(prefix.size());
+    if (value != "original" && value != "sharp" && value != "crafted") return true;
+    profile_data.preferences.bricks = value;
+    profile_dirty = true;
+    save_profile();
+    blockplanet::ui::set_setting("bricks", value);
+    tetrisphere::set_rt64_brick_style(value);
+    return true;
 }
 
 // Graphics > Text size: the card and speech text's size, saved in the profile.
@@ -4154,6 +4174,12 @@ bool handle_profile_command(const std::string& command) {
     }
     if (command == "minefield") {
         blockplanet::ui::request_show("minefield");
+        return true;
+    }
+    // Research (the test harness): show a screen by its name, as an
+    // "open:name" action does (for captures of menus).
+    if (const auto screen = argument("show_screen:")) {
+        blockplanet::ui::request_show(*screen);
         return true;
     }
     if (command == "profiles") {
@@ -4701,6 +4727,7 @@ bool handle_profile_command(const std::string& command) {
             if (handle_audio_setting(*command)) continue;
             if (handle_hud_setting(*command)) continue;
             if (handle_text_setting(*command)) continue;
+            if (handle_bricks_setting(*command)) continue;
             if (handle_sky_setting(*command)) continue;
             if (queue_menu_setting(*command)) continue;
             if (handle_profile_command(*command)) continue;

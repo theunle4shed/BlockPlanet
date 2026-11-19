@@ -52,8 +52,17 @@ std::vector<std::uint8_t> scale2x(const std::vector<std::uint8_t>& rgba, int wid
 // A DDS file (RGBA8, DX10 header) with `levels` mipmaps, each half the last.
 std::vector<std::uint8_t> dds(const std::vector<std::uint8_t>& rgba, int width, int height, int levels);
 
-// The replacement for a draw: 8 times larger, mipmaps down to the original
-// size, as a DDS file.
-std::vector<std::uint8_t> replacement(const Draw& draw);
+// The brick styles (Graphics > Bricks).
+enum class Style { Sharp, Crafted };
+
+// Crafted: each 16 x 16 tile redrawn at 8 times the size from its layout (the
+// regions of its palette colours: the base, the bevel, the outline), as
+// smooth shapes with straight edges and rounded corners, anti-aliased, with a
+// gentle top-to-bottom shading and a deeper outline. RGBA8, 8 times larger.
+std::vector<std::uint8_t> crafted(const Draw& draw);
+
+// The replacement for a draw in a style: 8 times larger, mipmaps down to the
+// original size, as a DDS file.
+std::vector<std::uint8_t> replacement(const Draw& draw, Style style = Style::Sharp);
 
 }  // namespace tetrisphere::bricks

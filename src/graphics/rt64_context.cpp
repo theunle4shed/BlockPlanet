@@ -183,6 +183,8 @@ namespace {
 std::mutex live_filters_mutex;
 std::optional<tetrisphere::PresentationFilter> pending_presentation;
 std::optional<bool> pending_texture;
+std::mutex pending_bricks_mutex;
+std::optional<std::string> pending_bricks;  // Graphics > Bricks, for the render thread
 
 
 std::array<std::uint8_t, 0x40> rom_header{};
@@ -554,23 +556,45 @@ public:
     bool bricks_ready_ = false;
     std::filesystem::path bricks_dir_;
     std::set<std::uint64_t> bricks_done_;
-    void sharp_bricks_init() {
-        const char* setting = std::getenv("BLOCKPLANET_BRICKS");
-        if (setting != nullptr && std::string(setting) == "original") return;
-        std::error_code error;
-        bricks_dir_ = ::tetrisphere::application_data_directory() / "texture-packs" / "sharp-bricks";
-        std::filesystem::create_directories(bricks_dir_, error);
-        if (error) return;
-        const auto database = bricks_dir_ / "rt64.json";
-        if (!std::filesystem::exists(database)) {
-            std::ofstream out(database);
-            out << "{\"configuration\": {\"configurationVersion\": 3, \"hashVersion\": 5}, \"textures\": []}\n";
+    ::tetrisphere::bricks::Style bricks_style_ = ::tetrisphere::bricks::Style::Sharp;
+    std::string bricks_current_;
+    // The style's pack: "original" none; "sharp" and "crafted" each their own
+    // folder in the data folder, filled as the bricks are drawn.
+    // BLOCKPLANET_BRICKS overrides the setting, for testing.
+    void sharp_bricks_apply(std::string style) {
+        if (const char* forced = std::getenv("BLOCKPLANET_BRICKS")) style = forced;
+        if (style != "original" && style != "sharp" && style != "crafted") style = "sharp";
+        if (style == bricks_current_) return;
+        bricks_current_ = style;
+        bricks_done_.clear();
+        if (style == "original") {
+            if (bricks_ready_) app_->textureCache->loadReplacementDirectories({});
+            bricks_ready_ = false;
+        } else {
+            bricks_style_ = style == "crafted" ? ::tetrisphere::bricks::Style::Crafted : ::tetrisphere::bricks::Style::Sharp;
+            std::error_code error;
+            bricks_dir_ = ::tetrisphere::application_data_directory() / "texture-packs" / (style == "crafted" ? "crafted-bricks" : "sharp-bricks");
+            std::filesystem::create_directories(bricks_dir_, error);
+            const auto database = bricks_dir_ / "rt64.json";
+            if (!error && !std::filesystem::exists(database)) {
+                std::ofstream out(database);
+                out << "{\"configuration\": {\"configurationVersion\": 3, \"hashVersion\": 5}, \"textures\": []}\n";
+            }
+            bricks_ready_ = !error && app_->textureCache->loadReplacementDirectory(RT64::ReplacementDirectory(bricks_dir_));
         }
-        bricks_ready_ = app_->textureCache->loadReplacementDirectory(RT64::ReplacementDirectory(bricks_dir_));
-        std::fprintf(stdout, "{\"event\":\"sharp_bricks\",\"ready\":%s}\n", bricks_ready_ ? "true" : "false");
+        std::fprintf(stdout, "{\"event\":\"brick_style\",\"style\":\"%s\",\"ready\":%s}\n", style.c_str(), bricks_ready_ ? "true" : "false");
         std::fflush(stdout);
     }
+    void sharp_bricks_init() { sharp_bricks_apply("sharp"); }
     void sharp_bricks_frame(const OSTask* task) {
+        {
+            std::optional<std::string> style;
+            {
+                std::lock_guard lock(pending_bricks_mutex);
+                style = std::exchange(pending_bricks, std::nullopt);
+            }
+            if (style) sharp_bricks_apply(*style);
+        }
         if (!bricks_ready_ || research_rdram_ == nullptr) return;
         // Every 15th frame: new brick colours come with a stage or a new
         // piece, and are sharpened within a quarter of a second. Walking every
@@ -593,7 +617,7 @@ public:
             const auto path = bricks_dir_ / name;
             const bool made = !std::filesystem::exists(path);
             if (made) {
-                const auto bytes = ::tetrisphere::bricks::replacement(d);
+                const auto bytes = ::tetrisphere::bricks::replacement(d, bricks_style_);
                 std::ofstream out(path, std::ios::binary);
                 out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
             }
@@ -797,6 +821,11 @@ void set_rt64_live_filters(std::optional<PresentationFilter> filter,std::optiona
     std::lock_guard lock(live_filters_mutex);
     if (filter) pending_presentation=filter;
     if (three_point) pending_texture=three_point;
+}
+
+void set_rt64_brick_style(const std::string& style) {
+    std::lock_guard lock(pending_bricks_mutex);
+    pending_bricks = style;
 }
 
 void set_rt64_run_options(const RunOptions& options) {

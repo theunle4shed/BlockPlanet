@@ -1,6 +1,7 @@
 #include "tetrisphere/brick_textures.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace tetrisphere::bricks {
@@ -200,12 +201,93 @@ std::vector<std::uint8_t> dds(const std::vector<std::uint8_t>& rgba, int width, 
     return out;
 }
 
-std::vector<std::uint8_t> replacement(const Draw& d) {
-    std::vector<std::uint8_t> image = decode(d);
+std::vector<std::uint8_t> crafted(const Draw& d) {
+    const std::vector<std::uint8_t> source = decode(d);
+    const int sw = d.width, sh = d.height, scale = 8, tile = 16;
+    const int w = sw * scale, h = sh * scale;
+    // The tone of each colour (its brightness), to deepen the darkest.
+    const auto colour = [&](int x, int y) {
+        std::uint32_t v;
+        std::memcpy(&v, &source[(std::size_t(y) * sw + x) * 4u], 4);
+        return v;
+    };
+    std::vector<std::uint8_t> out(std::size_t(w) * h * 4u);
+    // One sample: the colour whose region covers this point, from the 4 x 4
+    // nearest texels of the same tile weighted by a Gaussian of their
+    // distance (smooth, crisp boundaries with rounded corners; never across
+    // tiles).
+    const auto sample = [&](double u, double v, double out_rgba[4]) {
+        const int tx = int(u) / tile * tile, ty = int(v) / tile * tile;
+        const int cx = int(std::floor(u - 0.5)), cy = int(std::floor(v - 0.5));
+        std::uint32_t colours[16];
+        double weights[16];
+        int n = 0;
+        for (int dy = -1; dy <= 2; ++dy)
+            for (int dx = -1; dx <= 2; ++dx) {
+                const int x = std::clamp(cx + dx, tx, tx + tile - 1), y = std::clamp(cy + dy, ty, ty + tile - 1);
+                const double ddx = (x + 0.5) - u, ddy = (y + 0.5) - v;
+                const double wgt = std::exp(-(ddx * ddx + ddy * ddy) / (2.0 * 0.45 * 0.45));
+                const std::uint32_t c = colour(x, y);
+                int k = 0;
+                while (k < n && colours[k] != c) ++k;
+                if (k == n) colours[n] = c, weights[n++] = 0;
+                weights[k] += wgt;
+            }
+        int best = 0;
+        for (int k = 1; k < n; ++k)
+            if (weights[k] > weights[best]) best = k;
+        for (int k = 0; k < 4; ++k) out_rgba[k] = double((colours[best] >> (8 * k)) & 0xFFu);
+    };
+    std::vector<double> tone(std::size_t(w) * h);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            // 4 x 4 samples a pixel, for smooth edges.
+            double sum[4] = {0, 0, 0, 0};
+            for (int sy = 0; sy < 4; ++sy)
+                for (int sx = 0; sx < 4; ++sx) {
+                    double c[4];
+                    sample((x + (sx + 0.5) / 4.0) / scale, (y + (sy + 0.5) / 4.0) / scale, c);
+                    // A deeper outline: dark colours darker still.
+                    const double t = (c[0] + c[1] + c[2]) / 3.0;
+                    const double deepen = t < 110.0 ? 0.78 : 1.0;
+                    for (int k = 0; k < 3; ++k) sum[k] += c[k] * deepen;
+                    sum[3] += c[3];
+                }
+            std::uint8_t* o = &out[(std::size_t(y) * w + x) * 4u];
+            for (int k = 0; k < 4; ++k) o[k] = std::uint8_t(std::clamp(sum[k] / 16.0, 0.0, 255.0));
+            tone[std::size_t(y) * w + x] = (sum[0] + sum[1] + sum[2]) / 48.0;
+        }
+    // The bevel: a light line just inside an edge above (darker pixels a few
+    // pixels up, in the same tile), a soft shade just inside an edge below;
+    // and a gentle light from above within each tile.
+    const int reach = 4;
+    std::vector<std::uint8_t> lit = out;
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            const int in_tile = y % (tile * scale);
+            const double here = tone[std::size_t(y) * w + x];
+            double factor = 1.08 - 0.16 * double(in_tile) / double(tile * scale - 1);
+            if (in_tile >= reach && tone[std::size_t(y - reach) * w + x] < here - 35.0) factor *= 1.18;
+            else if (in_tile < tile * scale - reach && tone[std::size_t(y + reach) * w + x] < here - 35.0) factor *= 0.88;
+            std::uint8_t* o = &lit[(std::size_t(y) * w + x) * 4u];
+            for (int k = 0; k < 3; ++k) o[k] = std::uint8_t(std::clamp(out[(std::size_t(y) * w + x) * 4u + k] * factor, 0.0, 255.0));
+        }
+    out = std::move(lit);
+    return out;
+}
+
+std::vector<std::uint8_t> replacement(const Draw& d, Style style) {
     int w = d.width, h = d.height;
-    for (int i = 0; i < 3; ++i) {  // 8 times larger
-        image = scale2x(image, w, h);
-        w *= 2, h *= 2;
+    std::vector<std::uint8_t> image;
+    if (style == Style::Crafted) {
+        image = crafted(d);
+        w *= 8, h *= 8;
+    } else {
+        image = decode(d);
+        for (int i = 0; i < 3; ++i) {  // 8 times larger
+            image = scale2x(image, w, h);
+            w *= 2, h *= 2;
+        }
     }
     return dds(image, w, h, 4);  // 8x, 4x, 2x, the original size
 }

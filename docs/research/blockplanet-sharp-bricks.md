@@ -17,15 +17,22 @@ RT64 can draw a replacement image in place of any texture it recognises by a has
 
 Cost: walking the display list every frame cost 0.46 ms a frame on average on the test machine (Rescue 1:1, software Vulkan, 600 frames); every 15th frame, 0.035 ms. A new brick colour is sharpened within a quarter of a second of first appearing.
 
+## Styles (Graphics > Bricks, 2026-11-19)
+
+- **Sharp** (the default): the original tiles scaled up with Scale2x, as above.
+- **Crafted**: each tile redrawn at 8 times the size from its layout. The tile's colour regions (the base, the bevel, the outline) are traced as smooth shapes (each point takes the colour that dominates the nearby texels of the same tile, weighted by a Gaussian of distance, 4 x 4 samples a pixel), the darkest colours deepened for a more solid outline, a light line just inside the top of each outline and a shade inside the bottom (a bevel), and a gentle light from above. BlockPlanet's own drawing, from the player's own tiles.
+- **Original**: no pack (RT64's replacements cleared).
+
+Each style has its own folder in the data folder (`texture-packs/sharp-bricks`, `texture-packs/crafted-bricks`); the choice is saved in the profile and applied by the renderer on its next frame, so it can be changed in play.
+
 ## Switches
 
-- `BLOCKPLANET_BRICKS=original`: no replacement pack (the original bricks).
+- `BLOCKPLANET_BRICKS=original|sharp|crafted`: overrides the setting.
 - `BLOCKPLANET_TEXTURE_DUMP=dir`: RT64 dumps every texture's TMEM under its hash (large: about 900 MB for a short session).
 - `BLOCKPLANET_DL_TEX_LOG=1`: logs each distinct texture set-up used for triangles in a frame.
 
 ## Next
 
-- A Graphics option (Bricks: Sharp or Original).
 - The outline: thicker or darker, drawn at full resolution, if the owner wants more than the original's own edge made crisp.
 - Smooth gradients (the rubble orb's glow) come out in steps with Scale2x; a scaler that blends (xBR) or a separate treatment for those tiles would help.
 - Other sheets: the other episodes' and modes' bricks are found the same way if they use the same sheet size; check Episodes 2 to 10, Hide & Seek, Lines and VS.
