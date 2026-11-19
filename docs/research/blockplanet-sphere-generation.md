@@ -84,6 +84,17 @@ The list per stage stays in the private research logs, as AGENTS.md requires.
 
 **All six kinds at once (tested 2026-11-18):** the same start with `BLOCKPLANET_STAGE_RECORD_EDIT=2=6,11=0x3F` built every layer from all six kinds (piece draws in range 24), drawn in six colours, and the Next queue in play mixed them. Kinds 32, 34 and 35 are 3-cell shapes and 33, 36 and 37 are 4-cell shapes; each layer held about 21 to 53 pieces of each kind (fewer of the 4-cell ones, which fit less often) and about 260 to 290 single filler blocks. It started and played normally for the 25 seconds watched. No piece seed degenerates either: all 65,536 keep using all 8 slots, with no short repeating cycle.
 
+**Without the balancing (tested 2026-11-19, the owner's experiment).** `BLOCKPLANET_PIECE_BALANCE` replaces `func_8008A63C` (the slot to kind rule): `on` does what the game does (checked: Rescue 10-1 with seeds 1,234 and 777 built all five layers identical to the game's own build), `off` takes the kind straight from the slot (`slot % kinds`, so each piece an independent draw), `bias:P` gives the first kind P % of the slots (in steps of 12.5 % with two kinds, 8 slots). `BLOCKPLANET_LAYER_MAP=1` logs each layer as a 32 × 32 map. Same stage and seeds:
+
+| | Balanced (the game) | Off | bias:85 (75 %) |
+| --- | --- | --- | --- |
+| Pieces handed out in the build | 10,271: 5,137 / 5,134 | 10,271: 5,129 / 5,142 | 10,271: 7,694 / 2,577 |
+| Longest run of one kind | 7 | 14 | 23 |
+| Most one kind got ahead | 4 | 96 | 5,117 |
+| Cells of the two kinds, per layer | about 55 / 45 | about 55 / 45 | about 80 / 20 |
+
+So the balancing barely shapes the sphere: with about 2,000 placement attempts a layer and the pieces that do not fit thrown away, the order of the kinds matters little, and a balanced and an unbalanced build look alike (somewhat larger patches without it). It matters in play: the same generator deals the Next pieces, so without it runs of up to 14 of one piece come instead of at most 7. Odd spheres need the kinds uneven, not only unbalanced: with a 75 % bias the sphere is mostly one colour, with the other in scattered strips.
+
 ## More layers, and what happens to drops that make no combo
 
 Tested 2026-11-18 with `BLOCKPLANET_PLAY_LOG=1`, which logs player 1's hearts and each layer's fill whenever they change (`BLOCKPLANET_KEEP_HEARTS=1` keeps the hearts at 3 so that dropping can go on), on Episode 10 stage 1 with both seeds forced, pressing drop every few seconds.

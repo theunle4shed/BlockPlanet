@@ -341,7 +341,7 @@ extern "C" void blockplanet_sphere_play_log(std::uint8_t* rdram) {
     if (keep && hearts >= 0 && hearts < 3) store16(rdram, 0x80112F9Eu, 3);
 }
 
-// Research: BLOCKPLANET_PIECE_BALANCE=on|off (func_8008A63C, a piece's kind
+// Research: BLOCKPLANET_PIECE_BALANCE=on|off|bias:P (func_8008A63C, a piece's kind
 // from the slot drawn). The game's own rule ("on"): each of the 4 x kinds
 // slots hands out the kinds in turn (its counter at the player context's
 // +0x2C1E + 2 x slot), which keeps the kinds even. "off": the kind is the
@@ -353,8 +353,15 @@ extern "C" bool blockplanet_piece_kind(std::uint8_t* rdram, recomp_context* ctx)
     const int slot = static_cast<std::int16_t>(ctx->r4);
     const int kinds = std::max<int>(1, load16(rdram, 0x800E44B8u));
     int kind;
-    if (std::string(setting) == "off") {
+    const std::string mode_name(setting);
+    if (mode_name == "off") {
         kind = ((slot % kinds) + kinds) % kinds;
+    } else if (mode_name.rfind("bias:", 0) == 0) {
+        // "bias:P": the first kind P % of the time, the others shared (from
+        // the slot drawn, which spreads evenly over 0 to 4 x kinds - 1).
+        const int percent = std::clamp(std::atoi(mode_name.c_str() + 5), 0, 100);
+        const int slots = 4 * kinds, first = slots * percent / 100;
+        kind = slot < first || kinds == 1 ? 0 : 1 + (slot - first) % (kinds - 1);
     } else {
         const std::uint32_t at = load32(rdram, 0x8013DD00u) + 0x2C1Eu + 2u * std::uint32_t(slot);
         const int counter = load16(rdram, at);
