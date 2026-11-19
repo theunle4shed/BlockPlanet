@@ -180,6 +180,12 @@ std::optional<std::chrono::steady_clock::time_point> grid_quit_at;
 // (or their fade) are up the grid shows in red, and after Exit too.
 bool end_menu_active = false;
 bool end_menu_cleared = false;  // the end menu is an episode's end (not a game over)
+// Rescue's final episode: its last stage cleared (set by the HUD), and
+// BlockPlanet's credits shown in place of the game's own (the owner,
+// 2026-11-19: after Episode 10 the game went on to its credits with nothing
+// seen; "we need to kill the original credits").
+bool final_stage_cleared = false;
+bool final_credits_open = false;
 // An episode's last stage just cleared in a whole-episode Rescue run (1), or
 // a stage before the last in play (-1): told to the end menu bridge.
 int episode_end_expected = 0;
@@ -1138,6 +1144,7 @@ void update_hud() {
     // cleared (the core opened; the final episode has no next one to start).
     // Rescue's episode-end menu follows the last stage of a whole-episode
     // run (Story and Casual; the attack modes leave by themselves).
+    final_stage_cleared = state.mode == 1 && !single_stage && state.chapter == 10 && state.level >= 10 && state.progress >= 1.0f;
     if (state.mode == 1 && !single_stage && (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual)) {
         static bool last_cleared = false;  // told once, as it becomes so
         const bool last_cleared_now = state.level >= 10 && state.progress >= 1.0f;
@@ -5715,6 +5722,57 @@ bool handle_profile_command(const std::string& command) {
                                              std::chrono::steady_clock::now(), pause_bridge.hide_original());
             end_menu_active = end.active;
             end_menu_cleared = end.cleared;
+            // After Rescue's final episode the game shows no end menu but goes
+            // on to its own credits, with nothing seen. Once it gets there (the
+            // pause row set a moment after the last stage is cleared), the game
+            // is parked (its credits stop) and BlockPlanet's credits open;
+            // closing them leaves for the Rescue menu.
+            {
+                static std::optional<std::chrono::steady_clock::time_point> final_since;
+                const bool at_end = final_stage_cleared && guest::load16(guest_rdram, 0x800E121C) == -1 &&
+                                    guest::load16(guest_rdram, 0x800E1228) >= 0 && !blockplanet::ui::menus_open();
+                // (The end bridge counts this as an episode's end waiting for
+                // the game's menu, which never comes; its panel never opens.)
+                if (!at_end) final_since.reset();
+                else if (!final_since) final_since = std::chrono::steady_clock::now();
+                if (!final_credits_open && final_since && std::chrono::steady_clock::now() - *final_since > std::chrono::seconds(2)) {
+                    final_credits_open = true;
+                    final_stage_cleared = false;
+                    if (profile_save) {
+                        auto& progress = profile_data.progress;
+                        if (progress.chapters_completed["rescue"].insert(10).second) {
+                            progress.levels_completed["rescue"][10].insert(10);
+                            profile_dirty = true;
+                            save_profile();
+                        }
+                    }
+                    blockplanet::set_end_park(true);
+                    show_hud(std::nullopt);
+                    blockplanet::ui::send_command("credits");
+                    std::fprintf(stdout, "{\"event\":\"final_credits\",\"open\":true}\n");
+                    std::fflush(stdout);
+                }
+                static std::optional<std::chrono::steady_clock::time_point> credits_seen;
+                if (final_credits_open) {
+                    if (blockplanet::ui::current_screen() == "credits") credits_seen = std::chrono::steady_clock::now();
+                    else if (credits_seen && std::chrono::steady_clock::now() - *credits_seen > std::chrono::milliseconds(300)) {
+                        // Closed: back to the Rescue menu.
+                        final_credits_open = false;
+                        credits_seen.reset();
+                        // (A game started without the menus has no launch
+                        // path: Rescue's episode list then.)
+                        if (launch_path.empty()) {
+                            launch_path = {{"main", 0}, {"solo", 0}, {"story", 0}};
+                            campaign_source.clear();
+                        }
+                        end_track_override(), return_to_menu_chapter = 0, grid_quit_at = std::chrono::steady_clock::now();
+                        blockplanet::request_direct_quit(false);
+                        blockplanet::set_end_park(false);
+                        std::fprintf(stdout, "{\"event\":\"final_credits\",\"open\":false}\n");
+                        std::fflush(stdout);
+                    }
+                }
+            }
             if (end.open_menu) {
                 blockplanet::ui::set_text("end_title", end.title);
                 const bool lines_end = guest::load16(guest_rdram, 0x800E44A8) == 9;
