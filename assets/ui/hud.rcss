@@ -33,7 +33,10 @@ div { display: block; }
    The tint is on the groups, not the container, so the magic group can leave
    the item box clear. */
 .side { position: absolute; }
-#left { width: 232dp; }
+/* Both 248dp, so every bar, the item box and the dividers are 200dp wide,
+   the width inside the groups' padding (the owner, 2026-11-19: the same widths
+   throughout). */
+#left { width: 248dp; }
 #right { width: 248dp; text-align: right; }
 
 .group, .rule, #magic .band, #magic .edge { background-color: #0b1020c0; }
@@ -78,7 +81,7 @@ div { display: block; }
 
 /* Dividers between groups: a thin light line across the tint, with room
    either side. */
-.rule { padding: 10dp 18dp; }
+.rule { padding: 10dp 24dp; }
 .rule .line { height: 2dp; background-color: #3a4260; }
 
 /* Hearts: three red hearts with a white border, a lost one dark (the owner,
@@ -112,7 +115,7 @@ div { display: block; }
 /* The drop timer, below the hearts: a bar in thirds (split where the game's
    warning ticks start), green, then amber, then red, with a marker at the
    fill's edge (ui_system.cpp, drop_bar). */
-#drop { width: 150dp; margin-top: 12dp; }
+#drop { margin-top: 12dp; }
 .drop-bar { position: relative; }
 .drop-bar .fill { background-color: #4cc860; }
 .drop-bar.third-2 .fill { background-color: #f5c21f; }
@@ -120,37 +123,52 @@ div { display: block; }
 .drop-bar .notch { position: absolute; top: -2dp; width: 2dp; height: 20dp; margin-left: -1dp; background-color: #f0f0f0a0; }
 .drop-bar .needle { position: absolute; top: -5dp; width: 4dp; height: 26dp; margin-left: -2dp; border-radius: 2dp; background-color: #ffffff; }
 
-/* Magic: a clear window for the item (the game draws its 3D model there),
-   framed by tinted bands, with the meter beneath. */
+/* Magic: one box for the held magic that also charges up as the meter fills
+   (the owner, 2026-11-19: the box and bar merged, rounded like the bars, the
+   timer bar's width). The game draws the magic's 3D model there, and its tint
+   behind it (magic_hooks.cpp), so the box is clear while a model is held and
+   the game draws the charge too, behind the model; otherwise the charge is
+   this translucent purple from the bottom. */
 #magic .band { height: auto; padding: 16dp 24dp 0dp 24dp; }
-#magic .band:last-child { padding: 10dp 24dp 20dp 24dp; }
+#magic .band.foot { height: 20dp; padding: 0dp; }
 #magic .side-meter #meter-v { display: none; }
-#magic .window { height: 136dp; }
+#magic .window { height: 136dp; white-space: nowrap; }
 #magic .edge { display: inline-block; width: 24dp; height: 136dp; vertical-align: top; }
-/* 24 + 184 (180 + a 2dp border each side) + 24 = the container's 232dp. The
-   box's tint is drawn by the game behind the magic's model (magic_hooks.cpp),
-   so the box itself is clear; square corners there, so only a small radius. */
+/* 24 + 200 (196 + a 2dp border each side) + 24 = the container's 248dp. */
 #item {
     display: inline-block;
+    position: relative;
     vertical-align: top;
-    width: 180dp;
+    width: 196dp;
     height: 132dp;
-    border: 2dp #f0f0f040;
-    border-radius: 4dp;
+    border: 2dp #f0f0f0a0;
+    border-radius: 8dp;
     background-color: #0b1020ff;  /* solid, as the game-drawn tint behind a held magic */
 }
 #item.held { background-color: transparent; }
+#item-fill {
+    position: absolute;
+    left: 0dp;
+    bottom: 0dp;
+    width: 100%;
+    height: 0%;
+    border-radius: 6dp;
+    background-color: #9c5cf040;  /* no edge line (the owner, 2026-11-19) */
+}
+#item.full { border-color: #c9a2ff; }
 #item .name {
-    display: block;
-    padding-top: 50dp;
+    position: absolute;
+    left: 0dp;
+    top: 50dp;
+    width: 100%;
     text-align: center;
     font-size: 24dp;
     font-weight: bold;
     color: #f5821f;
 }
-#meter { width: 184dp; }
-#magic .window { white-space: nowrap; }
-#meter .fill { background-color: #9c5cf0; }
+
+/* Next pieces: centred in the panel (the owner, 2026-11-19). */
+#next .piece { margin-left: auto; margin-right: auto; }
 
 /* Puzzle: drops and slides left, large. */
 .count { display: block; font-size: 64dp; font-weight: bold; line-height: 68dp; }
@@ -254,26 +272,19 @@ div { display: block; }
     .rule { padding: 14dp 10dp; height: 108dp; }
     .rule .line { width: 2dp; height: 108dp; }
     #magic .band { height: auto; padding: 14dp 16dp 0dp 16dp; }
-    #magic .band:last-child { height: 3dp; padding: 0dp; }
-    #magic .band:last-child #meter { display: none; }
-    #magic .window { height: 92dp; }
-    #magic .edge { width: 16dp; height: 92dp; }
-    #magic .side-meter { width: 42dp; }
-    #magic .side-meter #meter-v {
-        display: block;
-        position: relative;
-        width: 12dp;
-        height: 88dp;
-        margin-left: 12dp;
-    }
-    #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
-    #item { width: 116dp; height: 88dp; }
-    #item .name { padding-top: 32dp; font-size: 20dp; }
+    #magic .band.foot { height: 3dp; padding: 0dp; }
+    #magic .window { height: 86dp; }
+    #magic .edge { width: 16dp; height: 86dp; }
+    #item { width: 116dp; height: 82dp; }
+    #item .name { top: 32dp; font-size: 20dp; }
     #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
     #stage { font-size: 40dp; line-height: 44dp; }
     #time { font-size: 40dp; }
     #where .sublabel { display: none; }
     #goal { font-size: 24dp; margin-top: 4dp; }
+    /* Rescue's clear target beside the stage, so the row keeps its height. */
+    #where.clear #stage { display: inline-block; }
+    #where.clear #goal { display: inline-block; margin: 0dp 0dp 0dp 14dp; }
     .count { font-size: 44dp; line-height: 52dp; }
     #progress { width: 120dp; margin-top: 8dp; height: 14dp; }
     #net { display: inline-block; margin-left: 12dp; }
@@ -398,15 +409,11 @@ div { display: block; }
 #left.row .rule { padding: 14dp 10dp; height: 108dp; }
 #left.row .rule .line { width: 2dp; height: 108dp; }
 #left.row #magic .band { height: auto; padding: 14dp 16dp 0dp 16dp; }
-#left.row #magic .band:last-child { height: 3dp; padding: 0dp; }
-#left.row #magic .band:last-child #meter { display: none; }
-#left.row #magic .window { height: 92dp; }
-#left.row #magic .edge { width: 16dp; height: 92dp; }
-#left.row #magic .side-meter { width: 42dp; }
-#left.row #magic .side-meter #meter-v { display: block; position: relative; width: 12dp; height: 88dp; margin-left: 12dp; }
-#left.row #meter-v .fill { position: absolute; bottom: 0dp; left: 0dp; width: 100%; height: 0%; }
-#left.row #item { width: 116dp; height: 88dp; }
-#left.row #item .name { padding-top: 32dp; font-size: 20dp; }
+#left.row #magic .band.foot { height: 3dp; padding: 0dp; }
+#left.row #magic .window { height: 86dp; }
+#left.row #magic .edge { width: 16dp; height: 86dp; }
+#left.row #item { width: 116dp; height: 82dp; }
+#left.row #item .name { top: 32dp; font-size: 20dp; }
 #left.row #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
 #left.row #progress { width: 160dp; margin-top: 18dp; height: 14dp; }
 #left.row .count { font-size: 44dp; line-height: 52dp; }

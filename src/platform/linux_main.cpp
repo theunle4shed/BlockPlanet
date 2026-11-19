@@ -751,6 +751,7 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     view.magic = state.magic;
     view.magic_model = view.show_magic && blockplanet::magic_box_active();
     view.meter = state.meter;
+    blockplanet::set_magic_charge(state.meter);
     for (const auto& piece : state.next) {
         blockplanet::ui::HudPieceView p;
         p.random_block = piece.random_block;
@@ -1041,6 +1042,7 @@ void update_hud() {
     view.magic = state.magic;
     view.magic_model = blockplanet::magic_box_active();
     view.meter = state.meter;
+    blockplanet::set_magic_charge(state.meter);
     for (const auto& piece : state.next) {
         blockplanet::ui::HudPieceView p;
         p.random_block = piece.random_block;
@@ -1059,6 +1061,12 @@ void update_hud() {
     } else {
         view.mode = variant_title(play_variant);
         view.stage = std::to_string(state.chapter) + ":" + std::to_string(state.level);
+        // The core square to uncover, beneath the stage (the owner, 2026-11-19).
+        const int square = guest::load16(guest_rdram, 0x80110220u + 0x23E4);
+        if (state.mode == 1 && square > 0 && square < 10) {
+            view.goal_label = "Clear";
+            view.goal = std::to_string(square) + "\u00A0\u00D7\u00A0" + std::to_string(square);
+        }
     }
     const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
     // A single stage cleared: the game plays its stage end, then builds the

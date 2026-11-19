@@ -17,6 +17,10 @@ namespace blockplanet {
 void set_magic_box(bool shown, float x, float y, float scale, float x_anchored, float anchor_shift,
                    float box_width = 0.0f, float box_height = 0.0f, float anchor_shift_2d = 0.0f);
 
+// The magic meter, 0 to 1: drawn by the game as the charge inside the box's
+// tint, behind the model (the HUD's own fill would lie over it).
+void set_magic_charge(float level);
+
 // True while the held magic's model is being drawn in the item box.
 bool magic_box_active();
 

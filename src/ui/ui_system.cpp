@@ -506,6 +506,15 @@ std::string game_text_rml(const HudView& hud) {
     return rml;
 }
 
+// The item box's classes: held (the game draws the model and its tint) and
+// full (the meter full, the next magic coming).
+std::string item_classes(const HudView& hud) {
+    std::string c;
+    if (hud.magic >= 0 && hud.magic_model) c += " held";
+    if (hud.meter >= 0.999f) c += " full";
+    return c.empty() ? std::string() : " class='" + c.substr(1) + "'";
+}
+
 std::string hud_rml_parts(const HudView& hud);
 
 std::string hud_rml_parts(const HudView& hud) {
@@ -540,10 +549,9 @@ std::string hud_rml_parts(const HudView& hud) {
             const bool model = hud.magic >= 0 && hud.magic_model;
             parts.push_back(std::string("<div id='magic' class='") + glow("magic") +
                             "'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'" +
-                            (model ? " class='held'" : "") + ">" +
+                            item_classes(hud) + "><div id='item-fill'/>" +
                             (hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "") +
-                            "</div><div class='edge side-meter'><div id='meter-v' class='bar'><div id='meter-v-fill' class='fill'/></div></div>"
-                            "</div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>");
+                            "</div><div class='edge'/></div><div class='band foot'/></div>");
         }
         if (hud.multiplier >= 1)
             parts.push_back(std::string("<div id='xcount' class='group") + glow("xcount") + "'><div class='label'>X count</div><div class='count'>\u00D7" +
@@ -590,14 +598,15 @@ std::string hud_rml_parts(const HudView& hud) {
     // While the game draws the magic's model in the box it draws the box's tint
     // too, behind the model (magic_hooks.cpp); otherwise the HUD tints it.
     const bool model = hud.magic >= 0 && hud.magic_model;
-    rml += std::string("<div id='magic'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'") +
-           (model ? " class='held'" : "") + ">";
+    (void)model;
+    // The box charges up as the magic meter fills (item-fill, set each frame),
+    // in place of a separate bar (the owner, 2026-11-19).
+    rml += "<div id='magic'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'" +
+           item_classes(hud) + "><div id='item-fill'/>";
     // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
     // its name is shown only when it is not.
     rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
-    // The meter sits under the box; on portrait screens, as a column beside it.
-    rml += "</div><div class='edge side-meter'><div id='meter-v' class='bar'><div id='meter-v-fill' class='fill'/></div></div>"
-           "</div><div class='band'><div id='meter' class='bar'><div id='meter-fill' class='fill'/></div></div></div>";
+    rml += "</div><div class='edge'/></div><div class='band foot'/></div>";
     if (hud.show_next) {
     rml += "<div class='rule'><div class='line'/></div>";
     rml += "<div id='next' class='group'><div class='label'>Next</div>";
@@ -613,9 +622,11 @@ std::string hud_rml_parts(const HudView& hud) {
     if (hud.show_where) {
     // A word for a stage (Minefield's arenas) is set smaller the longer it is.
     const char* stage_size = hud.stage.size() > 10 ? " class='word long'" : hud.stage.size() > 4 ? " class='word'" : "";
-    rml += "<div id='where' class='group'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'" + stage_size + ">" +
+    rml += std::string("<div id='where' class='group") + (hud.goal_label == "Clear" ? " clear" : "") + "'><div class='label'>" + escape(hud.mode) + "</div><div id='stage'" + stage_size + ">" +
            escape(hud.stage) + "</div>";
-    if (!hud.goal.empty()) rml += "<div class='sublabel'>Goal</div><div id='goal'>" + escape(hud.goal) + "</div>";
+    if (!hud.goal.empty())
+        rml += "<div class='sublabel'>" + escape(hud.goal_label.empty() ? std::string("Goal") : hud.goal_label) +
+               "</div><div id='goal'>" + escape(hud.goal) + "</div>";
     if (hud.progress >= 0.0f)
         rml += "<div class='sublabel'>Progress</div><div id='progress' class='bar'><div id='progress-fill' class='fill'/></div>";
     rml += "</div>";
@@ -688,12 +699,18 @@ std::string hud_rml_parts(const HudView& hud) {
 
 void set_hud_fills(const HudView& hud) {
     const std::pair<const char*, float> fills[] = {
-        {"drop-fill", hud.drop_left}, {"meter-fill", hud.meter}, {"progress-fill", hud.progress}};
+        {"drop-fill", hud.drop_left}, {"progress-fill", hud.progress}};
     for (const auto& [id, value] : fills)
         if (auto* e = hud_document->GetElementById(id)) e->SetProperty("width", percent(value));
     if (auto* e = hud_document->GetElementById("drop-needle")) e->SetProperty("left", percent(hud.drop_left));
-    // The portrait screens' column meter fills upwards.
-    if (auto* e = hud_document->GetElementById("meter-v-fill")) e->SetProperty("height", percent(hud.meter));
+    // The item box charges from the bottom.
+    if (auto* e = hud_document->GetElementById("item-fill")) {
+        e->SetProperty("height", percent(hud.meter));
+        // Hidden while the game draws the model: the game draws the charge
+        // then, behind the model (magic_hooks.cpp).
+        const bool model = hud.magic >= 0 && hud.magic_model;
+        e->SetProperty("visibility", hud.meter > 0.0f && !model ? "visible" : "hidden");
+    }
 }
 
 std::string px_text(float value);
@@ -979,8 +996,11 @@ bool update_hud_document() {
         // The item's place inside the left container, scaled as the container is drawn.
         Rml::Vector2f inside{0, 0};
         for (auto* e = item; e != nullptr && e != left_side; e = e->GetParentNode()) inside += e->GetRelativeOffset(Rml::BoxArea::Border);
-        const Rml::Vector2f offset = left_at + inside * hud_left_scale;
-        const auto item_size = item->GetBox().GetSize(Rml::BoxArea::Border) * hud_left_scale;
+        // Inside the border and 2dp more, so the game's square tint stays
+        // within the box's round corners.
+        const float inset = (2.0f + 2.0f) * context->GetDensityIndependentPixelRatio();
+        const Rml::Vector2f offset = left_at + (inside + Rml::Vector2f{inset, inset}) * hud_left_scale;
+        const auto item_size = (item->GetBox().GetSize(Rml::BoxArea::Border) - Rml::Vector2f{2 * inset, 2 * inset}) * hud_left_scale;
         if (item_size.x > 0 && item_size.y > 0) {  // not right after a rebuild
             std::lock_guard lock(hud_mutex);
             hud_item = std::array<float, 4>{offset.x, offset.y, item_size.x, item_size.y};

@@ -85,6 +85,7 @@ std::atomic<float> anchored_x{NAN};
 // half the picture's width beyond 4:3.
 std::atomic<float> anchor_shift{0.0f};
 std::atomic<float> box_w{0.0f}, box_h{0.0f}, shift_2d{0.0f};
+std::atomic<float> charge{0.0f};  // the magic meter, 0 to 1 (set_magic_charge)
 // The held model sits this much right of where the numbers put it (measured).
 constexpr float box_correction = 0.0f;
 std::atomic<bool> enabled{false};
@@ -116,6 +117,8 @@ void set_magic_box(bool shown, float x, float y, float scale, float x_anchored, 
     box_y.store(y);
     box_scale.store(scale);
 }
+
+void set_magic_charge(float level) { charge.store(std::clamp(level, 0.0f, 1.0f)); }
 
 bool magic_box_active() {
     return enabled.load() && !std::isnan(box_x.load()) && !std::isnan(box_y.load()) && !research().set;
@@ -159,6 +162,21 @@ void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, flo
     ctx->r6 = to_x(centre_x + w / 2.0f);
     ctx->r7 = to_y(centre_y + h / 2.0f);
     func_8006FA28(rdram, ctx);
+    // The charge: the bottom of the box, the HUD's fill colour (#9c5cf0 at a
+    // quarter over the box's #0b1020), so the model is drawn in front of it.
+    if (const float level = charge.load(); level > 0.0f) {
+        *ctx = saved;
+        ctx->r29 = static_cast<gpr>(static_cast<std::int32_t>(saved.r29) - 0x40);
+        store_word(rdram, sp + 0x10, 0x30);
+        store_word(rdram, sp + 0x14, 0x23);
+        store_word(rdram, sp + 0x18, 0x54);
+        store_word(rdram, sp + 0x1C, 0xFF);
+        ctx->r4 = to_x(centre_x - w / 2.0f);
+        ctx->r5 = to_y(centre_y + h / 2.0f - h * level);
+        ctx->r6 = to_x(centre_x + w / 2.0f);
+        ctx->r7 = to_y(centre_y + h / 2.0f);
+        func_8006FA28(rdram, ctx);
+    }
     *ctx = saved;
 }
 
