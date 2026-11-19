@@ -615,8 +615,9 @@ public:
             // The style's version is in the name, so a changed style is made
             // again rather than an older file reused (Crafted 2: square, bevelled; 3:
             // the rubble drawn as a block with circles; 4: the circles without rims; 5: outlines from the
-            // palette indices, so palettes without a darker outline get one).
-            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? 5 : 1;
+            // palette indices, so palettes without a darker outline get one; 6: the highlight sheet left as the original).
+            static const bool mark = std::getenv("BLOCKPLANET_BRICK_MARK") != nullptr;  // research
+            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? (mark ? 99 : 6) : 1;
             char name[48];
             std::snprintf(name, sizeof name, "%016llx-v%d.dds", static_cast<unsigned long long>(hash), version);
             const auto path = bricks_dir_ / name;

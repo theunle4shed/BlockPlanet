@@ -27,6 +27,10 @@ Each style has its own folder in the data folder (`texture-packs/sharp-bricks`, 
 
 **Palettes without a darker outline (version 5).** Some brick colours (the green ones, for example) map the outline's palette index to the brick's own colour, so the original has no drawn outline there. Crafted reads a tile's structure from its palette indices (the single-cube tile, the 6th, gives the outline index at its corner and the brick's at its middle) and, where the outline colour is not at least 30 levels darker, darkens the brick's colour to 45 % for it. **Cycling palettes:** in some stages the rubble's palette (bank 4) changes over time, so each step is a different texture with its own hash and gets its own replacement (12 in a short run of Rescue 10:1); they are made once and kept.
 
+**The highlight sheet (version 6, 2026-11-19).** The drop highlight is not drawn by tinting the bricks: the game lays a second sheet over them (`0x800E32D0` with the palette at `0x800E9400`, bank 1 in Rescue 1:1), in greys: black darkens the bricks under the cursor and the light rings make the highlight's bevelled frame (light where a drop is allowed, dark where it is not). Crafted had taken it for a brick colour and drawn it all black (its rubble tile as a block), so the frame was lost and the highlight was a flat patch (the owner's report). Crafted now recognises it (its single cube dark in the middle and light at the edge, the other way round from a brick's) and leaves it as Sharp's.
+
+**The patterned piece tiles (the 9th and 10th, to identify).** Each brick sheet has a second, mottled set of piece parts with a bright edge (the owner saw yellow bricks of both kinds in a demo). Not used in a full clear (bricks flash white) nor for the highlight. `BLOCKPLANET_BRICK_MARK=1` paints them red and cyan (files as version 99) to find when the game uses them.
+
 ## Switches
 
 - `BLOCKPLANET_BRICKS=original|sharp|crafted`: overrides the setting.

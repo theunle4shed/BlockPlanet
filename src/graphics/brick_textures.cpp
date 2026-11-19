@@ -1,6 +1,7 @@
 #include "tetrisphere/brick_textures.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <cstring>
 
@@ -235,6 +236,14 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
     // like) keep Sharp's look.
     std::vector<std::uint8_t> sharp = source;
     for (int i = 0, sw2 = sw, sh2 = sh; i < 3; ++i, sw2 *= 2, sh2 *= 2) sharp = scale2x(sharp, sw2, sh2);
+    // The highlight sheet (the drop highlight laid over the bricks: black
+    // darkens, the light rings make its bevelled frame) is not a brick
+    // colour: its single cube is dark in the middle and light at the edge,
+    // the other way round from a brick's. Kept as the original (sharpened):
+    // drawn as bricks its frame was lost (the owner, 2026-11-19).
+    if (sh == tile && sw >= 6 * tile &&
+        tone(palette_colour(d, texel_index(d, 5 * tile + 8, 8))) + 10.0 < tone(palette_colour(d, texel_index(d, 5 * tile, 0))))
+        return sharp;
     std::vector<std::uint8_t> out(std::size_t(w) * h * 4u);
     const auto put = [&](int x, int y, std::uint32_t c) { std::memcpy(&out[(std::size_t(y) * w + x) * 4u], &c, 4); };
     for (int t = 0; t < sw / tile; ++t) {
@@ -305,6 +314,13 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
                     for (int k = 0; k < 3; ++k) v |= std::uint32_t(std::clamp(rgb[k] / 16.0, 0.0, 255.0)) << (8 * k);
                     put(tx * scale + x, y, v);
                 }
+            continue;
+        }
+        // Research: BLOCKPLANET_BRICK_MARK=1 paints the 9th and 10th tiles
+        // (the patterned piece parts) red and cyan, to see when the game uses them.
+        if (static const bool mark = std::getenv("BLOCKPLANET_BRICK_MARK") != nullptr; mark && (t == 8 || t == 9) && sh == tile) {
+            for (int y = 0; y < big; ++y)
+                for (int x = 0; x < big; ++x) put(tx * scale + x, y, t == 8 ? 0xFF2020F0u : 0xFFF0F020u);
             continue;
         }
         const bool piece_tile = t < 8 && sh == tile && sw >= 6 * tile;
