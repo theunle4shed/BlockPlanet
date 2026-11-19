@@ -228,6 +228,72 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
         for (int y = 0; y < tile; ++y)
             for (int x = 0; x < tile; ++x)
                 if (std::find(colours.begin(), colours.end(), colour(tx + x, y)) == colours.end()) colours.push_back(colour(tx + x, y));
+        // Rubble (the 13th tile: a dark block with a glowing orb, blurry in
+        // the original): the owner's design, 2026-11-19: a square block with
+        // bevelled edges, a circle in the middle and a small one in each
+        // corner, in the tile's own colours.
+        if (t == 12 && sh == tile && colours.size() >= 3) {
+            std::sort(colours.begin(), colours.end(), [&](std::uint32_t a, std::uint32_t b) { return tone(a) < tone(b); });
+            std::uint32_t common = colours[colours.size() / 2];
+            {
+                int best = -1;
+                for (const std::uint32_t c : colours) {
+                    int n = 0;
+                    for (int y = 0; y < tile; ++y)
+                        for (int x = 0; x < tile; ++x) n += colour(tx + x, y) == c;
+                    if (n > best && c != colours.front()) best = n, common = c;
+                }
+            }
+            const std::uint32_t dark = colours.front(), light = colours.back();
+            const auto mix = [](std::uint32_t a, std::uint32_t b, double f) {
+                std::uint32_t out = 0xFF000000u;
+                for (int k = 0; k < 3; ++k) {
+                    const double va = double((a >> (8 * k)) & 0xFFu), vb = double((b >> (8 * k)) & 0xFFu);
+                    out |= std::uint32_t(std::clamp(va + (vb - va) * f, 0.0, 255.0)) << (8 * k);
+                }
+                return out;
+            };
+            constexpr int edge = 7, band = 11;
+            struct Circle { double x, y, r; };
+            const Circle circles[5] = {{64, 64, 27}, {30, 30, 9}, {98, 30, 9}, {30, 98, 9}, {98, 98, 9}};
+            for (int y = 0; y < big; ++y)
+                for (int x = 0; x < big; ++x) {
+                    double rgb[3] = {0, 0, 0};
+                    for (int sy = 0; sy < 4; ++sy)
+                        for (int sx = 0; sx < 4; ++sx) {
+                            const double px = x + (sx + 0.5) / 4.0, py = y + (sy + 0.5) / 4.0;
+                            const double light_from_above = 1.06 - 0.12 * py / double(big);
+                            std::uint32_t c;
+                            const double from_edge = std::min({px, py, big - px, big - py});
+                            if (from_edge < edge) {
+                                c = scaled(dark, 0.74 * light_from_above);
+                            } else {
+                                c = scaled(common, light_from_above);
+                                if (from_edge < edge + band) {  // the bevel, nearest edge deciding
+                                    const double up = py, left = px, down = big - py, right = big - px;
+                                    const double nearest = std::min({up, left, down, right});
+                                    c = scaled(c, nearest == up ? 1.24 : nearest == left ? 1.12 : nearest == down ? 0.78 : 0.88);
+                                }
+                                for (const Circle& o : circles) {
+                                    const double dx = (px - o.x) / o.r, dy = (py - o.y) / o.r, d = std::sqrt(dx * dx + dy * dy);
+                                    if (d > 1.0) continue;
+                                    if (d > 1.0 - 2.5 / o.r) {  // a dark rim
+                                        c = scaled(dark, 0.9);
+                                    } else {  // a dome lit from the top left
+                                        const double lit = std::clamp(0.55 - 0.5 * (0.7 * dx + 0.7 * dy) + 0.25 * (1.0 - d * d), 0.0, 1.0);
+                                        c = lit < 0.5 ? mix(dark, common, lit * 2.0) : mix(common, light, (lit - 0.5) * 2.0);
+                                    }
+                                    break;
+                                }
+                            }
+                            for (int k = 0; k < 3; ++k) rgb[k] += double((c >> (8 * k)) & 0xFFu);
+                        }
+                    std::uint32_t v = 0xFF000000u;
+                    for (int k = 0; k < 3; ++k) v |= std::uint32_t(std::clamp(rgb[k] / 16.0, 0.0, 255.0)) << (8 * k);
+                    put(tx * scale + x, y, v);
+                }
+            continue;
+        }
         if (colours.size() > 3 || sh != tile) {
             for (int y = 0; y < h; ++y)
                 std::memcpy(&out[(std::size_t(y) * w + tx * scale) * 4u], &sharp[(std::size_t(y) * w + tx * scale) * 4u], std::size_t(big) * 4u);
