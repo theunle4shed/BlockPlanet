@@ -563,7 +563,7 @@ public:
     // BLOCKPLANET_BRICKS overrides the setting, for testing.
     void sharp_bricks_apply(std::string style) {
         if (const char* forced = std::getenv("BLOCKPLANET_BRICKS")) style = forced;
-        if (style != "original" && style != "sharp" && style != "crafted") style = "sharp";
+        if (style != "original" && style != "sharp" && style != "crafted") style = "crafted";
         if (style == bricks_current_) return;
         bricks_current_ = style;
         bricks_done_.clear();
@@ -585,7 +585,7 @@ public:
         std::fprintf(stdout, "{\"event\":\"brick_style\",\"style\":\"%s\",\"ready\":%s}\n", style.c_str(), bricks_ready_ ? "true" : "false");
         std::fflush(stdout);
     }
-    void sharp_bricks_init() { sharp_bricks_apply("sharp"); }
+    void sharp_bricks_init() { sharp_bricks_apply("crafted"); }
     void sharp_bricks_frame(const OSTask* task) {
         {
             std::optional<std::string> style;

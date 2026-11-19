@@ -3743,7 +3743,7 @@ void publish_hud_settings() {
     const auto value = profile_data.preferences.hud_distance.value_or("near");
     const auto text = profile_data.preferences.text_size.value_or("default");
     static std::string last_bricks;
-    if (const auto bricks = profile_data.preferences.bricks.value_or("sharp"); bricks != last_bricks) {
+    if (const auto bricks = profile_data.preferences.bricks.value_or("crafted"); bricks != last_bricks) {
         blockplanet::ui::set_setting("bricks", last_bricks = bricks);
         tetrisphere::set_rt64_brick_style(bricks);
     }

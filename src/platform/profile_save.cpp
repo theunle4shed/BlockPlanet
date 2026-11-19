@@ -131,7 +131,7 @@ bool from_json(const std::string& text, ProfileSaveData& data) {
             result.preferences.hud_distance = distance;
         }
         if (preferences.contains("bricks")) {
-            const auto style = preferences.at("bricks").value("style", std::string("sharp"));
+            const auto style = preferences.at("bricks").value("style", std::string("crafted"));
             if (style == "original" || style == "sharp" || style == "crafted") result.preferences.bricks = style;
         }
         if (preferences.contains("text")) {
