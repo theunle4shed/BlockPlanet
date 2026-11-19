@@ -19,6 +19,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -317,8 +318,9 @@ extern "C" void blockplanet_music_log(std::uint8_t* rdram, recomp_context* ctx) 
         return (scene >> 24) == 0x80u ? static_cast<int>(load32(rdram, scene + 0x24u)) : -1;
     };
     std::fprintf(stdout,
-                 "{\"event\":\"music_start\",\"track\":%u,\"player\":\"0x%08X\",\"intro_done\":%d,\"title_done\":%d,"
+                 "{\"event\":\"music_start\",\"ms\":%lld,\"track\":%u,\"player\":\"0x%08X\",\"intro_done\":%d,\"title_done\":%d,"
                  "\"logo_frame\":%d,\"intro_frame\":%d,\"timer\":%d,\"songs\":%d}\n",
+                 static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()),
                  static_cast<unsigned>(ctx->r4), static_cast<std::uint32_t>(ctx->r5), load16(rdram, 0x800E1648u),
                  load16(rdram, 0x800E1646u), frame_of(logo_scene_pointer), frame_of(intro_scene_pointer),
                  static_cast<int>(load32(rdram, 0x800E1208u)), static_cast<int>(load16(rdram, 0x800E28E4u)));

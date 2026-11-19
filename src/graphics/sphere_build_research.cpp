@@ -296,8 +296,9 @@ extern "C" void blockplanet_level_build_end(std::uint8_t* rdram, recomp_context*
         callers += item;
     }
     std::fprintf(stdout,
-                 "{\"event\":\"level_build_end\",\"mode\":%d,\"level\":%d,\"draws\":%d,\"rng\":\"0x%08X\","
+                 "{\"event\":\"level_build_end\",\"ms\":%lld,\"mode\":%d,\"level\":%d,\"draws\":%d,\"rng\":\"0x%08X\","
                  "\"record\":\"%s\",\"ranges\":{%s},\"pieces\":%s,\"build_ms\":%.2f,\"placing_ms\":%.2f,\"layers\":[%s]}\n",
+                 static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()),
                  load16(rdram, mode), load16(rdram, level_counter), draws, load32(rdram, rng_state), record.c_str(),
                  callers.c_str(), pieces.c_str(),
                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - build_started).count(),

@@ -5112,7 +5112,9 @@ bool handle_profile_command(const std::string& command) {
                 auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
                 const std::uint32_t values = guest::load32(rdram, 0x800E44D0u);
                 // (Puzzle's border, type 47 cells of value 423, stays: its puzzles are the cells inside.)
-                for (int c = 0; c < 1024; ++c) {
+                // Every playfield layer (1 to 8), so a stage of many layers
+                // clears down to the core too.
+                for (int c = 0; c < 8 * 1024; ++c) {
                     const std::uint32_t at = values + 2048u + 2u * std::uint32_t(c);
                     const std::uint16_t v = guest::load16(rdram, at);
                     if (v != 0 && v != 423) guest::store16(rdram, at, 288);
@@ -6110,6 +6112,32 @@ bool handle_profile_command(const std::string& command) {
             was_paused = paused;
             if (unpaused_at && now_g - *unpaused_at > std::chrono::milliseconds(resume_ms)) unpaused_at.reset();
             blockplanet::jukebox::tick(guest_rdram);
+            // Research: BLOCKPLANET_TRANSITION_LOG=1 logs, with the time, each
+            // change of the states a stage-to-stage transition goes through:
+            // the scene/menu (0x800E121C), the pause row (0x800E1228), the
+            // stage (+0x23BA) and episode (0x800E44A0), the hearts, BlockPlanet's
+            // loading cover, and "playable" (a piece in hand: the drop timer
+            // counting, in play with no pause).
+            if (static const bool transition_log = std::getenv("BLOCKPLANET_TRANSITION_LOG") != nullptr;
+                transition_log && guest_rdram != nullptr) {
+                constexpr std::uint32_t p1 = 0x80110220u;
+                const int menu = guest::load16(guest_rdram, 0x800E121C), row = guest::load16(guest_rdram, 0x800E1228);
+                const int stage = guest::load16(guest_rdram, p1 + 0x23BA), episode = guest::load16(guest_rdram, 0x800E44A0);
+                const int hearts = guest::load16(guest_rdram, p1 + 0x2D7E);
+                const std::uint32_t t = guest::load32(guest_rdram, p1 + 0x2408);
+                float timer = 0;
+                std::memcpy(&timer, &t, 4);
+                const int playable = menu == -1 && row < 0 && timer > 0.0f && timer < 7000.0f;
+                const int state[7] = {menu, row, stage, episode, hearts, int(loading_active), playable};
+                static int last[7] = {-99, -99, -99, -99, -99, -99, -99};
+                if (std::memcmp(state, last, sizeof state) != 0) {
+                    std::memcpy(last, state, sizeof state);
+                    std::fprintf(stdout, "{\"event\":\"transition\",\"ms\":%lld,\"menu\":%d,\"pause_row\":%d,\"stage\":%d,\"episode\":%d,\"hearts\":%d,\"cover\":%d,\"playable\":%d}\n",
+                                 static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()),
+                                 menu, row, stage, episode + 1, hearts, int(loading_active), playable);
+                    std::fflush(stdout);
+                }
+            }
             // Research: BLOCKPLANET_DROP_LOG=1 logs player 1's drop timer
             // (+0x2408, its 0-600 form +0x2B10), the camera zoom (+0x2404 speed,
             // +0x2414 target, +0x2416 eased) and hearts whenever they change,
