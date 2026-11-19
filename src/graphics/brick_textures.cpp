@@ -203,76 +203,77 @@ std::vector<std::uint8_t> dds(const std::vector<std::uint8_t>& rgba, int width, 
 
 std::vector<std::uint8_t> crafted(const Draw& d) {
     const std::vector<std::uint8_t> source = decode(d);
-    const int sw = d.width, sh = d.height, scale = 8, tile = 16;
+    const int sw = d.width, sh = d.height, scale = 8, tile = 16, big = tile * scale;
     const int w = sw * scale, h = sh * scale;
-    // The tone of each colour (its brightness), to deepen the darkest.
     const auto colour = [&](int x, int y) {
         std::uint32_t v;
         std::memcpy(&v, &source[(std::size_t(y) * sw + x) * 4u], 4);
         return v;
     };
-    std::vector<std::uint8_t> out(std::size_t(w) * h * 4u);
-    // One sample: the colour whose region covers this point, from the 4 x 4
-    // nearest texels of the same tile weighted by a Gaussian of their
-    // distance (smooth, crisp boundaries with rounded corners; never across
-    // tiles).
-    const auto sample = [&](double u, double v, double out_rgba[4]) {
-        const int tx = int(u) / tile * tile, ty = int(v) / tile * tile;
-        const int cx = int(std::floor(u - 0.5)), cy = int(std::floor(v - 0.5));
-        std::uint32_t colours[16];
-        double weights[16];
-        int n = 0;
-        for (int dy = -1; dy <= 2; ++dy)
-            for (int dx = -1; dx <= 2; ++dx) {
-                const int x = std::clamp(cx + dx, tx, tx + tile - 1), y = std::clamp(cy + dy, ty, ty + tile - 1);
-                const double ddx = (x + 0.5) - u, ddy = (y + 0.5) - v;
-                const double wgt = std::exp(-(ddx * ddx + ddy * ddy) / (2.0 * 0.45 * 0.45));
-                const std::uint32_t c = colour(x, y);
-                int k = 0;
-                while (k < n && colours[k] != c) ++k;
-                if (k == n) colours[n] = c, weights[n++] = 0;
-                weights[k] += wgt;
-            }
-        int best = 0;
-        for (int k = 1; k < n; ++k)
-            if (weights[k] > weights[best]) best = k;
-        for (int k = 0; k < 4; ++k) out_rgba[k] = double((colours[best] >> (8 * k)) & 0xFFu);
+    const auto tone = [](std::uint32_t c) { return double((c & 0xFFu) + ((c >> 8) & 0xFFu) + ((c >> 16) & 0xFFu)) / 3.0; };
+    const auto scaled = [](std::uint32_t c, double f) {
+        std::uint32_t out = c & 0xFF000000u;
+        for (int k = 0; k < 3; ++k) out |= std::uint32_t(std::clamp(double((c >> (8 * k)) & 0xFFu) * f, 0.0, 255.0)) << (8 * k);
+        return out;
     };
-    std::vector<double> tone(std::size_t(w) * h);
-    for (int y = 0; y < h; ++y)
-        for (int x = 0; x < w; ++x) {
-            // 4 x 4 samples a pixel, for smooth edges.
-            double sum[4] = {0, 0, 0, 0};
-            for (int sy = 0; sy < 4; ++sy)
-                for (int sx = 0; sx < 4; ++sx) {
-                    double c[4];
-                    sample((x + (sx + 0.5) / 4.0) / scale, (y + (sy + 0.5) / 4.0) / scale, c);
-                    // A deeper outline: dark colours darker still.
-                    const double t = (c[0] + c[1] + c[2]) / 3.0;
-                    const double deepen = t < 110.0 ? 0.78 : 1.0;
-                    for (int k = 0; k < 3; ++k) sum[k] += c[k] * deepen;
-                    sum[3] += c[3];
+    // The patterned tiles (more than three colours: rubble, crystals and the
+    // like) keep Sharp's look.
+    std::vector<std::uint8_t> sharp = source;
+    for (int i = 0, sw2 = sw, sh2 = sh; i < 3; ++i, sw2 *= 2, sh2 *= 2) sharp = scale2x(sharp, sw2, sh2);
+    std::vector<std::uint8_t> out(std::size_t(w) * h * 4u);
+    const auto put = [&](int x, int y, std::uint32_t c) { std::memcpy(&out[(std::size_t(y) * w + x) * 4u], &c, 4); };
+    for (int t = 0; t < sw / tile; ++t) {
+        const int tx = t * tile;
+        std::vector<std::uint32_t> colours;
+        for (int y = 0; y < tile; ++y)
+            for (int x = 0; x < tile; ++x)
+                if (std::find(colours.begin(), colours.end(), colour(tx + x, y)) == colours.end()) colours.push_back(colour(tx + x, y));
+        if (colours.size() > 3 || sh != tile) {
+            for (int y = 0; y < h; ++y)
+                std::memcpy(&out[(std::size_t(y) * w + tx * scale) * 4u], &sharp[(std::size_t(y) * w + tx * scale) * 4u], std::size_t(big) * 4u);
+            continue;
+        }
+        // A piece tile: the darkest colour is the outline, the rest is the
+        // brick (the original's mid-tone ring inside the outline, its own
+        // bevel, becomes brick too). Square: each texel is an 8 x 8 block.
+        std::sort(colours.begin(), colours.end(), [&](std::uint32_t a, std::uint32_t b) { return tone(a) < tone(b); });
+        const std::uint32_t dark = colours.front(), base = colours.back();
+        const bool has_outline = colours.size() > 1 && tone(base) - tone(dark) > 30.0;
+        std::vector<std::uint8_t> outline(std::size_t(big) * big);
+        for (int y = 0; y < big; ++y)
+            for (int x = 0; x < big; ++x)
+                outline[std::size_t(y) * big + x] = has_outline && colour(tx + x / scale, y / scale) == dark;
+        const auto is_outline = [&](int x, int y) {
+            return x >= 0 && y >= 0 && x < big && y < big && outline[std::size_t(y) * big + x] != 0;
+        };
+        // The bevel: a band inside the outline, light on the top and left,
+        // dark on the bottom and right, meeting on the diagonal at the corners.
+        constexpr int band = 11;
+        for (int y = 0; y < big; ++y)
+            for (int x = 0; x < big; ++x) {
+                const double light = 1.06 - 0.12 * double(y) / double(big - 1);  // from above
+                if (is_outline(x, y)) {
+                    put(tx * scale + x, y, scaled(dark, 0.74 * light));
+                    continue;
                 }
-            std::uint8_t* o = &out[(std::size_t(y) * w + x) * 4u];
-            for (int k = 0; k < 4; ++k) o[k] = std::uint8_t(std::clamp(sum[k] / 16.0, 0.0, 255.0));
-            tone[std::size_t(y) * w + x] = (sum[0] + sum[1] + sum[2]) / 48.0;
-        }
-    // The bevel: a light line just inside an edge above (darker pixels a few
-    // pixels up, in the same tile), a soft shade just inside an edge below;
-    // and a gentle light from above within each tile.
-    const int reach = 4;
-    std::vector<std::uint8_t> lit = out;
-    for (int y = 0; y < h; ++y)
-        for (int x = 0; x < w; ++x) {
-            const int in_tile = y % (tile * scale);
-            const double here = tone[std::size_t(y) * w + x];
-            double factor = 1.08 - 0.16 * double(in_tile) / double(tile * scale - 1);
-            if (in_tile >= reach && tone[std::size_t(y - reach) * w + x] < here - 35.0) factor *= 1.18;
-            else if (in_tile < tile * scale - reach && tone[std::size_t(y + reach) * w + x] < here - 35.0) factor *= 0.88;
-            std::uint8_t* o = &lit[(std::size_t(y) * w + x) * 4u];
-            for (int k = 0; k < 3; ++k) o[k] = std::uint8_t(std::clamp(out[(std::size_t(y) * w + x) * 4u + k] * factor, 0.0, 255.0));
-        }
-    out = std::move(lit);
+                int up = band, left = band, down = band, right = band;
+                for (int k = 1; k < band; ++k) {
+                    if (up == band && is_outline(x, y - k)) up = k;
+                    if (left == band && is_outline(x - k, y)) left = k;
+                    if (down == band && is_outline(x, y + k)) down = k;
+                    if (right == band && is_outline(x + k, y)) right = k;
+                }
+                double f = 1.0;
+                const int nearest = std::min({up, left, down, right});
+                if (nearest < band) {
+                    if (nearest == up) f = 1.24;
+                    else if (nearest == left) f = 1.12;
+                    else if (nearest == down) f = 0.78;
+                    else f = 0.88;
+                }
+                put(tx * scale + x, y, scaled(base, f * light));
+            }
+    }
     return out;
 }
 

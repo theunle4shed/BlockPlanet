@@ -55,10 +55,12 @@ std::vector<std::uint8_t> dds(const std::vector<std::uint8_t>& rgba, int width, 
 // The brick styles (Graphics > Bricks).
 enum class Style { Sharp, Crafted };
 
-// Crafted: each 16 x 16 tile redrawn at 8 times the size from its layout (the
-// regions of its palette colours: the base, the bevel, the outline), as
-// smooth shapes with straight edges and rounded corners, anti-aliased, with a
-// gentle top-to-bottom shading and a deeper outline. RGBA8, 8 times larger.
+// Crafted: each piece tile (three colours or fewer: the brick, the
+// original's inner ring and the outline) redrawn at 8 times the size, square:
+// a deeper outline, and inside it a bevel, light on the top and left and dark
+// on the bottom and right, meeting on the diagonal at the corners (the owner,
+// 2026-11-19: square bevelled corners, not rounded), with a gentle light from
+// above. Patterned tiles keep Sharp's look. RGBA8, 8 times larger.
 std::vector<std::uint8_t> crafted(const Draw& draw);
 
 // The replacement for a draw in a style: 8 times larger, mipmaps down to the

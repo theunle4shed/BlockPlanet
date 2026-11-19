@@ -612,8 +612,11 @@ public:
             tile.palette = d.tile.palette;
             const std::uint64_t hash = RT64::TMEMHasher::hash(d.tmem.data(), tile, d.width, d.height, d.tlut, RT64::TMEMHasher::CurrentHashVersion);
             if (!bricks_done_.insert(hash).second) return;
-            char name[40];
-            std::snprintf(name, sizeof name, "%016llx.dds", static_cast<unsigned long long>(hash));
+            // The style's version is in the name, so a changed style is made
+            // again rather than an older file reused (Crafted 2: square, bevelled).
+            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? 2 : 1;
+            char name[48];
+            std::snprintf(name, sizeof name, "%016llx-v%d.dds", static_cast<unsigned long long>(hash), version);
             const auto path = bricks_dir_ / name;
             const bool made = !std::filesystem::exists(path);
             if (made) {
