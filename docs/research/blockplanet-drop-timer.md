@@ -39,6 +39,10 @@ So in Episodes 1 to 7 a piece has a long calm stretch and then 7 to 9 seconds of
 
 The bar is the time left to the drop: `drop_run` steps through the rules above from the current values. It was checked against forced drops in Rescue 1:1 and 10:10, where it empties 0.15 to 0.2 s before the heart is lost (the piece's drop itself). Its notches are at the two warnings, worked out for each piece. It is green until the first, amber until the second and red after it, so each warning sound plays as the gauge crosses its notch.
 
+## Still to check
+
+- **Lines (mode 9) and the other modes:** the measurements above are Rescue's. Lines shows the same bar, worked out with these rules; its timer speeds per episode, warnings and drop point are to be checked against real drops (the owner's reminder, 2026-11-19). Hide & Seek and Training too.
+
 ## Research switches
 
 - `BLOCKPLANET_DROP_LOG=1`: logs the timer, its speed, the steps per frame, the fall, the eased fall and the hearts whenever they change. It also logs the column under the cursor and the HUD bar's value.

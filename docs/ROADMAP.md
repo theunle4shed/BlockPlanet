@@ -45,7 +45,7 @@ The longer-term design direction (visual identity, camera, story, modes, junk ru
 **The owner's test notes (2026-11-16), lower priority:**
 - **Puzzle:** solving puzzle 1, then exiting to the puzzle list, does not let puzzle 2 be chosen (puzzle progression to look at); puzzle 2 loads before the green grid flies in; a failed puzzle still has the game's own dark bricks, not the shell.
 - **Hide & Seek:** hide the HUD during its intro and title; the mode needs more work, as Puzzle does.
-- **Lines:** the game over shell works. Reminder: compare making combos in BlockPlanet's Lines with the original.
+- **Lines:** the game over shell works. Reminder: compare making combos in BlockPlanet's Lines with the original. **Also check the drop timer in Lines' stages and episodes (the owner, 2026-11-19):** the timer's speed per episode (`+0x3254`), the warnings, the fall's start and end, and whether the piece drops at the fall's end as in Rescue ([drop timer notes](research/blockplanet-drop-timer.md)). Lines already shows BlockPlanet's two-stage drop bar, worked out with Rescue's rules, so a difference would make the bar wrong there. Check with `BLOCKPLANET_DROP_LOG=1` (the log has the speed and the bar) against real drops, as was done in Rescue 1:1 and 10:10.
 
 ## How the game is built, and why it matters for these plans
 
