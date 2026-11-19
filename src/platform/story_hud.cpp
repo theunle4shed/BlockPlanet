@@ -79,8 +79,14 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
         float timer = 0.0f;
         std::memcpy(&timer, &bits, 4);
         if (!(timer >= 0.0f && timer <= 7000.0f)) timer = 0.0f;
-        out.drop_left = clock.update(timer, load16(rdram, player1 + 0x2414), load16(rdram, player1 + 0x2416),
-                                     static_cast<int>(load32(rdram, player1 + 0x2404) >> 16), load16(rdram, 0x800E44A0) + 1);
+        const std::uint32_t speed_bits = load32(rdram, player1 + 0x3254);
+        float speed = 1.0f;
+        std::memcpy(&speed, &speed_bits, 4);
+        if (!(speed > 0.0f && speed < 100.0f)) speed = 1.0f;
+        out.drop_left = clock.update(timer, speed, load16(rdram, player1 + 0x2414), load16(rdram, player1 + 0x2416));
+        out.drop_steps = clock.whole().steps;
+        out.drop_warn_first = clock.whole().warn_first;
+        out.drop_warn_second = clock.whole().warn_second;
         out.drop_zoom = clock.zoom();
     }
     out.magic = static_cast<std::int8_t>(load8(rdram, player1 + 0x702));
@@ -340,65 +346,44 @@ ScoreSplitsView ScoreSplits::view() const {
     return v;
 }
 
-namespace {
-constexpr float fall_cap = 30845.0f;   // the double at 0x800F10B8
-constexpr float drop_eased = 30690.0f; // the double at 0x800F10B0
-constexpr float ease_frames = 10.0f;   // the eased value's lag behind the cap
+DropRun drop_run(float timer, float speed_per_step, int fall, int eased) {
+    DropRun run;
+    if (speed_per_step <= 0.0f) speed_per_step = 1.0f;
+    if (timer < 2000.0f) run.warn_first = int(std::ceil((2000.0f - timer) / speed_per_step));
+    if (timer < 4000.0f) run.warn_second = int(std::ceil((4000.0f - timer) / speed_per_step));
+    // The game's order each step: the timer and its speed for the fall, then
+    // the fall, then the eased copy.
+    for (int step = 1; step < 20000; ++step) {
+        timer += speed_per_step;
+        if (timer >= 6000.0f) return run.steps = step, run;
+        const int speed = timer >= 4000.0f ? 75 : timer >= 2000.0f ? 25 : 0;
+        if (fall <= 30845) fall = std::min(fall + speed, 30845 + 75);
+        eased += (fall - eased) / 9 + 1;
+        if (eased >= 30690) return run.steps = step, run;
+    }
+    run.steps = 20000;
+    return run;
 }
 
-float DropClock::frames_left(float t, float fall) const {
-    const float rate = rate_ > 0.0f ? rate_ : 1.0f;
-    const float limit = std::max(0.0f, 6000.0f - t) / rate;  // the timer's own end
-    float frames = 0.0f;
-    if (t < 2000.0f) {
-        frames += (2000.0f - t) / rate;
-        t = 2000.0f;
-    }
-    if (t < 4000.0f) {
-        const float to_4000 = (4000.0f - t) / rate;
-        const float need = std::max(0.0f, fall_cap - fall) / 25.0f;
-        if (need <= to_4000) return std::min(limit, frames + need + ease_frames);
-        frames += to_4000;
-        fall += 25.0f * to_4000;
-    }
-    frames += std::max(0.0f, fall_cap - fall) / 75.0f + ease_frames;
-    return std::min(limit, frames);
-}
-
-float DropClock::update(float timer, int fall, int eased, int speed, int chapter) {
-    // The timer's speed: guessed from the episode (1 a frame in Episode 1,
-    // about 6 in Episode 10), then measured from the fall, which moves a
-    // known amount a frame.
-    if (chapter != rate_chapter_) {
-        rate_chapter_ = chapter;
-        rate_ = 1.0f + 0.55f * float(std::max(0, chapter - 1));
-    }
-    if (speed > 0 && last_timer_ >= 0.0f && timer > last_timer_ && fall > last_fall_ && float(fall) < fall_cap - 100.0f &&
-        float(last_fall_) > 0.0f) {
-        const float frames = float(fall - last_fall_) / float(speed);
-        if (frames >= 1.0f) {
-            const float measured = (timer - last_timer_) / frames;
-            if (measured > 0.1f && measured < 50.0f) rate_ = rate_ * 0.8f + measured * 0.2f;
-        }
-    }
+float DropClock::update(float timer, float speed_per_step, int fall, int eased) {
     // The drop: the fall set back (before the timer is), or the timer at its
     // end. Empty until the next piece.
     if ((last_timer_ >= 0.0f && fall + 500 < last_fall_) || timer >= 5999.0f) dropped_ = true;
     // A new piece: the timer back near 0 (it starts again after each drop).
-    if (timer < 1.0f || (last_timer_ >= 0.0f && timer + 500.0f < last_timer_)) {
+    const bool fresh = timer < 1.0f || (last_timer_ >= 0.0f && timer + 500.0f < last_timer_);
+    if (fresh) dropped_ = false;
+    // Until the fall starts its value is the piece's starting point.
+    if (timer < 2000.0f && (fresh || fall != base_ || whole_.steps == 0)) {
         base_ = fall;
-        total_ = 0.0f;
-        dropped_ = false;
+        whole_ = drop_run(0.0f, speed_per_step, base_, base_);
     }
-    if (speed == 0 && timer < 2000.0f) base_ = fall;
     last_timer_ = timer;
     last_fall_ = fall;
     zoom_ = eased > base_ + 25;
     if (timer < 1.0f) return 1.0f;
     if (dropped_) return 0.0f;
-    const float left = frames_left(timer, float(fall));
-    if (total_ <= 0.0f) total_ = frames_left(0.0f, float(base_));
-    total_ = std::max(total_, left);
-    return std::clamp(left / total_, 0.0f, 1.0f);
+    const int left = drop_run(timer, speed_per_step, fall, eased).steps;
+    return std::clamp(float(left) / float(std::max(1, whole_.steps)), 0.0f, 1.0f);
 }
+
 } // namespace tetrisphere

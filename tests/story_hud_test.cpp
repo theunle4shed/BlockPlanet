@@ -201,7 +201,7 @@ int main() {
     store32(m, 0x800E44D0, 0x80116BF0u);
     store16(m, p1 + 0x23E4, 4);
     assert(read_story_hud(m, progress, state));
-    assert(state.hearts == 2 && std::fabs(state.drop_left - (500.0f + 552.0f + 10.0f) / (2000.0f + 552.0f + 10.0f)) < 0.01f && state.magic == -1 && state.meter == 0.5f);
+    assert(state.hearts == 2 && state.drop_left > 0.0f && state.drop_left < 1.0f && state.drop_steps > 2000 && state.magic == -1 && state.meter == 0.5f);
     assert(state.next.size() == 3);
     assert(state.next[0].shape == 2 && state.next[0].material == 33 && state.next[0].cells == 4 && !state.next[0].random_block);
     assert(state.next[1].random_block);
@@ -209,25 +209,31 @@ int main() {
     assert(state.chapter == 1 && state.level == 3);
     store8(m, p1 + 0x702, 3);
     assert(read_story_hud(m, progress, state) && state.magic == 3);
-    // The drop clock: Episode 10's first piece (timer about 6 a frame).
-    {
-        tetrisphere::DropClock clock;
-        assert(clock.update(0.0f, 17050, 17050, 0, 10) == 1.0f);
-        float timer = 0.0f, fall = 17050.0f, eased = 17050.0f, last = 1.0f;
-        int frames = 0;
-        for (; frames < 3000; ++frames) {
-            timer += 5.95f;
-            const int speed = timer >= 4000.0f ? 75 : timer >= 2000.0f ? 25 : 0;
-            fall = std::min(30845.0f, fall + float(speed));
-            eased += (fall - eased) / 8.0f;
-            if (eased >= 30690.0f) break;  // the game's drop
-            const float left = clock.update(timer, int(fall), int(eased), speed, 10);
-            assert(left <= last + 0.02f);  // empties steadily
-            last = left;
+    // The drop clock against the game's rules, stepped as the game does:
+    // Episode 1 (speed 1) and a later episode (3), from a stage's first
+    // piece (17,050) and a later one (20,450).
+    for (const float speed : {1.0f, 3.0f})
+        for (const int start : {17050, 20450}) {
+            tetrisphere::DropClock clock;
+            assert(clock.update(0.0f, speed, start, start) == 1.0f);
+            float timer = 0.0f, last = 1.0f;
+            int fall = start, eased = start, steps = 0;
+            for (;;) {
+                ++steps;
+                timer += speed;
+                if (timer >= 6000.0f) break;
+                const int v = timer >= 4000.0f ? 75 : timer >= 2000.0f ? 25 : 0;
+                if (fall <= 30845) fall += v;
+                eased += (fall - eased) / 9 + 1;
+                if (eased >= 30690) break;  // the game's drop
+                const float left = clock.update(timer, speed, fall, eased);
+                assert(left <= last + 1e-6f);  // only ever goes down
+                last = left;
+            }
+            assert(clock.whole().steps == steps);
+            assert(last * float(steps) <= 1.01f);  // one step left at the last update
+            assert(clock.whole().warn_first == int(std::ceil(2000.0f / speed)));
+            assert(clock.zoom() || speed > 2.0f);
         }
-        assert(frames > 600 && frames < 900);
-        assert(last < 0.03f);  // empty, or nearly, at the drop
-        assert(clock.zoom());
-    }
     return 0;
 }

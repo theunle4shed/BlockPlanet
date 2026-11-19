@@ -748,6 +748,12 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     }
     view.hearts = state.hearts;
     view.drop_left = state.drop_left;
+    if (state.drop_steps > 0) {
+        // The warnings' places on the bar, rounded so the markup changes only per piece.
+        const auto at = [&](int step) { return step >= 0 ? std::round(100.0f * (1.0f - float(step) / float(state.drop_steps))) / 100.0f : -1.0f; };
+        view.drop_warn_first = at(state.drop_warn_first);
+        view.drop_warn_second = state.drop_warn_second >= 0 && state.drop_warn_second < state.drop_steps ? at(state.drop_warn_second) : -1.0f;
+    }
     if (static const bool drop_log = std::getenv("BLOCKPLANET_DROP_LOG") != nullptr; drop_log) {
         static float logged = -1.0f;
         static bool zoom = false;
@@ -1050,6 +1056,12 @@ void update_hud() {
     blockplanet::ui::HudView view;
     view.hearts = state.hearts;
     view.drop_left = state.drop_left;
+    if (state.drop_steps > 0) {
+        // The warnings' places on the bar, rounded so the markup changes only per piece.
+        const auto at = [&](int step) { return step >= 0 ? std::round(100.0f * (1.0f - float(step) / float(state.drop_steps))) / 100.0f : -1.0f; };
+        view.drop_warn_first = at(state.drop_warn_first);
+        view.drop_warn_second = state.drop_warn_second >= 0 && state.drop_warn_second < state.drop_steps ? at(state.drop_warn_second) : -1.0f;
+    }
     if (static const bool drop_log = std::getenv("BLOCKPLANET_DROP_LOG") != nullptr; drop_log) {
         static float logged = -1.0f;
         static bool zoom = false;
@@ -6105,7 +6117,9 @@ bool handle_profile_command(const std::string& command) {
                         for (int layer = 0; layer < 8; ++layer)
                             column += (layer ? "," : "") + std::to_string(guest::load16(guest_rdram, values + 2u * std::uint32_t(layer * 1024 + cy * 32 + cx)));
                     const int map = columns != 0 ? guest::load8(guest_rdram, columns + std::uint32_t(cy * 32 + cx)) : -1;
-                    std::fprintf(stdout, "{\"event\":\"drop_log\",\"ms\":%lld,\"timer\":%.0f,\"shown\":%d,\"speed\":%u,\"target\":%d,\"eased\":%d,\"hearts\":%d,\"cell\":[%d,%d],\"column\":[%s],\"map\":%d}\n",
+                    std::fprintf(stdout, "{\"event\":\"drop_log\",\"speed_per_retrace\":%.3f,\"retraces\":%d,\"ms\":%lld,\"timer\":%.0f,\"shown\":%d,\"speed\":%u,\"target\":%d,\"eased\":%d,\"hearts\":%d,\"cell\":[%d,%d],\"column\":[%s],\"map\":%d}\n",
+                                 [&] { const std::uint32_t r = guest::load32(guest_rdram, c + 0x3254); float f; std::memcpy(&f, &r, 4); return double(f); }(),
+                                 int(guest::load16(guest_rdram, 0x80160C64u)),
                                  static_cast<long long>(ms), timer, shown, speed >> 16, target, eased, hearts, cx, cy, column.c_str(), map);
                     std::fflush(stdout);
                 }

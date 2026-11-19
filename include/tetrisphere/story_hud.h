@@ -36,36 +36,42 @@ struct StoryHudState {
     int combo = 0;                    // the running combo count (+0x2AE0)
     int cursor_x = 0, cursor_y = 0;   // the drop cursor (+0x2B2A, +0x2B2E)
     bool drop_zoom = false;           // the drop timer's fall is pulling the view in (or springing back)
+    // The piece's whole time to the drop in 60 Hz steps, and the steps from
+    // its start to the two warnings (the fall starting, then speeding up).
+    int drop_steps = 0, drop_warn_first = -1, drop_warn_second = -1;
 };
 
-// The time left until the game drops the piece itself (measured 2026-11-19,
-// docs/research/blockplanet-game-state.md). The game does not drop at the
-// timer's end: the timer (+0x2408, 0 to 6,000) starts a fall at 2,000 and
-// speeds it up at 4,000; the fall (+0x2414) climbs 25, then 75, a frame from
-// where the piece started (17,050 for a stage's first piece, about 20,450
-// after) to the cap at 30,845, the eased value (+0x2416) follows an eighth of
-// the gap a frame, and the piece drops when that reaches 30,690. Where the
-// piece would land makes no difference (tested with a dug hole). The timer's
-// own speed per frame is set by the episode; it is measured during each fall.
+// The time left until the game drops the piece itself (found 2026-11-19,
+// docs/research/blockplanet-drop-timer.md). Each 60 Hz step the timer
+// (+0x2408) gains the episode's speed (+0x3254: 1, 2 or 3 ...); at 2,000 the
+// fall starts (+0x2404 = 25) and at 4,000 speeds up (75); the fall (+0x2414)
+// gains that speed each step up to 30,845; its eased copy (+0x2416) gains a
+// ninth of the gap plus 1; the piece drops when the eased copy reaches 30,690,
+// or when the timer reaches 6,000. Where the piece would land makes no
+// difference. This steps through the same rules to the drop.
+struct DropRun {
+    int steps = 0;         // 60 Hz steps to the drop
+    int warn_first = -1;   // steps to the timer's 2,000 (the fall starts), or -1 if passed
+    int warn_second = -1;  // steps to 4,000 (the fall speeds up), or -1 if passed
+};
+DropRun drop_run(float timer, float speed_per_step, int fall, int eased);
+
 class DropClock {
 public:
     // Returns the time left, 1 (a new piece) to 0 (the drop).
-    float update(float timer, int fall, int eased, int speed, int chapter);
+    float update(float timer, float speed_per_step, int fall, int eased);
     // While the fall pulls the view in, and until it has sprung back.
     bool zoom() const { return zoom_; }
-    float rate() const { return rate_; }
-    // Frames until the drop from timer `t` with the fall at `fall`.
-    float frames_left(float t, float fall) const;
+    // The piece's whole time and where its warnings fall (from its start).
+    const DropRun& whole() const { return whole_; }
 
 private:
-    float rate_ = 0.0f;      // timer units a frame (0: not known yet)
-    int rate_chapter_ = -1;
     float last_timer_ = -1.0f;
     int last_fall_ = 0;
     int base_ = 0;           // the fall's value when the piece came
-    float total_ = 0.0f;     // frames from the piece's start to the drop
+    DropRun whole_{};
     bool zoom_ = false;
-    bool dropped_ = false;  // the piece has gone; empty until the next
+    bool dropped_ = false;   // the piece has gone; empty until the next
 };
 
 

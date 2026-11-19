@@ -104,6 +104,9 @@ struct HudPieceView {
 struct HudView {
     int hearts = 3;            // 0 to 3
     float drop_left = 1.0f;    // the drop timer, 1 (full) to 0
+    // Where the drop timer's two warnings fall on its bar (the time left at
+    // each, 1 to 0), or -1: the first starts the fall, the second speeds it up.
+    float drop_warn_first = -1.0f, drop_warn_second = -1.0f;
     int magic = -1;            // -1 none, 0 to 5
     bool magic_model = false;  // the game draws the magic's model in the box
     float meter = 0.0f;        // the magic meter, 0 to 1

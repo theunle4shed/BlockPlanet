@@ -352,16 +352,22 @@ std::string pieces_rml(const std::vector<HudPieceView>& next, std::size_t count,
 
 // The drop timer (the owner's design, 2026-11-18: "a bar in thirds with a
 // gauge that moves across it", [---|---|---]): the time left until the game
-// drops the piece itself (tetrisphere::DropClock, which empties it at the
-// drop, 2026-11-19), in equal thirds, its fill green, then amber, then red as
-// it crosses into each, and a marker at the fill's edge.
-std::string drop_bar(const char* id_attr, const char* classes, float left, bool inline_fill) {
+// drops the piece itself (tetrisphere::DropClock). Its notches are where the
+// game's two warnings come (2026-11-19): green until the first (the fall
+// starts and the view closes in), amber until the second (the fall speeds
+// up), red after it, so each warning sound plays as the gauge crosses its
+// notch. In Episodes 1 to 7 the piece drops before the second warning, so
+// there is one notch. Without the warnings (VS), equal thirds.
+std::string drop_bar(const char* id_attr, const char* classes, float left, bool inline_fill, float warn_first, float warn_second) {
     left = std::clamp(left, 0.0f, 1.0f);
-    const int third = left > 2.0f / 3.0f ? 1 : left > 1.0f / 3.0f ? 2 : 3;
+    if (warn_first < 0.0f && warn_second < 0.0f) warn_first = 2.0f / 3.0f, warn_second = 1.0f / 3.0f;
+    const int third = warn_first >= 0.0f && left > warn_first ? 1 : warn_second >= 0.0f && left <= warn_second ? 3 : 2;
+    const auto percent = [](float v) { return std::to_string(int(std::lround(v * 1000.0f)) / 10.0f).substr(0, 4) + "%"; };
     const std::string width = std::to_string(int(left * 100.0f)) + "%";
     std::string rml = std::string("<div") + id_attr + " class='bar drop-bar " + classes + " third-" + std::to_string(third) + "'>";
     rml += std::string("<div") + (inline_fill ? " class='fill' style='width: " + width + ";'" : " id='drop-fill' class='fill'") + "/>";
-    rml += "<div class='notch' style='left: 33.3%;'/><div class='notch' style='left: 66.7%;'/>";
+    for (const float at : {warn_first, warn_second})
+        if (at > 0.0f && at < 1.0f) rml += "<div class='notch' style='left: " + percent(at) + ";'/>";
     rml += std::string("<div") + (inline_fill ? " class='needle' style='left: " + width + ";'" : " id='drop-needle' class='needle'") + "/>";
     return rml + "</div>";
 }
@@ -371,7 +377,7 @@ std::string versus_column(const HudView::VersusPlayer& p, const char* id, const 
     std::string rml = std::string("<div id='") + id + "' class='side versus'>";
     rml += std::string("<div class='group'><div class='label'>") + name + "</div><div class='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < p.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
-    rml += "</div>" + drop_bar("", "vs-drop", p.drop_left, true) + "</div>";
+    rml += "</div>" + drop_bar("", "vs-drop", p.drop_left, true, -1.0f, -1.0f) + "</div>";
     rml += "<div class='rule'><div class='line'/></div>";
     rml += "<div class='group'><div class='label'>Attack</div><div class='count'>\u00D7" + std::to_string(p.multiplier) + "</div></div>";
     rml += "<div class='rule'><div class='line'/></div>";
@@ -542,7 +548,7 @@ std::string hud_rml_parts(const HudView& hud) {
         if (hud.show_lives) {
             std::string lives = std::string("<div id='lives' class='group") + glow("lives") + "'><div class='label'>Health</div><div id='hearts'>";
             for (int i = 0; i < 3; ++i) lives += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
-            lives += "</div>" + drop_bar(" id='drop'", "", hud.drop_left, false) + "</div>";
+            lives += "</div>" + drop_bar(" id='drop'", "", hud.drop_left, false, hud.drop_warn_first, hud.drop_warn_second) + "</div>";
             parts.push_back(lives);
         }
         if (hud.show_magic) {
@@ -585,7 +591,7 @@ std::string hud_rml_parts(const HudView& hud) {
     rml += "</div>";
     // Bar fills are set on the elements each frame (set_hud_fills), so the
     // markup only changes when something else does (here, at each third).
-    rml += drop_bar(" id='drop'", "", hud.drop_left, false);
+    rml += drop_bar(" id='drop'", "", hud.drop_left, false, hud.drop_warn_first, hud.drop_warn_second);
     // On portrait screens the clock sits here, under the hearts, so the top row stays one line.
     if (!hud.clock.empty())
         rml += std::string("<div class='clock-inline") + (hud.clock_low ? " low" : "") + "'>" + digits(escape(hud.clock)) + "</div>";
