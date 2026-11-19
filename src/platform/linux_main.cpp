@@ -192,6 +192,9 @@ bool final_stage_cleared_seen = false;  // research (BLOCKPLANET_FINAL_RAW)
 // hide it away"): the game's curtain call plays with no HUD and no cover;
 // any button skips it; then BlockPlanet's credits, to Sappy.
 bool final_finale = false;
+// Research (what each magic does): research_magic:K gives player 1 magic K
+// (0 to 5) and presses the magic button (N64 0x0004) a moment later.
+std::optional<std::chrono::steady_clock::time_point> research_magic_press;
 bool final_skip = false;
 // An episode's last stage just cleared in a whole-episode Rescue run (1), or
 // a stage before the last in play (-1): told to the end menu bridge.
@@ -850,6 +853,32 @@ void update_training_scissor(bool training) {
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
     if (update_title_overlay()) return;
+    // Research (the score formula and magic, 2026-11-19):
+    // BLOCKPLANET_SCORE_LOG=1 logs player 1's scoring values whenever one
+    // changes: the score (+0x2AF8), the combo's points so far (+0x2AFC, its
+    // copy +0x2B00, the second total +0x2B04), the combo's step count
+    // (+0x24BC), the bricks broken (+0x2AE0), the gravity and fuse counts
+    // (+0x2AE6, +0x2AE8), the best combo points (+0x2C70), the magic meter
+    // (+0x2AEC), the held magic (+0x702) and the hearts (+0x2D7E).
+    if (static const bool score_log = std::getenv("BLOCKPLANET_SCORE_LOG") != nullptr; score_log && guest_rdram != nullptr) {
+        const std::uint32_t p = 0x80110220u;
+        char line[400];
+        std::snprintf(line, sizeof line,
+                      "\"score\":%u,\"combo_pts\":%u,\"copy\":%u,\"second\":%u,\"steps\":%d,\"bricks\":%d,\"gravity\":%d,"
+                      "\"fuse\":%d,\"best\":%u,\"meter\":%d,\"magic\":%d,\"hearts\":%d",
+                      guest::load32(guest_rdram, p + 0x2AF8), guest::load32(guest_rdram, p + 0x2AFC), guest::load32(guest_rdram, p + 0x2B00),
+                      guest::load32(guest_rdram, p + 0x2B04), std::int16_t(guest::load16(guest_rdram, p + 0x24BC)),
+                      std::int16_t(guest::load16(guest_rdram, p + 0x2AE0)), std::int16_t(guest::load16(guest_rdram, p + 0x2AE6)),
+                      std::int16_t(guest::load16(guest_rdram, p + 0x2AE8)), guest::load32(guest_rdram, p + 0x2C70),
+                      std::int16_t(guest::load16(guest_rdram, p + 0x2AEC)), std::int8_t(guest::load8(guest_rdram, p + 0x702)),
+                      std::int16_t(guest::load16(guest_rdram, p + 0x2D7E)));
+        static std::string last;
+        if (last != line) {
+            last = line;
+            std::fprintf(stdout, "{\"event\":\"score_state\",%s}\n", line);
+            std::fflush(stdout);
+        }
+    }
     static tetrisphere::ProgressTracker progress;
     // The episode's splits (game time per level, LiveSplit style): counted
     // while playing (not paused); a new chapter, Try Again or a new game
@@ -5184,6 +5213,29 @@ bool handle_profile_command(const std::string& command) {
                 launch_mode(LaunchMode::HideAndSeek);
                 continue;
             }
+            if (command->rfind("research_magic:", 0) == 0 && guest_rdram != nullptr) {
+                const int kind = std::atoi(command->c_str() + 15);
+                guest::store8(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x702, std::uint8_t(std::int8_t(kind)));
+                research_magic_press = std::chrono::steady_clock::now() + std::chrono::milliseconds(800);
+                continue;
+            }
+            if (*command == "research_board" && guest_rdram != nullptr) {
+                // Filled cells per layer (0 the core), with the count of each value on the top layers.
+                const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
+                std::string out = "{\"event\":\"research_board\",\"layers\":[";
+                for (int layer = 0; layer < 9; ++layer) {
+                    int filled = 0;
+                    for (int c = 0; c < 1024; ++c) {
+                        const std::int16_t v = std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(layer * 1024 + c)));
+                        filled += v > 0;
+                    }
+                    out += (layer ? "," : "") + std::to_string(filled);
+                }
+                out += "]}";
+                std::fprintf(stdout, "%s\n", out.c_str());
+                std::fflush(stdout);
+                continue;
+            }
             if (*command == "research_win" && guest_rdram != nullptr &&
                 guest::load16(guest_rdram, 0x800E121C) == -1) {
                 // Research (the test harness, "poke cmd:research_win"): wins the
@@ -5996,6 +6048,9 @@ bool handle_profile_command(const std::string& command) {
                                    : end.inject ? (0x10000u | end.buttons)
                                    : hs_buttons != 0 ? (0x10000u | hs_buttons)
                                    : card_buttons != 0 ? (0x10000u | card_buttons)
+                                   : research_magic_press && std::chrono::steady_clock::now() >= *research_magic_press &&
+                                             std::chrono::steady_clock::now() < *research_magic_press + std::chrono::milliseconds(400)
+                                       ? 0x10004u
                                                 : training_inject.load());
             blockplanet::set_pause_menu_shown(pause_bridge.hide_original() || end_menu.hide_original());
             set_menu_play_state(read_game_state(guest_rdram).scene == -1);
