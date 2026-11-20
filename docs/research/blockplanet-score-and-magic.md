@@ -42,4 +42,23 @@ In short: the Firecracker and Dynamite clear wide patches of the top layers; the
 
 **A press while a magic is still working is ignored.** Retried 2026-11-19 (the press repeated at four cursor places): the Magnet, Atom and Ray Gun all worked on 10:5; about one press in four did nothing and the magic stayed held, so the single press of the first run was such a miss.
 
-**Still to find:** each magic's area and depth by design (from the code), how long the Magnet lasts, whether the Atom always takes the top layers or one kind of brick, and the points each scores.
+**Still to find:** see the code section below.
+
+## Each magic in the code (read 2026-11-20)
+
+Use is dispatched in `func_800C719C` by the held magic: three routines serve the six. Every magic but the Atom breaks **whole bricks**: for each column in its pattern it takes the column's **top brick** (`func_800C61F0`) and breaks all that brick's cells, even past the pattern's edge, so the "top two layers" measured in play are the sphere's uneven surface, not deeper digging. Cells go through a queue of up to 260 (`func_800B4740` at `+0x168E`, run by `func_800B4A54`). Times are in game steps (60 a second).
+
+| Magic | Routine | Area | Depth | Timing |
+| --- | --- | --- | --- | --- |
+| Firecracker | `func_800C6B74(2)` | A round disc of radius 4 at the cursor (49 columns; `func_800C6474`, radii {2, 4, 6} at `0x800E2AB0`) | Top brick per column | A 75-step countdown, the rocket, then the blast; it ripples outwards from the centre |
+| Dynamite | `func_800C6BE0` | Five sticks, each a disc of radius 2 (13 columns), aimed about 4 cells ahead, 4 to each side slightly ahead, and 2 to each side behind | Top brick per column per stick | The sticks land one after another, about 46 to 105 steps after use |
+| Bomb | `func_800C6B74(3)` | A disc of radius 6 (113 columns), then a second disc of radius 3 at the same centre on the layer it uncovered | About 2 bricks deep in the middle, 1 at the edge | As the Firecracker, the second blast a little later |
+| Magnet | `func_800C5CFC(1)` | Every 5 steps, one random cell of the 3 × 3 under the **live cursor** loses its column's top brick | Keeps digging while held over a spot | Starts after 40 steps; lasts while its model's animation runs (length not yet known) |
+| Ray Gun | `func_800C5CFC(3)` | Every 40 steps, all 9 columns of the 3 × 3 under the live cursor lose their top brick | One layer a step, down to the core | Starts after 120 steps; steerable like the Magnet; lasts while its animation runs |
+| Atom | `func_800C51F0` | The top brick of every column on the board: a 17 × 17 area round the cursor first (some cells flashing, then breaking; others at once, by a 16 × 16 table at `0x800E9190`), then the other quarters | The whole surface, one brick deep | A 40-step countdown, then a sweep of 432 steps |
+
+**In VS** (`0x8015D980` = 2, two-player) every magic acts as a Firecracker, and the rocket blasts a second time at the end of its animation.
+
+**Points: a magic scores nothing itself.** No routine on the magic's path writes the score (`+0x2AF8`) or the combo (`+0x2AFC`); the per-brick scorer is reached only from the ordinary match routine. What scores is what follows: combos and gravity set off by the hole, and the stage's clear. Consistent with play: on 10:5 the Firecracker, Dynamite and Bomb were followed by small combos only (50, 130 and 90, shown × 10), and the large totals in 1:1 came with the stage won.
+
+**Still to find:** how long the Magnet and Ray Gun last (their animation's length); the Dynamite sticks' exact landing cells; the Atom's table (which cells flash and which go at once). The Atom does not recolour the bricks into one combo, as it looked: it clears the cells directly (`func_8008CA34`).
