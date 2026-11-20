@@ -148,3 +148,11 @@ Each magic used once at the cursor on Casual 10:5 (seven layers), the board snap
 | Ray Gun | 86 | 6: 18, 5: 20, 4: 14, 3: 14, 2: 10, 1: 10 | The 3 × 3 under the cursor, drilled straight down to the bottom layer |
 
 All match the code's reading (Firecracker radius 4, Bomb radius 6 then 3, Dynamite five discs of radius 2 in a ring, Magnet and Ray Gun the 3 × 3 under the cursor, Atom the whole surface; whole bricks reaching past each pattern's edge). No magic scored by itself (the Ray Gun's run gained 1,000 from a core cell it uncovered). The heat maps are drawn from the logs by a script kept outside the repository; a magic lesson would show these shapes.
+
+## A striped board for the magic lessons (2026-11-20, the owner's idea)
+
+The owner's idea: a sphere whose layers alternate in colour, so a magic's damage shows at once how many layers down it went. Tried in the harness:
+
+1. `research_lab:stripes`: every cell a single cube of one colour per layer. **The game cleaned the board up at once** (single cells are not whole pieces) and counted the stage as won (score 261,000). Boards must be built from whole pieces.
+2. `research_lab:stripes2:N` on Casual 1:1 (its shapes: the 2 × 2 square, blue, and the lying bar, yellow), N layers (6; more than the stage's own one layer, accepted and drawn): layers alternating 2 × 2 squares (the one shape that tiles the 32 × 32 board) with **inert walls**: the board held, and looked clean, but **magic does not break walls**: the Ray Gun took 16 cells of the top layer and stopped at the wall layer beneath.
+3. Now: squares alternating with **lying bars** (ten bars a row, with a two-column strip of squares round the back of the sphere, opposite the cursor, to make up the 32 columns).

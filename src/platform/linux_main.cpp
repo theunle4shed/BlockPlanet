@@ -5642,6 +5642,120 @@ bool handle_profile_command(const std::string& command) {
                 research_fuse_at.reset();
                 continue;
             }
+            if (command->rfind("research_lab:stripes2", 0) == 0 && guest_rdram != nullptr) {
+                // research_lab:stripes2:N builds N layers (more than the stage's own).
+                const int forced_top = command->size() > 22 ? std::atoi(command->c_str() + 22) : 0;
+                // Second try (single cells were cleaned up by the game, and the
+                // stage counted as won): real pieces. Layers alternate between
+                // 2 x 2 squares (the one shape that tiles the board) and inert
+                // walls (value 423), to see whether a magic digs through walls.
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
+                                    entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
+                std::string kinds;
+                std::uint32_t square = 0, bar = 0;
+                for (int i = 0; i < 8; ++i) {
+                    const std::uint32_t r = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(i));
+                    const int m = std::int16_t(guest::load16(rd, r + 2));
+                    kinds += (i ? "," : "") + std::to_string(m);
+                    if (m == 33 && !square) square = r;
+                    if (m == 32 && !bar) bar = r;  // the lying bar (3 across)
+                }
+                if (!square) {
+                    std::fprintf(stdout, "{\"event\":\"research_lab\",\"lab\":\"stripes2\",\"error\":\"no square\",\"kinds\":[%s]}\n", kinds.c_str());
+                    std::fflush(stdout);
+                    continue;
+                }
+                const std::int16_t v0 = std::int16_t(guest::load16(rd, square));
+                int layout[9];
+                for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(rd, square + 0xA + 2u * std::uint32_t(k)));
+                int top = 1;
+                for (int layer = 1; layer < 9; ++layer)
+                    for (int c = 0; c < 1024; ++c)
+                        if (std::int16_t(guest::load16(rd, values + 2u * std::uint32_t(layer * 1024 + c))) > 0) top = std::max(top, layer);
+                if (forced_top >= 1 && forced_top <= 8) top = forced_top;
+                // The bar's cell numbers along its row, and the cursor (the
+                // squares' strip that makes up the width goes round the back).
+                int bar_num[3] = {};
+                if (bar)
+                    for (int x = 0; x < 3; ++x)
+                        for (int y = 0; y < 3; ++y) {
+                            const int n = std::int16_t(guest::load16(rd, bar + 0xA + 2u * std::uint32_t(x * 3 + y)));
+                            if (n > 0) bar_num[x] = n;
+                        }
+                const std::int16_t bar_v0 = bar ? std::int16_t(guest::load16(rd, bar)) : 0;
+                const int strip = (8 + std::int16_t(guest::load16(rd, 0x80110220u + 0x2B2A)) + 16) % 32;
+                // The square's cell number at each (x, y) within a 2 x 2 tile.
+                int num[2][2] = {};
+                for (int x = 0; x < 3; ++x)
+                    for (int y = 0; y < 3; ++y)
+                        if (layout[x * 3 + y] > 0 && x < 2 && y < 2) num[x][y] = layout[x * 3 + y];
+                for (int c = 0; c < 1024; ++c) {
+                    const int x = c % 32, y = c / 32;
+                    for (int layer = 1; layer < 9; ++layer) {
+                        const std::uint32_t at = std::uint32_t(layer * 1024 + c);
+                        if (layer > top) {
+                            guest::store16(rd, values + 2u * at, 0);
+                            guest::store32(rd, entries + 4u * at, 0);
+                            guest::store8(rd, masks + at, 0);
+                            continue;
+                        }
+                        const bool squares = (top - layer) % 2 == 0;
+                        const int rel = ((x - strip) % 32 + 32) % 32;  // 0, 1: the squares' strip; 2 to 31: ten bars a row
+                        if (squares || rel < 2 || !bar) {
+                            if (!squares && !bar) {
+                                guest::store16(rd, values + 2u * at, 423);
+                            } else {
+                                const int n = squares ? num[x % 2][y % 2] : num[rel % 2][y % 2];
+                                guest::store16(rd, values + 2u * at, std::int16_t(v0 + n - 1));
+                                guest::store32(rd, entries + 4u * at, square + 0x78u + 96u * std::uint32_t(n - 1));
+                            }
+                        } else {
+                            const int n = bar_num[(rel - 2) % 3];
+                            guest::store16(rd, values + 2u * at, std::int16_t(bar_v0 + n - 1));
+                            guest::store32(rd, entries + 4u * at, bar + 0x78u + 96u * std::uint32_t(n - 1));
+                        }
+                        guest::store8(rd, masks + at, layer == top ? 16 : 0);
+                    }
+                    guest::store8(rd, columns + std::uint32_t(c), std::uint8_t((top << 4) | top));
+                }
+                std::fprintf(stdout, "{\"event\":\"research_lab\",\"lab\":\"stripes2\",\"top\":%d,\"kinds\":[%s]}\n", top, kinds.c_str());
+                std::fflush(stdout);
+                continue;
+            }
+            if (*command == "research_lab:stripes" && guest_rdram != nullptr) {
+                // Research (2026-11-20, the owner's idea for the magic lessons):
+                // every layer of the stage one colour, alternating between the
+                // stage's first two piece colours, each cell a plain cube (the
+                // smooth single-block look, tile 81, as Minefield's cells), so a
+                // magic's damage shows how many layers down it went.
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
+                                    entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
+                constexpr std::uint32_t cube_table = 0x807F8400u;  // free upper memory, after Minefield's tables
+                const std::int16_t corners[8] = {81, 14, 94, 14, 81, 1, 94, 1};
+                for (int i = 0; i < 48; ++i) guest::store16(rd, cube_table + 2u * std::uint32_t(i), std::uint16_t(corners[i % 8]));
+                int top = 1;
+                for (int layer = 1; layer < 9; ++layer)
+                    for (int c = 0; c < 1024; ++c)
+                        if (std::int16_t(guest::load16(rd, values + 2u * std::uint32_t(layer * 1024 + c))) > 0) top = std::max(top, layer);
+                const std::int16_t mat[2] = {
+                    std::int16_t(guest::load16(rd, guest::load32(rd, 0x8014CBC8u) + 2)),
+                    std::int16_t(guest::load16(rd, guest::load32(rd, 0x8014CBC8u + 4u) + 2))};
+                for (int c = 0; c < 1024; ++c) {
+                    for (int layer = 1; layer < 9; ++layer) {
+                        const bool filled = layer <= top;
+                        guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), filled ? std::int16_t(mat[(top - layer) % 2] * 9) : 0);
+                        guest::store32(rd, entries + 4u * std::uint32_t(layer * 1024 + c), filled ? cube_table : 0u);
+                        guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), layer == top ? 16 : 0);
+                    }
+                    guest::store8(rd, masks + std::uint32_t(c), 0);
+                    guest::store8(rd, columns + std::uint32_t(c), std::uint8_t((top << 4) | top));
+                }
+                std::fprintf(stdout, "{\"event\":\"research_lab\",\"lab\":\"stripes\",\"top\":%d,\"materials\":[%d,%d]}\n", top, mat[0], mat[1]);
+                std::fflush(stdout);
+                continue;
+            }
             if (*command == "research_board" && guest_rdram != nullptr) {
                 // Filled cells per layer (0 the core), with the count of each value on the top layers.
                 const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
@@ -5661,7 +5775,7 @@ bool handle_profile_command(const std::string& command) {
                     const int a = guest::load8(guest_rdram, attrs + std::uint32_t(i)) & 0x60;
                     power += a == 0x40, crystal += a == 0x20;
                 }
-                out += ",\"power\":" + std::to_string(power) + ",\"crystal\":" + std::to_string(crystal) + "}";
+                out += "],\"power\":" + std::to_string(power) + ",\"crystal\":" + std::to_string(crystal) + "}";
                 std::fprintf(stdout, "%s\n", out.c_str());
                 std::fflush(stdout);
                 continue;
