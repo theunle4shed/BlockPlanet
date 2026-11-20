@@ -707,9 +707,13 @@ void show_hud(std::optional<blockplanet::ui::HudView> view) {
         v.score_best.clear(), v.best.clear(), v.time_delta.clear(), v.splits.clear();
         v.combo = 0, v.multiplier = -1, v.progress = -1.0f, v.drops_left = -1, v.slides_left = -1;
     }
-    // The Drop lesson's HUD: the next pieces and what is happening now.
+    // The Drop lesson's HUD: Training's layout (the owner, 2026-11-20): the
+    // next pieces in a row under the sphere (centred: Casual's camera), the
+    // lesson's text in the panel to its right (publish_game_text).
     if (view && drop_lesson_phase >= 1 && drop_lesson_phase <= 6) {
         auto& v = *view;
+        v.bottom_row = true;
+        v.row_column = 160.0f;
         v.show_lives = false;
         v.show_magic = false;
         v.mode = "Training";
@@ -2553,7 +2557,7 @@ void publish_game_text() {
         for (auto& t : texts)
             if (t.font == 1) t.x += shift;
     }
-    if ((!texts.empty() || box) && frame) {
+    if ((!texts.empty() || box || (drop_lesson_phase >= 2 && drop_lesson_phase <= 6)) && frame) {
         if (!view) {
             view = blockplanet::ui::HudView{};
             view->text_only = true;
@@ -2976,6 +2980,40 @@ void publish_game_text() {
                 const char f = family == ControllerFamily::Xbox ? 'x' : family == ControllerFamily::PlayStation ? 'p' : 'n';
                 panel.scroll_hint = family == ControllerFamily::Keyboard ? "[k:PgDn] Scroll" : std::string("[") + f + ":RS] Scroll";
             }
+            view->card_panel = panel;
+        }
+        // The Drop lesson's text (BlockPlanet's own lesson): as Training's
+        // panel, right of the sphere (centred in Casual, reaching about column
+        // 230), from its top to the HUD row's bottom, reaching out into a wide
+        // screen's margin: the lesson's name, what it teaches, then what is
+        // happening now.
+        if (!box && drop_lesson_phase >= 2 && drop_lesson_phase <= 6) {
+            const auto fx = [&](float x) { return (area_x + x / 320.0f * area_w) / frame->window_w; };
+            const auto fy = [&](float y) { return (frame->y + y / 240.0f * frame->h) / frame->window_h; };
+            const float left = fx(250.0f), right = std::min(0.98f, fx(430.0f));
+            blockplanet::ui::HudView::Panel panel;
+            panel.right = 1.0f - right;
+            panel.w = right - left;
+            panel.top = fy(46.0f);
+            panel.height = fy(232.0f) - fy(46.0f);
+            panel.tail = -1.0f;
+            constexpr const char* yellow = "#e8b818ff";
+            constexpr const char* orange = "#f5821fff";
+            using Block = blockplanet::ui::HudView::Panel::Block;
+            const auto heading = [&](const std::string& t) { panel.blocks.push_back(Block{true, {{t, yellow}}}); };
+            const auto para = [&](const std::string& t) { panel.blocks.push_back(Block{false, {{t, orange}}}); };
+            heading("Drop");
+            para("Your shadow is your next piece. Drop it onto two matching pieces and all three break.");
+            const int ph = drop_lesson_phase;
+            std::string move = buttons("%MOVE%");  // a d-pad symbol, or words for the keyboard ("the arrow keys")
+            if (move.find('[') == std::string::npos)
+                for (auto& ch : move) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+            if (ph == 2) heading("Watch"), para("The shadow moves onto the pair, then " + buttons("%A%") + " drops the piece.");
+            else if (ph == 3) heading("Watch"), para("All three break.");
+            else if (ph == 4) heading("Your turn"), para("Move your shadow onto the pair with " + move + ", then press " + buttons("%A%") + ".");
+            else if (ph == 5) heading("Not quite"), para("No match there, so the piece stacked up. Line your shadow up with the pair first.");
+            else heading("Well done"), para("All three broke.");
+            if (ph == 2 || ph == 3) panel.hint = "Watching\u2026";
             view->card_panel = panel;
         }
     }

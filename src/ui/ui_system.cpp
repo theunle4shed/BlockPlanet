@@ -815,7 +815,7 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         constexpr float scale = 1.3f;
         const float grow = (scale - 1.0f) / 2.0f * s.x;
         const float area_w = hud.picture_h * height * 4.0f / 3.0f;
-        const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width - (160.0f - 94.0f) / 320.0f * area_w;
+        const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width - (160.0f - hud.row_column) / 320.0f * area_w;
         const float lx = std::clamp(cx - s.x / 2.0f, margin + grow, std::max(margin + grow, width - margin - s.x - grow));
         const float ly = height - margin - s.y;
         left->SetProperty("left", px(lx));
