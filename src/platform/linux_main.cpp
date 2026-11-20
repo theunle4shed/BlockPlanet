@@ -3809,6 +3809,17 @@ void publish_audio_settings() {
     blockplanet::ui::set_setting("track", std::to_string(track));
 }
 
+// Training's completed marks: the game's lessons (chapter 0 of a mode) and
+// BlockPlanet's magic lessons (progress "magic_lessons": the magics done).
+bool training_done(const char* mode) {
+    const auto found = profile_data.progress.chapters_completed.find(mode);
+    return profile_save && found != profile_data.progress.chapters_completed.end() && found->second.count(0) != 0;
+}
+std::set<int> magic_lessons_done() {
+    const auto found = profile_data.progress.chapters_completed.find("magic_lessons");
+    return found == profile_data.progress.chapters_completed.end() ? std::set<int>{} : found->second;
+}
+
 // The fuse lab's automatic slide: the buttons to press now (see research_fuse_target).
 std::uint16_t research_fuse_buttons() {
     if (research_fuse_target == 0 || guest_rdram == nullptr) return 0;
@@ -5901,7 +5912,7 @@ bool handle_profile_command(const std::string& command) {
                 };
                 blockplanet::ui::set_text("chapters_title", "Training");
                 blockplanet::ui::set_text("chapters_subtitle", "Choose a lesson");
-                blockplanet::ui::set_list("chapters", training_lessons(done("rescue"), done("training_advanced")));
+                blockplanet::ui::set_list("chapters", training_lessons(done("rescue"), done("training_advanced"), magic_lessons_done()));
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
@@ -6135,6 +6146,14 @@ bool handle_profile_command(const std::string& command) {
                     if (magic_lesson_phase == 2 && std::int8_t(guest::load8(rd, pc + 0x702)) < 0) {
                         magic_lesson_phase = 3;
                         magic_lesson_at = now_m;
+                        // Done: marked in the profile, and the Training list
+                        // (the menus it returns to) refreshed.
+                        if (profile_save && profile_data.progress.chapters_completed["magic_lessons"].insert(magic_lesson).second) {
+                            profile_dirty = true;
+                            save_profile();
+                        }
+                        blockplanet::ui::set_list("chapters", training_lessons(training_done("rescue"), training_done("training_advanced"),
+                                                                               magic_lessons_done()));
                         // The results to show once play is left, whichever way.
                         pending_results = StageResults{};
                         pending_results->lesson = magic_lesson;

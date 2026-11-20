@@ -129,7 +129,8 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
 // (anyone can look one up by its title), each starting at that lesson
 // (lesson:T:L); then the topics the game's training does not cover yet, as
 // items marked Not started.
-std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done);
+std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done,
+                                                       const std::set<int>& magic_done = {});
 // The puzzles to choose from: each solved one (with its best time and fewest
 // moves, when known) and the next unsolved, up to `count`; the next is focused.
 // The game's all-capitals text in BlockPlanet's style: short labels (three

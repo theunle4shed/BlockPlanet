@@ -298,7 +298,7 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
     return {basics, advanced};
 }
 
-std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done) {
+std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done, const std::set<int>& magic_done) {
     struct Lesson { const char* id; const char* label; const char* group; const char* action; const char* description; const char* icon; };
     static const Lesson lessons[] = {
         {"basics", "The Basics", "Basics", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB"},
@@ -328,7 +328,9 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         {"magic_ray_gun", "Ray Gun", "Drills straight down to the core under your shadow."},
     };
     for (int k = 0; k < 6; ++k) {
-        blockplanet::ui::ListItem item{magics[k].id, magics[k].label, "Magic", "command:magic_lesson:" + std::to_string(k), true};
+        // (Done: "completed" beside the group, as the other menus mark a finished item.)
+        blockplanet::ui::ListItem item{magics[k].id, magics[k].label, magic_done.count(k) ? "Magic \u00B7 completed" : "Magic",
+                                       "command:magic_lesson:" + std::to_string(k), true};
         item.description = magics[k].description;
         item.icon = "\uE417";
         items.push_back(item);

@@ -196,6 +196,10 @@ int main(int argc, char** argv) {
     // The game's eight lessons, BlockPlanet's six magic lessons, then four topics not covered yet.
     assert(all.size() == 18 && all[0].focus && all[2].action == "command:lesson:1:3" && all[7].action == "command:lesson:3:1");
     assert(all[8].action == "command:magic_lesson:0" && all[13].action == "command:magic_lesson:5" && all[8].note == "Magic");
+    {
+        const auto marked = training_lessons(true, true, {0, 4});
+        assert(marked[8].note == "Magic \u00B7 completed" && marked[9].note == "Magic" && marked[12].note == "Magic \u00B7 completed");
+    }
     assert(training_lessons(true, false)[4].focus && all[14].enabled && all[14].action.empty() && all[14].classes == "rag-not-started");
 
     auto confirm = delete_confirmation(store, "1");
