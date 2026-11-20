@@ -801,8 +801,9 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
     const float dp = dp_ratio(height);
     const float margin = 24.0f * dp;
     if (hud.bottom_row && left != nullptr) {
-        // Training's row: at the bottom, centred under the sphere's side of the
-        // picture (a quarter of the way across), clear of Wheels on the right.
+        // Training's row: at the bottom, centred under the sphere (the owner's
+        // layout, 2026-11-20; Wheels is no longer drawn): the sphere's middle is
+        // the game's column 94 of 320, in the 4:3 area centred in the picture.
         static Rml::Vector2f last{0, 0};
         auto s = left->GetBox().GetSize(Rml::BoxArea::Border);
         if (s.x > 0 && s.y > 0) last = s; else s = last;
@@ -810,7 +811,8 @@ void place_hud_sides(const HudView& hud, float width, float height, Rml::Vector2
         // so it is kept on screen at that size.
         constexpr float scale = 1.3f;
         const float grow = (scale - 1.0f) / 2.0f * s.x;
-        const float cx = (hud.picture_x + hud.picture_w * 0.25f) * width;
+        const float area_w = hud.picture_h * height * 4.0f / 3.0f;
+        const float cx = (hud.picture_x + hud.picture_w / 2.0f) * width - (160.0f - 94.0f) / 320.0f * area_w;
         const float lx = std::clamp(cx - s.x / 2.0f, margin + grow, std::max(margin + grow, width - margin - s.x - grow));
         const float ly = height - margin - s.y;
         left->SetProperty("left", px(lx));

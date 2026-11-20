@@ -2740,12 +2740,13 @@ void publish_game_text() {
             // Wheels is no longer drawn (the owner, 2026-11-20: more room for
             // the instructions): the panel fills the right of the picture,
             // from the sphere's top (line 46) to the bottom of the HUD's row
-            // (line 232), from column 172 (clear of the sphere, which reaches
-            // column 164) to 312; no tail, nobody speaking.
+            // (line 232), from column 184 (clear of the sphere, which reaches
+            // about column 164, further as the lesson's camera moves) to 316;
+            // no tail, nobody speaking.
             static const bool keep_wheels = std::getenv("BLOCKPLANET_KEEP_WHEELS") != nullptr;
             if (!keep_wheels && box->kind != 1) {
-                panel.right = 1.0f - fx(312.0f);
-                panel.w = fx(312.0f) - fx(172.0f);
+                panel.right = 1.0f - fx(316.0f);
+                panel.w = fx(316.0f) - fx(184.0f);
                 panel.top = fy(46.0f);
                 panel.height = fy(232.0f) - fy(46.0f);
                 panel.tail = -1.0f;

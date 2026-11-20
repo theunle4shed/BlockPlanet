@@ -413,6 +413,12 @@ div { display: block; }
 #left.row > div { display: inline-block; vertical-align: top; }
 #left.row > :first-child { border-radius: 0dp; border-top-left-radius: 24dp; border-bottom-left-radius: 24dp; }
 #left.row > :last-child { border-radius: 0dp; border-top-right-radius: 24dp; border-bottom-right-radius: 24dp; }
+/* One group alone (Training's Next at first): rounded at both ends (the
+   last-child rule above would square its left end). */
+#left.row > :only-child { border-radius: 24dp; }
+/* Next keeps room for three pieces, so the row does not change width with
+   the number of shapes a lesson uses (the owner, 2026-11-20). */
+#left.row #next { min-width: 300dp; }
 #left.row .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
 #left.row .rule { padding: 14dp 10dp; height: 108dp; }
 #left.row .rule .line { width: 2dp; height: 108dp; }
