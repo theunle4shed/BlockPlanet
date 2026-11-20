@@ -201,6 +201,7 @@ std::optional<std::chrono::steady_clock::time_point> research_magic_press;
 int research_fuse_target = 0;  // 0 off, 1 B, 2 A (armed)
 int research_fuse_xy[2][2] = {};
 int research_fuse_steps = 3;  // up presses: the corridor's length
+int research_fuse_delay = 0;  // ms after the combo starts before the grab
 std::optional<std::chrono::steady_clock::time_point> research_fuse_at;
 bool final_skip = false;
 // An episode's last stage just cleared in a whole-episode Rescue run (1), or
@@ -3781,7 +3782,11 @@ std::uint16_t research_fuse_buttons() {
     const std::uint32_t pc = 0x80110220u;
     const auto now = std::chrono::steady_clock::now();
     if (!research_fuse_at) {
-        if (guest::load32(rd, pc + 0x2AFC) == 0) return 0;  // waiting for the combo
+        static std::optional<std::chrono::steady_clock::time_point> combo_seen;
+        if (guest::load32(rd, pc + 0x2AFC) == 0 && !combo_seen) return 0;  // waiting for the combo
+        if (!combo_seen) combo_seen = now;
+        if (now - *combo_seen < std::chrono::milliseconds(research_fuse_delay)) return 0;
+        combo_seen.reset();
         research_fuse_at = now;
         const int* xy = research_fuse_xy[research_fuse_target - 1];
         guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(xy[0] - 8)));
@@ -5512,7 +5517,11 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
                 continue;
             }
-            if ((*command == "research_lab:fuse" || *command == "research_lab_cursor") && guest_rdram != nullptr) {
+            if ((command->rfind("research_lab:fuse", 0) == 0 || *command == "research_lab_cursor") && guest_rdram != nullptr) {
+                // Options after "fuse": B (B a power piece too), H (the drop
+                // hole's cells flagged power, for a combo started on one).
+                const std::string opts = command->size() > 17 ? command->substr(17) : std::string();
+                const bool power_b = opts.find('B') != std::string::npos, power_hole = opts.find('H') != std::string::npos;
                 // Research (2026-11-20, the fuse lab): the combo lab's first
                 // combo with A a power piece (attribute 0x40 on its cells), and,
                 // beside B, an empty corridor running up (+y) to a place where
@@ -5573,6 +5582,8 @@ bool handle_profile_command(const std::string& command) {
                         }
                 };
                 hole(cx, cy);
+                if (power_hole)
+                    for (const auto& [c, n] : cells_at(cx, cy)) power[std::size_t(c)] = 1;
                 // A on the -x side (a fitting position with dx < 0, else the
                 // first), B on the +x side.
                 std::pair<int, int> fa = fit[0], fb = fit.size() > 1 ? fit[1] : fit[0];
@@ -5582,7 +5593,7 @@ bool handle_profile_command(const std::string& command) {
                 bx = cx + fb.first, by = cy + fb.second;
                 research_fuse_xy[0][0] = bx, research_fuse_xy[0][1] = by;
                 research_fuse_xy[1][0] = cx + fa.first, research_fuse_xy[1][1] = cy + fa.second;
-                put(bx, by, false);
+                put(bx, by, power_b);
                 // The corridor: B's shape moved up 1 to s cells, s one more than
                 // the largest row offset among the fits (so the end fits nothing
                 // B touches at its start).
@@ -5611,6 +5622,8 @@ bool handle_profile_command(const std::string& command) {
                     if (power[std::size_t(c)]) m |= 0x40;
                     guest::store8(rd, masks + std::uint32_t(1024 + c), m);
                 }
+                if (power_hole)  // the hole's cells: empty, flagged power
+                    for (const auto& [c, n] : cells_at(cx, cy)) guest::store8(rd, masks + std::uint32_t(1024 + c), 0x40);
                 std::fprintf(stdout, "{\"event\":\"research_lab\",\"lab\":\"fuse\",\"k\":%d,\"cursor\":[%d,%d],\"a\":[%d,%d],\"b\":[%d,%d],\"slide_up\":%d,\"e\":[%d,%d],\"g\":[%d,%d]}\n",
                              ki, cx, cy, cx + fa.first, cy + fa.second, bx, by, s_up, dx + fe.first, dy + fe.second, dx + fg.first, dy + fg.second);
                 std::fflush(stdout);
@@ -5618,6 +5631,7 @@ bool handle_profile_command(const std::string& command) {
             }
             if (command->rfind("research_fuse_auto:", 0) == 0) {
                 research_fuse_target = (*command)[19] == 'A' ? 2 : 1;
+                research_fuse_delay = command->size() > 21 ? std::atoi(command->c_str() + 21) : 0;  // research_fuse_auto:B:150
                 research_fuse_at.reset();
                 continue;
             }
