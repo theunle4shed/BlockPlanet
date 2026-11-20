@@ -289,11 +289,19 @@ constexpr int hearts_goal = 3;
 int hearts_target[2] = {0, 0};
 int hearts_slot = -1;
 std::uint16_t hearts_held = 0;
-bool hearts_aimed = false;
+bool hearts_aimed = false, hearts_aim_pending = false;
 // The drop timer set by the lesson, so the bar runs out in a few seconds (the
 // stage's own rate took over a minute): the game's value (+0x2408, counting up
 // to its limit, 6000) set from the time since the piece came.
 std::optional<std::chrono::steady_clock::time_point> hearts_timer_from;
+// The three good drops each with another shape (the owner: a blue, a yellow and
+// a red example): the stage's square (0) and bar (1), then the red T, put in
+// the stage's shape table as entry 2 for the lesson (the six kinds' records are
+// all built: 0x800E4508 points at them; the T is the sixth, material 37, red).
+int hearts_round = 0;
+std::uint32_t hearts_table2_saved = 0;
+int hearts_kinds_saved = -1;  // the stage's number of shapes (0x800E44B8), raised to 3 for the T
+int hearts_shape() { return hearts_round == 0 ? 0 : hearts_round == 1 ? 1 : 2; }
 bool slide_lesson_shown() {
     return (slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14) ||
            (slide_lesson_phase >= 20 && slide_lesson_phase <= 24);
@@ -576,6 +584,10 @@ void show_stage_results() {
     }
     if (r.lesson == 103) {
         slide_lesson_phase = -1, hearts_lesson = false;
+        if (hearts_table2_saved && guest_rdram) guest::store32(const_cast<std::uint8_t*>(guest_rdram), 0x8014CBC8u + 8u, hearts_table2_saved);
+        hearts_table2_saved = 0;
+        if (hearts_kinds_saved >= 0 && guest_rdram) guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x800E44B8u, std::uint16_t(hearts_kinds_saved));
+        hearts_kinds_saved = -1;
         blockplanet::ui::set_text("results_title", "Hearts and the Drop Timer Complete");
         blockplanet::ui::set_text("results_where", "Training \u00B7 The Basics");
         blockplanet::ui::set_text("results_line", "");
@@ -4336,6 +4348,7 @@ PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy, int p
     place(cx, cy, true);
     for (const int k : {fi, fj})
         if (k >= 0 && k < int(fit.size())) place(cx + sx * fit[std::size_t(k)].first, cy + sy * fit[std::size_t(k)].second, false);
+    if (pit != 0) place(cx + 16, cy, false);  // a spare on the far side, out of sight: the board never empty (see build_pit_board)
     // Face masks: the top, and each side facing an empty cell.
     for (int c = 0; c < 1024; ++c) {
         if (!filled[std::size_t(c)]) continue;
@@ -4407,7 +4420,12 @@ int build_pit_board(int x0, int y0, int w, int h, int index, const std::vector<s
             guest::store8(rd, columns + std::uint32_t(c), 0x00);
             guest::store16(rd, values + 2u * std::uint32_t(c), 87);
         }
-    for (const auto& [ox, oy] : origins)
+    // A spare piece on the far side of the sphere, out of sight: with every
+    // piece in the pit broken the board would be empty, which the game takes as
+    // the stage cleared (the owner saw its transition start mid-lesson).
+    auto all = origins;
+    all.push_back({x0 + w / 2 + 16, y0 + h / 2});
+    for (const auto& [ox, oy] : all)
         for (int x = 0; x < 3; ++x)
             for (int y = 0; y < 3; ++y) {
                 const int n = layout[x * 3 + y];
@@ -4581,20 +4599,15 @@ void hearts_new_pair() {
     tetrisphere::minefield_sphere::queue_game_thread_job([](std::uint8_t* g) {
         static std::mt19937 pick(std::random_device{}());
         const int cx = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2E));
-        int hx = std::uniform_int_distribution<int>(5, 6)(pick), hy = std::uniform_int_distribution<int>(-2, 2)(pick);
-        if (const char* fixed = std::getenv("BLOCKPLANET_HEARTS_SPOT")) std::sscanf(fixed, "%d,%d", &hx, &hy);  // tests: a fixed spot
-        // The pair on the side towards the board's middle (column 16), so the
-        // play area does not creep, drop by drop, to the seam at 31 and 0.
-        const bool mirrored = cx < 16;
-        if (mirrored) hx = 2 - hx;  // the shadow on the pair's other side (-3 or -4)
-        slide_origin[0] = cx - hx, slide_origin[1] = cy - hy;
-        std::vector<std::pair<int, int>> origins;
-        for (const auto& f : slide_finals) origins.push_back({slide_origin[0] + f[0], slide_origin[1] + f[1]});
-        const std::uint32_t rec = guest::load32(g, 0x8014CBC8u + 4u * std::uint32_t(slide_square));
-        int ax = 9, ay = 9;
-        for (int k = 0; k < 9; ++k)
-            if (std::int16_t(guest::load16(g, rec + 0xA + 2u * std::uint32_t(k))) > 0) ax = std::min(ax, k / 3), ay = std::min(ay, k % 3);
-        build_pit_board(slide_origin[0] + ax - 1 - (mirrored ? 4 : 0), slide_origin[1] + ay - 1 - 2, 8, 6, slide_square, origins);
+        // The gap the piece should land in, four or five cells from the shadow,
+        // on the side towards the board's middle (column 16), so the play area
+        // does not creep to the seam at 31 and 0; a row up or down for variety.
+        int dx = std::uniform_int_distribution<int>(4, 5)(pick), dy = std::uniform_int_distribution<int>(-1, 1)(pick);
+        if (const char* fixed = std::getenv("BLOCKPLANET_HEARTS_SPOT")) std::sscanf(fixed, "%d,%d", &dx, &dy);  // tests: a fixed gap
+        if (cx >= 16) dx = -dx;
+        for (int q = 0; q < 4; ++q) guest::store16(g, pc_ctx + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(hearts_shape()));
+        hearts_target[0] = cx + dx, hearts_target[1] = cy + dy;
+        build_pair_board(hearts_target[0], hearts_target[1], -1, -1, 1, 1, -1, cx, cy);
         guest::store32(g, pc_ctx + 0x2408, 0);  // the timer from the start
     });
 }
@@ -4602,7 +4615,7 @@ void hearts_new_pair() {
 // Hearts' demonstration, its second part: the shadow steered onto a square,
 // a pause, then A.
 std::uint16_t hearts_demo_buttons() {
-    if (slide_lesson_phase != 21 || hearts_demo_part != 2 || guest_rdram == nullptr || !hearts_demo_at) return 0;
+    if (slide_lesson_phase != 21 || hearts_demo_part != 2 || hearts_aim_pending || guest_rdram == nullptr || !hearts_demo_at) return 0;
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *hearts_demo_at).count();
     if (ms < 600) return 0;
     const int slot = int((ms - 600) / 300), within = int((ms - 600) % 300);
@@ -4941,6 +4954,7 @@ void begin_launch_presentation(LaunchMode mode) {
     loading_title = names[std::min<std::size_t>(std::size_t(mode), 8)];
     // Minefield plays in Rescue's mode: its own name on the loading cover.
     if (tetrisphere::minefield_sphere::armed()) loading_title = "Minefield";
+    else if (mode == LaunchMode::Rescue && (slide_lesson_phase >= 0 || magic_lesson_phase >= 0 || drop_lesson_phase >= 0)) loading_title = "Training";
     else if (mode == LaunchMode::Rescue) loading_title = variant_title(play_variant);
     // A restart from the pause keeps the menus the game was first started
     // from: the pause screen is not a place to come back to.
@@ -5923,6 +5937,21 @@ bool handle_profile_command(const std::string& command) {
             }
             if (*command == "pause_restart" && guest_rdram != nullptr) {
                 const bool restart_single_lesson = single_lesson.has_value();
+                // A BlockPlanet lesson starts again from its beginning (the
+                // owner, 2026-11-20: a restart left the stage's own sphere,
+                // the lesson still thinking its board was built): armed again,
+                // with Training's background for the stage it restarts.
+                if (slide_lesson_phase >= 0 || magic_lesson_phase >= 0 || drop_lesson_phase >= 0) {
+                    if (slide_lesson_phase >= 0) slide_lesson_phase = 0, slide_lesson_at.reset();
+                    if (magic_lesson_phase >= 0) magic_lesson_phase = 0, magic_lesson_at.reset();
+                    if (drop_lesson_phase >= 0) drop_lesson_phase = 0, drop_lesson_at.reset();
+                    pending_results.reset();
+                    if (slide_lesson_phase >= 0 || drop_lesson_phase >= 0) {  // (the magic lessons keep the stage's own)
+                        auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                        if (drop_lesson_saved_background < 0) drop_lesson_saved_background = guest::load16(rd, 0x800E94C4u);
+                        guest::store16(rd, 0x800E94C4u, guest::load16(rd, 0x800E949Cu));
+                    }
+                }
                 // Quit through the game's pause, then start the same place again.
                 const auto state = read_game_state(guest_rdram);
                 std::optional<LaunchMode> mode;
@@ -7098,6 +7127,13 @@ bool handle_profile_command(const std::string& command) {
             tetrisphere::minefield_sphere::set_lesson_hides_marker(slide_lesson_phase == 1 || slide_lesson_phase == 6 || slide_lesson_phase == 10 ||
                                                                    slide_lesson_phase == 14 || slide_lesson_phase == 20 || slide_lesson_phase == 24 ||
                                                                    drop_lesson_phase == 1);
+            // The stage's shape table and count put back once Hearts is over,
+            // however it ended (quit, restart into another lesson, done).
+            if (!(hearts_lesson && slide_lesson_phase >= 0) && guest_rdram != nullptr) {
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                if (hearts_table2_saved) guest::store32(rd, 0x8014CBC8u + 8u, hearts_table2_saved), hearts_table2_saved = 0;
+                if (hearts_kinds_saved >= 0) guest::store16(rd, 0x800E44B8u, std::uint16_t(hearts_kinds_saved)), hearts_kinds_saved = -1;
+            }
             // Casual's heart refill off while Hearts runs (the lesson keeps them
             // from running out), back on after.
             {
@@ -7173,8 +7209,9 @@ bool handle_profile_command(const std::string& command) {
                         guest::store32(rd, pc + 0x2408, raw);
                     }
                     // The piece in hand always the square, so every square can be grabbed.
-                    if (slide_square >= 0)
-                        for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
+                    const int held = hearts_lesson ? hearts_shape() : slide_square;
+                    if (held >= 0)
+                        for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(held));
                 }
                 // The drop stage begins: the board kept as it is (the player's
                 // pair), the shadow where it is.
@@ -7248,6 +7285,11 @@ bool handle_profile_command(const std::string& command) {
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
                         if (hearts_lesson) {
+                            if (!hearts_table2_saved) hearts_table2_saved = guest::load32(rd, 0x8014CBC8u + 8u);
+                            guest::store32(rd, 0x8014CBC8u + 8u, guest::load32(rd, 0x800E4508u + 4u * 5u));
+                            if (hearts_kinds_saved < 0) hearts_kinds_saved = guest::load16(rd, 0x800E44B8u);
+                            guest::store16(rd, 0x800E44B8u, 3);
+                            hearts_round = 0;
                             hearts_new_pair();
                             lesson_refill_hearts(rd);
                             slide_lesson_phase = 20, slide_lesson_at = now_m;
@@ -7413,7 +7455,8 @@ bool handle_profile_command(const std::string& command) {
                         if (b & 0x8000u) ++hearts_page, slide_choice_armed = false;
                     } else if (b & 0x8000u) {
                         lesson_wait_release = true;
-                        hearts_good = 0, hearts_note.clear(), hearts_bricks = -1;
+                        hearts_good = 0, hearts_note.clear(), hearts_bricks = -1, hearts_round = 0;
+                        hearts_new_pair();
                         guest::store32(rd, pc + 0x2408, 0);
                         slide_lesson_phase = 22, slide_lesson_at = now_m;
                     } else if (b & 0x4000u) {
@@ -7448,17 +7491,17 @@ bool handle_profile_command(const std::string& command) {
                         if (part_ms > 3000 && !tetrisphere::minefield_sphere::game_thread_job_pending()) {
                             hearts_new_pair();
                             hearts_demo_part = 2, hearts_demo_at = now_m, hearts_slot = -1, hearts_held = 0, hearts_aimed = false;
-                            hearts_target[0] = -99;
+                            hearts_aim_pending = true;
                         }
                     } else if (hearts_demo_part == 2) {
                         // Aimed once the new pair is in place.
-                        if (hearts_target[0] == -99 && !tetrisphere::minefield_sphere::game_thread_job_pending()) {
-                            const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
-                            if (!slide_nearest_square(cx, cy, hearts_target)) hearts_target[0] = cx, hearts_target[1] = cy;
+                        if (hearts_aim_pending && !tetrisphere::minefield_sphere::game_thread_job_pending()) {
+                            hearts_aim_pending = false;  // the gap, set as the pair was built
                             hearts_demo_at = now_m;
                         }
                         if (part_ms > 15000) hearts_demo_part = 3, hearts_demo_at = now_m;
                     } else if (part_ms > 4000 && guest::load32(rd, pc + 0x2AFC) == 0) {
+                        hearts_round = 0;
                         hearts_new_pair();
                         lesson_refill_hearts(rd);
                         slide_lesson_phase = 20, slide_lesson_at = now_m;
@@ -7473,12 +7516,13 @@ bool handle_profile_command(const std::string& command) {
                             hearts_score = guest::load32(rd, pc + 0x2AF8), hearts_bricks = count_bricks(), hearts_before = hearts;
                     } else if (guest::load32(rd, pc + 0x2AF8) != hearts_score) {
                         ++hearts_good;
-                        hearts_note = "Good drop: all three broke.";
+                        hearts_round = std::min(2, hearts_good);  // the next shape
+                        hearts_note = hearts_good < hearts_goal ? "Good drop! Now another shape." : "Good drop: all three broke.";
                         slide_lesson_phase = 23, slide_lesson_at = now_m;
                     } else if (hearts < hearts_before) {
                         if (hearts <= 0) {
                             hearts_note = "Out of hearts! In a game, that's game over. Let's start again.";
-                            hearts_good = 0;
+                            hearts_good = 0, hearts_round = 0;
                         } else {
                             hearts_note = "No match there, so a heart was lost.";
                         }
@@ -7800,6 +7844,8 @@ bool handle_profile_command(const std::string& command) {
                 // Training's lessons go back to Training's menu (its screen's file title is another mode's).
                 if (guest::load16(guest_rdram, 0x800E44A8) == 3 && !launch_path.empty() && launch_path.back().first == "chapters")
                     return "Exit to Training Menu";
+                // BlockPlanet's lessons play on a Rescue stage but go back to Training's list.
+                if (slide_lesson_phase >= 0 || magic_lesson_phase >= 0 || drop_lesson_phase >= 0) return "Exit to Training Menu";
                 if (!launch_path.empty() && !launch_place.empty()) return "Exit to " + blockplanet::ui::menu_place(launch_place);
                 // Lines' Campaign list is the same screen as Rescue's (titled Rescue).
                 if (state_mode_now == 9 && (launch_path.empty() || launch_path.back().first == "chapters")) return "Exit to Lines Menu";
