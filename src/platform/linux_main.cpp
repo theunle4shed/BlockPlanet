@@ -5222,6 +5222,37 @@ bool handle_profile_command(const std::string& command) {
                 research_magic_press = std::chrono::steady_clock::now() + std::chrono::milliseconds(800);
                 continue;
             }
+            if ((*command == "research_snap" || *command == "research_diff") && guest_rdram != nullptr) {
+                // Research: research_snap keeps the board; research_diff logs each
+                // cell emptied since, as [x, y, layer], with the cursor and the
+                // magic's aim (+0x2B48/+0x2B4C, if set).
+                static std::vector<std::int16_t> snap;
+                const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
+                if (*command == "research_snap") {
+                    snap.assign(9 * 1024, 0);
+                    for (int i = 0; i < 9 * 1024; ++i) snap[std::size_t(i)] = std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(i)));
+                    continue;
+                }
+                const std::uint32_t pc = 0x80110220u;
+                std::string out = "{\"event\":\"research_diff\",\"cursor\":[" +
+                                  std::to_string(8 + std::int16_t(guest::load16(guest_rdram, pc + 0x2B2A))) + "," +
+                                  std::to_string(8 + std::int16_t(guest::load16(guest_rdram, pc + 0x2B2E))) + "],\"aim\":[" +
+                                  std::to_string(std::int16_t(guest::load16(guest_rdram, pc + 0x2B48))) + "," +
+                                  std::to_string(std::int16_t(guest::load16(guest_rdram, pc + 0x2B4C))) + "],\"gone\":[";
+                bool first = true;
+                for (int i = 0; i < 9 * 1024 && i < int(snap.size()); ++i) {
+                    const std::int16_t v = std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(i)));
+                    if (snap[std::size_t(i)] > 0 && v <= 0) {
+                        out += std::string(first ? "" : ",") + "[" + std::to_string(i % 32) + "," + std::to_string((i % 1024) / 32) + "," +
+                               std::to_string(i / 1024) + "]";
+                        first = false;
+                    }
+                }
+                out += "]}";
+                std::fprintf(stdout, "%s\n", out.c_str());
+                std::fflush(stdout);
+                continue;
+            }
             if (*command == "research_board" && guest_rdram != nullptr) {
                 // Filled cells per layer (0 the core), with the count of each value on the top layers.
                 const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);

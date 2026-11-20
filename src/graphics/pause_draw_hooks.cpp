@@ -718,6 +718,19 @@ extern "C" bool blockplanet_skip_orb_effects(std::uint8_t*, recomp_context*) {
     return !keep && hud_hidden.load(std::memory_order_relaxed);
 }
 
+// Research (2026-11-20): each magic blast's centre and size, from
+// func_800C6474's arguments (a0, a1, a2 as s16, a3 the kind), with player 1's
+// cursor cell, to see where each Dynamite stick lands.
+extern "C" void blockplanet_blast_log(std::uint8_t* rdram, recomp_context* ctx) {
+    static const bool log = std::getenv("BLOCKPLANET_BLAST_LOG") != nullptr;
+    if (!log) return;
+    using namespace tetrisphere::guest;
+    std::fprintf(stdout, "{\"event\":\"magic_blast\",\"a0\":%d,\"a1\":%d,\"a2\":%d,\"kind\":%u,\"cursor\":[%d,%d]}\n",
+                 int(std::int16_t(ctx->r4)), int(std::int16_t(ctx->r5)), int(std::int16_t(ctx->r6)), unsigned(ctx->r7 & 0xFF),
+                 8 + int(std::int16_t(load16(rdram, 0x80110220u + 0x2B2A))), 8 + int(std::int16_t(load16(rdram, 0x80110220u + 0x2B2E))));
+    std::fflush(stdout);
+}
+
 extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
     // With models kept (the GAME OVER scene), only the HUD routine's own
     // models (the next pieces, the bowl) stay hidden.

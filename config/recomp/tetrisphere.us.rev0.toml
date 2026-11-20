@@ -1005,3 +1005,9 @@ text = "blockplanet_rng_draw(rdram, ctx);"
 func = "func_8002A870"
 before_vram = 0x8002A894
 text = "blockplanet_stage_record_edit(rdram, ctx);"
+
+# Research (2026-11-20, where each magic blast lands): the blast routine's
+# arguments, logged with BLOCKPLANET_BLAST_LOG=1.
+[[patches.hook]]
+func = "func_800C6474"
+text = "blockplanet_blast_log(rdram, ctx);"

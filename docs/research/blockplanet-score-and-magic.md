@@ -61,6 +61,18 @@ Use is dispatched in `func_800C719C` by the held magic: three routines serve the
 
 **Points: a magic scores nothing itself.** No routine on the magic's path writes the score (`+0x2AF8`) or the combo (`+0x2AFC`); the per-brick scorer is reached only from the ordinary match routine. What scores is what follows: combos and gravity set off by the hole, and the stage's clear. Consistent with play: on 10:5 the Firecracker, Dynamite and Bomb were followed by small combos only (50, 130 and 90, shown × 10), and the large totals in 1:1 came with the stage won.
 
-**Still to find:** the Dynamite sticks' exact landing cells; the Atom's table (which cells flash and which go at once). The Atom does not recolour the bricks into one combo, as it looked: it clears the cells directly (`func_8008CA34`).
+**Still to find:** the Atom's table (which cells flash and which go at once). The Atom does not recolour the bricks into one combo, as it looked: it clears the cells directly (`func_8008CA34`).
 
 **How long the Magnet and Ray Gun last (measured 2026-11-20, Casual 10:5, `BLOCKPLANET_SCORE_LOG=1`, which now logs the magic's flag `+0x1269` and the time):** the Magnet is active for **4.2 s** (about 250 steps: after its 40-step start, about 42 picks of a random cell of the 3 × 3, which took 73 cells from six layers where held still), the Ray Gun for **7.1 s** (about 425 steps: after its 120-step start, about 7 digs of the whole 3 × 3, which took it down through all seven layers to the bottom one). The test machine drew 14 frames a second; the game counts these in its real-time steps, as the drop timer, so the times should hold at any frame rate (to confirm on a faster machine).
+
+**Where the Dynamite sticks land (measured 2026-11-20, `BLOCKPLANET_BLAST_LOG=1`, a hook on the blast routine `func_800C6474`, whose first two arguments are the blast's centre in 1/256 of a cell):** the five sticks land in a ring round the cursor, never on it, the same offsets each time (two uses, the cursor at 8,8 and at 5,10), in board cells:
+
+| Stick | Offset from the cursor (x, y) | On screen (moving right lowers x, up raises y) |
+| --- | --- | --- |
+| 1 | 0, −3.1 | 3 below |
+| 2 | −3.8, −1.8 | about 4 right, 2 below |
+| 3 | +4.6, −2.2 | about 4.5 left, 2 below |
+| 4 | −2.7, +2.7 | about 2.7 up and right |
+| 5 | +3.3, +3.3 | about 3.3 up and left |
+
+They match the code's flight steps (1/256 of a cell a step) carried on until each stick goes off. Each blast is a disc of radius 2 taking whole bricks, so the cursor's own cell is reached only by bricks that stick into a disc. The blasts' third argument rose with each stick (1,400 to 1,872 in the first use): perhaps a clock, not yet identified.
