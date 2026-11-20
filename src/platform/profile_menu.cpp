@@ -300,7 +300,7 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
 
 std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done, const std::set<int>& magic_done) {
     // Grouped under headers (the owner's layout, 2026-11-20): The Basics,
-    // Magic, Advanced, Other Modes. A header is a disabled item, so the
+    // Magic, Advanced, Other Modes; a lesson builds on those above it. A header is a disabled item, so the
     // focus passes over it. Lessons not built yet are listed, marked Not started.
     struct Lesson { const char* id; const char* label; const char* action; const char* description; const char* icon; int magic; };
     struct Group { const char* id; const char* title; std::vector<Lesson> lessons; };
@@ -308,11 +308,12 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         {"group_basics", "The Basics", {
             {"basics", "Slide and Drop", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB", -1},
             {"lives", "Lives", "command:lesson:1:2", "Your hearts, and how a drop that matches nothing costs one.", "\uE0F5", -1},
+            {"drop_timer", "Drop Timer", "", "When your brick drops by itself, and how the bar warns you.", "", -1},
             {"rubble", "Rubble", "", "The small purple blocks: sliding into them, and turning them into a brick.", "", -1},
             {"combos", "Combos", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4", -1},
-            {"magic", "Magic", "command:lesson:1:4", "A combo of 20 or more earns magic, and how to use it.", "\uE417", -1},
         }},
         {"group_magic", "Magic", {
+            {"magic", "Earning Magic", "command:lesson:1:4", "A combo of 20 or more earns magic, and how to use it.", "\uE417", -1},
             {"magic_firecracker", "Firecracker", "command:magic_lesson:0", "A round patch of the top layer round your shadow.", "\uE417", 0},
             {"magic_dynamite", "Dynamite", "command:magic_lesson:1", "Five small blasts in a ring round your shadow.", "\uE417", 1},
             {"magic_magnet", "Magnet", "command:magic_lesson:2", "Pulls bricks out from under your shadow, as deep as you hold it.", "\uE417", 2},
@@ -322,11 +323,13 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             {"mystery", "Mystery Blocks", "", "The flickering yellow and red blocks that give magic.", "", -1},
         }},
         {"group_advanced", "Advanced", {
-            {"x_count", "X Count", "command:lesson:2:2", "The multiplier on your combo score.", "\uE1B2", -1},
+            // Each builds on the one before (2026-11-20): a fuse needs a power
+            // brick, and the X count adds up gravity combos and fuses.
             {"gravity", "Gravity Combos", "", "When bricks fall into a new match during a combo.", "", -1},
-            {"fuse", "Fuse Combos", "command:lesson:2:3", "Slide a flashing brick into a match to keep a combo going.", "\uE0D7", -1},
             {"crystal", "Crystal Bricks", "command:lesson:2:1", "Turn a group of crystal bricks into a power brick.", "\uE242", -1},
             {"power_scoring", "Power Bricks and Scoring", "", "How power bricks make a combo pay far more.", "", -1},
+            {"fuse", "Fuse Combos", "command:lesson:2:3", "Slide a flashing brick into a match to keep a combo going.", "\uE0D7", -1},
+            {"x_count", "X Count", "command:lesson:2:2", "The multiplier on your combo score.", "\uE1B2", -1},
         }},
         {"group_other", "Other Modes", {
             {"puzzle", "Puzzle Controls", "command:lesson:3:1", "Zooming and the other controls for puzzles.", "\uE1B6", -1},
