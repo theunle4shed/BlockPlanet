@@ -1,4 +1,46 @@
-# Training redesign (proposal, 2026-11-07)
+# Training redesign
+
+## The fresh approach (decided 2026-11-20)
+
+The owner's decision, after reading the script review (`docs/research/training-script-review.md`): the original lessons are not patched further. Their short pages (a couple of sentences, press A, a couple more), the tutor and the scripted steps come from the original system's limits. BlockPlanet builds its own lessons from scratch, laid out by what Rescue asks of the player. The original lessons stay playable, but stop being the main path. The proposal below (2026-11-07) is kept as the record of what was done to the original lessons.
+
+**Every lesson follows one pattern:**
+
+1. **Show.** A short demonstration plays by itself on a prepared board, showing which button is pressed and when. Start skips it.
+2. **Reset.** The board goes back to how the demonstration started.
+3. **Your turn.** The player does the same thing once, on a board set up so they can succeed.
+4. **Check.** BlockPlanet sees the goal reached (from the game's counters: bricks broken, combo size, fuse and gravity counts, hearts, magic used) and shows "<Lesson> Complete": Next, Try Again, Back to Training. If the goal is missed (a heart lost, the magic wasted), the board is set up again with a short hint.
+
+One idea per lesson, under a minute, one or two sentences of text (no paging), no tutor, and "lesson" rather than "level".
+
+**The lessons, by what the player needs and when:**
+
+| Group | Lesson | Show | Your turn | What the player is told (draft) |
+| --- | --- | --- | --- | --- |
+| The Basics | The Goal | The sphere is dug down to the picture | (none) | Clear the bricks over the core to uncover the picture. |
+| | Drop | The shadow moves onto a matching pair; A drops a third; all three break | Drop onto a pair the shadow is already over, then find one more | Your shadow is your next piece. Drop it onto two matching pieces to break all three. |
+| | Slide | B held on a piece, slid beside its twin, then dropped on | Line up a pair by sliding, then drop | Hold B on a piece to slide it. Line up a pair, then drop on it. |
+| | Hearts and the Drop Timer | A drop with no match lands on top and costs a heart; the bar runs out and the piece falls by itself | Three good drops before the bar empties | Drop on a match before the bar runs out. A drop with no match costs a heart and leaves rubble to clear. |
+| Getting Faster | Combos | More than three pieces break at once; power pieces left behind | Make a combo of four or more | Break more than three at once for a combo. Smaller combos leave power pieces. |
+| | Earning Magic | A combo of 20+ earns a magic, which is fired | Make one on a prepared board, then fire it | A combo of 20 or more earns a magic. Press [Magic] to use it. |
+| | The six magics | (built: one card, fire it, see what it digs) | | |
+| Scoring Big | Power Pieces and Fuse Combos | A flashing power piece is slid into line and starts a new combo | Make a fuse combo | Breaking power pieces can still be slid. Line one up to start a fuse combo. |
+| | Gravity Combos | A piece slid out from under another; the top one falls into a match | Make a gravity combo | Slide a piece out from under another; if the top one falls into a match, that's a gravity combo. |
+| | X Count | Fuse and gravity combos raise the X count; the payout grows | Reach X3 | Every fuse or gravity combo raises your X count, which multiplies your combo points. |
+| | Crystal Bricks | B held over a crystal group turns it into a power piece | Make one and use it | Hold B over crystals to turn them into a power piece. |
+| Other Modes | Puzzle Controls, Lines | One demonstration, one go each | | (VS: one line saying every magic acts as a Firecracker there) |
+
+**Hints in play as well as lessons.** In the first Rescue stages, one-line hints at the moment they matter: the first time the drop bar is nearly empty, the first heart lost (and why), the first magic earned.
+
+**What it needs:**
+
+- **Boards:** the research tools already build boards from whole pieces, give magic and read the counters (`research_lab:*`, `magic_lesson`, `docs/research/blockplanet-score-and-magic.md`).
+- **Demonstrations:** new. BlockPlanet plays the move itself through the controller (as `research_fuse_auto` does and the test harness does), so the game's own rules apply; a button picture lights as each press is made. The same driver later serves the computer opponent's moves.
+- **Reset:** the board saved before the demonstration and written back after it.
+
+**Order:** The Basics first (Drop as the template lesson: show, reset, your turn, check), then the rest in the same pattern.
+
+## Proposal (2026-11-07): the original lessons
 
 From the owner's notes after seeing Training with BlockPlanet's speech panel: there is too much on screen for a new player; HUD elements should be in Story's style, at the bottom, and shown only once introduced; the N64 pad picture should go (done); the bubble should be narrower and fit its text (done); pages that only show more text should be combined and scrolled; the heading needs weight (done).
 
