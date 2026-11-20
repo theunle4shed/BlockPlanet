@@ -1011,3 +1011,9 @@ text = "blockplanet_stage_record_edit(rdram, ctx);"
 [[patches.hook]]
 func = "func_800C6474"
 text = "blockplanet_blast_log(rdram, ctx);"
+
+# Research (2026-11-20, which bricks raise the combo's steps): each broken
+# brick's record as it scores, logged with BLOCKPLANET_BRICK_SCORE_LOG=1.
+[[patches.hook]]
+func = "func_800C7E5C"
+text = "blockplanet_brick_score_log(rdram, ctx);"

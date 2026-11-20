@@ -862,7 +862,7 @@ void update_hud() {
     // (+0x2AEC), the held magic (+0x702) and the hearts (+0x2D7E).
     if (static const bool score_log = std::getenv("BLOCKPLANET_SCORE_LOG") != nullptr; score_log && guest_rdram != nullptr) {
         const std::uint32_t p = 0x80110220u;
-        char line[400];
+        char line[600];
         std::snprintf(line, sizeof line,
                       "\"score\":%u,\"combo_pts\":%u,\"copy\":%u,\"second\":%u,\"steps\":%d,\"bricks\":%d,\"gravity\":%d,"
                       "\"fuse\":%d,\"best\":%u,\"meter\":%d,\"magic\":%d,\"hearts\":%d,\"magic_on\":%d",
@@ -872,6 +872,10 @@ void update_hud() {
                       std::int16_t(guest::load16(guest_rdram, p + 0x2AE8)), guest::load32(guest_rdram, p + 0x2C70),
                       std::int16_t(guest::load16(guest_rdram, p + 0x2AEC)), std::int8_t(guest::load8(guest_rdram, p + 0x702)),
                       std::int16_t(guest::load16(guest_rdram, p + 0x2D7E)), guest::load8(guest_rdram, p + 0x1269));
+        // The piece queue's first 8 slots (+0x2374; 22 is the "?" piece).
+        std::string queue;
+        for (int k = 0; k < 8; ++k) queue += (k ? "," : "") + std::to_string(std::int16_t(guest::load16(guest_rdram, p + 0x2374 + 2u * k)));
+        std::snprintf(line + std::strlen(line), sizeof line - std::strlen(line), ",\"queue\":[%s]", queue.c_str());
         static std::string last;
         if (last != line) {
             last = line;
@@ -5276,7 +5280,14 @@ bool handle_profile_command(const std::string& command) {
                     }
                     out += (layer ? "," : "") + std::to_string(filled);
                 }
-                out += "]}";
+                // Power and crystal pieces: the per-cell attribute bytes (0x800E44D4), mask 0x60.
+                const std::uint32_t attrs = guest::load32(guest_rdram, 0x800E44D4u);
+                int power = 0, crystal = 0;
+                for (int i = 0; i < 9 * 1024; ++i) {
+                    const int a = guest::load8(guest_rdram, attrs + std::uint32_t(i)) & 0x60;
+                    power += a == 0x40, crystal += a == 0x20;
+                }
+                out += ",\"power\":" + std::to_string(power) + ",\"crystal\":" + std::to_string(crystal) + "}";
                 std::fprintf(stdout, "%s\n", out.c_str());
                 std::fflush(stdout);
                 continue;

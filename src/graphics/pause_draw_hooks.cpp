@@ -731,6 +731,25 @@ extern "C" void blockplanet_blast_log(std::uint8_t* rdram, recomp_context* ctx) 
     std::fflush(stdout);
 }
 
+// Research (2026-11-20): each broken brick's record as func_800C7E5C scores
+// it (a0): its fields +0x4, +0x6 (the cell's state), +0xA, +0xC, +0xE, the
+// flags +0x10 (0x40 raises the combo's steps) and +0x12, with the steps,
+// gravity and fuse counts and the combo's points before it.
+extern "C" void blockplanet_brick_score_log(std::uint8_t* rdram, recomp_context* ctx) {
+    static const bool log = std::getenv("BLOCKPLANET_BRICK_SCORE_LOG") != nullptr;
+    if (!log) return;
+    using namespace tetrisphere::guest;
+    const std::uint32_t r = std::uint32_t(ctx->r4), p = 0x80110220u;
+    std::fprintf(stdout,
+                 "{\"event\":\"brick_score\",\"f4\":%d,\"state\":\"%04X\",\"fA\":%d,\"fC\":%d,\"fE\":%d,\"flags\":\"%04X\",\"f12\":%d,"
+                 "\"steps\":%d,\"gravity\":%d,\"fuse\":%d,\"combo_pts\":%u}\n",
+                 int(std::int16_t(load16(rdram, r + 4))), unsigned(load16(rdram, r + 6)), int(std::int16_t(load16(rdram, r + 0xA))),
+                 int(std::int16_t(load16(rdram, r + 0xC))), int(std::int16_t(load16(rdram, r + 0xE))), unsigned(load16(rdram, r + 0x10)),
+                 int(std::int16_t(load16(rdram, r + 0x12))), int(std::int16_t(load16(rdram, p + 0x24BC))),
+                 int(std::int16_t(load16(rdram, p + 0x2AE6))), int(std::int16_t(load16(rdram, p + 0x2AE8))), load32(rdram, p + 0x2AFC));
+    std::fflush(stdout);
+}
+
 extern "C" bool blockplanet_skip_queue_model(std::uint8_t*, recomp_context*) {
     // With models kept (the GAME OVER scene), only the HUD routine's own
     // models (the next pieces, the bowl) stay hidden.

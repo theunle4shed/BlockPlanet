@@ -77,6 +77,7 @@ void blockplanet_hud_end(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_skip_queue_model(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_skip_orb_effects(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_blast_log(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_brick_score_log(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_magic_box_active();

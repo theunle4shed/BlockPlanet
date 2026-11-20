@@ -84,3 +84,17 @@ They match the code's flight steps (1/256 of a cell a step) carried on until eac
 3. last, about 2 to 3 s in, the square in view round the cursor, **from its edge inwards: the cell under the cursor breaks last**, as the dome's values say.
 
 So the table times the collapse of the part of the sphere the player sees (the middle last), rather than choosing which cells go.
+
+## Power pieces and the combo's steps (read 2026-11-20)
+
+**Flag 0x40 is a power piece.** Each board cell has an attribute byte (array at the pointer `0x800E44D4`, 9 layers of 1,024); its bits `0x60` hold 0x40 for a **power piece** and 0x20 for a **crystal piece** (Training's lessons describe both). `func_8008AF00` returns that byte & 0x60, and the match routine (`func_8009423C`) copies it into each broken brick's record. A broken brick also gets 0x40 when it fell by gravity, then matched, and touches a power piece (the check `func_800C8A8C` looks at listed neighbours and the cell below).
+
+So **the combo's steps rise when power pieces break** (and gravity-fallen bricks beside them): each such brick adds one step and scores 100 × steps (at most 10), and every ordinary brick after it scores 10 × (steps + 1). A combo started on a power piece therefore pays far more per brick, and lasts longer.
+
+**Where power pieces come from:** when a combo of 1 to 19 bricks ends (in every mode but Puzzle), after about a second its brick count is added to `+0x5A0`, and `func_800CD3B8` launches that many small objects (`func_800C18F8`) that each land on a brick and mark it a power piece (with a sound). Crystal pieces come the same way from `+0x5A2`. (A combo of 20 or more gives magic instead.)
+
+## The second total: a mid-combo pop-up
+
+`+0x2B04` gains the same points as the combo for most bricks (record `+0x12` set: ordinary matches; not a dropped piece that makes no fuse, nor the gravity-fallen bricks beside power pieces). It is only for show: `func_800B363C` adds to a floating 3D number (up to 4 at once, rising for 45 steps), it never touches the score. When a combo runs for 120 steps without a new counted brick (`+0x2B0A`), `func_800C7BE4(1)` floats the subtotal × 10 and clears it; at the combo's end the whole payout floats instead and the subtotal is dropped. So long combos (power combos) show part-totals as they go.
+
+**The large grey number** (for example "6000" after a combo of about 59,000) is probably one of these: a mid-combo subtotal, or `func_800C7DB4`, which adds 1,000 + 1,000 × (gravity + fuse) to the score and floats it (gravity + fuse = 5 gives exactly 6,000); it is called from `func_800AA5A8` and six related functions (perhaps uncovering parts of the core). Not yet confirmed in play.
