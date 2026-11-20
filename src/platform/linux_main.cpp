@@ -4604,7 +4604,11 @@ void hearts_new_pair() {
         // does not creep to the seam at 31 and 0; a row up or down for variety.
         int dx = std::uniform_int_distribution<int>(4, 5)(pick), dy = std::uniform_int_distribution<int>(-1, 1)(pick);
         if (const char* fixed = std::getenv("BLOCKPLANET_HEARTS_SPOT")) std::sscanf(fixed, "%d,%d", &dx, &dy);  // tests: a fixed gap
-        if (cx >= 16) dx = -dx;
+        // On the shadow's left on screen (higher columns; the owner: the pair on
+        // the right sat at the sphere's edge by the text panel); the lesson
+        // starts at column 10, so three drops reach about 22, clear of the seam;
+        // past 20, the right instead.
+        if (cx > 20) dx = -dx;
         for (int q = 0; q < 4; ++q) guest::store16(g, pc_ctx + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(hearts_shape()));
         hearts_target[0] = cx + dx, hearts_target[1] = cy + dy;
         build_pair_board(hearts_target[0], hearts_target[1], -1, -1, 1, 1, -1, cx, cy);
@@ -7279,7 +7283,7 @@ bool handle_profile_command(const std::string& command) {
                         // shadow and moved with it, and a square left across the
                         // seam was removed by the game (a false miss). Moved
                         // while the sphere flies in, so the swing is not seen.
-                        guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(16 - 8)));
+                        guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t((hearts_lesson ? 10 : 16) - 8)));
                         slide_square = square_piece_index();
                         if (slide_square < 0) slide_square = 0;
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit

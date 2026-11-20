@@ -556,3 +556,7 @@ On the title (the box art), in full screen on a very wide display (about 32:9), 
 - **A new magic appeared after firing one** (the Bomb lesson: a rocket in the item box after the bomb). After the lesson's magic is used, no other magic may arrive: hold the magic meter at zero and clear any magic the game gives.
 - **The shadow is sometimes a bar on a board of squares.** Lock the piece in hand for these lessons (the queue held to one shape, as Slide and Drop does, or the wildcard), so the shadow always matches the board.
 - **Ray Gun Complete: Back to Training does not work.** The last magic's results panel (no Next item) cannot get back to the Training list; check its items and focus, and the return path (lessons now return to Training's list, as Slide and Drop).
+
+**The intro's N64 logo (the owner, 2026-11-20, for when the intro is polished).** The background changes from black to white around the N64 logo and looks odd round the logo's edges. Investigate why (the logo picture's edges or alpha against the white, the fade), whether there is a better approach, and whether the white screen is needed at all.
+
+**Hearts and the Drop Timer: the Complete screen may hang (the owner, 2026-11-20).** On the owner's PC, after the turn (a second go, with the demonstration watched first), the Complete panel appeared over the game with the menu grid's tiles part-way in, and it seemed to stop there. Not reproduced in the test setup (the tiles finish and Back to Training works); a crash report or a note on whether input still answered would help.
