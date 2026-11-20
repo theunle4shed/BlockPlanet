@@ -312,8 +312,8 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             // each shows the move, resets the board, then the player does it.
             // Lesson keys 100+ (lessons_done); Next runs them in order.
             {"goal", "The Goal", "", "What a stage asks: dig through to the picture in the core.", "", -1},
+            {"slide", "Slide", "command:new_lesson:slide", "Hold B to grab a piece and slide it; gather six squares together.", "\uE1EB", 101},
             {"drop", "Drop", "command:new_lesson:drop", "Drop your piece onto two matching pieces to break all three.", "\uE1EB", 100},
-            {"slide", "Slide", "", "Hold B to slide a piece into line, then drop on it.", "", -1},
             {"hearts", "Hearts and the Drop Timer", "", "Drop on a match before the bar runs out, or lose a heart.", "", -1},
             {"combos", "Combos", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4", -1},
         }},
@@ -348,7 +348,7 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         }},
     };
     // The first lesson not yet done has the focus (the game's own order).
-    const char* focus_id = !lessons_done.count(100) ? "drop" : !basics_done ? "combos" : !advanced_done ? "crystal" : "drop";
+    const char* focus_id = !lessons_done.count(101) ? "slide" : !lessons_done.count(100) ? "drop" : !basics_done ? "combos" : !advanced_done ? "crystal" : "drop";
     std::vector<blockplanet::ui::ListItem> items;
     for (const auto& g : groups) {
         blockplanet::ui::ListItem header{g.id, g.title, "", "", false};
