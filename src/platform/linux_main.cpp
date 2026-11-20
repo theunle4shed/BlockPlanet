@@ -865,17 +865,20 @@ void update_hud() {
         char line[400];
         std::snprintf(line, sizeof line,
                       "\"score\":%u,\"combo_pts\":%u,\"copy\":%u,\"second\":%u,\"steps\":%d,\"bricks\":%d,\"gravity\":%d,"
-                      "\"fuse\":%d,\"best\":%u,\"meter\":%d,\"magic\":%d,\"hearts\":%d",
+                      "\"fuse\":%d,\"best\":%u,\"meter\":%d,\"magic\":%d,\"hearts\":%d,\"magic_on\":%d",
                       guest::load32(guest_rdram, p + 0x2AF8), guest::load32(guest_rdram, p + 0x2AFC), guest::load32(guest_rdram, p + 0x2B00),
                       guest::load32(guest_rdram, p + 0x2B04), std::int16_t(guest::load16(guest_rdram, p + 0x24BC)),
                       std::int16_t(guest::load16(guest_rdram, p + 0x2AE0)), std::int16_t(guest::load16(guest_rdram, p + 0x2AE6)),
                       std::int16_t(guest::load16(guest_rdram, p + 0x2AE8)), guest::load32(guest_rdram, p + 0x2C70),
                       std::int16_t(guest::load16(guest_rdram, p + 0x2AEC)), std::int8_t(guest::load8(guest_rdram, p + 0x702)),
-                      std::int16_t(guest::load16(guest_rdram, p + 0x2D7E)));
+                      std::int16_t(guest::load16(guest_rdram, p + 0x2D7E)), guest::load8(guest_rdram, p + 0x1269));
         static std::string last;
         if (last != line) {
             last = line;
-            std::fprintf(stdout, "{\"event\":\"score_state\",%s}\n", line);
+            // (ms: for timing a magic's run, the Magnet's and Ray Gun's flag +0x1269.)
+            static const auto t0 = std::chrono::steady_clock::now();
+            std::fprintf(stdout, "{\"event\":\"score_state\",\"ms\":%lld,%s}\n",
+                         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count(), line);
             std::fflush(stdout);
         }
     }
