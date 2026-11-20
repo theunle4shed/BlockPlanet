@@ -11,7 +11,7 @@ The owner's decision, after reading the script review (`docs/research/training-s
 3. **Your turn.** The player does the same thing once, on a board set up so they can succeed.
 4. **Check.** BlockPlanet sees the goal reached (from the game's counters: bricks broken, combo size, fuse and gravity counts, hearts, magic used) and shows "<Lesson> Complete": Next, Try Again, Back to Training. If the goal is missed (a heart lost, the magic wasted), the board is set up again with a short hint.
 
-One idea per lesson, under a minute, one or two sentences of text (no paging), no tutor, and "lesson" rather than "level".
+One idea per lesson, under a minute, one or two sentences of text (no paging), no tutor, and "lesson" rather than "level". **Every lesson opens with its purpose (the owner, 2026-11-20):** a line on why it matters, what problem it solves, before how to do it (Slide: "Pieces break when three matching ones touch. Sliding brings two together; dropping adds the third.").
 
 **The lessons, by what the player needs and when:**
 

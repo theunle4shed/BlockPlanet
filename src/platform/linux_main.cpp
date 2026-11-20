@@ -3075,15 +3075,17 @@ void publish_game_text() {
             const auto para = [&](const std::string& t) { panel.blocks.push_back(Block{false, {{t, orange}}}); };
             if (slide_lesson_phase >= 1) {
                 heading("Slide");
-                para("Put your shadow over a piece of the same shape, hold " + buttons("%B%") +
-                     " to grab it, move to slide it along the floor, and let go to leave it there.");
+                // Why first (the owner, 2026-11-20): what clearing needs, and
+                // the two steps the lessons take in turn.
+                para("Pieces break when three matching ones touch. Sliding brings two together; dropping adds the third.");
+                para("Put your shadow on a piece, hold " + buttons("%B%") + " to grab it, move, then let go.");
                 const int ph = slide_lesson_phase;
-                if (ph == 1 && !slide_watched) heading("Try it"), para("Slide one square across until it touches the other.");
-                else if (ph == 1) heading("Your turn"), para("Now you try: slide one square across to the other.");
+                if (ph == 1 && !slide_watched) heading("Try it"), para("Slide one square across to the other.");
+                else if (ph == 1) heading("Your turn"), para("Now you try.");
                 else if (ph == 2 && slide_demo_step >= slide_moves) heading("Watch"), para("The two squares are together.");
-                else if (ph == 2) heading("Watch"), para("The shadow goes over a square, " + buttons("%B%") + " grabs it, and it slides across to the other.");
+                else if (ph == 2) heading("Watch"), para(buttons("%B%") + " grabs a square and slides it across.");
                 else if (ph == 4)
-                    heading("Your turn"), para("Slide one square across until it touches the other. Dropping is off for now.");
+                    heading("Your turn"), para("Slide one square across to the other. Dropping is off for now.");
                 else heading("Well done"), para("The two squares are together.");
                 if (ph == 2) panel.hint = "Watching\u2026";
                 if (ph == 1) panel.hint = buttons("%A%") + " Try it    " + buttons("%B%") + (slide_watched ? " Watch again" : " Watch");
