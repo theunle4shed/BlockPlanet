@@ -195,6 +195,13 @@ bool final_finale = false;
 // Research (what each magic does): research_magic:K gives player 1 magic K
 // (0 to 5) and presses the magic button (N64 0x0004) a moment later.
 std::optional<std::chrono::steady_clock::time_point> research_magic_press;
+// The fuse lab's automatic slide (research_fuse_auto:A|B): as soon as a combo
+// starts, the cursor goes onto the chosen piece, B is held, up is pressed
+// three times, and B is let go (the timing a script cannot hit).
+int research_fuse_target = 0;  // 0 off, 1 B, 2 A (armed)
+int research_fuse_xy[2][2] = {};
+int research_fuse_steps = 3;  // up presses: the corridor's length
+std::optional<std::chrono::steady_clock::time_point> research_fuse_at;
 bool final_skip = false;
 // An episode's last stage just cleared in a whole-episode Rescue run (1), or
 // a stage before the last in play (-1): told to the end menu bridge.
@@ -3767,6 +3774,32 @@ void publish_audio_settings() {
     blockplanet::ui::set_setting("track", std::to_string(track));
 }
 
+// The fuse lab's automatic slide: the buttons to press now (see research_fuse_target).
+std::uint16_t research_fuse_buttons() {
+    if (research_fuse_target == 0 || guest_rdram == nullptr) return 0;
+    auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+    const std::uint32_t pc = 0x80110220u;
+    const auto now = std::chrono::steady_clock::now();
+    if (!research_fuse_at) {
+        if (guest::load32(rd, pc + 0x2AFC) == 0) return 0;  // waiting for the combo
+        research_fuse_at = now;
+        const int* xy = research_fuse_xy[research_fuse_target - 1];
+        guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(xy[0] - 8)));
+        guest::store16(rd, pc + 0x2B2E, std::uint16_t(std::int16_t(xy[1] - 8)));
+        std::fprintf(stdout, "{\"event\":\"research_fuse_grab\",\"target\":%d,\"at\":[%d,%d]}\n", research_fuse_target, xy[0], xy[1]);
+        std::fflush(stdout);
+    }
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - *research_fuse_at).count();
+    if (ms > 1600) {
+        research_fuse_target = 0;
+        return 0;
+    }
+    std::uint16_t b = ms >= 60 && ms < 1400 ? 0x4000 : 0;  // B held
+    for (int k = 0; k < research_fuse_steps; ++k)
+        if (ms >= 300 + 300 * k && ms < 420 + 300 * k) b |= 0x0800;  // D-pad up, once per corridor cell
+    return b;
+}
+
 // Ends the pause menu's track override (quitting, or starting another game).
 void end_track_override() {
     if (blockplanet::track_override()) blockplanet::set_music_random(current_audio().random_music);
@@ -5479,6 +5512,115 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
                 continue;
             }
+            if ((*command == "research_lab:fuse" || *command == "research_lab_cursor") && guest_rdram != nullptr) {
+                // Research (2026-11-20, the fuse lab): the combo lab's first
+                // combo with A a power piece (attribute 0x40 on its cells), and,
+                // beside B, an empty corridor running up (+y) to a place where
+                // two more pieces of B's shape (E, G) fit B but not B's start.
+                // Sliding B (a fuse, flashing in the combo) up the corridor and
+                // letting go should set off a fuse combo. research_lab_cursor
+                // puts the cursor on B (for the harness, after the drop).
+                static int bx = 0, by = 0;
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                const std::uint32_t pc = 0x80110220u;
+                if (*command == "research_lab_cursor") {
+                    guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(bx - 8)));
+                    guest::store16(rd, pc + 0x2B2E, std::uint16_t(std::int16_t(by - 8)));
+                    continue;
+                }
+                const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
+                                    entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
+                const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                const int ki = std::int16_t(guest::load16(rd, pc + 0x2374));
+                const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(ki));
+                const std::int16_t v0 = std::int16_t(guest::load16(rd, rec));
+                int layout[9];
+                for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k)));
+                std::vector<std::pair<int, int>> fit;
+                for (int k = 0; k < std::int16_t(guest::load16(rd, rec + 0x74A)) && k < 14; ++k)
+                    fit.push_back({std::int8_t(guest::load8(rd, rec + 0x74C + 2u * std::uint32_t(k))),
+                                   std::int8_t(guest::load8(rd, rec + 0x74D + 2u * std::uint32_t(k)))});
+                const auto cell = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
+                const auto cells_at = [&](int ox, int oy) {
+                    std::vector<std::pair<int, int>> out;
+                    for (int x = 0; x < 3; ++x)
+                        for (int y = 0; y < 3; ++y)
+                            if (layout[x * 3 + y] > 0) out.push_back({cell(ox + x - 1, oy + y - 1), layout[x * 3 + y]});
+                    return out;
+                };
+                std::vector<int> l1(1024, 1), power(1024, 0);
+                for (int c = 0; c < 1024; ++c) {
+                    guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 423);
+                    for (int layer = 2; layer < 9; ++layer) {
+                        guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), 0);
+                        guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), 0);
+                    }
+                }
+                const auto put = [&](int ox, int oy, bool is_power) {
+                    for (const auto& [c, n] : cells_at(ox, oy)) {
+                        guest::store16(rd, values + 2u * std::uint32_t(1024 + c), std::int16_t(v0 + n - 1));
+                        guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), rec + 0x78u + 96u * std::uint32_t(n - 1));
+                        l1[std::size_t(c)] = 2;
+                        power[std::size_t(c)] = is_power;
+                    }
+                };
+                const auto hole = [&](int ox, int oy) {
+                    for (const auto& [c, n] : cells_at(ox, oy))
+                        if (l1[std::size_t(c)] == 1) {
+                            l1[std::size_t(c)] = 0;
+                            guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 0);
+                            guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), 0);
+                        }
+                };
+                hole(cx, cy);
+                // A on the -x side (a fitting position with dx < 0, else the
+                // first), B on the +x side.
+                std::pair<int, int> fa = fit[0], fb = fit.size() > 1 ? fit[1] : fit[0];
+                for (const auto& f : fit) if (f.first < 0 && f.second == 0) fa = f;
+                for (const auto& f : fit) if (f.first > 0 && f.second == 0) fb = f;
+                put(cx + fa.first, cy + fa.second, true);
+                bx = cx + fb.first, by = cy + fb.second;
+                research_fuse_xy[0][0] = bx, research_fuse_xy[0][1] = by;
+                research_fuse_xy[1][0] = cx + fa.first, research_fuse_xy[1][1] = cy + fa.second;
+                put(bx, by, false);
+                // The corridor: B's shape moved up 1 to s cells, s one more than
+                // the largest row offset among the fits (so the end fits nothing
+                // B touches at its start).
+                int s_up = 1;
+                for (const auto& f : fit) s_up = std::max(s_up, std::abs(f.second) + 1);
+                for (int k = 1; k <= s_up; ++k) hole(bx, by + k);
+                research_fuse_steps = s_up;
+                const int dx = bx, dy = by + s_up;
+                // E: the fit with the largest row offset (above the end); G: one
+                // with dx > 0 and no row offset (beside it).
+                std::pair<int, int> fe = fit[0], fg = fit[0];
+                for (const auto& f : fit) if (f.second > fe.second) fe = f;
+                for (const auto& f : fit) if (f.first > 0 && f.second == 0) fg = f;
+                put(dx + fe.first, dy + fe.second, false);
+                put(dx + fg.first, dy + fg.second, false);
+                for (int c = 0; c < 1024; ++c) {
+                    const int x = c % 32, y = c / 32;
+                    guest::store8(rd, masks + std::uint32_t(c), l1[std::size_t(c)] ? 0 : 80);
+                    guest::store8(rd, columns + std::uint32_t(c), l1[std::size_t(c)] ? 0x11 : 0x00);
+                    if (!l1[std::size_t(c)]) continue;
+                    std::uint8_t m = 16;
+                    if (!l1[std::size_t(cell(x + 1, y))]) m |= 8;
+                    if (!l1[std::size_t(cell(x - 1, y))]) m |= 4;
+                    if (!l1[std::size_t(cell(x, y + 1))]) m |= 2;
+                    if (!l1[std::size_t(cell(x, y - 1))]) m |= 1;
+                    if (power[std::size_t(c)]) m |= 0x40;
+                    guest::store8(rd, masks + std::uint32_t(1024 + c), m);
+                }
+                std::fprintf(stdout, "{\"event\":\"research_lab\",\"lab\":\"fuse\",\"k\":%d,\"cursor\":[%d,%d],\"a\":[%d,%d],\"b\":[%d,%d],\"slide_up\":%d,\"e\":[%d,%d],\"g\":[%d,%d]}\n",
+                             ki, cx, cy, cx + fa.first, cy + fa.second, bx, by, s_up, dx + fe.first, dy + fe.second, dx + fg.first, dy + fg.second);
+                std::fflush(stdout);
+                continue;
+            }
+            if (command->rfind("research_fuse_auto:", 0) == 0) {
+                research_fuse_target = (*command)[19] == 'A' ? 2 : 1;
+                research_fuse_at.reset();
+                continue;
+            }
             if (*command == "research_board" && guest_rdram != nullptr) {
                 // Filled cells per layer (0 the core), with the count of each value on the top layers.
                 const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
@@ -6315,6 +6457,7 @@ bool handle_profile_command(const std::string& command) {
                                    : end.inject ? (0x10000u | end.buttons)
                                    : hs_buttons != 0 ? (0x10000u | hs_buttons)
                                    : card_buttons != 0 ? (0x10000u | card_buttons)
+                                   : research_fuse_buttons() != 0 ? (0x10000u | research_fuse_buttons())
                                    : research_magic_press && std::chrono::steady_clock::now() >= *research_magic_press &&
                                              std::chrono::steady_clock::now() < *research_magic_press + std::chrono::milliseconds(400)
                                        ? 0x10004u
