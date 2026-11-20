@@ -5269,6 +5269,13 @@ bool handle_profile_command(const std::string& command) {
                 launch_mode(LaunchMode::HideAndSeek);
                 continue;
             }
+            if (*command == "research_magic_retry" && guest_rdram != nullptr) {
+                // Presses the magic button again only if the magic is still held
+                // (a press while another magic works is ignored).
+                if (std::int8_t(guest::load8(guest_rdram, 0x80110220u + 0x702)) >= 0)
+                    research_magic_press = std::chrono::steady_clock::now();
+                continue;
+            }
             if (command->rfind("research_magic:", 0) == 0 && guest_rdram != nullptr) {
                 const int kind = std::atoi(command->c_str() + 15);
                 guest::store8(const_cast<std::uint8_t*>(guest_rdram), 0x80110220u + 0x702, std::uint8_t(std::int8_t(kind)));
