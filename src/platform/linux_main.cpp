@@ -216,6 +216,10 @@ const char* const magic_lesson_texts[6] = {
 // -1 none, 0 armed, 1 card up, 2 the demonstration, 3 its bricks breaking,
 // 4 the player's turn, 5 a miss (board set up again), 6 done, 7 leaving.
 int drop_lesson_phase = -1;
+// Rescue's background for episode 1 while the Drop lesson's stage loads: the
+// original Training's (index 25, its fixed table 0x800E949C) in place of 1:1's
+// (Rescue's table by episode, 0x800E94C4); put back once in play (-1: not changed).
+int drop_lesson_saved_background = -1;
 std::optional<std::chrono::steady_clock::time_point> drop_lesson_at;
 int drop_lesson_home[2] = {0, 0};    // the cursor's cell as the lesson starts
 int drop_lesson_target[2] = {0, 0};  // the hole beside the pair
@@ -6247,6 +6251,11 @@ bool handle_profile_command(const std::string& command) {
                 magic_lesson = -1, magic_lesson_phase = -1;
                 drop_lesson_phase = 0;
                 drop_lesson_at.reset();
+                if (guest_rdram != nullptr) {
+                    auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                    if (drop_lesson_saved_background < 0) drop_lesson_saved_background = guest::load16(rd, 0x800E94C4u);
+                    guest::store16(rd, 0x800E94C4u, guest::load16(rd, 0x800E949Cu));
+                }
                 blockplanet::ui::send_command("casual");
                 blockplanet::ui::send_command("stage:1:1");
                 continue;
@@ -6418,6 +6427,12 @@ bool handle_profile_command(const std::string& command) {
                         single_stage_quit_at = now_m;
                     }
                 }
+            }
+            // The background table put back once the lesson's stage is in play
+            // (or the lesson was dropped before it started).
+            if (drop_lesson_saved_background >= 0 && drop_lesson_phase != 0) {
+                guest::store16(const_cast<std::uint8_t*>(guest_rdram), 0x800E94C4u, std::uint16_t(drop_lesson_saved_background));
+                drop_lesson_saved_background = -1;
             }
             // The Drop lesson in play (see drop_lesson_phase).
             if (drop_lesson_phase >= 0) {
