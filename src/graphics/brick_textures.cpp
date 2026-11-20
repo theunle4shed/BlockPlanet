@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace tetrisphere::bricks {
@@ -108,6 +109,42 @@ void find_draws(const Read32& read32, std::uint32_t list, const std::function<vo
         }
     };
     walk(walk, list & 0x007FFFFFu, 0);
+}
+
+std::vector<std::uint32_t> arrow_triangles(const Read32& read32, std::uint32_t list, int budget) {
+    std::vector<std::uint32_t> out;
+    std::array<std::uint32_t, 16> segments{};
+    std::uint32_t image = 0, loaded = 0;
+    const auto resolve = [&](std::uint32_t a) { return (segments[(a >> 24) & 0xFu] + (a & 0x00FFFFFFu)) & 0x007FFFFFu; };
+    const auto walk = [&](auto&& self, std::uint32_t at, int depth) -> void {
+        for (; budget-- > 0; at += 8u) {
+            const std::uint32_t w0 = read32(at), w1 = read32(at + 4u);
+            const std::uint32_t op = w0 >> 24;
+            if (op == 0xBCu && (w0 & 0xFFu) == 6u) segments[((w0 >> 8) & 0xFFFFu) / 4u & 0xFu] = w1 & 0x00FFFFFFu;
+            if (op == 0xFDu) image = resolve(w1);
+            if (op == 0xF3u || op == 0xF4u) loaded = image;  // G_LOADBLOCK, G_LOADTILE
+            // Research: BLOCKPLANET_ARROW_LOG=1 prints the commands after an
+            // arrow frame's image is set (a few times), to see how it is drawn.
+            static const bool log = std::getenv("BLOCKPLANET_ARROW_LOG") != nullptr;
+            static int logged = 0, follow = 0;
+            if (log && op == 0xFDu && image >= arrow_first && image < arrow_first + arrow_stride * arrow_frames && logged < 4) ++logged, follow = 24;
+            if (log && follow > 0) {
+                --follow;
+                std::fprintf(stdout, "{\"event\":\"arrow_cmd\",\"at\":\"%08X\",\"w0\":\"%08X\",\"w1\":\"%08X\",\"depth\":%d}\n", at, w0, w1, depth);
+                std::fflush(stdout);
+            }
+            if ((op == 0xBFu || op == 0xB1u || op == 0xB5u) && loaded >= arrow_first &&
+                loaded < arrow_first + arrow_stride * arrow_frames && (loaded - arrow_first) % arrow_stride == 0u)
+                out.push_back(at);
+            if (op == 0x06u && depth < 8) {
+                self(self, resolve(w1), depth + 1);
+                if (((w0 >> 16) & 0xFFu) == 1u) return;
+            }
+            if (op == 0xB8u) return;
+        }
+    };
+    walk(walk, list & 0x007FFFFFu, 0);
+    return out;
 }
 
 std::vector<std::uint8_t> decode(const Draw& d) {

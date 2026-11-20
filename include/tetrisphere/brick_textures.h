@@ -43,6 +43,15 @@ using Read32 = std::function<std::uint32_t(std::uint32_t)>;
 void find_draws(const Read32& read32, std::uint32_t list, const std::function<void(const Draw&)>& found,
                 int budget = 400000);
 
+// Training's arrow (the owner, 2026-11-20: pixelated and flashing very fast):
+// a flipbook of 18 frames, 8-bit intensity-alpha, 0x2A8 bytes apart from
+// 0x00184030 (physical). arrow_triangles lists the triangle commands drawn
+// with any of them (after a block or tile load from one), so they can be left
+// out of the frame; BlockPlanet's HUD draws its own steady arrow instead.
+constexpr std::uint32_t arrow_first = 0x00184030u, arrow_stride = 0x2A8u;
+constexpr int arrow_frames = 18;
+std::vector<std::uint32_t> arrow_triangles(const Read32& read32, std::uint32_t list, int budget = 400000);
+
 // The draw's texels as RGBA8 (width x height x 4 bytes).
 std::vector<std::uint8_t> decode(const Draw& draw);
 

@@ -16,6 +16,10 @@ void set_rt64_live_filters(std::optional<PresentationFilter> filter,
 // Graphics > Bricks: "original", "sharp" or "crafted" (brick_textures.h),
 // applied by the renderer on its next frame.
 void set_rt64_brick_style(const std::string& style);
+// Training's arrow (2026-11-20): whether the game drew it this frame (its
+// triangles are left out; BlockPlanet's HUD shows its own while it would).
+void set_training_arrow(bool shown);
+bool training_arrow_shown();
 
 // Apply only options represented by RT64's current user configuration. This
 // deliberately leaves window mode, HUD layout, VSync and backend unchanged.

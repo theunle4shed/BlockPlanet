@@ -724,6 +724,22 @@ public:
             F3DFlatShadePatch flat_shade(app_->core.RDRAM, 9437184,
                                          task->t.data_ptr,
                                          task->t.data_size);
+            // Research (2026-11-20, Training's flashing arrow):
+            // BLOCKPLANET_ARROW_LOG=1 logs the triangle commands drawn after a
+            // load from the arrow's flipbook (bricks::arrow_triangles). Blanking
+            // them here did not hide the arrow (RT64 still drew it, and nothing
+            // else), so the arrow is to be left out at the game's own draw.
+            if (static const bool arrow_log = std::getenv("BLOCKPLANET_ARROW_LOG") != nullptr; arrow_log) {
+                std::uint8_t* m = app_->core.RDRAM;
+                const auto read32 = [m](std::uint32_t at) { std::uint32_t v; std::memcpy(&v, m + (at & 0x007FFFFCu), 4); return v; };
+                static int arrow_logged = 0;
+                const auto found = ::tetrisphere::bricks::arrow_triangles(read32, task->t.data_ptr);
+                if (!found.empty() && arrow_logged++ < 3) {
+                    std::fprintf(stdout, "{\"event\":\"arrow_triangles\",\"count\":%zu,\"first\":\"%08X\",\"list\":\"%08X\"}\n",
+                                 found.size(), found.front(), task->t.data_ptr);
+                    std::fflush(stdout);
+                }
+            }
             if (!ui_active_batch.spans.empty()) {
                 static std::atomic<unsigned> logged{0};
                 if (logged.fetch_add(1, std::memory_order_relaxed) < 8) {
@@ -828,6 +844,10 @@ void set_rt64_live_filters(std::optional<PresentationFilter> filter,std::optiona
     if (filter) pending_presentation=filter;
     if (three_point) pending_texture=three_point;
 }
+
+namespace { std::atomic<bool> training_arrow{false}; }
+void set_training_arrow(bool shown) { training_arrow.store(shown); }
+bool training_arrow_shown() { return training_arrow.load(); }
 
 void set_rt64_brick_style(const std::string& style) {
     std::lock_guard lock(pending_bricks_mutex);
