@@ -234,8 +234,10 @@ bool drop_demo_aimed = false, drop_demo_dropped = false;
 // demonstration first; the game gets no input meanwhile. Waits for every button
 // to be let go before taking a press.
 bool drop_lesson_watched = false, drop_choice_armed = false;
-// The Slide lesson (the owner's design, 2026-11-20): six squares scattered in
-// an 8 x 8 pit, to be gathered into one group by sliding; dropping is off.
+// The Slide lesson (the owner's design, 2026-11-20): two squares far apart in
+// a small pit, one to be slid across until they touch; dropping is off (the
+// owner first tried six: too many for a first lesson; bigger groups come with
+// combos).
 // Phases as the Drop lesson's: -1 none, 0 armed, 1 choosing (A try, B watch),
 // 2 the demonstration, 4 the player's turn, 6 done, 7 leaving.
 int slide_lesson_phase = -1;
@@ -244,12 +246,13 @@ int slide_origin[2] = {0, 0};  // where the layout's (0, 0) is on the board
 int slide_square = -1;         // the stage's square piece (its queue index)
 int slide_group = 0;           // squares in the biggest group now (shown in the panel)
 bool slide_watched = false, slide_choice_armed = false;
-// The layout (found by search, 2026-11-20): each square slides in a straight
-// line into a 2 x 3 block, the first not at all; none touch at the start,
-// every path is clear in this order; all within 8 x 8 cells.
-constexpr int slide_starts[6][2] = {{0, 0}, {2, 4}, {4, 2}, {0, 6}, {-2, 2}, {4, 6}};
-constexpr int slide_finals[6][2] = {{0, 0}, {2, 0}, {4, 0}, {0, 2}, {2, 2}, {4, 2}};
-constexpr int slide_order[5] = {1, 2, 4, 3, 5};
+// The layout: the first square stays, the second slides four cells across
+// to touch it; the pit 8 x 6 round them, the shadow starting between them.
+constexpr int slide_pieces = 2, slide_moves = 1;
+constexpr int slide_starts[slide_pieces][2] = {{0, 0}, {6, 0}};
+constexpr int slide_finals[slide_pieces][2] = {{0, 0}, {2, 0}};
+constexpr int slide_order[slide_moves] = {1};
+constexpr int slide_home[2] = {3, 0};  // the shadow's start, from the layout's (0, 0)
 // The demonstration: piece slide_order[step], stage 0 to its start, 1 B held,
 // 2 to its final place (B held), 3 let go.
 int slide_demo_step = 0, slide_demo_stage = 0, slide_demo_slot = -1;
@@ -3075,13 +3078,13 @@ void publish_game_text() {
                 para("Put your shadow over a piece of the same shape, hold " + buttons("%B%") +
                      " to grab it, move to slide it along the floor, and let go to leave it there.");
                 const int ph = slide_lesson_phase;
-                if (ph == 1 && !slide_watched) heading("Try it"), para("Gather all six squares into one group, each touching another.");
-                else if (ph == 1) heading("Your turn"), para("Now gather them yourself.");
-                else if (ph == 2) heading("Watch"), para("Each square is grabbed with " + buttons("%B%") + " and slid up against the others.");
+                if (ph == 1 && !slide_watched) heading("Try it"), para("Slide one square across until it touches the other.");
+                else if (ph == 1) heading("Your turn"), para("Now you try: slide one square across to the other.");
+                else if (ph == 2 && slide_demo_step >= slide_moves) heading("Watch"), para("The two squares are together.");
+                else if (ph == 2) heading("Watch"), para("The shadow goes over a square, " + buttons("%B%") + " grabs it, and it slides across to the other.");
                 else if (ph == 4)
-                    heading("Your turn"), para("Gather all six squares into one group. Dropping is off for now."),
-                        para("Together: " + std::to_string(std::max(1, slide_group)) + " of 6");
-                else heading("Well done"), para("All six are together.");
+                    heading("Your turn"), para("Slide one square across until it touches the other. Dropping is off for now.");
+                else heading("Well done"), para("The two squares are together.");
                 if (ph == 2) panel.hint = "Watching\u2026";
                 if (ph == 1) panel.hint = buttons("%A%") + " Try it    " + buttons("%B%") + (slide_watched ? " Watch again" : " Watch");
                 view->card_panel = panel;
@@ -4321,7 +4324,7 @@ int slide_biggest_group() {
 // held, the shadow steered to the square's place in the block (dragging it),
 // B let go. D-pad right moves the cursor -1 in x, down -1 in y.
 std::uint16_t slide_lesson_buttons() {
-    if (slide_lesson_phase != 2 || guest_rdram == nullptr || !slide_lesson_at || slide_demo_step >= 5) return 0;
+    if (slide_lesson_phase != 2 || guest_rdram == nullptr || !slide_lesson_at || slide_demo_step >= slide_moves) return 0;
     const auto now = std::chrono::steady_clock::now();
     if (now - *slide_lesson_at < std::chrono::milliseconds(800)) return 0;
     if (!slide_demo_stage_at) slide_demo_stage_at = now;
@@ -6774,9 +6777,12 @@ bool handle_profile_command(const std::string& command) {
                         std::fflush(stdout);
                     }
                 }
-                // The board: the six squares at their starts, the pit round
-                // them (8 x 8), the shadow in its middle.
+                // The board: the squares at their starts, the pit round them
+                // (8 x 6), laid out round where the shadow is now (no jump, so
+                // the camera does not swing round the sphere).
                 const auto set_up = [&] {
+                    slide_origin[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)) - slide_home[0];
+                    slide_origin[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E)) - slide_home[1];
                     std::vector<std::pair<int, int>> origins;
                     for (const auto& st : slide_starts) origins.push_back({slide_origin[0] + st[0], slide_origin[1] + st[1]});
                     // The pit: the squares' cells (a 2 x 2 layout's cells sit at
@@ -6785,9 +6791,7 @@ bool handle_profile_command(const std::string& command) {
                     int ax = 9, ay = 9;
                     for (int k = 0; k < 9; ++k)
                         if (std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k))) > 0) ax = std::min(ax, k / 3), ay = std::min(ay, k % 3);
-                    build_pit_board(slide_origin[0] - 2 + ax - 1, slide_origin[1] + ay - 1, 8, 8, slide_square, origins);
-                    guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(slide_origin[0] + 1 - 8)));
-                    guest::store16(rd, pc + 0x2B2E, std::uint16_t(std::int16_t(slide_origin[1] + 3 - 8)));
+                    build_pit_board(slide_origin[0] + ax - 1, slide_origin[1] + ay - 1 - 2, 8, 6, slide_square, origins);
                     guest::store16(rd, pc + 0x2D7E, 3);
                 };
                 start_card_pending.reset();
@@ -6812,9 +6816,6 @@ bool handle_profile_command(const std::string& command) {
                     else if (since() > 200) {
                         slide_square = square_piece_index();
                         if (slide_square < 0) slide_square = 0;
-                        // The layout centred on the shadow: its cells run -2 .. 5 by 0 .. 7.
-                        slide_origin[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)) - 1;
-                        slide_origin[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E)) - 3;
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
                         set_up();
@@ -6834,15 +6835,16 @@ bool handle_profile_command(const std::string& command) {
                     }
                 } else if (slide_lesson_phase == 2) {
                     // Done once every square has been moved (or after 60 s),
-                    // then a moment to look, and the board set up again.
+                    // then a moment to look (the owner: it went too soon), and
+                    // the board set up again.
                     static std::optional<std::chrono::steady_clock::time_point> done_at;
-                    if (slide_demo_step >= 5 || since() > 60000) {
+                    if (slide_demo_step >= slide_moves || since() > 60000) {
                         if (!done_at) {
                             done_at = now_m;
                             std::fprintf(stdout, "{\"event\":\"slide_demo_done\",\"group\":%d,\"ms\":%lld}\n", slide_biggest_group(), (long long)since());
                             std::fflush(stdout);
                         }
-                        else if (now_m - *done_at > std::chrono::milliseconds(2000)) {
+                        else if (now_m - *done_at > std::chrono::milliseconds(3500)) {
                             done_at.reset();
                             set_up();
                             slide_lesson_phase = 1, slide_lesson_at = now_m;
@@ -6853,7 +6855,7 @@ bool handle_profile_command(const std::string& command) {
                     // Done when all six touch, held for a moment with B let go.
                     slide_group = slide_biggest_group();
                     static std::optional<std::chrono::steady_clock::time_point> together;
-                    if (slide_group >= 6 && !(player_buttons_now() & 0x4000u)) {
+                    if (slide_group >= slide_pieces && !(player_buttons_now() & 0x4000u)) {
                         if (!together) together = now_m;
                         else if (now_m - *together > std::chrono::milliseconds(600)) {
                             together.reset();
