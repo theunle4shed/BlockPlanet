@@ -191,21 +191,21 @@ int main(int argc, char** argv) {
            lessons[0].note == "start here" && !lessons[1].focus && lessons[1].action == "command:training_advanced");
     lessons = story_training(true, false);
     assert(!lessons[0].focus && lessons[1].focus && lessons[0].note == "completed");
-    // Training's menu: four groups under headers (disabled items), the first lesson not done focused,
+    // Training's menu: four groups under headers (The Basics, Magic, Advanced, Other Modes) (disabled items), the first lesson not done focused,
     // lessons not built yet listed as Not started, finished magic lessons marked completed.
     auto all = training_lessons(false, false);
     assert(all.size() == 23 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
     assert(all[1].focus && all[1].label == "Slide and Drop" && all[1].action == "command:lesson:1:1");
     assert(all[3].label == "Rubble" && all[3].action.empty() && all[3].classes == "rag-not-started" && all[3].enabled);
-    assert(all[6].label == "Advanced" && !all[6].enabled && all[12].label == "Magic" && all[20].label == "Other Modes");
-    assert(all[13].action == "command:magic_lesson:0" && all[18].action == "command:magic_lesson:5" && all[19].label == "Mystery Blocks");
+    assert(all[6].label == "Magic" && !all[6].enabled && all[14].label == "Advanced" && all[20].label == "Other Modes");
+    assert(all[7].action == "command:magic_lesson:0" && all[12].action == "command:magic_lesson:5" && all[13].label == "Mystery Blocks");
     {
         const auto marked = training_lessons(true, true, {0, 4});
-        assert(marked[13].note == "completed" && marked[14].note.empty() && marked[17].note == "completed");
+        assert(marked[7].note == "completed" && marked[8].note.empty() && marked[11].note == "completed");
     }
     {
         const auto advanced = training_lessons(true, false);
-        assert(!advanced[1].focus && advanced[10].label == "Crystal Bricks" && advanced[10].focus);
+        assert(!advanced[1].focus && advanced[18].label == "Crystal Bricks" && advanced[18].focus);
     }
 
     auto confirm = delete_confirmation(store, "1");
