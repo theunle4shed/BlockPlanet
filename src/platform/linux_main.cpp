@@ -3922,7 +3922,10 @@ std::set<int> new_lessons_done() {
 // to the core, with two bricks of the same shape beside it at fitting entries
 // fi and fj (signs sx, sy), so the piece dropped there breaks all three.
 struct PairBoard { int index = 0, v0 = 0; int layout[9] = {}; std::vector<std::pair<int, int>> fit; };
-PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy) {
+// pit != 0: as the original Training's board (read in play, 2026-11-20), a
+// square pit pit x pit cut through the wall round (px, py), its floor the core's
+// plain white tile (87), so the pair sits on a blank page; 0: just the hole.
+PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy, int pit = 0, int px = 0, int py = 0) {
     auto* rd = const_cast<std::uint8_t*>(guest_rdram);
     // The walls smooth, as Training's own (the owner, 2026-11-20): every face
     // cut from the sheet's flat first tile, so the cells join into one surface
@@ -3953,6 +3956,7 @@ PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy) {
         guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 423);
         guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), flat_wall);
         guest::store8(rd, columns + std::uint32_t(c), 0x11);
+        if (pit != 0) guest::store8(rd, masks + std::uint32_t(c), 0);  // the core, covered
         for (int layer = 2; layer < 9; ++layer) {
             guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), 0);
             guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), 0);
@@ -3970,13 +3974,71 @@ PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy) {
                     guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), 0);
                     guest::store8(rd, masks + std::uint32_t(c), 80);  // the core, open
                     guest::store8(rd, columns + std::uint32_t(c), 0x00);
+                    if (pit != 0) guest::store16(rd, values + 2u * std::uint32_t(c), 87);
                 } else {
                     filled[std::size_t(c)] = 2;
+                    guest::store8(rd, masks + std::uint32_t(c), 0);
+                    guest::store8(rd, columns + std::uint32_t(c), 0x11);
                     guest::store16(rd, values + 2u * std::uint32_t(1024 + c), std::int16_t(v0 + n - 1));
                     guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), rec + 0x78u + 96u * std::uint32_t(n - 1));
                 }
             }
     };
+    // fi < 0: the two fitting places that keep the three pieces most compact
+    // (the pair beside the hole, not end to end), and pit < 0: a pit just
+    // round them and (px, py), one cell to spare (the owner: a small space).
+    int bx0 = 0, by0 = 0, bx1 = 0, by1 = 0, pit_w = pit, pit_h = pit, pit_x0 = px - pit / 2, pit_y0 = py - pit / 2;
+    {
+        const auto cells_at = [&](int ox, int oy) {
+            std::vector<std::pair<int, int>> out;
+            for (int x = 0; x < 3; ++x)
+                for (int y = 0; y < 3; ++y)
+                    if (layout[x * 3 + y] > 0) out.push_back({ox + x - 1, oy + y - 1});
+            return out;
+        };
+        if (fi < 0) {
+            int best = 1 << 30;
+            for (int i = 0; i < int(fit.size()); ++i)
+                for (int j = i + 1; j < int(fit.size()); ++j) {
+                    auto all = cells_at(cx, cy);
+                    const auto a = cells_at(cx + fit[std::size_t(i)].first, cy + fit[std::size_t(i)].second);
+                    const auto b = cells_at(cx + fit[std::size_t(j)].first, cy + fit[std::size_t(j)].second);
+                    bool clash = false;
+                    for (const auto& q : b)
+                        for (const auto& r : a) clash |= q == r;
+                    if (clash) continue;
+                    all.insert(all.end(), a.begin(), a.end());
+                    all.insert(all.end(), b.begin(), b.end());
+                    int x0 = 99, y0 = 99, x1 = -99, y1 = -99;
+                    for (const auto& [x, y] : all) x0 = std::min(x0, x), y0 = std::min(y0, y), x1 = std::max(x1, x), y1 = std::max(y1, y);
+                    const int size = std::max(x1 - x0, y1 - y0) * 100 + (x1 - x0) * (y1 - y0);
+                    if (size < best) best = size, fi = i, fj = j;
+                }
+            sx = sy = 1;
+            if (fi < 0) fi = 0, fj = 1;
+        }
+        auto all = cells_at(cx, cy);
+        for (const int k : {fi, fj})
+            if (k >= 0 && k < int(fit.size())) {
+                const auto a = cells_at(cx + sx * fit[std::size_t(k)].first, cy + sy * fit[std::size_t(k)].second);
+                all.insert(all.end(), a.begin(), a.end());
+            }
+        all.push_back({px, py});
+        bx0 = 99, by0 = 99, bx1 = -99, by1 = -99;
+        for (const auto& [x, y] : all) bx0 = std::min(bx0, x), by0 = std::min(by0, y), bx1 = std::max(bx1, x), by1 = std::max(by1, y);
+        if (pit < 0) pit_x0 = bx0 - 1, pit_y0 = by0 - 1, pit_w = bx1 - bx0 + 3, pit_h = by1 - by0 + 3;
+    }
+    if (pit != 0)
+        for (int y = 0; y < pit_h; ++y)
+            for (int x = 0; x < pit_w; ++x) {
+                const int c = cell(pit_x0 + x, pit_y0 + y);
+                filled[std::size_t(c)] = 0;
+                guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 0);
+                guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), 0);
+                guest::store8(rd, masks + std::uint32_t(c), 80);
+                guest::store8(rd, columns + std::uint32_t(c), 0x00);
+                guest::store16(rd, values + 2u * std::uint32_t(c), 87);
+            }
     place(cx, cy, true);
     for (const int k : {fi, fj})
         if (k >= 0 && k < int(fit.size())) place(cx + sx * fit[std::size_t(k)].first, cy + sy * fit[std::size_t(k)].second, false);
@@ -6386,7 +6448,8 @@ bool handle_profile_command(const std::string& command) {
                 const auto set_up = [&](int dx, int dy) {
                     cursor_to(drop_lesson_home);
                     drop_lesson_target[0] = drop_lesson_home[0] + dx, drop_lesson_target[1] = drop_lesson_home[1] + dy;
-                    build_pair_board(drop_lesson_target[0], drop_lesson_target[1], 0, 1, 1, 1);
+                    static const int pit = [] { const char* v = std::getenv("BLOCKPLANET_DROP_PIT"); return v ? std::atoi(v) : -1; }();
+                    build_pair_board(drop_lesson_target[0], drop_lesson_target[1], -1, -1, 1, 1, pit, drop_lesson_home[0], drop_lesson_home[1]);
                     guest::store16(rd, pc + 0x2D7E, 3);
                     drop_lesson_bricks = count_bricks();
                     drop_lesson_score = guest::load32(rd, pc + 0x2AF8);
@@ -6409,7 +6472,8 @@ bool handle_profile_command(const std::string& command) {
                     else if (since() > 800) {
                         drop_lesson_home[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A));
                         drop_lesson_home[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
-                        guest::store16(rd, pc + 0x23E4, 8);  // no win from the open hole
+                        static const int square = [] { const char* v = std::getenv("BLOCKPLANET_DROP_SQUARE"); return v ? std::atoi(v) : 16; }();
+                        guest::store16(rd, pc + 0x23E4, std::uint16_t(square));  // no win from the open pit
                         set_up(-3, 0);  // the demonstration's pair: three to the right
                         std::fprintf(stdout, "{\"event\":\"drop_lesson\",\"home\":[%d,%d],\"target\":[%d,%d]}\n", drop_lesson_home[0],
                                      drop_lesson_home[1], drop_lesson_target[0], drop_lesson_target[1]);
