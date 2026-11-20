@@ -570,6 +570,11 @@ std::string hud_delta(double seconds) {
 void show_stage_results() {
     if (!pending_results) return;
     const auto r = *pending_results;
+    {
+        char line[120];
+        std::snprintf(line, sizeof line, "{\"event\":\"results_shown\",\"lesson\":%d,\"chapter\":%d}", r.lesson, r.chapter);
+        diagnostic_log().perf(line);
+    }
     pending_results.reset();
     std::string line;
     if (r.value <= 0.0) {
@@ -7161,6 +7166,13 @@ bool handle_profile_command(const std::string& command) {
                     static int last = -9;
                     if (slide_lesson_phase != last) {
                         last = slide_lesson_phase;
+                        char line[200];
+                        std::snprintf(line, sizeof line, "{\"event\":\"lesson_step\",\"lesson\":\"%s\",\"phase\":%d,\"cursor\":[%d,%d],\"hearts\":%d}",
+                                      hearts_lesson ? "hearts" : "slide_drop", last, 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)),
+                                      8 + std::int16_t(guest::load16(rd, pc + 0x2B2E)), int(std::int16_t(guest::load16(rd, pc + 0x2D7E))));
+                        // In the diagnostics file too, for the owner's reports (a
+                        // possible hang at Hearts' Complete, 2026-11-20).
+                        diagnostic_log().perf(line);
                         std::fprintf(stdout, "{\"event\":\"slide_phase\",\"phase\":%d,\"cursor\":[%d,%d],\"group\":%d,\"square\":%d}\n", last,
                                      8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E)),
                                      slide_biggest_group(), slide_square);
