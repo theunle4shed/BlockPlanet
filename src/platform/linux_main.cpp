@@ -3924,6 +3924,14 @@ std::set<int> new_lessons_done() {
 struct PairBoard { int index = 0, v0 = 0; int layout[9] = {}; std::vector<std::pair<int, int>> fit; };
 PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy) {
     auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+    // The walls smooth, as Training's own (the owner, 2026-11-20): every face
+    // cut from the sheet's flat first tile, so the cells join into one surface
+    // (as Minefield's wall); the table in free upper memory.
+    constexpr std::uint32_t flat_wall = 0x807F8600u;
+    {
+        const std::int16_t flat[8] = {1, 14, 14, 14, 1, 1, 14, 1};
+        for (int i = 0; i < 48; ++i) guest::store16(rd, flat_wall + 2u * std::uint32_t(i), std::uint16_t(flat[i % 8]));
+    }
     const std::uint32_t pc = 0x80110220u;
     // The piece about to be dropped: the queue's first entry (as the
     // cursor's shadow shows; +0x2386 is the piece taken last).
@@ -3943,6 +3951,7 @@ PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy) {
     std::vector<int> filled(1024, 1);  // layer 1: 1 wall, 0 empty, 2 a target brick
     for (int c = 0; c < 1024; ++c) {
         guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 423);
+        guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), flat_wall);
         guest::store8(rd, columns + std::uint32_t(c), 0x11);
         for (int layer = 2; layer < 9; ++layer) {
             guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), 0);
