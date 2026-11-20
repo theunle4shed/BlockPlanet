@@ -5263,8 +5263,99 @@ bool handle_profile_command(const std::string& command) {
                         first = false;
                     }
                 }
+                out += "],\"added\":[";
+                first = true;
+                for (int i = 1024; i < 9 * 1024 && i < int(snap.size()); ++i) {
+                    const std::int16_t v = std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(i)));
+                    if (snap[std::size_t(i)] <= 0 && v > 0) {
+                        out += std::string(first ? "" : ",") + "[" + std::to_string(i % 32) + "," + std::to_string((i % 1024) / 32) + "," +
+                               std::to_string(i / 1024) + "]";
+                        first = false;
+                    }
+                }
                 out += "]}";
                 std::fprintf(stdout, "%s\n", out.c_str());
+                std::fflush(stdout);
+                continue;
+            }
+            if (command->rfind("research_lab:", 0) == 0 && guest_rdram != nullptr) {
+                // Research (2026-11-20, the combo lab): rebuilds stage 1:1's top
+                // layer round the cursor so one drop makes a combo. Every cell
+                // of layer 1 becomes an inert wall; the piece in hand's shape is
+                // cut out of it at the cursor (down to the core), and two bricks
+                // of the same shape are set beside the hole at two of the
+                // shape's fitting positions (record +0x74C), so the piece
+                // dropped there lands in the hole touching both.
+                // research_lab:combo:I:J:SX:SY picks fitting entries I and J and
+                // the signs for their column and row (default 0:1:1:1).
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                int fi = 0, fj = 1, sx = 1, sy = 1;
+                std::sscanf(command->c_str() + 13, "combo:%d:%d:%d:%d", &fi, &fj, &sx, &sy);
+                const std::uint32_t pc = 0x80110220u;
+                // The piece about to be dropped: the queue's first entry (as the
+                // cursor's shadow shows; +0x2386 is the piece taken last).
+                const int index = std::int16_t(guest::load16(rd, pc + 0x2374));
+                const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(index));
+                const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
+                                    entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
+                const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                const std::int16_t v0 = std::int16_t(guest::load16(rd, rec));
+                int layout[9];
+                for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k)));
+                const int fits = std::int16_t(guest::load16(rd, rec + 0x74A));
+                std::vector<std::pair<int, int>> fit;
+                for (int k = 0; k < fits && k < 14; ++k)
+                    fit.push_back({std::int8_t(guest::load8(rd, rec + 0x74C + 2u * std::uint32_t(k))),
+                                   std::int8_t(guest::load8(rd, rec + 0x74D + 2u * std::uint32_t(k)))});
+                const auto cell = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
+                std::vector<int> filled(1024, 1);  // layer 1: 1 wall, 0 empty, 2 a target brick
+                for (int c = 0; c < 1024; ++c) {
+                    guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 423);
+                    guest::store8(rd, columns + std::uint32_t(c), 0x11);
+                    for (int layer = 2; layer < 9; ++layer) {
+                        guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), 0);
+                        guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), 0);
+                    }
+                }
+                const auto place = [&](int ox, int oy, bool hole) {
+                    for (int x = 0; x < 3; ++x)
+                        for (int y = 0; y < 3; ++y) {
+                            const int n = layout[x * 3 + y];
+                            if (n <= 0) continue;
+                            const int c = cell(ox + x - 1, oy + y - 1);
+                            if (hole) {
+                                filled[std::size_t(c)] = 0;
+                                guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 0);
+                                guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), 0);
+                                guest::store8(rd, masks + std::uint32_t(c), 80);  // the core, open
+                                guest::store8(rd, columns + std::uint32_t(c), 0x00);
+                            } else {
+                                filled[std::size_t(c)] = 2;
+                                guest::store16(rd, values + 2u * std::uint32_t(1024 + c), std::int16_t(v0 + n - 1));
+                                guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), rec + 0x78u + 96u * std::uint32_t(n - 1));
+                            }
+                        }
+                };
+                place(cx, cy, true);
+                for (const int k : {fi, fj})
+                    if (k >= 0 && k < int(fit.size())) place(cx + sx * fit[std::size_t(k)].first, cy + sy * fit[std::size_t(k)].second, false);
+                // Face masks: the top, and each side facing an empty cell.
+                for (int c = 0; c < 1024; ++c) {
+                    if (!filled[std::size_t(c)]) continue;
+                    const int x = c % 32, y = c / 32;
+                    std::uint8_t m = 16;
+                    if (!filled[std::size_t(cell(x + 1, y))]) m |= 8;
+                    if (!filled[std::size_t(cell(x - 1, y))]) m |= 4;
+                    if (!filled[std::size_t(cell(x, y + 1))]) m |= 2;
+                    if (!filled[std::size_t(cell(x, y - 1))]) m |= 1;
+                    guest::store8(rd, masks + std::uint32_t(1024 + c), m);
+                }
+                std::string fl;
+                for (const auto& [fx, fy] : fit) fl += (fl.empty() ? "" : ",") + std::string("[") + std::to_string(fx) + "," + std::to_string(fy) + "]";
+                std::string lay;
+                for (int k = 0; k < 9; ++k) lay += (k ? "," : "") + std::to_string(layout[k]);
+                std::fprintf(stdout, "{\"event\":\"research_lab\",\"index\":%d,\"value\":%d,\"cursor\":[%d,%d],\"layout\":[%s],\"fits\":[%s],\"used\":[%d,%d],\"signs\":[%d,%d]}\n",
+                             index, v0, cx, cy, lay.c_str(), fl.c_str(), fi, fj, sx, sy);
                 std::fflush(stdout);
                 continue;
             }
