@@ -230,6 +230,10 @@ std::string drop_lesson_say;         // the HUD's line: what is happening now
 int drop_demo_slot = -1;
 std::uint16_t drop_demo_held = 0;
 bool drop_demo_aimed = false, drop_demo_dropped = false;
+// The choice before each go (the owner, 2026-11-20): A tries it, B watches the
+// demonstration first; the game gets no input meanwhile. Waits for every button
+// to be let go before taking a press.
+bool drop_lesson_watched = false, drop_choice_armed = false;
 // Research (what each magic does): research_magic:K gives player 1 magic K
 // (0 to 5) and presses the magic button (N64 0x0004) a moment later.
 std::optional<std::chrono::steady_clock::time_point> research_magic_press;
@@ -2585,7 +2589,7 @@ void publish_game_text() {
         for (auto& t : texts)
             if (t.font == 1) t.x += shift;
     }
-    if ((!texts.empty() || box || (drop_lesson_phase >= 2 && drop_lesson_phase <= 6)) && frame) {
+    if ((!texts.empty() || box || (drop_lesson_phase >= 1 && drop_lesson_phase <= 6)) && frame) {
         if (!view) {
             view = blockplanet::ui::HudView{};
             view->text_only = true;
@@ -3014,7 +3018,7 @@ void publish_game_text() {
         // right of the sphere (moved left, as Training's), from its top to the
         // HUD row's bottom, a little into a wide screen's margin: the lesson's
         // name, what it teaches, then what is happening now.
-        if (!box && drop_lesson_phase >= 2 && drop_lesson_phase <= 6) {
+        if (!box && drop_lesson_phase >= 1 && drop_lesson_phase <= 6) {
             const auto fx = [&](float x) { return (area_x + x / 320.0f * area_w) / frame->window_w; };
             const auto fy = [&](float y) { return (frame->y + y / 240.0f * frame->h) / frame->window_h; };
             const float left = fx(184.0f), right = std::min(0.98f, fx(330.0f));
@@ -3030,17 +3034,20 @@ void publish_game_text() {
             const auto heading = [&](const std::string& t) { panel.blocks.push_back(Block{true, {{t, yellow}}}); };
             const auto para = [&](const std::string& t) { panel.blocks.push_back(Block{false, {{t, orange}}}); };
             heading("Drop");
-            para("Your shadow is your next piece. Drop it onto two matching pieces and all three break.");
-            const int ph = drop_lesson_phase;
+            para("Your shadow shows where your piece will land. Move it next to two matching pieces and drop: all three break.");
             std::string move = buttons("%MOVE%");  // a d-pad symbol, or words for the keyboard ("the arrow keys")
             if (move.find('[') == std::string::npos)
                 for (auto& ch : move) ch = char(std::tolower(static_cast<unsigned char>(ch)));
-            if (ph == 2) heading("Watch"), para("The shadow moves onto the pair, then " + buttons("%A%") + " drops the piece.");
+            const int ph = drop_lesson_phase;
+            if (ph == 1 && !drop_lesson_watched) heading("Try it"), para("A matching pair is waiting nearby. Move your shadow next to it and drop your piece.");
+            else if (ph == 1) heading("Your turn"), para("Now you try the same.");
+            else if (ph == 2) heading("Watch"), para("The shadow moves next to the pair, then " + buttons("%A%") + " drops the piece.");
             else if (ph == 3) heading("Watch"), para("All three break.");
-            else if (ph == 4) heading("Your turn"), para("Move your shadow onto the pair with " + move + ", then press " + buttons("%A%") + ".");
+            else if (ph == 4) heading("Your turn"), para("Move your shadow next to the pair with " + move + ", then press " + buttons("%A%") + ".");
             else if (ph == 5) heading("Not quite"), para("No match there, so the piece stacked up. Line your shadow up with the pair first.");
             else heading("Well done"), para("All three broke.");
             if (ph == 2 || ph == 3) panel.hint = "Watching\u2026";
+            if (ph == 1) panel.hint = buttons("%A%") + " Try it    " + buttons("%B%") + (drop_lesson_watched ? " Watch again" : " Watch");
             view->card_panel = panel;
         }
     }
@@ -4128,6 +4135,20 @@ PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy, int p
     return out;
 }
 
+// Player 1's buttons now, mapped as the game would get them (N64 bits), read
+// apart from what the game is given (a lesson's choice, while the game's input
+// is held).
+std::uint16_t player_buttons_now() {
+    std::array<ControllerPortSnapshot, 2> controllers{};
+    std::uint16_t keys = 0;
+    {
+        std::lock_guard lock(input_snapshot_mutex);
+        controllers = input_snapshot;
+        keys = keyboard_snapshot;
+    }
+    return map_port_input(0, controllers[0], keys, controller_bindings(), magic_control()).buttons;
+}
+
 // The Drop lesson's demonstration: the D-pad, one press at a time, until the
 // shadow is over the hole (D-pad right moves the cursor -1 in x, down -1 in
 // y, checked in play), a pause, then A.
@@ -4135,7 +4156,7 @@ std::uint16_t drop_lesson_buttons() {
     if (drop_lesson_phase != 2 || guest_rdram == nullptr || !drop_lesson_at || drop_demo_dropped) return 0;
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *drop_lesson_at).count();
     // A moment to look first, once the sphere has settled after its fly-in.
-    constexpr long long look = 3000;
+    constexpr long long look = 800;
     if (ms < look) return 0;
     const int slot = int((ms - look) / 400), within = int((ms - look) % 400);
     if (slot != drop_demo_slot) {
@@ -6521,14 +6542,13 @@ bool handle_profile_command(const std::string& command) {
                 const auto since = [&] {
                     return drop_lesson_at ? std::chrono::duration_cast<std::chrono::milliseconds>(now_m - *drop_lesson_at).count() : 0;
                 };
-                const auto cursor_to = [&](const int* xy) {
-                    guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(xy[0] - 8)));
-                    guest::store16(rd, pc + 0x2B2E, std::uint16_t(std::int16_t(xy[1] - 8)));
-                };
                 // The board for a go: the cursor home, the hole and the pair at
                 // the target, the hearts full, nothing breaking.
+                // Round the shadow where it is (no jump: the camera stays still;
+                // while it swung, part of the pit's floor went undrawn).
                 const auto set_up = [&](int dx, int dy) {
-                    cursor_to(drop_lesson_home);
+                    drop_lesson_home[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A));
+                    drop_lesson_home[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
                     drop_lesson_target[0] = drop_lesson_home[0] + dx, drop_lesson_target[1] = drop_lesson_home[1] + dy;
                     static const int pit = [] { const char* v = std::getenv("BLOCKPLANET_DROP_PIT"); return v ? std::atoi(v) : -1; }();
                     build_pair_board(drop_lesson_target[0], drop_lesson_target[1], -1, -1, 1, 1, pit, drop_lesson_home[0], drop_lesson_home[1]);
@@ -6547,7 +6567,7 @@ bool handle_profile_command(const std::string& command) {
                         out_since.reset();
                     }
                 }
-                if (drop_lesson_phase >= 2 && in_play) guest::store32(rd, pc + 0x2408, 0);  // no drop timer in this lesson
+                if (drop_lesson_phase >= 1 && in_play) guest::store32(rd, pc + 0x2408, 0);  // no drop timer in this lesson
                 if (drop_lesson_phase == 0) {
                     if (!in_play || blockplanet::ui::menus_open()) drop_lesson_at.reset();
                     else if (!drop_lesson_at) drop_lesson_at = now_m;
@@ -6556,22 +6576,25 @@ bool handle_profile_command(const std::string& command) {
                         drop_lesson_home[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
                         static const int square = [] { const char* v = std::getenv("BLOCKPLANET_DROP_SQUARE"); return v ? std::atoi(v) : 16; }();
                         guest::store16(rd, pc + 0x23E4, std::uint16_t(square));  // no win from the open pit
-                        set_up(-3, 0);  // the demonstration's pair: three to the right
+                        set_up(2, -2);  // the pair two left and two down: move the shadow there and drop (the owner; dragging a piece is Slide's)
                         std::fprintf(stdout, "{\"event\":\"drop_lesson\",\"home\":[%d,%d],\"target\":[%d,%d]}\n", drop_lesson_home[0],
                                      drop_lesson_home[1], drop_lesson_target[0], drop_lesson_target[1]);
                         std::fflush(stdout);
                         // No card (the owner, 2026-11-20): the panel says what
-                        // the lesson is; the demonstration starts at once.
-                        drop_lesson_phase = 2, drop_lesson_at = now_m;
-                        drop_demo_slot = -1, drop_demo_held = 0, drop_demo_aimed = false, drop_demo_dropped = false;
-                        drop_lesson_say = "Watch: the shadow moves to the pair";
+                        // the lesson is, then the choice: try it, or watch first.
+                        drop_lesson_phase = 1, drop_lesson_at = now_m;
+                        drop_lesson_watched = false, drop_choice_armed = false;
                     }
                 } else if (drop_lesson_phase == 1) {
-                    // Once the card has been up and closed again.
-                    static bool card_up = false;
-                    if (blockplanet::ui::menus_open()) card_up = true;
-                    if (card_up && !start_card_requested && in_play && !blockplanet::ui::menus_open()) {
-                        card_up = false;
+                    // The choice: A tries it, B watches; Start pauses as usual.
+                    const std::uint16_t b = player_buttons_now();
+                    if (!in_play || blockplanet::ui::menus_open()) drop_choice_armed = false;
+                    else if (!drop_choice_armed) drop_choice_armed = (b & 0xF000u) == 0;
+                    else if (b & 0x1000u) drop_choice_armed = false, pause_bridge.request_pause(now_m);
+                    else if (b & 0x8000u) {
+                        drop_lesson_phase = 4, drop_lesson_at = now_m;
+                        drop_lesson_say = "Your turn: move onto the pair and press A";
+                    } else if (b & 0x4000u) {
                         drop_lesson_phase = 2, drop_lesson_at = now_m;
                         drop_demo_slot = -1, drop_demo_held = 0, drop_demo_aimed = false, drop_demo_dropped = false;
                         drop_lesson_say = "Watch: the shadow moves to the pair";
@@ -6582,13 +6605,9 @@ bool handle_profile_command(const std::string& command) {
                 } else if (drop_lesson_phase == 3) {
                     // The bricks break, then the board is set up again for the player.
                     if (since() > 3500 && guest::load32(rd, pc + 0x2AFC) == 0) {
-                        // From where the demonstration left the shadow (no jump,
-                        // so the camera stays still).
-                        drop_lesson_home[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A));
-                        drop_lesson_home[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
-                        set_up(2, -2);  // the player's pair: elsewhere
-                        drop_lesson_phase = 4, drop_lesson_at = now_m;
-                        drop_lesson_say = "Your turn: move onto the pair and press A";
+                        set_up(2, -2);  // the same again, for the player
+                        drop_lesson_phase = 1, drop_lesson_at = now_m;
+                        drop_lesson_watched = true, drop_choice_armed = false;
                     }
                 } else if (drop_lesson_phase == 4) {
                     // A drop lands first and scores a moment later: a landing
@@ -7203,6 +7222,7 @@ bool handle_profile_command(const std::string& command) {
                                    : hs_buttons != 0 ? (0x10000u | hs_buttons)
                                    : card_buttons != 0 ? (0x10000u | card_buttons)
                                    // The Drop lesson's demonstration plays itself.
+                                   : drop_lesson_phase == 1 ? 0x10000u  // choosing: the game waits
                                    : drop_lesson_phase == 2 || drop_lesson_phase == 3 ? (0x30000u | drop_lesson_buttons())
                                    : research_fuse_buttons() != 0 ? (0x10000u | research_fuse_buttons())
                                    : research_magic_press && std::chrono::steady_clock::now() >= *research_magic_press &&
