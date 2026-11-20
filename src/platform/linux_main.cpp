@@ -2737,6 +2737,19 @@ void publish_game_text() {
             panel.bottom = 1.0f - fy(bottom);
             panel.w = fx(right) - fx(right - width);
             panel.tail = (tail_x - (right - width)) / width;
+            // Wheels is no longer drawn (the owner, 2026-11-20: more room for
+            // the instructions): the panel fills the right of the picture,
+            // from the sphere's top (line 46) to the bottom of the HUD's row
+            // (line 232), from column 172 (clear of the sphere, which reaches
+            // column 164) to 312; no tail, nobody speaking.
+            static const bool keep_wheels = std::getenv("BLOCKPLANET_KEEP_WHEELS") != nullptr;
+            if (!keep_wheels && box->kind != 1) {
+                panel.right = 1.0f - fx(312.0f);
+                panel.w = fx(312.0f) - fx(172.0f);
+                panel.top = fy(46.0f);
+                panel.height = fy(232.0f) - fy(46.0f);
+                panel.tail = -1.0f;
+            }
             if (box->kind == 1) {
                 // A rules or goal card: centred where the game's box was (its
                 // middle column, from near its top), a little narrower, growing
@@ -5267,6 +5280,22 @@ bool handle_profile_command(const std::string& command) {
                 single_lesson = lesson - 1;  // the lesson's level (0-based)
                 game_option_applier->choose_start(0, lesson);
                 launch_mode(type == 2 ? LaunchMode::TrainingAdvanced : type == 3 ? LaunchMode::TrainingPuzzle : LaunchMode::TrainingBasics);
+                continue;
+            }
+            if (command->rfind("research_find:", 0) == 0 && guest_rdram != nullptr) {
+                // Research: the addresses (0x80000000 to 0x80400000) whose word
+                // equals a value ("research_find:8018B550"), the first 32.
+                const std::uint32_t value = std::uint32_t(std::strtoul(command->c_str() + 14, nullptr, 16));
+                std::string out;
+                int n = 0;
+                for (std::uint32_t a = 0x80000000u; a < 0x80400000u && n < 32; a += 4u)
+                    if (guest::load32(guest_rdram, a) == value) {
+                        char hex[16];
+                        std::snprintf(hex, sizeof hex, "%08X", a);
+                        out += (n++ ? "," : "") + std::string("\"") + hex + "\"";
+                    }
+                std::fprintf(stdout, "{\"event\":\"research_find\",\"value\":\"%08X\",\"at\":[%s]}\n", value, out.c_str());
+                std::fflush(stdout);
                 continue;
             }
             if (command->rfind("research_hex:", 0) == 0 && guest_rdram != nullptr) {

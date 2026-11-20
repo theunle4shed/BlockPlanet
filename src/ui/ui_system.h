@@ -223,6 +223,7 @@ struct HudView {
         float right = 0, bottom = 0, w = 0;  // fractions of the window: its right and bottom edges, its width
         float tail = 0.8f;                   // the tail's place along the bottom edge, 0 left to 1 right; negative: none
         float top = -1.0f;                   // when set: the panel's top edge (it grows downwards), instead of `bottom`
+        float height = 0.0f;                 // when set (with `top`): a fixed height, a fraction of the window
         std::vector<std::pair<std::string, std::string>> heading, body;  // (text, colour) runs
         // Several pages at once (Training's joined pages): blocks in order,
         // each a heading or a paragraph; a run "\n" is a line break.

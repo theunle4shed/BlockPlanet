@@ -206,8 +206,23 @@ void apply_card_scroll(float window_h) {
         }();
         // A panel anchored at its top grows downwards: it stops 3% short of the bottom.
         const bool from_top = panel->GetAttribute<Rml::String>("data-anchor", "bottom") == "top";
-        const float wanted = from_top ? window_h * (1.0f - 0.03f) - panel_top - others
-                                      : (panel_top + panel_h) - window_h * top_margin - others;
+        float wanted = from_top ? window_h * (1.0f - 0.03f) - panel_top - others
+                                : (panel_top + panel_h) - window_h * top_margin - others;
+        // A panel of fixed height (Training, 2026-11-20): the text gets what
+        // its padding and the other parts (heading, hint) leave.
+        if (panel->GetAttribute<Rml::String>("data-fixed", "0") == "1") {
+            const auto& box = panel->GetBox();
+            float rest = box.GetEdge(Rml::BoxArea::Padding, Rml::BoxEdge::Top) + box.GetEdge(Rml::BoxArea::Padding, Rml::BoxEdge::Bottom) +
+                         box.GetEdge(Rml::BoxArea::Border, Rml::BoxEdge::Top) + box.GetEdge(Rml::BoxArea::Border, Rml::BoxEdge::Bottom);
+            for (int i = 0; i < panel->GetNumChildren(); ++i) {
+                Rml::Element* child = panel->GetChild(i);
+                if (child == scroll) continue;
+                const auto& cb = child->GetBox();
+                rest += cb.GetSize(Rml::BoxArea::Border).y + cb.GetEdge(Rml::BoxArea::Margin, Rml::BoxEdge::Top) +
+                        cb.GetEdge(Rml::BoxArea::Margin, Rml::BoxEdge::Bottom);
+            }
+            wanted = panel_h - rest;
+        }
         if (std::abs(wanted - card_scroll.max_px) > 2.0f) card_scroll.max_px = std::max(0.0f, wanted);
     }
     const float max_top = std::max(0.0f, scroll->GetScrollHeight() - shown);
@@ -458,7 +473,8 @@ std::string game_text_rml(const HudView& hud) {
         const std::string anchor = p->top >= 0.0f ? "top: " + pct(p->top) : "bottom: " + pct(p->bottom);
         rml += std::string("<div class='card-panel") + (card_scroll.overflow ? " overflow" : "") + "' data-anchor='" +
                (p->top >= 0.0f ? "top" : "bottom") + "' style='right: " + pct(p->right) + "; " + anchor + "; width: " + pct(p->w) +
-               ";'>";
+               (p->height > 0.0f ? "; height: " + pct(p->height) : std::string()) + ";'" +
+               (p->height > 0.0f ? " data-fixed='1'" : "") + ">";
         const std::string limit = card_scroll.max_px > 0.0f ? "max-height: " + std::to_string(int(card_scroll.max_px)) + "px;" : "";
         if (p->blocks.empty()) {
             if (!p->heading.empty()) rml += "<div class='card-heading'>" + runs(p->heading) + "</div>";

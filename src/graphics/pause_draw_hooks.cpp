@@ -766,6 +766,16 @@ extern "C" bool blockplanet_scene_object(std::uint8_t* rdram, recomp_context* ct
     const auto scene = static_cast<std::uint32_t>(ctx->r4);
     const int object = static_cast<int>(ctx->r7);
     if (blockplanet_title_object(rdram, scene, object, static_cast<std::uint32_t>(ctx->r6))) return true;
+    // Training's tutor, Wheels, left out (the owner, 2026-11-20: more room for
+    // the instructions): in Training (mode 3) in play, the scene the game
+    // keeps at 0x801033C0 (his; the same in the lessons checked).
+    // BLOCKPLANET_KEEP_WHEELS=1 keeps him.
+    {
+        static const bool keep = std::getenv("BLOCKPLANET_KEEP_WHEELS") != nullptr;
+        if (!keep && guest16(rdram, 0x800E44A8u) == 3 && guest16(rdram, 0x800E121Cu) == -1 &&
+            scene == guest32(rdram, 0x801033C0u))
+            return true;
+    }
     blockplanet_vortex_object(rdram, scene, object);  // the jukebox's Vortex, centred (vortex_backdrop.cpp)
     blockplanet_logo_object_draw(rdram, scene, object);  // the N64 logo's wordmark, straight on
     if (std::getenv("BLOCKPLANET_OBJECT_COUNT") != nullptr) {  // research: objects drawn per frame of a scene
