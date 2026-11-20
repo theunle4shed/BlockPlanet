@@ -200,13 +200,16 @@ int main(int argc, char** argv) {
     assert(all.size() == 36 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
     assert(all[1].focus && all[1].label == "Slide and Drop" && all[1].action == "command:new_lesson:slide" &&
            all[1].note == "(In progress)" && all[1].classes == "rag-in-progress");
-    assert(all[2].label == "Hearts and the Drop Timer" && all[2].action.empty() && all[2].classes == "rag-not-started" && all[2].enabled);
+    assert(all[2].label == "Hearts and the Drop Timer" && all[2].action == "command:new_lesson:hearts" && all[2].classes == "rag-in-progress");
+    assert(all[4].label == "Combos" && all[4].action.empty() && all[4].classes == "rag-not-started" && all[4].enabled);
     assert(all[3].label == "Getting Faster" && all[6].action == "command:magic_lesson:0" && all[11].action == "command:magic_lesson:5");
     assert(all[13].label == "Scoring Big" && all[18].label == "Game Modes" && all[19].label == "Rescue" && all[27].label == "Original Lessons");
     assert(all[28].label == "Slide and Drop" && all[28].action == "command:lesson:1:1" && all[28].note == "(Viable)" && all[35].action == "command:lesson:3:1");
     {
         const auto marked = training_lessons(true, true, {0, 4}, {100});
-        assert(!marked[1].focus && marked[7].focus && marked[7].label == "Dynamite");  // the first lesson not done
+        assert(!marked[1].focus && marked[2].focus);  // the first lesson not done: Hearts
+        const auto later = training_lessons(true, true, {0, 4}, {100, 103});
+        assert(later[7].focus && later[7].label == "Dynamite");
         assert(marked[6].note == "(In progress)");  // the status, not the player's progress
     }
 

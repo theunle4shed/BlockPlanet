@@ -272,7 +272,32 @@ std::vector<std::uint8_t> slide_drop_board;
 // go (the A that chose Try it would otherwise drop at once).
 bool lesson_wait_release = false;
 constexpr std::uint32_t pc_ctx = 0x80110220u;  // player 1's context (for jobs on the game's thread)
-bool slide_lesson_shown() { return (slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14); }
+// Hearts and the Drop Timer (2026-11-20), run by the same machinery
+// (hearts_lesson): phases 20 choosing (pages 0 to 3), 21 the demonstration,
+// 22 the player's turn, 23 after a drop (a pause, a new pair), 24 done,
+// 25 leaving. Casual's heart refill is off meanwhile; the lesson refills them.
+bool hearts_lesson = false;
+int hearts_page = 0;
+constexpr int hearts_last_page = 3;
+bool hearts_watched = false;
+int hearts_demo_part = 0;  // 0 the timer runs out on open floor, 1 a heart lost, 2 to the pair, 3 dropped
+std::optional<std::chrono::steady_clock::time_point> hearts_demo_at;
+int hearts_good = 0, hearts_before = 3, hearts_bricks = -1;
+std::uint32_t hearts_score = 0;
+std::string hearts_note;
+constexpr int hearts_goal = 3;
+int hearts_target[2] = {0, 0};
+int hearts_slot = -1;
+std::uint16_t hearts_held = 0;
+bool hearts_aimed = false;
+// The drop timer set by the lesson, so the bar runs out in a few seconds (the
+// stage's own rate took over a minute): the game's value (+0x2408, counting up
+// to its limit, 6000) set from the time since the piece came.
+std::optional<std::chrono::steady_clock::time_point> hearts_timer_from;
+bool slide_lesson_shown() {
+    return (slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14) ||
+           (slide_lesson_phase >= 20 && slide_lesson_phase <= 24);
+}
 // The layout: the first square stays, the second slides four cells across
 // to touch it; the pit 8 x 6 round them, the shadow starting between them.
 constexpr int slide_pieces = 2, slide_moves = 1;
@@ -549,6 +574,18 @@ void show_stage_results() {
         if (r.best_before <= 0.0 || r.value < r.best_before) line += "  \u00B7  New best";
         else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.value - r.best_before) + ")";
     }
+    if (r.lesson == 103) {
+        slide_lesson_phase = -1, hearts_lesson = false;
+        blockplanet::ui::set_text("results_title", "Hearts and the Drop Timer Complete");
+        blockplanet::ui::set_text("results_where", "Training \u00B7 The Basics");
+        blockplanet::ui::set_text("results_line", "");
+        std::vector<blockplanet::ui::ListItem> items;
+        items.push_back({"again", "Try Again", "", "command:new_lesson:hearts", true, 1, false});
+        items.push_back({"back", "Back to Training", "", "back", true, 1, true});
+        blockplanet::ui::set_list("results", items);
+        blockplanet::ui::request_show("results");
+        return;
+    }
     if (r.lesson == 102) {
         slide_lesson_phase = -1;
         blockplanet::ui::set_text("results_title", "Slide and Drop Complete");
@@ -799,7 +836,8 @@ void show_hud(std::optional<blockplanet::ui::HudView> view) {
         v.show_lives = false;
         v.show_magic = false;
         v.mode = "Training";
-        v.stage = slide_lesson_phase >= 1 ? "Slide and Drop" : "Drop";
+        v.stage = hearts_lesson && slide_lesson_phase >= 1 ? "Hearts" : slide_lesson_phase >= 1 ? "Slide and Drop" : "Drop";
+        if (hearts_lesson && slide_lesson_phase >= 20) v.show_lives = true;  // the hearts and the drop timer's bar
         // Only as many next pieces as the lesson needs (the owner: Slide shows one).
         if (slide_lesson_phase >= 1 && v.next.size() > 1) v.next.resize(1);
         if (slide_lesson_phase >= 1) v.next_room = 1;  // and the box only as wide as one (the owner: keep the HUD small)
@@ -1198,7 +1236,7 @@ void update_hud() {
         }
     }
     update_training_scissor(story && state.mode == 3);
-    update_lesson_viewport(((drop_lesson_phase >= 1 && drop_lesson_phase <= 7) || slide_lesson_shown() || slide_lesson_phase == 7 || slide_lesson_phase == 15) &&
+    update_lesson_viewport(((drop_lesson_phase >= 1 && drop_lesson_phase <= 7) || slide_lesson_shown() || slide_lesson_phase == 7 || slide_lesson_phase == 15 || slide_lesson_phase == 25) &&
                            state.mode == 1);
     if (story && state.mode == 3) {  // Training
         update_training_hud(state);
@@ -3130,7 +3168,43 @@ void publish_game_text() {
                     else if (move[c] == ']' && depth) --depth;
                     else if (!depth) move[c] = char(std::tolower(static_cast<unsigned char>(move[c])));
                 }
-                if (ph >= 10) {
+                if (ph >= 20) {
+                    // Hearts and the Drop Timer (2026-11-20): why, then how,
+                    // a line at a time, then try it or show me.
+                    if (ph == 20 && hearts_page <= 1) {
+                        heading("Hearts and the Drop Timer");
+                        para("You start each stage with three hearts.");
+                        if (hearts_page >= 1)
+                            para("Dropping your piece where it doesn't make a match costs a heart. Lose them all and the game is over.");
+                        panel.hint = buttons("%A%") + " Next";
+                    } else if (ph == 20 && hearts_page == 2) {
+                        heading("Hearts and the Drop Timer");
+                        para("Your piece won't wait for ever. The bar under your hearts is the drop timer: when it runs out, your piece "
+                             "drops by itself, wherever your shadow is.");
+                        panel.hint = buttons("%A%") + " Next";
+                    } else if (ph == 20) {
+                        heading("How to Keep Your Hearts");
+                        para("Watch the bar. Line your shadow up with a pair and drop before it runs out.");
+                        panel.hint = buttons("%A%") + " Try it\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + buttons("%B%") +
+                                     (hearts_watched ? " Show me again" : " Show me");
+                    } else if (ph == 21) {
+                        heading("Watch");
+                        if (hearts_demo_part <= 1)
+                            para(hearts_demo_part == 0 ? "The shadow waits on open floor while the bar runs down."
+                                                       : "The bar ran out, so the piece dropped by itself. No match there, so a heart was lost.");
+                        else if (hearts_demo_part == 2) para("This time the shadow goes to the pair, and the piece is dropped in time.");
+                        else para("All three break, and no heart is lost.");
+                        panel.hint = "Watching\u2026";
+                    } else if (ph == 22 || ph == 23) {
+                        heading("Your Turn");
+                        para("Make three good drops before the bar runs out.");
+                        para("Good drops: " + std::to_string(hearts_good) + " of " + std::to_string(hearts_goal));
+                        if (ph == 23 && !hearts_note.empty()) para(hearts_note);
+                    } else {
+                        heading("Well Done");
+                        para("Three good drops, in time.");
+                    }
+                } else if (ph >= 10) {
                     // The drop stage (the owner, 2026-11-20): a new page, just how.
                     heading("How to Drop");
                     if (ph == 10) {
@@ -4491,6 +4565,58 @@ bool slide_free_spot(int cx, int cy, int out[2], std::vector<std::pair<int, int>
             if (d < best) best = d, out[0] = ox, out[1] = oy;
         }
     return best < (1 << 30);
+}
+
+// The hearts as at a stage's start (as Casual's refill does): three, shown full.
+void lesson_refill_hearts(std::uint8_t* g) {
+    guest::store16(g, pc_ctx + 0x2D7E, 3);
+    guest::store16(g, pc_ctx + 0x30FC, 3);
+    for (std::uint32_t i = 0; i < 3; ++i) guest::store8(g, pc_ctx + 0x2FFC + 0x20 * i, 0);
+}
+
+// A new pair for Hearts and the Drop Timer, built on the game's thread round
+// the shadow: two squares side by side in an 8 x 6 pit, the shadow on open
+// floor beside them at one of several places (a bit of variety).
+void hearts_new_pair() {
+    tetrisphere::minefield_sphere::queue_game_thread_job([](std::uint8_t* g) {
+        static std::mt19937 pick(std::random_device{}());
+        const int cx = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2E));
+        int hx = std::uniform_int_distribution<int>(5, 6)(pick), hy = std::uniform_int_distribution<int>(-2, 2)(pick);
+        if (const char* fixed = std::getenv("BLOCKPLANET_HEARTS_SPOT")) std::sscanf(fixed, "%d,%d", &hx, &hy);  // tests: a fixed spot
+        // The pair on the side towards the board's middle (column 16), so the
+        // play area does not creep, drop by drop, to the seam at 31 and 0.
+        const bool mirrored = cx < 16;
+        if (mirrored) hx = 2 - hx;  // the shadow on the pair's other side (-3 or -4)
+        slide_origin[0] = cx - hx, slide_origin[1] = cy - hy;
+        std::vector<std::pair<int, int>> origins;
+        for (const auto& f : slide_finals) origins.push_back({slide_origin[0] + f[0], slide_origin[1] + f[1]});
+        const std::uint32_t rec = guest::load32(g, 0x8014CBC8u + 4u * std::uint32_t(slide_square));
+        int ax = 9, ay = 9;
+        for (int k = 0; k < 9; ++k)
+            if (std::int16_t(guest::load16(g, rec + 0xA + 2u * std::uint32_t(k))) > 0) ax = std::min(ax, k / 3), ay = std::min(ay, k % 3);
+        build_pit_board(slide_origin[0] + ax - 1 - (mirrored ? 4 : 0), slide_origin[1] + ay - 1 - 2, 8, 6, slide_square, origins);
+        guest::store32(g, pc_ctx + 0x2408, 0);  // the timer from the start
+    });
+}
+
+// Hearts' demonstration, its second part: the shadow steered onto a square,
+// a pause, then A.
+std::uint16_t hearts_demo_buttons() {
+    if (slide_lesson_phase != 21 || hearts_demo_part != 2 || guest_rdram == nullptr || !hearts_demo_at) return 0;
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *hearts_demo_at).count();
+    if (ms < 600) return 0;
+    const int slot = int((ms - 600) / 300), within = int((ms - 600) % 300);
+    if (slot != hearts_slot) {
+        hearts_slot = slot;
+        const int dx = hearts_target[0] - (8 + std::int16_t(guest::load16(guest_rdram, pc_ctx + 0x2B2A)));
+        const int dy = hearts_target[1] - (8 + std::int16_t(guest::load16(guest_rdram, pc_ctx + 0x2B2E)));
+        if (dx != 0) hearts_held = dx > 0 ? 0x0200 : 0x0100;
+        else if (dy != 0) hearts_held = dy > 0 ? 0x0800 : 0x0400;
+        else if (!hearts_aimed) hearts_aimed = true, hearts_held = 0;
+        else hearts_held = 0x8000;
+    }
+    if (hearts_held == 0x8000 && within >= 150) hearts_demo_part = 3, hearts_demo_at = std::chrono::steady_clock::now();
+    return within < 150 ? hearts_held : 0;
 }
 
 // The drop stage's demonstration: the shadow steered onto a square (one press
@@ -6754,7 +6880,8 @@ bool handle_profile_command(const std::string& command) {
                 }
                 continue;
             }
-            if (*command == "new_lesson:slide" || *command == "new_lesson:drop") {
+            if (*command == "new_lesson:slide" || *command == "new_lesson:drop" || *command == "new_lesson:hearts") {
+                hearts_lesson = *command == "new_lesson:hearts";
                 // Slide and Drop: Casual 1:1 on its own, taken over once in play;
                 // Drop (from the list) starts at the drop stage, the pair together.
                 magic_lesson = -1, magic_lesson_phase = -1, drop_lesson_phase = -1;
@@ -6969,7 +7096,18 @@ bool handle_profile_command(const std::string& command) {
             // The shadow hidden while a lesson's text is read and the choice
             // waits (and after a step is done): shown only to watch or to play.
             tetrisphere::minefield_sphere::set_lesson_hides_marker(slide_lesson_phase == 1 || slide_lesson_phase == 6 || slide_lesson_phase == 10 ||
-                                                                   slide_lesson_phase == 14 || drop_lesson_phase == 1);
+                                                                   slide_lesson_phase == 14 || slide_lesson_phase == 20 || slide_lesson_phase == 24 ||
+                                                                   drop_lesson_phase == 1);
+            // Casual's heart refill off while Hearts runs (the lesson keeps them
+            // from running out), back on after.
+            {
+                static bool refill_off = false;
+                const bool want_off = hearts_lesson && slide_lesson_phase >= 20 && slide_lesson_phase <= 25;
+                if (want_off != refill_off && game_option_applier) {
+                    refill_off = want_off;
+                    game_option_applier->set_menu_casual(!want_off && play_variant == PlayVariant::Casual);
+                }
+            }
             if (slide_lesson_phase >= 0) {
                 const auto now_m = std::chrono::steady_clock::now();
                 auto* rd = const_cast<std::uint8_t*>(guest_rdram);
@@ -7009,7 +7147,7 @@ bool handle_profile_command(const std::string& command) {
                 start_card_pending.reset();
                 {
                     static std::optional<std::chrono::steady_clock::time_point> out_since;
-                    if (((slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14)) && !pending_results &&
+                    if (slide_lesson_shown() && !pending_results &&
                         std::int16_t(guest::load16(rd, 0x800E121C)) >= 0) {
                         if (!out_since) out_since = now_m;
                         else if (now_m - *out_since > std::chrono::milliseconds(1500)) slide_lesson_phase = -1;
@@ -7018,7 +7156,22 @@ bool handle_profile_command(const std::string& command) {
                     }
                 }
                 if (slide_lesson_phase >= 1 && in_play) {
-                    guest::store32(rd, pc + 0x2408, 0);  // no drop timer
+                    // No drop timer, but in Hearts while it is being shown or played:
+                    // there the lesson's own (6 s in the demonstration, 8 s a piece in
+                    // the player's turn), once the board is in place.
+                    const bool timed = slide_lesson_phase == 22 || (slide_lesson_phase == 21 && hearts_demo_part == 0);
+                    if (!timed || tetrisphere::minefield_sphere::game_thread_job_pending()) {
+                        guest::store32(rd, pc + 0x2408, 0);
+                        hearts_timer_from.reset();
+                    } else {
+                        if (!hearts_timer_from) hearts_timer_from = now_m;
+                        const float seconds = slide_lesson_phase == 21 ? 6.0f : 8.0f;
+                        const float done = std::chrono::duration<float>(now_m - *hearts_timer_from).count() / seconds;
+                        const float value = std::min(6000.0f, 6000.0f * done);
+                        std::uint32_t raw;
+                        std::memcpy(&raw, &value, 4);
+                        guest::store32(rd, pc + 0x2408, raw);
+                    }
                     // The piece in hand always the square, so every square can be grabbed.
                     if (slide_square >= 0)
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
@@ -7094,7 +7247,12 @@ bool handle_profile_command(const std::string& command) {
                         if (slide_square < 0) slide_square = 0;
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
-                        if (slide_drop_start) {
+                        if (hearts_lesson) {
+                            hearts_new_pair();
+                            lesson_refill_hearts(rd);
+                            slide_lesson_phase = 20, slide_lesson_at = now_m;
+                            hearts_page = 0, hearts_watched = false, slide_choice_armed = false;
+                        } else if (slide_drop_start) {
                             // Drop chosen from the list: the pair already together,
                             // the shadow on the floor beside them.
                             slide_origin[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)) - 6;
@@ -7244,6 +7402,107 @@ bool handle_profile_command(const std::string& command) {
                         pending_results = StageResults{};
                         pending_results->lesson = 102;
                         slide_lesson_phase = 15;
+                        if (!single_stage_quit_at && !single_stage_quitting) single_stage_quit_at = now_m;
+                    }
+                } else if (slide_lesson_phase == 20) {
+                    const std::uint16_t b = player_buttons_now();
+                    if (!in_play || blockplanet::ui::menus_open()) slide_choice_armed = false;
+                    else if (!slide_choice_armed) slide_choice_armed = (b & 0xF000u) == 0;
+                    else if (b & 0x1000u) slide_choice_armed = false, pause_bridge.request_pause(now_m);
+                    else if (hearts_page < hearts_last_page) {
+                        if (b & 0x8000u) ++hearts_page, slide_choice_armed = false;
+                    } else if (b & 0x8000u) {
+                        lesson_wait_release = true;
+                        hearts_good = 0, hearts_note.clear(), hearts_bricks = -1;
+                        guest::store32(rd, pc + 0x2408, 0);
+                        slide_lesson_phase = 22, slide_lesson_at = now_m;
+                    } else if (b & 0x4000u) {
+                        hearts_demo_part = 0, hearts_demo_at = now_m, hearts_bricks = count_bricks(), hearts_before = std::int16_t(guest::load16(rd, pc + 0x2D7E));
+                        guest::store32(rd, pc + 0x2408, 0);
+                        slide_lesson_phase = 21, slide_lesson_at = now_m;
+                    }
+                } else if (slide_lesson_phase == 21) {
+                    const int hearts = std::int16_t(guest::load16(rd, pc + 0x2D7E));
+                    const auto part_ms = hearts_demo_at ? std::chrono::duration_cast<std::chrono::milliseconds>(now_m - *hearts_demo_at).count() : 0;
+                    {
+                        static int last_b = -1, last_h = -9;
+                        static float last_t = -1;
+                        const int b = count_bricks();
+                        float t;
+                        const std::uint32_t raw = guest::load32(rd, pc + 0x2408);
+                        std::memcpy(&t, &raw, 4);
+                        static auto last_at = std::chrono::steady_clock::now();
+                        if (b != last_b || hearts != last_h || now_m - last_at > std::chrono::milliseconds(700)) {
+                            last_at = now_m;
+                            std::fprintf(stdout, "{\"event\":\"hearts_demo\",\"part\":%d,\"bricks\":%d,\"hearts\":%d,\"timer\":%.1f,\"shown\":%d}\n", hearts_demo_part, b, hearts, t,
+                                         int(std::int16_t(guest::load16(rd, pc + 0x2B10))));
+                            std::fflush(stdout);
+                            last_b = b, last_h = hearts, last_t = t;
+                        }
+                    }
+                    if (hearts_demo_part == 0) {
+                        // The bar runs out with the shadow on open floor: the
+                        // piece drops by itself, matches nothing, a heart goes.
+                        if (hearts < hearts_before || part_ms > 15000) hearts_demo_part = 1, hearts_demo_at = now_m;
+                    } else if (hearts_demo_part == 1) {
+                        if (part_ms > 3000 && !tetrisphere::minefield_sphere::game_thread_job_pending()) {
+                            hearts_new_pair();
+                            hearts_demo_part = 2, hearts_demo_at = now_m, hearts_slot = -1, hearts_held = 0, hearts_aimed = false;
+                            hearts_target[0] = -99;
+                        }
+                    } else if (hearts_demo_part == 2) {
+                        // Aimed once the new pair is in place.
+                        if (hearts_target[0] == -99 && !tetrisphere::minefield_sphere::game_thread_job_pending()) {
+                            const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                            if (!slide_nearest_square(cx, cy, hearts_target)) hearts_target[0] = cx, hearts_target[1] = cy;
+                            hearts_demo_at = now_m;
+                        }
+                        if (part_ms > 15000) hearts_demo_part = 3, hearts_demo_at = now_m;
+                    } else if (part_ms > 4000 && guest::load32(rd, pc + 0x2AFC) == 0) {
+                        hearts_new_pair();
+                        lesson_refill_hearts(rd);
+                        slide_lesson_phase = 20, slide_lesson_at = now_m;
+                        hearts_watched = true, slide_choice_armed = false, hearts_page = hearts_last_page;
+                    }
+                } else if (slide_lesson_phase == 22) {
+                    // Three good drops before the bar runs out; a drop that
+                    // matches nothing (the player's, or the timer's) costs a heart.
+                    const int hearts = std::int16_t(guest::load16(rd, pc + 0x2D7E));
+                    if (hearts_bricks < 0) {
+                        if (!tetrisphere::minefield_sphere::game_thread_job_pending())
+                            hearts_score = guest::load32(rd, pc + 0x2AF8), hearts_bricks = count_bricks(), hearts_before = hearts;
+                    } else if (guest::load32(rd, pc + 0x2AF8) != hearts_score) {
+                        ++hearts_good;
+                        hearts_note = "Good drop: all three broke.";
+                        slide_lesson_phase = 23, slide_lesson_at = now_m;
+                    } else if (hearts < hearts_before) {
+                        if (hearts <= 0) {
+                            hearts_note = "Out of hearts! In a game, that's game over. Let's start again.";
+                            hearts_good = 0;
+                        } else {
+                            hearts_note = "No match there, so a heart was lost.";
+                        }
+                        slide_lesson_phase = 23, slide_lesson_at = now_m;
+                    }
+                } else if (slide_lesson_phase == 23) {
+                    if (since() > 2500 && guest::load32(rd, pc + 0x2AFC) == 0) {
+                        if (hearts_good >= hearts_goal) {
+                            slide_lesson_phase = 24, slide_lesson_at = now_m;
+                        } else {
+                            if (std::int16_t(guest::load16(rd, pc + 0x2D7E)) <= 0) lesson_refill_hearts(rd);
+                            hearts_new_pair();
+                            hearts_bricks = -1;
+                            slide_lesson_phase = 22, slide_lesson_at = now_m;
+                        }
+                    }
+                } else if (slide_lesson_phase == 24) {
+                    if (since() > 3500 && !pending_results) {
+                        if (profile_save && profile_data.progress.chapters_completed["lessons"].insert(103).second) profile_dirty = true, save_profile();
+                        blockplanet::ui::set_list("chapters", training_lessons(training_done("rescue"), training_done("training_advanced"),
+                                                                               magic_lessons_done(), new_lessons_done()));
+                        pending_results = StageResults{};
+                        pending_results->lesson = 103;
+                        slide_lesson_phase = 25;
                         if (!single_stage_quit_at && !single_stage_quitting) single_stage_quit_at = now_m;
                     }
                 }
@@ -7951,11 +8210,13 @@ bool handle_profile_command(const std::string& command) {
                                    // The Drop lesson's demonstration plays itself.
                                    : drop_lesson_phase == 1 || slide_lesson_phase == 1 || slide_lesson_phase == 10 || lesson_wait_release ||
                                              // done or missed: no second press until the board is reset or the lesson ends (the owner)
-                                             slide_lesson_phase == 6 || slide_lesson_phase == 13 || slide_lesson_phase >= 14 ||
+                                             slide_lesson_phase == 6 || slide_lesson_phase == 13 || (slide_lesson_phase >= 14 && slide_lesson_phase <= 20) ||
+                                             slide_lesson_phase >= 23 || (slide_lesson_phase == 21 && hearts_demo_part != 2) ||
                                              drop_lesson_phase >= 5
                                          ? 0x10000u  // choosing: the game waits
                                    : slide_lesson_phase == 2 ? (0x30000u | slide_lesson_buttons())
                                    : slide_lesson_phase == 11 ? (0x30000u | slide_drop_buttons())
+                                   : slide_lesson_phase == 21 ? (0x30000u | hearts_demo_buttons())
                                    : drop_lesson_phase == 2 || drop_lesson_phase == 3 ? (0x30000u | drop_lesson_buttons())
                                    : research_fuse_buttons() != 0 ? (0x10000u | research_fuse_buttons())
                                    : research_magic_press && std::chrono::steady_clock::now() >= *research_magic_press &&

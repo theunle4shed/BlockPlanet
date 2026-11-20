@@ -316,7 +316,7 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         // on why, then how, then try it or watch it first.
         {"group_basics", "The Basics", {
             {"slide_drop", "Slide and Drop", "command:new_lesson:slide", "Slide two matching pieces together, then drop a third on them.", "\uE1EB", 100, P},
-            {"hearts", "Hearts and the Drop Timer", "", "Drop on a match before the bar runs out, or lose a heart.", "", -1, N},
+            {"hearts", "Hearts and the Drop Timer", "command:new_lesson:hearts", "Drop on a match before the bar runs out, or lose a heart.", "\uE0F5", 103, P},
         }},
         {"group_faster", "Getting Faster", {
             {"combos", "Combos", "", "Break more than three at once, and why bigger combos help.", "", -1, N},
