@@ -713,7 +713,7 @@ void show_hud(std::optional<blockplanet::ui::HudView> view) {
     if (view && drop_lesson_phase >= 1 && drop_lesson_phase <= 6) {
         auto& v = *view;
         v.bottom_row = true;
-        v.row_column = 160.0f;
+        v.row_column = 94.0f;  // the sphere moved left, as Training's (update_lesson_viewport)
         v.show_lives = false;
         v.show_magic = false;
         v.mode = "Training";
@@ -957,6 +957,33 @@ void update_training_scissor(bool training) {
     }
 }
 
+// A BlockPlanet lesson's sphere left of centre, as the original Training's
+// (the owner, 2026-11-20: the sphere and the text sharing the screen). The
+// game draws Casual's sphere through the viewport in its table near the
+// scissors (scale 640 x 480, centre 640, 480 in quarter pixels), the one just
+// before Versus' left half (centre 320); its centre is moved to Training's
+// (377, the game's column 94). The background has its own viewport and stays.
+void update_lesson_viewport(bool shifted) {
+    static std::uint32_t found = 0;
+    static bool moved = false;
+    if (guest_rdram == nullptr) return;
+    auto* rdram = const_cast<std::uint8_t*>(guest_rdram);
+    const auto h = [&](std::uint32_t a) { return guest::load16(guest_rdram, a); };
+    const auto valid = [&](std::uint32_t a) {
+        return h(a) == 640 && h(a + 2) == 480 && h(a + 4) == 511 && (h(a + 8) == 640 || h(a + 8) == 377) && h(a + 10) == 480 &&
+               h(a + 16) == 640 && h(a + 24) == 320;
+    };
+    if (found == 0 || !valid(found)) {
+        found = 0;
+        moved = false;
+        for (std::uint32_t a = 0x80164000u; a < 0x80167000u; a += 8)
+            if (valid(a)) { found = a; break; }
+    }
+    if (found == 0) return;
+    if (shifted && !moved) guest::store16(rdram, found + 8, 377), moved = true;
+    else if (!shifted && moved) guest::store16(rdram, found + 8, 640), moved = false;
+}
+
 void update_hud() {
     static const bool original = std::getenv("BLOCKPLANET_ORIGINAL_HUD") != nullptr;
     if (update_title_overlay()) return;
@@ -1086,6 +1113,7 @@ void update_hud() {
         }
     }
     update_training_scissor(story && state.mode == 3);
+    update_lesson_viewport(drop_lesson_phase >= 1 && drop_lesson_phase <= 7 && state.mode == 1);
     if (story && state.mode == 3) {  // Training
         update_training_hud(state);
         return;
@@ -2982,15 +3010,14 @@ void publish_game_text() {
             }
             view->card_panel = panel;
         }
-        // The Drop lesson's text (BlockPlanet's own lesson): as Training's
-        // panel, right of the sphere (centred in Casual, reaching about column
-        // 230), from its top to the HUD row's bottom, reaching out into a wide
-        // screen's margin: the lesson's name, what it teaches, then what is
-        // happening now.
+        // The Drop lesson's text (BlockPlanet's own lesson): Training's panel,
+        // right of the sphere (moved left, as Training's), from its top to the
+        // HUD row's bottom, a little into a wide screen's margin: the lesson's
+        // name, what it teaches, then what is happening now.
         if (!box && drop_lesson_phase >= 2 && drop_lesson_phase <= 6) {
             const auto fx = [&](float x) { return (area_x + x / 320.0f * area_w) / frame->window_w; };
             const auto fy = [&](float y) { return (frame->y + y / 240.0f * frame->h) / frame->window_h; };
-            const float left = fx(250.0f), right = std::min(0.98f, fx(430.0f));
+            const float left = fx(184.0f), right = std::min(0.98f, fx(330.0f));
             blockplanet::ui::HudView::Panel panel;
             panel.right = 1.0f - right;
             panel.w = right - left;
@@ -4107,8 +4134,10 @@ PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy, int p
 std::uint16_t drop_lesson_buttons() {
     if (drop_lesson_phase != 2 || guest_rdram == nullptr || !drop_lesson_at || drop_demo_dropped) return 0;
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *drop_lesson_at).count();
-    if (ms < 1500) return 0;  // a moment to look first
-    const int slot = int((ms - 1500) / 400), within = int((ms - 1500) % 400);
+    // A moment to look first, once the sphere has settled after its fly-in.
+    constexpr long long look = 3000;
+    if (ms < look) return 0;
+    const int slot = int((ms - look) / 400), within = int((ms - look) % 400);
     if (slot != drop_demo_slot) {
         drop_demo_slot = slot;
         const std::uint32_t pc = 0x80110220u;
@@ -6522,7 +6551,7 @@ bool handle_profile_command(const std::string& command) {
                 if (drop_lesson_phase == 0) {
                     if (!in_play || blockplanet::ui::menus_open()) drop_lesson_at.reset();
                     else if (!drop_lesson_at) drop_lesson_at = now_m;
-                    else if (since() > 800) {
+                    else if (since() > 200) {  // the board at once (the stage's own sphere barely seen)
                         drop_lesson_home[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A));
                         drop_lesson_home[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
                         static const int square = [] { const char* v = std::getenv("BLOCKPLANET_DROP_SQUARE"); return v ? std::atoi(v) : 16; }();
@@ -6531,10 +6560,11 @@ bool handle_profile_command(const std::string& command) {
                         std::fprintf(stdout, "{\"event\":\"drop_lesson\",\"home\":[%d,%d],\"target\":[%d,%d]}\n", drop_lesson_home[0],
                                      drop_lesson_home[1], drop_lesson_target[0], drop_lesson_target[1]);
                         std::fflush(stdout);
-                        drop_lesson_phase = 1;
-                        drop_lesson_say = "Watch";
-                        start_card_requested = now_m;
-                        pause_bridge.request_pause(now_m);
+                        // No card (the owner, 2026-11-20): the panel says what
+                        // the lesson is; the demonstration starts at once.
+                        drop_lesson_phase = 2, drop_lesson_at = now_m;
+                        drop_demo_slot = -1, drop_demo_held = 0, drop_demo_aimed = false, drop_demo_dropped = false;
+                        drop_lesson_say = "Watch: the shadow moves to the pair";
                     }
                 } else if (drop_lesson_phase == 1) {
                     // Once the card has been up and closed again.
@@ -6552,6 +6582,10 @@ bool handle_profile_command(const std::string& command) {
                 } else if (drop_lesson_phase == 3) {
                     // The bricks break, then the board is set up again for the player.
                     if (since() > 3500 && guest::load32(rd, pc + 0x2AFC) == 0) {
+                        // From where the demonstration left the shadow (no jump,
+                        // so the camera stays still).
+                        drop_lesson_home[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A));
+                        drop_lesson_home[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
                         set_up(2, -2);  // the player's pair: elsewhere
                         drop_lesson_phase = 4, drop_lesson_at = now_m;
                         drop_lesson_say = "Your turn: move onto the pair and press A";
