@@ -246,6 +246,9 @@ int slide_origin[2] = {0, 0};  // where the layout's (0, 0) is on the board
 int slide_square = -1;         // the stage's square piece (its queue index)
 int slide_group = 0;           // squares in the biggest group now (shown in the panel)
 bool slide_watched = false, slide_choice_armed = false;
+// The panel's page while choosing (the owner, 2026-11-20: split into pages):
+// 0 what the lesson is for ([A] Next), 1 how to slide and the choice.
+int slide_page = 0;
 // The layout: the first square stays, the second slides four cells across
 // to touch it; the pit 8 x 6 round them, the shadow starting between them.
 constexpr int slide_pieces = 2, slide_moves = 1;
@@ -3074,21 +3077,28 @@ void publish_game_text() {
             const auto heading = [&](const std::string& t) { panel.blocks.push_back(Block{true, {{t, yellow}}}); };
             const auto para = [&](const std::string& t) { panel.blocks.push_back(Block{false, {{t, orange}}}); };
             if (slide_lesson_phase >= 1) {
-                heading("Slide");
-                // Why first (the owner, 2026-11-20): what clearing needs, and
-                // the two steps the lessons take in turn.
-                para("Pieces break when three matching ones touch. Sliding brings two together; dropping adds the third.");
-                para("Put your shadow on a piece, hold " + buttons("%B%") + " to grab it, move, then let go.");
+                // Pages (the owner, 2026-11-20): first what the lesson is for,
+                // then how to slide with the choice; the demonstration and the
+                // player's turn keep the how.
                 const int ph = slide_lesson_phase;
-                if (ph == 1 && !slide_watched) heading("Try it"), para("Slide one square across to the other.");
-                else if (ph == 1) heading("Your turn"), para("Now you try.");
-                else if (ph == 2 && slide_demo_step >= slide_moves) heading("Watch"), para("The two squares are together.");
-                else if (ph == 2) heading("Watch"), para(buttons("%B%") + " grabs a square and slides it across.");
-                else if (ph == 4)
-                    heading("Your turn"), para("Slide one square across to the other. Dropping is off for now.");
-                else heading("Well done"), para("The two squares are together.");
+                if (ph == 1 && slide_page == 0) {
+                    heading("Slide");
+                    para("To clear pieces, you need at least two matching pieces together, then drop a third onto them.");
+                    para("In this lesson you'll slide two pieces together. In the next, you'll drop one on them.");
+                } else {
+                    heading("How to slide");
+                    para("Put your shadow over a piece of the same shape, hold " + buttons("%B%") +
+                         " to grab it, move to slide it along the floor, and let go to leave it there.");
+                    if (ph == 1 && !slide_watched) heading("Try it"), para("Slide one square across until it touches the other.");
+                    else if (ph == 1) heading("Your turn"), para("Now you try.");
+                    else if (ph == 2 && slide_demo_step >= slide_moves) heading("Watch"), para("The two squares are together.");
+                    else if (ph == 2) heading("Watch"), para(buttons("%B%") + " grabs a square and slides it across.");
+                    else if (ph == 4) heading("Your turn"), para("Slide one square across until it touches the other. Dropping is off for now.");
+                    else heading("Well done"), para("The two squares are together.");
+                }
                 if (ph == 2) panel.hint = "Watching\u2026";
-                if (ph == 1) panel.hint = buttons("%A%") + " Try it    " + buttons("%B%") + (slide_watched ? " Watch again" : " Watch");
+                if (ph == 1 && slide_page == 0) panel.hint = buttons("%A%") + " Next";
+                else if (ph == 1) panel.hint = buttons("%A%") + " Try it    " + buttons("%B%") + (slide_watched ? " Watch again" : " Watch");
                 view->card_panel = panel;
             } else {
             heading("Drop");
@@ -6822,14 +6832,16 @@ bool handle_profile_command(const std::string& command) {
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
                         set_up();
                         slide_lesson_phase = 1, slide_lesson_at = now_m;
-                        slide_watched = false, slide_choice_armed = false;
+                        slide_watched = false, slide_choice_armed = false, slide_page = 0;
                     }
                 } else if (slide_lesson_phase == 1) {
                     const std::uint16_t b = player_buttons_now();
                     if (!in_play || blockplanet::ui::menus_open()) slide_choice_armed = false;
                     else if (!slide_choice_armed) slide_choice_armed = (b & 0xF000u) == 0;
                     else if (b & 0x1000u) slide_choice_armed = false, pause_bridge.request_pause(now_m);
-                    else if (b & 0x8000u) slide_lesson_phase = 4, slide_lesson_at = now_m;
+                    else if (slide_page == 0) {
+                        if (b & 0x8000u) slide_page = 1, slide_choice_armed = false;  // on to how
+                    } else if (b & 0x8000u) slide_lesson_phase = 4, slide_lesson_at = now_m;
                     else if (b & 0x4000u) {
                         slide_lesson_phase = 2, slide_lesson_at = now_m;
                         slide_demo_step = 0, slide_demo_stage = 0, slide_demo_slot = -1, slide_demo_held = 0;
