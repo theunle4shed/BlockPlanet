@@ -399,7 +399,7 @@ div { display: block; }
     color: #e8b818;
     font-weight: normal;
     font-size: 0.6em;
-    margin-top: 0.75em;  /* clear of the text above */
+    margin-top: 2.2em;  /* well clear of the text above (the owner: more space before the prompts) */
 }
 .card-tail {
     position: absolute;

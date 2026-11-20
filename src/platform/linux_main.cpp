@@ -253,6 +253,25 @@ bool slide_watched = false, slide_choice_armed = false;
 // Every step that waits for A says so ([A] Next).
 int slide_page = 0;
 constexpr int slide_last_page = 5;
+// The drop stage (the owner, 2026-11-20: Drop carries on from Slide on the
+// same board, no new intro): phases 10 choosing (two lines, then A try it, B
+// show me), 11 the demonstration, 12 the player's turn, 13 a miss, 14 done,
+// 15 leaving. The board as the drop stage began, put back after the
+// demonstration or a miss, with the shadow where it was.
+int slide_drop_page = 0;
+bool slide_drop_watched = false, slide_drop_start = false;  // start: begun at the drop stage (Drop chosen from the list)
+int slide_drop_cursor[2] = {0, 0}, slide_drop_target[2] = {0, 0};
+std::uint32_t slide_drop_score = 0;
+int slide_drop_bricks = 0;
+bool slide_drop_aimed = false, slide_drop_dropped = false;
+int slide_drop_slot = -1;
+std::uint16_t slide_drop_held = 0;
+std::optional<std::chrono::steady_clock::time_point> slide_drop_dropped_at;
+std::vector<std::uint8_t> slide_drop_board;
+// After a choice in a lesson, the game gets no input until every button is let
+// go (the A that chose Try it would otherwise drop at once).
+bool lesson_wait_release = false;
+bool slide_lesson_shown() { return (slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14); }
 // The layout: the first square stays, the second slides four cells across
 // to touch it; the pit 8 x 6 round them, the shadow starting between them.
 constexpr int slide_pieces = 2, slide_moves = 1;
@@ -529,6 +548,18 @@ void show_stage_results() {
         if (r.best_before <= 0.0 || r.value < r.best_before) line += "  \u00B7  New best";
         else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.value - r.best_before) + ")";
     }
+    if (r.lesson == 102) {
+        slide_lesson_phase = -1;
+        blockplanet::ui::set_text("results_title", "Slide and Drop Complete");
+        blockplanet::ui::set_text("results_where", "Training \u00B7 The Basics");
+        blockplanet::ui::set_text("results_line", "");
+        std::vector<blockplanet::ui::ListItem> items;
+        items.push_back({"again", "Try Again", "", "command:new_lesson:slide", true, 1, false});
+        items.push_back({"back", "Back to Training", "", "back", true, 1, true});
+        blockplanet::ui::set_list("results", items);
+        blockplanet::ui::request_show("results");
+        return;
+    }
     if (r.lesson == 101) {
         slide_lesson_phase = -1;
         blockplanet::ui::set_text("results_title", "Slide Complete");
@@ -760,14 +791,14 @@ void show_hud(std::optional<blockplanet::ui::HudView> view) {
     // The Drop lesson's HUD: Training's layout (the owner, 2026-11-20): the
     // next pieces in a row under the sphere (centred: Casual's camera), the
     // lesson's text in the panel to its right (publish_game_text).
-    if (view && ((drop_lesson_phase >= 1 && drop_lesson_phase <= 6) || (slide_lesson_phase >= 1 && slide_lesson_phase <= 6))) {
+    if (view && ((drop_lesson_phase >= 1 && drop_lesson_phase <= 6) || slide_lesson_shown())) {
         auto& v = *view;
         v.bottom_row = true;
         v.row_column = 94.0f;  // the sphere moved left, as Training's (update_lesson_viewport)
         v.show_lives = false;
         v.show_magic = false;
         v.mode = "Training";
-        v.stage = slide_lesson_phase >= 1 ? "Slide" : "Drop";
+        v.stage = slide_lesson_phase >= 1 ? "Slide and Drop" : "Drop";
         // Only as many next pieces as the lesson needs (the owner: Slide shows one).
         if (slide_lesson_phase >= 1 && v.next.size() > 1) v.next.resize(1);
         v.goal_label = "Now";
@@ -1165,7 +1196,7 @@ void update_hud() {
         }
     }
     update_training_scissor(story && state.mode == 3);
-    update_lesson_viewport(((drop_lesson_phase >= 1 && drop_lesson_phase <= 7) || (slide_lesson_phase >= 1 && slide_lesson_phase <= 7)) &&
+    update_lesson_viewport(((drop_lesson_phase >= 1 && drop_lesson_phase <= 7) || slide_lesson_shown() || slide_lesson_phase == 7 || slide_lesson_phase == 15) &&
                            state.mode == 1);
     if (story && state.mode == 3) {  // Training
         update_training_hud(state);
@@ -2638,7 +2669,7 @@ void publish_game_text() {
         for (auto& t : texts)
             if (t.font == 1) t.x += shift;
     }
-    if ((!texts.empty() || box || (drop_lesson_phase >= 1 && drop_lesson_phase <= 6) || (slide_lesson_phase >= 1 && slide_lesson_phase <= 6)) && frame) {
+    if ((!texts.empty() || box || (drop_lesson_phase >= 1 && drop_lesson_phase <= 6) || slide_lesson_shown()) && frame) {
         if (!view) {
             view = blockplanet::ui::HudView{};
             view->text_only = true;
@@ -3069,7 +3100,7 @@ void publish_game_text() {
         // right of the sphere (moved left, as Training's), from its top to the
         // HUD row's bottom, a little into a wide screen's margin: the lesson's
         // name, what it teaches, then what is happening now.
-        if (!box && ((drop_lesson_phase >= 1 && drop_lesson_phase <= 6) || (slide_lesson_phase >= 1 && slide_lesson_phase <= 6))) {
+        if (!box && ((drop_lesson_phase >= 1 && drop_lesson_phase <= 6) || slide_lesson_shown())) {
             const auto fx = [&](float x) { return (area_x + x / 320.0f * area_w) / frame->window_w; };
             const auto fy = [&](float y) { return (frame->y + y / 240.0f * frame->h) / frame->window_h; };
             const float left = fx(184.0f), right = std::min(0.98f, fx(330.0f));
@@ -3097,6 +3128,24 @@ void publish_game_text() {
                     else if (move[c] == ']' && depth) --depth;
                     else if (!depth) move[c] = char(std::tolower(static_cast<unsigned char>(move[c])));
                 }
+                if (ph >= 10) {
+                    // The drop stage (the owner, 2026-11-20): a new page, just how.
+                    heading("How to Drop");
+                    if (ph == 10) {
+                        para("If your shadow isn't lined up with one of the pair, move it with " + move + " until it is.");
+                        if (slide_drop_page >= 1) para("Then press " + buttons("%A%") + " to drop your piece. All three break.");
+                        panel.hint = slide_drop_page < 1 ? buttons("%A%") + " Next"
+                                                         : buttons("%A%") + " Try it\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + buttons("%B%") + (slide_drop_watched ? " Show me again" : " Show me");
+                    } else {
+                        para("Line your shadow up with one of the pair, then press " + buttons("%A%") + ".");
+                        if (ph == 11 && slide_drop_dropped) heading("Watch"), para("All three break.");
+                        else if (ph == 11) heading("Watch"), para("The shadow lines up with a square, then " + buttons("%A%") + " drops the piece.");
+                        else if (ph == 12) heading("Your turn"), para("Drop your piece onto the pair.");
+                        else if (ph == 13) heading("Not quite"), para("No match there, so the piece stacked up. Line your shadow up with one of the pair first.");
+                        else heading("Well done"), para("All three broke.");
+                        if (ph == 11) panel.hint = "Watching\u2026";
+                    }
+                } else
                 if (ph == 1 && slide_page <= 2) {
                     heading("Slide and Drop");
                     // A page break before the third line (the owner: it ran off the box).
@@ -3112,7 +3161,7 @@ void publish_game_text() {
                     if (slide_page >= 4) para("Notice the shadow change when you are over a valid piece.");
                     if (slide_page >= 5) para("Hold " + buttons("%B%") + " and push " + move + " to slide one piece in line with another.");
                     panel.hint = slide_page < slide_last_page ? buttons("%A%") + " Next"
-                                                              : buttons("%A%") + " Try it    " + buttons("%B%") + (slide_watched ? " Show me again" : " Show me");
+                                                              : buttons("%A%") + " Try it\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + buttons("%B%") + (slide_watched ? " Show me again" : " Show me");
                 } else {
                     heading("How to Slide");
                     para("Hold " + buttons("%B%") + " and push " + move + " to slide one piece in line with another.");
@@ -3138,7 +3187,7 @@ void publish_game_text() {
             else if (ph == 5) heading("Not quite"), para("No match there, so the piece stacked up. Line your shadow up with the pair first.");
             else heading("Well done"), para("All three broke.");
             if (ph == 2 || ph == 3) panel.hint = "Watching\u2026";
-            if (ph == 1) panel.hint = buttons("%A%") + " Try it    " + buttons("%B%") + (drop_lesson_watched ? " Watch again" : " Watch");
+            if (ph == 1) panel.hint = buttons("%A%") + " Try it\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + buttons("%B%") + (drop_lesson_watched ? " Watch again" : " Watch");
             view->card_panel = panel;
             }
         }
@@ -4352,6 +4401,78 @@ int slide_biggest_group() {
         best = std::max(best, size);
     }
     return best / 4;
+}
+
+// The board's layers (values, face masks, texture entries, columns) saved and
+// put back: the drop stage's board, after the demonstration or a miss.
+void lesson_board_save(std::vector<std::uint8_t>& out) {
+    out.clear();
+    if (guest_rdram == nullptr) return;
+    const std::uint32_t parts[4][2] = {{guest::load32(guest_rdram, 0x800E44D0u), 9u * 1024u * 2u},
+                                       {guest::load32(guest_rdram, 0x800E44D4u), 9u * 1024u},
+                                       {guest::load32(guest_rdram, 0x800E44D8u), 9u * 1024u * 4u},
+                                       {guest::load32(guest_rdram, 0x800E44DCu), 1024u}};
+    for (const auto& [at, n] : parts)
+        for (std::uint32_t i = 0; i < n; ++i) out.push_back(guest::load8(guest_rdram, at + i));
+}
+void lesson_board_restore(const std::vector<std::uint8_t>& in) {
+    if (guest_rdram == nullptr || in.empty()) return;
+    auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+    const std::uint32_t parts[4][2] = {{guest::load32(rd, 0x800E44D0u), 9u * 1024u * 2u},
+                                       {guest::load32(rd, 0x800E44D4u), 9u * 1024u},
+                                       {guest::load32(rd, 0x800E44D8u), 9u * 1024u * 4u},
+                                       {guest::load32(rd, 0x800E44DCu), 1024u}};
+    std::size_t k = 0;
+    for (const auto& [at, n] : parts)
+        for (std::uint32_t i = 0; i < n && k < in.size(); ++i) guest::store8(rd, at + i, in[k++]);
+}
+
+// The nearest place (a cursor cell) where the shadow lines up with one of the
+// squares on layer 1: each square's top-left cell (its cell number tells which)
+// less the layout's offset. False if none.
+bool slide_nearest_square(int cx, int cy, int out[2]) {
+    if (guest_rdram == nullptr || slide_square < 0) return false;
+    const std::uint32_t rec = guest::load32(guest_rdram, 0x8014CBC8u + 4u * std::uint32_t(slide_square));
+    const int v0 = std::int16_t(guest::load16(guest_rdram, rec));
+    int ax = 9, ay = 9;
+    for (int k = 0; k < 9; ++k)
+        if (std::int16_t(guest::load16(guest_rdram, rec + 0xA + 2u * std::uint32_t(k))) > 0) ax = std::min(ax, k / 3), ay = std::min(ay, k % 3);
+    const int corner = std::int16_t(guest::load16(guest_rdram, rec + 0xA + 2u * std::uint32_t(ax * 3 + ay)));
+    const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
+    int best = 1 << 30;
+    for (int c = 0; c < 1024; ++c) {
+        if (std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(1024 + c))) != v0 + corner - 1) continue;
+        // The cell's place nearest the cursor (the board wraps every 32).
+        int ox = c % 32 - (ax - 1), oy = c / 32 - (ay - 1);
+        ox += 32 * int(std::lround((cx - ox) / 32.0)), oy += 32 * int(std::lround((cy - oy) / 32.0));
+        const int d = std::abs(ox - cx) + std::abs(oy - cy);
+        if (d < best) best = d, out[0] = ox, out[1] = oy;
+    }
+    return best < (1 << 30);
+}
+
+// The drop stage's demonstration: the shadow steered onto a square (one press
+// each 300 ms), a pause, then A.
+std::uint16_t slide_drop_buttons() {
+    if (slide_lesson_phase != 11 || guest_rdram == nullptr || !slide_lesson_at || slide_drop_dropped) return 0;
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *slide_lesson_at).count();
+    if (ms < 800) return 0;
+    const int slot = int((ms - 800) / 300), within = int((ms - 800) % 300);
+    if (slot != slide_drop_slot) {
+        slide_drop_slot = slot;
+        const std::uint32_t pc = 0x80110220u;
+        const int dx = slide_drop_target[0] - (8 + std::int16_t(guest::load16(guest_rdram, pc + 0x2B2A)));
+        const int dy = slide_drop_target[1] - (8 + std::int16_t(guest::load16(guest_rdram, pc + 0x2B2E)));
+        if (dx != 0) slide_drop_held = dx > 0 ? 0x0200 : 0x0100;
+        else if (dy != 0) slide_drop_held = dy > 0 ? 0x0800 : 0x0400;
+        else if (!slide_drop_aimed) slide_drop_aimed = true, slide_drop_held = 0;
+        else slide_drop_held = 0x8000;
+    }
+    if (slide_drop_held == 0x8000 && within >= 150) {
+        slide_drop_dropped = true;
+        slide_drop_dropped_at = std::chrono::steady_clock::now();
+    }
+    return within < 150 ? slide_drop_held : 0;
 }
 
 // The Slide lesson's demonstration: for each square in turn, the shadow
@@ -6588,9 +6709,11 @@ bool handle_profile_command(const std::string& command) {
                 }
                 continue;
             }
-            if (*command == "new_lesson:slide") {
-                // The Slide lesson: Casual 1:1 on its own, taken over once in play.
+            if (*command == "new_lesson:slide" || *command == "new_lesson:drop") {
+                // Slide and Drop: Casual 1:1 on its own, taken over once in play;
+                // Drop (from the list) starts at the drop stage, the pair together.
                 magic_lesson = -1, magic_lesson_phase = -1, drop_lesson_phase = -1;
+                slide_drop_start = *command == "new_lesson:drop";
                 slide_lesson_phase = 0;
                 slide_lesson_at.reset();
                 if (guest_rdram != nullptr) {
@@ -6792,7 +6915,8 @@ bool handle_profile_command(const std::string& command) {
                 drop_lesson_saved_background = -1;
             }
             // The Slide lesson in play (see slide_lesson_phase).
-            lesson_no_drop.store(slide_lesson_phase >= 1 && slide_lesson_phase <= 6);
+            lesson_no_drop.store(slide_lesson_phase >= 1 && slide_lesson_phase <= 6);  // the drop stage (10 on) drops
+            if (lesson_wait_release && (player_buttons_now() & 0xF000u) == 0) lesson_wait_release = false;
             if (slide_lesson_phase >= 0) {
                 const auto now_m = std::chrono::steady_clock::now();
                 auto* rd = const_cast<std::uint8_t*>(guest_rdram);
@@ -6832,7 +6956,8 @@ bool handle_profile_command(const std::string& command) {
                 start_card_pending.reset();
                 {
                     static std::optional<std::chrono::steady_clock::time_point> out_since;
-                    if (slide_lesson_phase >= 1 && slide_lesson_phase <= 5 && !pending_results && std::int16_t(guest::load16(rd, 0x800E121C)) >= 0) {
+                    if (((slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14)) && !pending_results &&
+                        std::int16_t(guest::load16(rd, 0x800E121C)) >= 0) {
                         if (!out_since) out_since = now_m;
                         else if (now_m - *out_since > std::chrono::milliseconds(1500)) slide_lesson_phase = -1;
                     } else {
@@ -6845,6 +6970,21 @@ bool handle_profile_command(const std::string& command) {
                     if (slide_square >= 0)
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
                 }
+                // The drop stage begins: the board kept as it is (the player's
+                // pair), the shadow where it is.
+                const auto enter_drop = [&] {
+                    lesson_board_save(slide_drop_board);
+                    slide_drop_cursor[0] = std::int16_t(guest::load16(rd, pc + 0x2B2A));
+                    slide_drop_cursor[1] = std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                    slide_lesson_phase = 10, slide_lesson_at = now_m;
+                    slide_drop_page = 0, slide_drop_watched = false, slide_choice_armed = false;
+                };
+                const auto restore_drop = [&] {
+                    lesson_board_restore(slide_drop_board);
+                    guest::store16(rd, pc + 0x2B2A, std::uint16_t(slide_drop_cursor[0]));
+                    guest::store16(rd, pc + 0x2B2E, std::uint16_t(slide_drop_cursor[1]));
+                    guest::store16(rd, pc + 0x2D7E, 3);
+                };
                 if (slide_lesson_phase == 0) {
                     if (!in_play || blockplanet::ui::menus_open()) slide_lesson_at.reset();
                     else if (!slide_lesson_at) slide_lesson_at = now_m;
@@ -6853,9 +6993,25 @@ bool handle_profile_command(const std::string& command) {
                         if (slide_square < 0) slide_square = 0;
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
-                        set_up();
-                        slide_lesson_phase = 1, slide_lesson_at = now_m;
-                        slide_watched = false, slide_choice_armed = false, slide_page = 0;
+                        if (slide_drop_start) {
+                            // Drop chosen from the list: the pair already together,
+                            // the shadow on the floor beside them.
+                            slide_origin[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)) - 6;
+                            slide_origin[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                            std::vector<std::pair<int, int>> origins;
+                            for (const auto& f : slide_finals) origins.push_back({slide_origin[0] + f[0], slide_origin[1] + f[1]});
+                            const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(slide_square));
+                            int ax = 9, ay = 9;
+                            for (int k = 0; k < 9; ++k)
+                                if (std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k))) > 0) ax = std::min(ax, k / 3), ay = std::min(ay, k % 3);
+                            build_pit_board(slide_origin[0] + ax - 1, slide_origin[1] + ay - 1 - 2, 8, 6, slide_square, origins);
+                            guest::store16(rd, pc + 0x2D7E, 3);
+                            enter_drop();
+                        } else {
+                            set_up();
+                            slide_lesson_phase = 1, slide_lesson_at = now_m;
+                            slide_watched = false, slide_choice_armed = false, slide_page = 0;
+                        }
                     }
                 } else if (slide_lesson_phase == 1) {
                     const std::uint16_t b = player_buttons_now();
@@ -6864,7 +7020,7 @@ bool handle_profile_command(const std::string& command) {
                     else if (b & 0x1000u) slide_choice_armed = false, pause_bridge.request_pause(now_m);
                     else if (slide_page < slide_last_page) {
                         if (b & 0x8000u) ++slide_page, slide_choice_armed = false;  // the next line, or page
-                    } else if (b & 0x8000u) slide_lesson_phase = 4, slide_lesson_at = now_m;
+                    } else if (b & 0x8000u) slide_lesson_phase = 4, slide_lesson_at = now_m, lesson_wait_release = true;
                     else if (b & 0x4000u) {
                         slide_lesson_phase = 2, slide_lesson_at = now_m;
                         slide_demo_step = 0, slide_demo_stage = 0, slide_demo_slot = -1, slide_demo_held = 0;
@@ -6902,16 +7058,73 @@ bool handle_profile_command(const std::string& command) {
                         together.reset();
                     }
                 } else if (slide_lesson_phase == 6) {
-                    if (since() > 2500 && !pending_results) {
+                    // Slid together: on to the drop stage on the same board.
+                    if (since() > 2500) {
                         if (profile_save && profile_data.progress.chapters_completed["lessons"].insert(101).second) {
                             profile_dirty = true;
                             save_profile();
                         }
+                        enter_drop();
+                    }
+                } else if (slide_lesson_phase == 10) {
+                    const std::uint16_t b = player_buttons_now();
+                    if (!in_play || blockplanet::ui::menus_open()) slide_choice_armed = false;
+                    else if (!slide_choice_armed) slide_choice_armed = (b & 0xF000u) == 0;
+                    else if (b & 0x1000u) slide_choice_armed = false, pause_bridge.request_pause(now_m);
+                    else if (slide_drop_page < 1) {
+                        if (b & 0x8000u) ++slide_drop_page, slide_choice_armed = false;
+                    } else if (b & 0x8000u) {
+                        lesson_wait_release = true;
+                        slide_lesson_phase = 12, slide_lesson_at = now_m;
+                        slide_drop_score = guest::load32(rd, pc + 0x2AF8), slide_drop_bricks = count_bricks();
+                    } else if (b & 0x4000u) {
+                        const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                        if (!slide_nearest_square(cx, cy, slide_drop_target)) slide_drop_target[0] = cx, slide_drop_target[1] = cy;
+                        slide_lesson_phase = 11, slide_lesson_at = now_m;
+                        slide_drop_aimed = false, slide_drop_dropped = false, slide_drop_slot = -1, slide_drop_held = 0;
+                        slide_drop_dropped_at.reset();
+                    }
+                } else if (slide_lesson_phase == 11) {
+                    // Dropped: all three break; a pause to look (the owner),
+                    // then the pair put back for the player.
+                    if (slide_drop_dropped && slide_drop_dropped_at && now_m - *slide_drop_dropped_at > std::chrono::milliseconds(4500) &&
+                        guest::load32(rd, pc + 0x2AFC) == 0) {
+                        restore_drop();
+                        slide_lesson_phase = 10, slide_lesson_at = now_m;
+                        slide_drop_watched = true, slide_choice_armed = false, slide_drop_page = 1;
+                    } else if (since() > 20000) {
+                        restore_drop();
+                        slide_lesson_phase = 10, slide_lesson_at = now_m, slide_choice_armed = false, slide_drop_page = 1;
+                    }
+                } else if (slide_lesson_phase == 12) {
+                    // A landing scores a moment later: none after 1.5 s is a miss.
+                    static std::optional<std::chrono::steady_clock::time_point> landed;
+                    if (guest::load32(rd, pc + 0x2AF8) != slide_drop_score) {
+                        landed.reset();
+                        slide_lesson_phase = 14, slide_lesson_at = now_m;
+                    } else if (count_bricks() != slide_drop_bricks) {
+                        if (!landed) landed = now_m;
+                        else if (now_m - *landed > std::chrono::milliseconds(1500)) landed.reset(), slide_lesson_phase = 13, slide_lesson_at = now_m;
+                    } else {
+                        landed.reset();
+                    }
+                } else if (slide_lesson_phase == 13) {
+                    if (since() > 2500) {
+                        restore_drop();
+                        slide_lesson_phase = 12, slide_lesson_at = now_m;
+                        slide_drop_score = guest::load32(rd, pc + 0x2AF8), slide_drop_bricks = count_bricks();
+                    }
+                } else if (slide_lesson_phase == 14) {
+                    if (since() > 3500 && !pending_results) {
+                        if (profile_save) {
+                            auto& done = profile_data.progress.chapters_completed["lessons"];
+                            if (done.insert(100).second | done.insert(101).second) profile_dirty = true, save_profile();
+                        }
                         blockplanet::ui::set_list("chapters", training_lessons(training_done("rescue"), training_done("training_advanced"),
                                                                                magic_lessons_done(), new_lessons_done()));
                         pending_results = StageResults{};
-                        pending_results->lesson = 101;
-                        slide_lesson_phase = 7;
+                        pending_results->lesson = 102;
+                        slide_lesson_phase = 15;
                         if (!single_stage_quit_at && !single_stage_quitting) single_stage_quit_at = now_m;
                     }
                 }
@@ -6986,6 +7199,7 @@ bool handle_profile_command(const std::string& command) {
                     else if (!drop_choice_armed) drop_choice_armed = (b & 0xF000u) == 0;
                     else if (b & 0x1000u) drop_choice_armed = false, pause_bridge.request_pause(now_m);
                     else if (b & 0x8000u) {
+                        lesson_wait_release = true;
                         drop_lesson_phase = 4, drop_lesson_at = now_m;
                         drop_lesson_say = "Your turn: move onto the pair and press A";
                     } else if (b & 0x4000u) {
@@ -7616,8 +7830,9 @@ bool handle_profile_command(const std::string& command) {
                                    : hs_buttons != 0 ? (0x10000u | hs_buttons)
                                    : card_buttons != 0 ? (0x10000u | card_buttons)
                                    // The Drop lesson's demonstration plays itself.
-                                   : drop_lesson_phase == 1 || slide_lesson_phase == 1 ? 0x10000u  // choosing: the game waits
+                                   : drop_lesson_phase == 1 || slide_lesson_phase == 1 || slide_lesson_phase == 10 || lesson_wait_release ? 0x10000u  // choosing: the game waits
                                    : slide_lesson_phase == 2 ? (0x30000u | slide_lesson_buttons())
+                                   : slide_lesson_phase == 11 ? (0x30000u | slide_drop_buttons())
                                    : drop_lesson_phase == 2 || drop_lesson_phase == 3 ? (0x30000u | drop_lesson_buttons())
                                    : research_fuse_buttons() != 0 ? (0x10000u | research_fuse_buttons())
                                    : research_magic_press && std::chrono::steady_clock::now() >= *research_magic_press &&
