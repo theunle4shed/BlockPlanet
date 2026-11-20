@@ -133,3 +133,18 @@ So **the combo's steps rise when power pieces break** (and gravity-fallen bricks
 **The fuse combo, checked in play (2026-11-20).** With B itself a power piece (`research_lab:fuseB`, and the same with the hole flagged too, `fuseBH`) and the game grabbing B 120 ms after the combo started (`research_fuse_auto:B:120`): the first combo paid 400; B, flashing, was grabbed and slid up the corridor; on letting go the **fuse count rose to 1** and B broke the two waiting pieces in a second combo, which paid 20 × 2 = 40 (doubled by the X count), and the cells it opened gave the core bonus of 2,000 (1,000 × (1 + fuse 1)). With only the hole flagged (`fuseH`), B stayed locked and broke with the first combo.
 
 So **a power piece breaking in a combo can be grabbed and slid; ordinary breaking pieces are locked**. Slid into line with matching pieces and let go, it sets off a fuse combo, counted when it is let go, as the code says (`0x800CE9A8`) and as the original's fuse lesson teaches ("a fuse from a power combo"). This is the owner's memory of moving a white block to chain a combo. Dropping a piece onto a running combo is not counted as a fuse in the code (not tested directly).
+
+## The magic lab (2026-11-20)
+
+Each magic used once at the cursor on Casual 10:5 (seven layers), the board snapshotted before (`research_snap`) and compared 10 s after (`research_diff`), the magic given by `research_magic:K` and pressed again with `research_magic_retry` only if still held (each was used exactly once). Cells emptied, by layer from the top (6) down:
+
+| Magic | Cells | By layer | Shape round the cursor |
+| --- | --- | --- | --- |
+| Firecracker | 69 | 6: 69 | One round patch about 4 cells across each way, centred on the cursor, top layer only |
+| Dynamite | 94 | 6: 94 | Five small patches in a ring round the cursor, the cursor's own cell left |
+| Magnet | 81 | 6: 18, 5: 15, 4: 16, 3: 18, 2: 6, 1: 8 | The 3 × 3 under the cursor (with whole bricks round it), dug down to the bottom layer when held still |
+| Atom | 1,024 | 6: 1,024 | The whole top layer |
+| Bomb | 168 | 6: 131, 5: 37 | A larger round patch about 6 cells each way, and a second layer in its middle |
+| Ray Gun | 86 | 6: 18, 5: 20, 4: 14, 3: 14, 2: 10, 1: 10 | The 3 × 3 under the cursor, drilled straight down to the bottom layer |
+
+All match the code's reading (Firecracker radius 4, Bomb radius 6 then 3, Dynamite five discs of radius 2 in a ring, Magnet and Ray Gun the 3 × 3 under the cursor, Atom the whole surface; whole bricks reaching past each pattern's edge). No magic scored by itself (the Ray Gun's run gained 1,000 from a core cell it uncovered). The heat maps are drawn from the logs by a script kept outside the repository; a magic lesson would show these shapes.
