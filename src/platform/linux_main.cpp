@@ -5278,7 +5278,7 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
                 continue;
             }
-            if (command->rfind("research_lab:", 0) == 0 && guest_rdram != nullptr) {
+            if (command->rfind("research_lab:combo", 0) == 0 && guest_rdram != nullptr) {
                 // Research (2026-11-20, the combo lab): rebuilds stage 1:1's top
                 // layer round the cursor so one drop makes a combo. Every cell
                 // of layer 1 becomes an inert wall; the piece in hand's shape is
@@ -5356,6 +5356,126 @@ bool handle_profile_command(const std::string& command) {
                 for (int k = 0; k < 9; ++k) lay += (k ? "," : "") + std::to_string(layout[k]);
                 std::fprintf(stdout, "{\"event\":\"research_lab\",\"index\":%d,\"value\":%d,\"cursor\":[%d,%d],\"layout\":[%s],\"fits\":[%s],\"used\":[%d,%d],\"signs\":[%d,%d]}\n",
                              index, v0, cx, cy, lay.c_str(), fl.c_str(), fi, fj, sx, sy);
+                std::fflush(stdout);
+                continue;
+            }
+            if (*command == "research_lab:gravity" && guest_rdram != nullptr) {
+                // Research (2026-11-20, the gravity lab): stage 1:1 rebuilt so
+                // one drop makes a combo that drops a piece into a second one.
+                // Layer 1 is walls; the piece about to drop (shape K) is cut out
+                // at the cursor with two K pieces beside it (A, B: the first
+                // combo). A piece of the stage's other shape (L), F, rests on
+                // layer 2 over A (its other cells over holes); two L pieces (C,
+                // D) wait on layer 1 at L's fitting positions round A's place,
+                // so when A breaks, F falls there and matches them: a gravity
+                // combo. (They are another shape, so the first combo leaves them.)
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                const std::uint32_t pc = 0x80110220u;
+                const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
+                                    entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
+                const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                struct Shape { std::uint32_t rec; std::int16_t v0; int layout[9]; std::vector<std::pair<int, int>> fit; };
+                const auto shape = [&](int index) {
+                    Shape sh{};
+                    sh.rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(index));
+                    sh.v0 = std::int16_t(guest::load16(rd, sh.rec));
+                    for (int k = 0; k < 9; ++k) sh.layout[k] = std::int16_t(guest::load16(rd, sh.rec + 0xA + 2u * std::uint32_t(k)));
+                    const int fits = std::int16_t(guest::load16(rd, sh.rec + 0x74A));
+                    for (int k = 0; k < fits && k < 14; ++k)
+                        sh.fit.push_back({std::int8_t(guest::load8(rd, sh.rec + 0x74C + 2u * std::uint32_t(k))),
+                                          std::int8_t(guest::load8(rd, sh.rec + 0x74D + 2u * std::uint32_t(k)))});
+                    return sh;
+                };
+                const int ki = std::int16_t(guest::load16(rd, pc + 0x2374));
+                const int li = ki == 0 ? 1 : 0;  // 1:1 has two shapes, indexes 0 and 1
+                const Shape K = shape(ki), L = shape(li);
+                const auto cell = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
+                const auto cells_of = [&](const Shape& sh, int ox, int oy) {
+                    std::vector<std::pair<int, int>> out;  // (board cell, cell number)
+                    for (int x = 0; x < 3; ++x)
+                        for (int y = 0; y < 3; ++y)
+                            if (sh.layout[x * 3 + y] > 0) out.push_back({cell(ox + x - 1, oy + y - 1), sh.layout[x * 3 + y]});
+                    return out;
+                };
+                std::vector<int> l1(1024, 1), l2(1024, 0);  // layer 1: 0 empty, 1 wall, 2 piece; layer 2: 1 piece
+                for (int c = 0; c < 1024; ++c) {
+                    guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 423);
+                    for (int layer = 2; layer < 9; ++layer) {
+                        guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), 0);
+                        guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), 0);
+                    }
+                }
+                const auto put = [&](const Shape& sh, int ox, int oy, int layer) {
+                    for (const auto& [c, n] : cells_of(sh, ox, oy)) {
+                        guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), std::int16_t(sh.v0 + n - 1));
+                        guest::store32(rd, entries + 4u * std::uint32_t(layer * 1024 + c), sh.rec + 0x78u + 96u * std::uint32_t(n - 1));
+                        (layer == 1 ? l1 : l2)[std::size_t(c)] = layer == 1 ? 2 : 1;
+                    }
+                };
+                const auto hole = [&](int c) {
+                    l1[std::size_t(c)] = 0;
+                    guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 0);
+                    guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), 0);
+                };
+                // The first combo: the hole at the cursor, A and B.
+                for (const auto& [c, n] : cells_of(K, cx, cy)) hole(c);
+                const int ax = cx + K.fit[0].first, ay = cy + K.fit[0].second;
+                put(K, ax, ay, 1);
+                put(K, cx + K.fit[1].first, cy + K.fit[1].second, 1);
+                // F: an L piece on layer 2 resting on A (at least one cell over
+                // A) and clear of the hole and of B, found by trying origins
+                // round A; its cells not over A are cut out of layer 1 beneath.
+                std::vector<int> a_cells;
+                for (const auto& [c, n] : cells_of(K, ax, ay)) a_cells.push_back(c);
+                const auto in_a = [&](int c) { return std::find(a_cells.begin(), a_cells.end(), c) != a_cells.end(); };
+                int fx = ax, fy = ay;
+                bool found = false;
+                for (int r = 0; r <= 2 && !found; ++r)
+                    for (int dy = -r; dy <= r && !found; ++dy)
+                        for (int dx = -r; dx <= r && !found; ++dx) {
+                            if (std::max(std::abs(dx), std::abs(dy)) != r) continue;
+                            bool over_a = false, clear = true;
+                            for (const auto& [c, n] : cells_of(L, ax + dx, ay + dy)) {
+                                over_a = over_a || in_a(c);
+                                clear = clear && (in_a(c) || l1[std::size_t(c)] == 1);
+                            }
+                            if (over_a && clear) fx = ax + dx, fy = ay + dy, found = true;
+                        }
+                for (const auto& [c, n] : cells_of(L, fx, fy))
+                    if (!in_a(c)) hole(c);
+                put(L, fx, fy, 2);
+                // C and D: the first two of L's fitting positions round F's
+                // landing place whose cells are all walls now.
+                int placed = 0;
+                std::string used;
+                for (std::size_t k = 0; k < L.fit.size() && placed < 2; ++k) {
+                    const int ox = fx + L.fit[k].first, oy = fy + L.fit[k].second;
+                    bool free = true;
+                    for (const auto& [c, n] : cells_of(L, ox, oy)) free = free && l1[std::size_t(c)] == 1;
+                    if (!free) continue;
+                    put(L, ox, oy, 1);
+                    used += (used.empty() ? "" : ",") + std::to_string(k);
+                    ++placed;
+                }
+                // Columns and face masks.
+                for (int c = 0; c < 1024; ++c) {
+                    const int x = c % 32, y = c / 32;
+                    guest::store8(rd, masks + std::uint32_t(c), l1[std::size_t(c)] ? 0 : 80);
+                    guest::store8(rd, columns + std::uint32_t(c),
+                                  l2[std::size_t(c)] ? 0x22 : l1[std::size_t(c)] ? 0x11 : 0x00);
+                    for (int layer = 1; layer <= 2; ++layer) {
+                        const auto& g = layer == 1 ? l1 : l2;
+                        if (!g[std::size_t(c)]) continue;
+                        std::uint8_t m = (layer == 1 && l2[std::size_t(c)]) ? 0 : 16;
+                        if (!g[std::size_t(cell(x + 1, y))]) m |= 8;
+                        if (!g[std::size_t(cell(x - 1, y))]) m |= 4;
+                        if (!g[std::size_t(cell(x, y + 1))]) m |= 2;
+                        if (!g[std::size_t(cell(x, y - 1))]) m |= 1;
+                        guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), m);
+                    }
+                }
+                std::fprintf(stdout, "{\"event\":\"research_lab\",\"lab\":\"gravity\",\"k\":%d,\"l\":%d,\"cursor\":[%d,%d],\"a\":[%d,%d],\"f\":[%d,%d],\"f_found\":%d,\"cd_fits\":[%s]}\n",
+                             ki, li, cx, cy, ax, ay, fx, fy, found, used.c_str());
                 std::fflush(stdout);
                 continue;
             }
