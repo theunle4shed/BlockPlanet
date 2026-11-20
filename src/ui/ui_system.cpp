@@ -632,14 +632,17 @@ std::string hud_rml_parts(const HudView& hud) {
     (void)model;
     // The box charges up as the magic meter fills (item-fill, set each frame),
     // in place of a separate bar (the owner, 2026-11-19).
+    // Left out where not needed (the Drop lesson, 2026-11-20).
+    if (hud.show_magic) {
     rml += "<div id='magic'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'" +
            item_classes(hud) + "><div id='item-fill'/>";
     // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
     // its name is shown only when it is not.
     rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
     rml += "</div><div class='edge'/></div><div class='band foot'/></div>";
+    }
     if (hud.show_next) {
-    rml += "<div class='rule'><div class='line'/></div>";
+    if (hud.show_magic) rml += "<div class='rule'><div class='line'/></div>";
     rml += "<div id='next' class='group'><div class='label'>Next</div>";
     rml += pieces_rml(hud.next, hud.next.size(), 3);
     rml += "</div>";

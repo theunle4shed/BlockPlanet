@@ -40,6 +40,9 @@ One idea per lesson, under a minute, one or two sentences of text (no paging), n
 
 **Order:** The Basics first (Drop as the template lesson: show, reset, your turn, check), then the rest in the same pattern.
 
+**Progress:**
+- **Drop: built (2026-11-20).** `new_lesson:drop` (`drop_lesson_phase` in `src/platform/linux_main.cpp`). The demonstration waits for the card to close (the game is paused under it), then presses one direction every 400 ms, steered by where the cursor is, until the shadow is over the hole; a pause; A. Its presses go through the injected controller with bit 17 set, which copies the D-pad onto the stick (the game steers the shadow by the stick): D-pad right moves the cursor −1 in x, down −1 in y. A landing is judged 1.5 s later (it lands before it scores): scored is done, not scored is a miss. Still to add: Start to skip the demonstration; Next to the following lesson once Slide exists; a button picture lighting with each press.
+
 ## Proposal (2026-11-07): the original lessons
 
 From the owner's notes after seeing Training with BlockPlanet's speech panel: there is too much on screen for a new player; HUD elements should be in Story's style, at the bottom, and shown only once introduced; the N64 pad picture should go (done); the bubble should be narrower and fit its text (done); pages that only show more text should be combined and scrolled; the heading needs weight (done).

@@ -298,18 +298,23 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
     return {basics, advanced};
 }
 
-std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done, const std::set<int>& magic_done) {
+std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done, const std::set<int>& magic_done,
+                                                        const std::set<int>& lessons_done) {
     // Grouped under headers (the owner's layout, 2026-11-20): The Basics,
     // Magic, Advanced, Other Modes; a lesson builds on those above it. A header is a disabled item, so the
     // focus passes over it. Lessons not built yet are listed, marked Not started.
+    // done: a magic lesson's number (0 to 5), BlockPlanet's own lessons 100+, -1 none.
     struct Lesson { const char* id; const char* label; const char* action; const char* description; const char* icon; int magic; };
     struct Group { const char* id; const char* title; std::vector<Lesson> lessons; };
     static const std::vector<Group> groups = {
         {"group_basics", "The Basics", {
-            {"basics", "Slide and Drop", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB", -1},
-            {"lives", "Lives", "command:lesson:1:2", "Your hearts, and how a drop that matches nothing costs one.", "\uE0F5", -1},
-            {"drop_timer", "Drop Timer", "", "When your brick drops by itself, and how the bar warns you.", "", -1},
-            {"rubble", "Rubble", "", "The small purple blocks: sliding into them, and turning them into a brick.", "", -1},
+            // BlockPlanet's own lessons (2026-11-20, docs/TRAINING_REDESIGN.md):
+            // each shows the move, resets the board, then the player does it.
+            // Lesson keys 100+ (lessons_done); Next runs them in order.
+            {"goal", "The Goal", "", "What a stage asks: dig through to the picture in the core.", "", -1},
+            {"drop", "Drop", "command:new_lesson:drop", "Drop your piece onto two matching pieces to break all three.", "\uE1EB", 100},
+            {"slide", "Slide", "", "Hold B to slide a piece into line, then drop on it.", "", -1},
+            {"hearts", "Hearts and the Drop Timer", "", "Drop on a match before the bar runs out, or lose a heart.", "", -1},
             {"combos", "Combos", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4", -1},
         }},
         {"group_magic", "Magic", {
@@ -335,9 +340,15 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             {"puzzle", "Puzzle Controls", "command:lesson:3:1", "Zooming and the other controls for puzzles.", "\uE1B6", -1},
             {"lines_rules", "Lines", "", "Lining up three in a row to remove bricks.", "", -1},
         }},
+        {"group_original", "Original Lessons", {
+            // The game's own first lessons, kept playable (BlockPlanet's
+            // lessons above replace them).
+            {"basics", "Slide and Drop", "command:lesson:1:1", "The original game's first lesson: the shadow, dropping and sliding.", "\uE1EB", -1},
+            {"lives", "Lives", "command:lesson:1:2", "The original game's lesson on hearts and the core picture.", "\uE0F5", -1},
+        }},
     };
     // The first lesson not yet done has the focus (the game's own order).
-    const char* focus_id = !basics_done ? "basics" : !advanced_done ? "crystal" : "basics";
+    const char* focus_id = !lessons_done.count(100) ? "drop" : !basics_done ? "combos" : !advanced_done ? "crystal" : "drop";
     std::vector<blockplanet::ui::ListItem> items;
     for (const auto& g : groups) {
         blockplanet::ui::ListItem header{g.id, g.title, "", "", false};
@@ -345,7 +356,7 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         items.push_back(header);
         for (const auto& l : g.lessons) {
             const bool built = l.action[0] != '\0';
-            const bool done = l.magic >= 0 && magic_done.count(l.magic) != 0;
+            const bool done = l.magic >= 100 ? lessons_done.count(l.magic) != 0 : l.magic >= 0 && magic_done.count(l.magic) != 0;
             // Selectable even when not built (so the list scrolls to it and its
             // description shows), as the other menus' Not started items;
             // choosing it does nothing yet.

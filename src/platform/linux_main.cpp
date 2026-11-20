@@ -210,6 +210,22 @@ const char* const magic_lesson_texts[6] = {
     "The Bomb blasts a wide patch of the top layer, about six bricks out in every direction, then a second layer in the middle.",
     "The Ray Gun drills straight down under your shadow, one layer at a time, for about seven seconds. Move the shadow to drill somewhere else.",
 };
+// The Drop lesson (BlockPlanet's own Training, 2026-11-20, docs/TRAINING_REDESIGN.md):
+// show the move, reset the board, then the player's turn. Casual 1:1, its top
+// layer walls but for a hole and a matching pair (build_pair_board). Phases:
+// -1 none, 0 armed, 1 card up, 2 the demonstration, 3 its bricks breaking,
+// 4 the player's turn, 5 a miss (board set up again), 6 done, 7 leaving.
+int drop_lesson_phase = -1;
+std::optional<std::chrono::steady_clock::time_point> drop_lesson_at;
+int drop_lesson_home[2] = {0, 0};    // the cursor's cell as the lesson starts
+int drop_lesson_target[2] = {0, 0};  // the hole beside the pair
+int drop_lesson_bricks = 0;          // the board's bricks as the turn starts (more: a drop that missed)
+std::uint32_t drop_lesson_score = 0;
+std::string drop_lesson_say;         // the HUD's line: what is happening now
+// The demonstration's presses: one each 400 ms, steered by where the cursor is.
+int drop_demo_slot = -1;
+std::uint16_t drop_demo_held = 0;
+bool drop_demo_aimed = false, drop_demo_dropped = false;
 // Research (what each magic does): research_magic:K gives player 1 magic K
 // (0 to 5) and presses the magic button (N64 0x0004) a moment later.
 std::optional<std::chrono::steady_clock::time_point> research_magic_press;
@@ -472,6 +488,19 @@ void show_stage_results() {
         if (r.best_before <= 0.0 || r.value < r.best_before) line += "  \u00B7  New best";
         else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.value - r.best_before) + ")";
     }
+    if (r.lesson == 100) {
+        // The Drop lesson (the next Basics lessons are still to be built).
+        drop_lesson_phase = -1;
+        blockplanet::ui::set_text("results_title", "Drop Complete");
+        blockplanet::ui::set_text("results_where", "Training \u00B7 The Basics");
+        blockplanet::ui::set_text("results_line", "");
+        std::vector<blockplanet::ui::ListItem> items;
+        items.push_back({"again", "Try Again", "", "command:new_lesson:drop", true, 1, false});
+        items.push_back({"back", "Back to Training", "", "back", true, 1, true});
+        blockplanet::ui::set_list("results", items);
+        blockplanet::ui::request_show("results");
+        return;
+    }
     if (r.lesson >= 0 && r.lesson < 6) {
         // A magic lesson: its own title and items.
         const int k = r.lesson;
@@ -670,6 +699,19 @@ void show_hud(std::optional<blockplanet::ui::HudView> view) {
         v.stage = magic_lesson_names[magic_lesson];
         v.goal_label = "Magic left";
         v.goal = magic_lesson_phase >= 3 ? "0" : "1";
+        v.time.clear(), v.clock.clear(), v.score.clear(), v.story_score.clear(), v.story_gains.clear();
+        v.score_best.clear(), v.best.clear(), v.time_delta.clear(), v.splits.clear();
+        v.combo = 0, v.multiplier = -1, v.progress = -1.0f, v.drops_left = -1, v.slides_left = -1;
+    }
+    // The Drop lesson's HUD: the next pieces and what is happening now.
+    if (view && drop_lesson_phase >= 1 && drop_lesson_phase <= 6) {
+        auto& v = *view;
+        v.show_lives = false;
+        v.show_magic = false;
+        v.mode = "Training";
+        v.stage = "Drop";
+        v.goal_label = "Now";
+        v.goal = drop_lesson_say;
         v.time.clear(), v.clock.clear(), v.score.clear(), v.story_score.clear(), v.story_gains.clear();
         v.score_best.clear(), v.best.clear(), v.time_delta.clear(), v.splits.clear();
         v.combo = 0, v.multiplier = -1, v.progress = -1.0f, v.drops_left = -1, v.slides_left = -1;
@@ -3256,6 +3298,14 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (const auto injected = launcher_buttons.load(); injected & 0x10000u) {
         *buttons = port == 0 ? static_cast<std::uint16_t>(injected & 0xFFFFu) : 0;
         *x = 0; *y = 0;
+        // Bit 17: the D-pad's directions on the stick too (the game moves
+        // the cursor by the stick; the Drop lesson's demonstration).
+        if (port == 0 && (injected & 0x20000u)) {
+            if (injected & 0x0200) *x = -1.0f;
+            if (injected & 0x0100) *x = 1.0f;
+            if (injected & 0x0800) *y = 1.0f;
+            if (injected & 0x0400) *y = -1.0f;
+        }
         note_start(*buttons);
         return true;
     }
@@ -3860,6 +3910,104 @@ bool training_done(const char* mode) {
 std::set<int> magic_lessons_done() {
     const auto found = profile_data.progress.chapters_completed.find("magic_lessons");
     return found == profile_data.progress.chapters_completed.end() ? std::set<int>{} : found->second;
+}
+// BlockPlanet's own lessons done (progress "lessons": keys 100+, Drop 100).
+std::set<int> new_lessons_done() {
+    const auto found = profile_data.progress.chapters_completed.find("lessons");
+    return found == profile_data.progress.chapters_completed.end() ? std::set<int>{} : found->second;
+}
+
+// The combo lab's board (research_lab:combo), also the Drop lesson's: layer 1
+// all inert walls but for a hole of the piece in hand's shape at (cx, cy), down
+// to the core, with two bricks of the same shape beside it at fitting entries
+// fi and fj (signs sx, sy), so the piece dropped there breaks all three.
+struct PairBoard { int index = 0, v0 = 0; int layout[9] = {}; std::vector<std::pair<int, int>> fit; };
+PairBoard build_pair_board(int cx, int cy, int fi, int fj, int sx, int sy) {
+    auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+    const std::uint32_t pc = 0x80110220u;
+    // The piece about to be dropped: the queue's first entry (as the
+    // cursor's shadow shows; +0x2386 is the piece taken last).
+    const int index = std::int16_t(guest::load16(rd, pc + 0x2374));
+    const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(index));
+    const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
+                        entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
+    const std::int16_t v0 = std::int16_t(guest::load16(rd, rec));
+    int layout[9];
+    for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k)));
+    const int fits = std::int16_t(guest::load16(rd, rec + 0x74A));
+    std::vector<std::pair<int, int>> fit;
+    for (int k = 0; k < fits && k < 14; ++k)
+        fit.push_back({std::int8_t(guest::load8(rd, rec + 0x74C + 2u * std::uint32_t(k))),
+                       std::int8_t(guest::load8(rd, rec + 0x74D + 2u * std::uint32_t(k)))});
+    const auto cell = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
+    std::vector<int> filled(1024, 1);  // layer 1: 1 wall, 0 empty, 2 a target brick
+    for (int c = 0; c < 1024; ++c) {
+        guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 423);
+        guest::store8(rd, columns + std::uint32_t(c), 0x11);
+        for (int layer = 2; layer < 9; ++layer) {
+            guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), 0);
+            guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), 0);
+        }
+    }
+    const auto place = [&](int ox, int oy, bool hole) {
+        for (int x = 0; x < 3; ++x)
+            for (int y = 0; y < 3; ++y) {
+                const int n = layout[x * 3 + y];
+                if (n <= 0) continue;
+                const int c = cell(ox + x - 1, oy + y - 1);
+                if (hole) {
+                    filled[std::size_t(c)] = 0;
+                    guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 0);
+                    guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), 0);
+                    guest::store8(rd, masks + std::uint32_t(c), 80);  // the core, open
+                    guest::store8(rd, columns + std::uint32_t(c), 0x00);
+                } else {
+                    filled[std::size_t(c)] = 2;
+                    guest::store16(rd, values + 2u * std::uint32_t(1024 + c), std::int16_t(v0 + n - 1));
+                    guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), rec + 0x78u + 96u * std::uint32_t(n - 1));
+                }
+            }
+    };
+    place(cx, cy, true);
+    for (const int k : {fi, fj})
+        if (k >= 0 && k < int(fit.size())) place(cx + sx * fit[std::size_t(k)].first, cy + sy * fit[std::size_t(k)].second, false);
+    // Face masks: the top, and each side facing an empty cell.
+    for (int c = 0; c < 1024; ++c) {
+        if (!filled[std::size_t(c)]) continue;
+        const int x = c % 32, y = c / 32;
+        std::uint8_t m = 16;
+        if (!filled[std::size_t(cell(x + 1, y))]) m |= 8;
+        if (!filled[std::size_t(cell(x - 1, y))]) m |= 4;
+        if (!filled[std::size_t(cell(x, y + 1))]) m |= 2;
+        if (!filled[std::size_t(cell(x, y - 1))]) m |= 1;
+        guest::store8(rd, masks + std::uint32_t(1024 + c), m);
+    }
+    PairBoard out;
+    out.index = index, out.v0 = v0, out.fit = fit;
+    for (int k = 0; k < 9; ++k) out.layout[k] = layout[k];
+    return out;
+}
+
+// The Drop lesson's demonstration: the D-pad, one press at a time, until the
+// shadow is over the hole (D-pad right moves the cursor -1 in x, down -1 in
+// y, checked in play), a pause, then A.
+std::uint16_t drop_lesson_buttons() {
+    if (drop_lesson_phase != 2 || guest_rdram == nullptr || !drop_lesson_at || drop_demo_dropped) return 0;
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *drop_lesson_at).count();
+    if (ms < 1500) return 0;  // a moment to look first
+    const int slot = int((ms - 1500) / 400), within = int((ms - 1500) % 400);
+    if (slot != drop_demo_slot) {
+        drop_demo_slot = slot;
+        const std::uint32_t pc = 0x80110220u;
+        const int dx = drop_lesson_target[0] - (8 + std::int16_t(guest::load16(guest_rdram, pc + 0x2B2A)));
+        const int dy = drop_lesson_target[1] - (8 + std::int16_t(guest::load16(guest_rdram, pc + 0x2B2E)));
+        if (dx != 0) drop_demo_held = dx > 0 ? 0x0200 : 0x0100;
+        else if (dy != 0) drop_demo_held = dy > 0 ? 0x0800 : 0x0400;
+        else if (!drop_demo_aimed) drop_demo_aimed = true, drop_demo_held = 0, drop_lesson_say = "Lined up: press A";
+        else drop_demo_held = 0x8000;
+    }
+    if (drop_demo_held == 0x8000 && within >= 150) drop_demo_dropped = true;
+    return within < 150 ? drop_demo_held : 0;
 }
 
 // The fuse lab's automatic slide: the buttons to press now (see research_fuse_target).
@@ -5436,68 +5584,15 @@ bool handle_profile_command(const std::string& command) {
                 // dropped there lands in the hole touching both.
                 // research_lab:combo:I:J:SX:SY picks fitting entries I and J and
                 // the signs for their column and row (default 0:1:1:1).
-                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
                 int fi = 0, fj = 1, sx = 1, sy = 1;
                 std::sscanf(command->c_str() + 13, "combo:%d:%d:%d:%d", &fi, &fj, &sx, &sy);
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
                 const std::uint32_t pc = 0x80110220u;
-                // The piece about to be dropped: the queue's first entry (as the
-                // cursor's shadow shows; +0x2386 is the piece taken last).
-                const int index = std::int16_t(guest::load16(rd, pc + 0x2374));
-                const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(index));
-                const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
-                                    entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
                 const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
-                const std::int16_t v0 = std::int16_t(guest::load16(rd, rec));
-                int layout[9];
-                for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k)));
-                const int fits = std::int16_t(guest::load16(rd, rec + 0x74A));
-                std::vector<std::pair<int, int>> fit;
-                for (int k = 0; k < fits && k < 14; ++k)
-                    fit.push_back({std::int8_t(guest::load8(rd, rec + 0x74C + 2u * std::uint32_t(k))),
-                                   std::int8_t(guest::load8(rd, rec + 0x74D + 2u * std::uint32_t(k)))});
-                const auto cell = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
-                std::vector<int> filled(1024, 1);  // layer 1: 1 wall, 0 empty, 2 a target brick
-                for (int c = 0; c < 1024; ++c) {
-                    guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 423);
-                    guest::store8(rd, columns + std::uint32_t(c), 0x11);
-                    for (int layer = 2; layer < 9; ++layer) {
-                        guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), 0);
-                        guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), 0);
-                    }
-                }
-                const auto place = [&](int ox, int oy, bool hole) {
-                    for (int x = 0; x < 3; ++x)
-                        for (int y = 0; y < 3; ++y) {
-                            const int n = layout[x * 3 + y];
-                            if (n <= 0) continue;
-                            const int c = cell(ox + x - 1, oy + y - 1);
-                            if (hole) {
-                                filled[std::size_t(c)] = 0;
-                                guest::store16(rd, values + 2u * std::uint32_t(1024 + c), 0);
-                                guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), 0);
-                                guest::store8(rd, masks + std::uint32_t(c), 80);  // the core, open
-                                guest::store8(rd, columns + std::uint32_t(c), 0x00);
-                            } else {
-                                filled[std::size_t(c)] = 2;
-                                guest::store16(rd, values + 2u * std::uint32_t(1024 + c), std::int16_t(v0 + n - 1));
-                                guest::store32(rd, entries + 4u * std::uint32_t(1024 + c), rec + 0x78u + 96u * std::uint32_t(n - 1));
-                            }
-                        }
-                };
-                place(cx, cy, true);
-                for (const int k : {fi, fj})
-                    if (k >= 0 && k < int(fit.size())) place(cx + sx * fit[std::size_t(k)].first, cy + sy * fit[std::size_t(k)].second, false);
-                // Face masks: the top, and each side facing an empty cell.
-                for (int c = 0; c < 1024; ++c) {
-                    if (!filled[std::size_t(c)]) continue;
-                    const int x = c % 32, y = c / 32;
-                    std::uint8_t m = 16;
-                    if (!filled[std::size_t(cell(x + 1, y))]) m |= 8;
-                    if (!filled[std::size_t(cell(x - 1, y))]) m |= 4;
-                    if (!filled[std::size_t(cell(x, y + 1))]) m |= 2;
-                    if (!filled[std::size_t(cell(x, y - 1))]) m |= 1;
-                    guest::store8(rd, masks + std::uint32_t(1024 + c), m);
-                }
+                const auto board = build_pair_board(cx, cy, fi, fj, sx, sy);
+                const int index = board.index, v0 = board.v0;
+                const auto& fit = board.fit;
+                const int* layout = board.layout;
                 std::string fl;
                 for (const auto& [fx, fy] : fit) fl += (fl.empty() ? "" : ",") + std::string("[") + std::to_string(fx) + "," + std::to_string(fy) + "]";
                 std::string lay;
@@ -5970,7 +6065,7 @@ bool handle_profile_command(const std::string& command) {
                 };
                 blockplanet::ui::set_text("chapters_title", "Training");
                 blockplanet::ui::set_text("chapters_subtitle", "Choose a lesson");
-                blockplanet::ui::set_list("chapters", training_lessons(done("rescue"), done("training_advanced"), magic_lessons_done()));
+                blockplanet::ui::set_list("chapters", training_lessons(done("rescue"), done("training_advanced"), magic_lessons_done(), new_lessons_done()));
                 blockplanet::ui::request_show("chapters");
                 continue;
             }
@@ -6076,10 +6171,20 @@ bool handle_profile_command(const std::string& command) {
                 }
                 continue;
             }
+            if (*command == "new_lesson:drop") {
+                // The Drop lesson: Casual 1:1 on its own, taken over once in play.
+                magic_lesson = -1, magic_lesson_phase = -1;
+                drop_lesson_phase = 0;
+                drop_lesson_at.reset();
+                blockplanet::ui::send_command("casual");
+                blockplanet::ui::send_command("stage:1:1");
+                continue;
+            }
             if (command->rfind("magic_lesson:", 0) == 0) {
                 // A magic lesson: Casual 1:1 on its own, taken over once in play.
                 const int k = std::atoi(command->c_str() + 13);
                 if (k >= 0 && k < 6) {
+                    drop_lesson_phase = -1;
                     magic_lesson = k, magic_lesson_phase = 0;
                     magic_lesson_at.reset();
                     blockplanet::ui::send_command("casual");
@@ -6230,7 +6335,7 @@ bool handle_profile_command(const std::string& command) {
                             save_profile();
                         }
                         blockplanet::ui::set_list("chapters", training_lessons(training_done("rescue"), training_done("training_advanced"),
-                                                                               magic_lessons_done()));
+                                                                               magic_lessons_done(), new_lessons_done()));
                         // The results to show once play is left, whichever way.
                         pending_results = StageResults{};
                         pending_results->lesson = magic_lesson;
@@ -6240,6 +6345,127 @@ bool handle_profile_command(const std::string& command) {
                         !single_stage_quitting) {
                         magic_lesson_phase = 4;
                         single_stage_quit_at = now_m;
+                    }
+                }
+            }
+            // The Drop lesson in play (see drop_lesson_phase).
+            if (drop_lesson_phase >= 0) {
+                {
+                    static int last = -9;
+                    if (drop_lesson_phase != last) {
+                        last = drop_lesson_phase;
+                        std::fprintf(stdout, "{\"event\":\"drop_phase\",\"phase\":%d,\"cursor\":[%d,%d],\"score\":%u,\"bricks\":%d}\n", last,
+                                     8 + std::int16_t(guest::load16(guest_rdram, 0x80112D4A)), 8 + std::int16_t(guest::load16(guest_rdram, 0x80112D4E)),
+                                     guest::load32(guest_rdram, 0x80112D18), count_bricks());
+                        std::fflush(stdout);
+                    }
+                }
+                const auto now_m = std::chrono::steady_clock::now();
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                const std::uint32_t pc = 0x80110220u;
+                const bool in_play = guest::load16(rd, 0x800E121C) == -1 && guest::load16(rd, 0x800E44A8) == 1 &&
+                                     std::int16_t(guest::load16(rd, 0x800E1228)) < 0 && std::int16_t(guest::load16(rd, pc + 0x2D7E)) >= 0;
+                const auto since = [&] {
+                    return drop_lesson_at ? std::chrono::duration_cast<std::chrono::milliseconds>(now_m - *drop_lesson_at).count() : 0;
+                };
+                const auto cursor_to = [&](const int* xy) {
+                    guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(xy[0] - 8)));
+                    guest::store16(rd, pc + 0x2B2E, std::uint16_t(std::int16_t(xy[1] - 8)));
+                };
+                // The board for a go: the cursor home, the hole and the pair at
+                // the target, the hearts full, nothing breaking.
+                const auto set_up = [&](int dx, int dy) {
+                    cursor_to(drop_lesson_home);
+                    drop_lesson_target[0] = drop_lesson_home[0] + dx, drop_lesson_target[1] = drop_lesson_home[1] + dy;
+                    build_pair_board(drop_lesson_target[0], drop_lesson_target[1], 0, 1, 1, 1);
+                    guest::store16(rd, pc + 0x2D7E, 3);
+                    drop_lesson_bricks = count_bricks();
+                    drop_lesson_score = guest::load32(rd, pc + 0x2AF8);
+                };
+                start_card_pending.reset();  // the lesson's own card instead
+                // Left before the end (Quit): the lesson ends there.
+                {
+                    static std::optional<std::chrono::steady_clock::time_point> out_since;
+                    if (drop_lesson_phase >= 1 && drop_lesson_phase <= 5 && !pending_results && std::int16_t(guest::load16(rd, 0x800E121C)) >= 0) {
+                        if (!out_since) out_since = now_m;
+                        else if (now_m - *out_since > std::chrono::milliseconds(1500)) drop_lesson_phase = -1;
+                    } else {
+                        out_since.reset();
+                    }
+                }
+                if (drop_lesson_phase >= 2 && in_play) guest::store32(rd, pc + 0x2408, 0);  // no drop timer in this lesson
+                if (drop_lesson_phase == 0) {
+                    if (!in_play || blockplanet::ui::menus_open()) drop_lesson_at.reset();
+                    else if (!drop_lesson_at) drop_lesson_at = now_m;
+                    else if (since() > 800) {
+                        drop_lesson_home[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A));
+                        drop_lesson_home[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                        guest::store16(rd, pc + 0x23E4, 8);  // no win from the open hole
+                        set_up(-3, 0);  // the demonstration's pair: three to the right
+                        std::fprintf(stdout, "{\"event\":\"drop_lesson\",\"home\":[%d,%d],\"target\":[%d,%d]}\n", drop_lesson_home[0],
+                                     drop_lesson_home[1], drop_lesson_target[0], drop_lesson_target[1]);
+                        std::fflush(stdout);
+                        drop_lesson_phase = 1;
+                        drop_lesson_say = "Watch";
+                        start_card_requested = now_m;
+                        pause_bridge.request_pause(now_m);
+                    }
+                } else if (drop_lesson_phase == 1) {
+                    // Once the card has been up and closed again.
+                    static bool card_up = false;
+                    if (blockplanet::ui::menus_open()) card_up = true;
+                    if (card_up && !start_card_requested && in_play && !blockplanet::ui::menus_open()) {
+                        card_up = false;
+                        drop_lesson_phase = 2, drop_lesson_at = now_m;
+                        drop_demo_slot = -1, drop_demo_held = 0, drop_demo_aimed = false, drop_demo_dropped = false;
+                        drop_lesson_say = "Watch: the shadow moves to the pair";
+                    }
+                } else if (drop_lesson_phase == 2) {
+                    if (drop_demo_dropped) drop_lesson_phase = 3, drop_lesson_at = now_m, drop_lesson_say = "All three break";
+                    else if (since() > 15000) drop_lesson_phase = 3, drop_lesson_at = now_m;  // never stuck
+                } else if (drop_lesson_phase == 3) {
+                    // The bricks break, then the board is set up again for the player.
+                    if (since() > 3500 && guest::load32(rd, pc + 0x2AFC) == 0) {
+                        set_up(2, -2);  // the player's pair: elsewhere
+                        drop_lesson_phase = 4, drop_lesson_at = now_m;
+                        drop_lesson_say = "Your turn: move onto the pair and press A";
+                    }
+                } else if (drop_lesson_phase == 4) {
+                    // A drop lands first and scores a moment later: a landing
+                    // with no score after 1.5 s missed the pair.
+                    static std::optional<std::chrono::steady_clock::time_point> landed;
+                    if (guest::load32(rd, pc + 0x2AF8) != drop_lesson_score) {
+                        landed.reset();
+                        drop_lesson_phase = 6, drop_lesson_at = now_m;
+                        drop_lesson_say = "Well done";
+                    } else if (count_bricks() != drop_lesson_bricks) {
+                        if (!landed) landed = now_m;
+                        else if (now_m - *landed > std::chrono::milliseconds(1500)) {
+                            landed.reset();
+                            drop_lesson_phase = 5, drop_lesson_at = now_m;
+                            drop_lesson_say = "No match there: line up with the pair first";
+                        }
+                    } else {
+                        landed.reset();
+                    }
+                } else if (drop_lesson_phase == 5) {
+                    if (since() > 2000) {
+                        set_up(2, -2);
+                        drop_lesson_phase = 4, drop_lesson_at = now_m;
+                        drop_lesson_say = "Try again: move onto the pair and press A";
+                    }
+                } else if (drop_lesson_phase == 6) {
+                    if (since() > 2500 && !pending_results) {
+                        if (profile_save && profile_data.progress.chapters_completed["lessons"].insert(100).second) {
+                            profile_dirty = true;
+                            save_profile();
+                        }
+                        blockplanet::ui::set_list("chapters", training_lessons(training_done("rescue"), training_done("training_advanced"),
+                                                                               magic_lessons_done(), new_lessons_done()));
+                        pending_results = StageResults{};
+                        pending_results->lesson = 100;
+                        drop_lesson_phase = 7;
+                        if (!single_stage_quit_at && !single_stage_quitting) single_stage_quit_at = now_m;
                     }
                 }
             }
@@ -6517,7 +6743,12 @@ bool handle_profile_command(const std::string& command) {
                     save_profile();
                 }
                 const auto state = read_game_state(guest_rdram);
-                if (magic_lesson >= 0 && magic_lesson < 6) {
+                if (drop_lesson_phase >= 0) {
+                    blockplanet::ui::set_text("card_title", "Drop");
+                    blockplanet::ui::set_text("card_where", "Training \u00B7 The Basics");
+                    blockplanet::ui::set_text("card_goal", "Your shadow is your next piece. Drop it onto two matching pieces "
+                                                           "and all three break. Watch first, then it's your turn.");
+                } else if (magic_lesson >= 0 && magic_lesson < 6) {
                     const auto family = active_family.load();
                     blockplanet::ui::set_text("card_title", std::string("Magic: ") + magic_lesson_names[magic_lesson]);
                     blockplanet::ui::set_text("card_where", "Training \u00B7 Magic");
@@ -6811,6 +7042,8 @@ bool handle_profile_command(const std::string& command) {
                                    : end.inject ? (0x10000u | end.buttons)
                                    : hs_buttons != 0 ? (0x10000u | hs_buttons)
                                    : card_buttons != 0 ? (0x10000u | card_buttons)
+                                   // The Drop lesson's demonstration plays itself.
+                                   : drop_lesson_phase == 2 || drop_lesson_phase == 3 ? (0x30000u | drop_lesson_buttons())
                                    : research_fuse_buttons() != 0 ? (0x10000u | research_fuse_buttons())
                                    : research_magic_press && std::chrono::steady_clock::now() >= *research_magic_press &&
                                              std::chrono::steady_clock::now() < *research_magic_press + std::chrono::milliseconds(400)
