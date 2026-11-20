@@ -421,8 +421,14 @@ std::string with_buttons(const std::string& escaped_text) {
         const std::string name = escaped_text.substr(open + 3, close - open - 3);
         const bool shoulder = family != 'k' && ((name.size() == 2 && (name[0] == 'L' || name[0] == 'R' || name[0] == 'Z')) ||
                                                 name == "L" || name == "R");
-        if (family == 'd') {  // the d-pad: a small cross on a dark cap
+        std::string lower = name;
+        for (auto& ch : lower) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+        if (family == 'd' || family == 'D') {  // the d-pad: a small cross on a dark cap
             out += "<span class='btn pad dpad'><span class='dpad-cross'><span class='arm h'/><span class='arm v'/></span></span>";
+        } else if (family == 's' || family == 'S') {  // a stick: a round cap with its name ("[s:L]")
+            out += "<span class='btn stick'>" + name.substr(0, 1) + "</span>";
+        } else if ((family == 'k' || family == 'K') && lower == "arrows") {  // the arrow keys: a key cap with a four-way arrow
+            out += "<span class='btn key arrows'>\uE125</span>";
         } else if (shoulder) {  // bumpers and triggers: a dark rounded bar with its name
             out += "<span class='btn shoulder'>" + name + "</span>";
         } else if (family == 'k') {

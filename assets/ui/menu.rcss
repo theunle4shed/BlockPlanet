@@ -264,6 +264,10 @@ body.lists .description.empty { display: none; }
 .dpad-cross .arm { display: block; position: absolute; background-color: #e8ecf6; border-radius: 0.05em; }
 .dpad-cross .arm.h { left: 0em; top: 0.27em; width: 0.75em; height: 0.21em; }
 .dpad-cross .arm.v { left: 0.27em; top: 0em; width: 0.21em; height: 0.75em; }
+/* The stick: a round dark cap with a lighter ring and its name (L). */
+.btn.stick { background-color: #1e2028; border: 0.1em #b8bcc8; border-radius: 0.6em; width: 1.15em; padding: 0em; font-size: 0.7em; }
+/* The arrow keys: a key cap holding a four-way arrow (the icon font's "move"). */
+.btn.arrows { font-family: lucide; font-weight: normal; font-style: normal; padding: 0em 0.15em; }
 
 /* Long lists (the main menu): smaller rows so the description fits. */
 body.compact #panel { top: 40dp; padding: 40dp 48dp; }

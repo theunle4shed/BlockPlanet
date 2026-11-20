@@ -346,6 +346,16 @@ div { display: block; }
 .btn.nx { background-color: #3a3c44; border: 0.08em #d8d8e0; }
 .btn.ps { background-color: #1e2028; border: 0.08em #9098b0; position: relative; width: 1.15em; padding: 0em; }
 .ps-cross, .ps-circle, .ps-square, .ps-triangle { display: block; position: absolute; }
+/* The d-pad: a light cross on a dark cap. */
+.btn.dpad { background-color: #2a2c34; border: 0.08em #b8bcc8; position: relative; width: 1.15em; padding: 0em; }
+.dpad-cross { display: block; position: absolute; left: 0.2em; top: 0.2em; width: 0.75em; height: 0.75em; }
+.dpad-cross .arm { display: block; position: absolute; background-color: #e8ecf6; border-radius: 0.05em; }
+.dpad-cross .arm.h { left: 0em; top: 0.27em; width: 0.75em; height: 0.21em; }
+.dpad-cross .arm.v { left: 0.27em; top: 0em; width: 0.21em; height: 0.75em; }
+/* The stick: a round dark cap with a lighter ring and its name (L). */
+.btn.stick { background-color: #1e2028; border: 0.1em #b8bcc8; border-radius: 0.6em; width: 1.15em; padding: 0em; font-size: 0.7em; }
+/* The arrow keys: a key cap holding a four-way arrow (the icon font's "move"). */
+.btn.arrows { font-family: lucide; font-weight: normal; font-style: normal; padding: 0em 0.15em; }
 .ps-cross { left: 0.22em; top: 0.22em; width: 0.7em; height: 0.7em; }
 .ps-cross .bar { display: block; position: absolute; left: 0em; top: 0.3em; width: 0.7em; height: 0.12em; background-color: #7aa8ff; }
 .ps-cross .bar.a { transform: rotate(45deg); }

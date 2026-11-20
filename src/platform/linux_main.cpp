@@ -2685,7 +2685,9 @@ void publish_game_text() {
             }
             // The movement controls, for the player's input (BlockPlanet's own wording).
             for (std::size_t at; (at = text.find("%MOVE%")) != std::string::npos;)
-                text.replace(at, 6, family == ControllerFamily::Keyboard ? "THE ARROW KEYS" : "THE STICK OR D-PAD");
+                // As symbols (the owner, 2026-11-20): the arrow keys' cap on a
+                // keyboard, the left stick or the d-pad on a controller.
+                text.replace(at, 6, family == ControllerFamily::Keyboard ? "[k:Arrows]" : "[s:L] or [d:Pad]");
             // Any other % is the font's apostrophe or quote mark ("LET%S", "%X%").
             return tetrisphere::game_quotes(tetrisphere::fix_wording(text));
         };
