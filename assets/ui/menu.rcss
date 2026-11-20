@@ -471,3 +471,17 @@ body.player-hidden .player-hint {
     opacity: 0;
 }
 @keyframes hint-fade { 0% { opacity: 1; } 60% { opacity: 1; } 100% { opacity: 0; } }
+
+/* A list's header (Training's groups, 2026-11-20): a divider with the group's
+   name, not selectable (a disabled item, which the focus passes over). */
+.item.list-header, .item.list-header.disabled {
+    color: #e8b84a;
+    font-size: 24dp;
+    letter-spacing: 1dp;
+    margin-top: 10dp;
+    padding-top: 6dp;
+    padding-bottom: 2dp;
+    border-bottom: 1dp #e8b84a55;
+    opacity: 1;
+}
+.item.list-header:first-child { margin-top: 0dp; }

@@ -299,60 +299,60 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
 }
 
 std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done, const std::set<int>& magic_done) {
-    struct Lesson { const char* id; const char* label; const char* group; const char* action; const char* description; const char* icon; };
-    static const Lesson lessons[] = {
-        {"basics", "Slide and Drop", "Basics", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB"},
-        {"lives", "Lives", "Basics", "command:lesson:1:2", "Your hearts, and how a drop that matches nothing costs one.", "\uE0F5"},
-        {"combos", "Combos", "Basics", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4"},
-        {"magic", "Magic", "Basics", "command:lesson:1:4", "A combo of 20 or more earns magic, and how to use it.", "\uE417"},
-        {"crystal", "Crystal Bricks", "Advanced", "command:lesson:2:1", "Turn a group of crystal bricks into a power brick.", "\uE242"},
-        {"x_count", "X Count", "Advanced", "command:lesson:2:2", "The multiplier on your combo score.", "\uE1B2"},
-        {"fuse", "Fuse Combos", "Advanced", "command:lesson:2:3", "Slide a flashing brick into a match to keep a combo going.", "\uE0D7"},
-        {"puzzle", "Puzzle Controls", "Puzzle", "command:lesson:3:1", "Zooming and the other controls for puzzles.", "\uE1B6"},
+    // Grouped under headers (the owner's layout, 2026-11-20): The Basics,
+    // Advanced, Magic, Other Modes. A header is a disabled item, so the
+    // focus passes over it. Lessons not built yet are listed, marked Not started.
+    struct Lesson { const char* id; const char* label; const char* action; const char* description; const char* icon; int magic; };
+    struct Group { const char* id; const char* title; std::vector<Lesson> lessons; };
+    static const std::vector<Group> groups = {
+        {"group_basics", "The Basics", {
+            {"basics", "Slide and Drop", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB", -1},
+            {"lives", "Lives", "command:lesson:1:2", "Your hearts, and how a drop that matches nothing costs one.", "\uE0F5", -1},
+            {"rubble", "Rubble", "", "The small purple blocks: sliding into them, and turning them into a brick.", "", -1},
+            {"combos", "Combos", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4", -1},
+            {"magic", "Magic", "command:lesson:1:4", "A combo of 20 or more earns magic, and how to use it.", "\uE417", -1},
+        }},
+        {"group_advanced", "Advanced", {
+            {"x_count", "X Count", "command:lesson:2:2", "The multiplier on your combo score.", "\uE1B2", -1},
+            {"gravity", "Gravity Combos", "", "When bricks fall into a new match during a combo.", "", -1},
+            {"fuse", "Fuse Combos", "command:lesson:2:3", "Slide a flashing brick into a match to keep a combo going.", "\uE0D7", -1},
+            {"crystal", "Crystal Bricks", "command:lesson:2:1", "Turn a group of crystal bricks into a power brick.", "\uE242", -1},
+            {"power_scoring", "Power Bricks and Scoring", "", "How power bricks make a combo pay far more.", "", -1},
+        }},
+        {"group_magic", "Magic", {
+            {"magic_firecracker", "Firecracker", "command:magic_lesson:0", "A round patch of the top layer round your shadow.", "\uE417", 0},
+            {"magic_dynamite", "Dynamite", "command:magic_lesson:1", "Five small blasts in a ring round your shadow.", "\uE417", 1},
+            {"magic_magnet", "Magnet", "command:magic_lesson:2", "Pulls bricks out from under your shadow, as deep as you hold it.", "\uE417", 2},
+            {"magic_atom", "Atom", "command:magic_lesson:3", "Clears the whole top layer of the sphere.", "\uE417", 3},
+            {"magic_bomb", "Bomb", "command:magic_lesson:4", "A wide blast, two layers deep in the middle.", "\uE417", 4},
+            {"magic_ray_gun", "Ray Gun", "command:magic_lesson:5", "Drills straight down to the core under your shadow.", "\uE417", 5},
+            {"mystery", "Mystery Blocks", "", "The flickering yellow and red blocks that give magic.", "", -1},
+        }},
+        {"group_other", "Other Modes", {
+            {"puzzle", "Puzzle Controls", "command:lesson:3:1", "Zooming and the other controls for puzzles.", "\uE1B6", -1},
+            {"lines_rules", "Lines", "", "Lining up three in a row to remove bricks.", "", -1},
+        }},
     };
+    // The first lesson not yet done has the focus (the game's own order).
+    const char* focus_id = !basics_done ? "basics" : !advanced_done ? "crystal" : "basics";
     std::vector<blockplanet::ui::ListItem> items;
-    for (const auto& l : lessons) {
-        blockplanet::ui::ListItem item{l.id, l.label, l.group, l.action, true};
-        item.description = l.description;
-        item.icon = l.icon;
-        items.push_back(item);
-    }
-    // BlockPlanet's own lessons: each magic on a striped sphere (2026-11-20).
-    struct Magic { const char* id; const char* label; const char* description; };
-    static const Magic magics[] = {
-        {"magic_firecracker", "Firecracker", "A round patch of the top layer round your shadow."},
-        {"magic_dynamite", "Dynamite", "Five small blasts in a ring round your shadow."},
-        {"magic_magnet", "Magnet", "Pulls bricks out from under your shadow, as deep as you hold it."},
-        {"magic_atom", "Atom", "Clears the whole top layer of the sphere."},
-        {"magic_bomb", "Bomb", "A wide blast, two layers deep in the middle."},
-        {"magic_ray_gun", "Ray Gun", "Drills straight down to the core under your shadow."},
-    };
-    for (int k = 0; k < 6; ++k) {
-        // (Done: "completed" beside the group, as the other menus mark a finished item.)
-        blockplanet::ui::ListItem item{magics[k].id, magics[k].label, magic_done.count(k) ? "Magic \u00B7 completed" : "Magic",
-                                       "command:magic_lesson:" + std::to_string(k), true};
-        item.description = magics[k].description;
-        item.icon = "\uE417";
-        items.push_back(item);
-    }
-    // The first lesson not yet done has the focus.
-    const std::size_t first = !basics_done ? 0 : !advanced_done ? 4 : 0;
-    items[first].focus = true;
-    // Topics the game's training leaves out (the owner: listed, marked Not started).
-    struct Missing { const char* id; const char* label; const char* description; };
-    static const Missing missing[] = {
-        {"gravity", "Gravity Combos", "When bricks fall into a new match during a combo."},
-        {"mystery", "Mystery Blocks", "The flickering yellow and red blocks that give magic."},
-        {"rubble", "Rubble", "The small purple blocks: sliding into them, and turning them into a brick."},
-        {"lines_rules", "Lines", "Lining up three in a row to remove bricks."},
-    };
-    for (const auto& m : missing) {
-        // Selectable (so the list scrolls to it and its description shows), as
-        // the other menus' Not started items; choosing it does nothing yet.
-        blockplanet::ui::ListItem item{m.id, m.label, "(Not started)", "", true};
-        item.description = m.description;
-        item.classes = "rag-not-started";
-        items.push_back(item);
+    for (const auto& g : groups) {
+        blockplanet::ui::ListItem header{g.id, g.title, "", "", false};
+        header.classes = "list-header";
+        items.push_back(header);
+        for (const auto& l : g.lessons) {
+            const bool built = l.action[0] != '\0';
+            const bool done = l.magic >= 0 && magic_done.count(l.magic) != 0;
+            // Selectable even when not built (so the list scrolls to it and its
+            // description shows), as the other menus' Not started items;
+            // choosing it does nothing yet.
+            blockplanet::ui::ListItem item{l.id, l.label, built ? (done ? "completed" : "") : "(Not started)", l.action, true};
+            item.description = l.description;
+            item.icon = l.icon;
+            if (!built) item.classes = "rag-not-started";
+            item.focus = std::string(l.id) == focus_id;
+            items.push_back(item);
+        }
     }
     return items;
 }

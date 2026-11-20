@@ -191,16 +191,22 @@ int main(int argc, char** argv) {
            lessons[0].note == "start here" && !lessons[1].focus && lessons[1].action == "command:training_advanced");
     lessons = story_training(true, false);
     assert(!lessons[0].focus && lessons[1].focus && lessons[0].note == "completed");
-    // Training's menu: every lesson open, the first not done focused, then topics not covered yet.
+    // Training's menu: four groups under headers (disabled items), the first lesson not done focused,
+    // lessons not built yet listed as Not started, finished magic lessons marked completed.
     auto all = training_lessons(false, false);
-    // The game's eight lessons, BlockPlanet's six magic lessons, then four topics not covered yet.
-    assert(all.size() == 18 && all[0].focus && all[2].action == "command:lesson:1:3" && all[7].action == "command:lesson:3:1");
-    assert(all[8].action == "command:magic_lesson:0" && all[13].action == "command:magic_lesson:5" && all[8].note == "Magic");
+    assert(all.size() == 23 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
+    assert(all[1].focus && all[1].label == "Slide and Drop" && all[1].action == "command:lesson:1:1");
+    assert(all[3].label == "Rubble" && all[3].action.empty() && all[3].classes == "rag-not-started" && all[3].enabled);
+    assert(all[6].label == "Advanced" && !all[6].enabled && all[12].label == "Magic" && all[20].label == "Other Modes");
+    assert(all[13].action == "command:magic_lesson:0" && all[18].action == "command:magic_lesson:5" && all[19].label == "Mystery Blocks");
     {
         const auto marked = training_lessons(true, true, {0, 4});
-        assert(marked[8].note == "Magic \u00B7 completed" && marked[9].note == "Magic" && marked[12].note == "Magic \u00B7 completed");
+        assert(marked[13].note == "completed" && marked[14].note.empty() && marked[17].note == "completed");
     }
-    assert(training_lessons(true, false)[4].focus && all[14].enabled && all[14].action.empty() && all[14].classes == "rag-not-started");
+    {
+        const auto advanced = training_lessons(true, false);
+        assert(!advanced[1].focus && advanced[10].label == "Crystal Bricks" && advanced[10].focus);
+    }
 
     auto confirm = delete_confirmation(store, "1");
     assert(confirm.size() == 2 && confirm[0].action == "command:profile_delete_confirmed:1" &&
