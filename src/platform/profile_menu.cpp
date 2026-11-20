@@ -317,6 +317,22 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         item.icon = l.icon;
         items.push_back(item);
     }
+    // BlockPlanet's own lessons: each magic on a striped sphere (2026-11-20).
+    struct Magic { const char* id; const char* label; const char* description; };
+    static const Magic magics[] = {
+        {"magic_firecracker", "Firecracker", "A round patch of the top layer round your shadow."},
+        {"magic_dynamite", "Dynamite", "Five small blasts in a ring round your shadow."},
+        {"magic_magnet", "Magnet", "Pulls bricks out from under your shadow, as deep as you hold it."},
+        {"magic_atom", "Atom", "Clears the whole top layer of the sphere."},
+        {"magic_bomb", "Bomb", "A wide blast, two layers deep in the middle."},
+        {"magic_ray_gun", "Ray Gun", "Drills straight down to the core under your shadow."},
+    };
+    for (int k = 0; k < 6; ++k) {
+        blockplanet::ui::ListItem item{magics[k].id, magics[k].label, "Magic", "command:magic_lesson:" + std::to_string(k), true};
+        item.description = magics[k].description;
+        item.icon = "\uE417";
+        items.push_back(item);
+    }
     // The first lesson not yet done has the focus.
     const std::size_t first = !basics_done ? 0 : !advanced_done ? 4 : 0;
     items[first].focus = true;
@@ -326,7 +342,6 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         {"gravity", "Gravity Combos", "When bricks fall into a new match during a combo."},
         {"mystery", "Mystery Blocks", "The flickering yellow and red blocks that give magic."},
         {"rubble", "Rubble", "The small purple blocks: sliding into them, and turning them into a brick."},
-        {"magic_kinds", "The Six Magics", "Firecracker to Ray Gun: what each one does."},
         {"lines_rules", "Lines", "Lining up three in a row to remove bricks."},
     };
     for (const auto& m : missing) {

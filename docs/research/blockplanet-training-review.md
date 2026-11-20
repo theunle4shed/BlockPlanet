@@ -37,3 +37,9 @@ This settles the owner's memory (2026-11-20) of moving a white, flashing block t
 ## Proposal
 
 BlockPlanet's labs (the combo lab first, [blockplanet-score-and-magic.md](blockplanet-score-and-magic.md)) test each mechanic; once confirmed, a lab becomes a lesson only where the original has none: **the six magics** (one board each, showing its area and how to aim it), **gravity combos** (one set up to fall into a match), **what costs a heart and the drop timer**, **the drop highlight**, and **power-piece scoring**. Combos, crystals, the X count and fuse combos stay the original's lessons.
+
+## Built: the magic lessons (2026-11-20)
+
+Training lists six BlockPlanet lessons under **Magic** (Firecracker, Dynamite, Magnet, Atom, Bomb, Ray Gun; `magic_lesson:K`), in place of the "The Six Magics" placeholder. Each starts Casual 1:1 on its own, and once in play builds a **striped patch** (the owner's idea): six layers alternating blue 2 × 2 squares and yellow bars in an 18 × 16 patch round the cursor (six bars or nine squares across), the rest of the sphere pink walls (magic does not break walls, so the damage stays in the patch; the owner's idea to use part of the sphere). The magic is given, a card says in BlockPlanet's words what it does and which button fires it, the drop timer is held, and the core square needed to win is raised to 8 × 8 (the largest) so that no magic ends the lesson by opening the core. About 9 s after the magic is used, play is left for the Training list with a panel: Next (the next magic), Try Again, Back to Training. Checked end to end with the Bomb in the harness.
+
+Still to do: a lesson-done mark in the profile (the list's "completed"), and checking the other five in the harness.

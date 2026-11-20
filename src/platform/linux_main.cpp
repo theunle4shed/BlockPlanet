@@ -192,6 +192,23 @@ bool final_stage_cleared_seen = false;  // research (BLOCKPLANET_FINAL_RAW)
 // hide it away"): the game's curtain call plays with no HUD and no cover;
 // any button skips it; then BlockPlanet's credits, to Sappy.
 bool final_finale = false;
+// The magic lessons (BlockPlanet's own Training, 2026-11-20): each magic on a
+// striped sphere (layers alternating blue squares and yellow bars, Casual 1:1,
+// six layers), so its damage shows how deep it went. Phases: 0 armed, 1 board
+// built and card up, 2 waiting for the magic, 3 used (finishing), -1 none.
+int magic_lesson = -1;
+int magic_lesson_phase = -1;
+std::optional<std::chrono::steady_clock::time_point> magic_lesson_at;
+const char* const magic_lesson_names[6] = {"Firecracker", "Dynamite", "Magnet", "Atom", "Bomb", "Ray Gun"};
+// What each magic does, in BlockPlanet's words (docs/research/blockplanet-score-and-magic.md).
+const char* const magic_lesson_texts[6] = {
+    "The Firecracker blasts a round patch of the top layer, about four bricks out from your shadow in every direction.",
+    "The Dynamite throws five sticks in a ring round your shadow. Each blows a small hole in the top layer, leaving the middle standing.",
+    "The Magnet pulls bricks out from under your shadow for about four seconds. Hold it still to dig deep, or move the shadow to dig where you want.",
+    "The Atom clears the whole top layer of the sphere: the far side first, then the part you can see, from its edge to the middle.",
+    "The Bomb blasts a wide patch of the top layer, about six bricks out in every direction, then a second layer in the middle.",
+    "The Ray Gun drills straight down under your shadow, one layer at a time, for about seven seconds. Move the shadow to drill somewhere else.",
+};
 // Research (what each magic does): research_magic:K gives player 1 magic K
 // (0 to 5) and presses the magic button (N64 0x0004) a moment later.
 std::optional<std::chrono::steady_clock::time_point> research_magic_press;
@@ -337,6 +354,7 @@ struct StageResults {
     double value = 0.0, best_before = 0.0;
     std::string where;
     bool episode = false;  // a whole episode (the attack modes)
+    int lesson = -1;       // a magic lesson (0 to 5), shown with its own items
 };
 std::optional<StageResults> pending_results;
 // A whole episode in an attack mode, its last stage cleared: shown once play
@@ -452,6 +470,22 @@ void show_stage_results() {
         line = hud_time(r.value);
         if (r.best_before <= 0.0 || r.value < r.best_before) line += "  \u00B7  New best";
         else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.value - r.best_before) + ")";
+    }
+    if (r.lesson >= 0 && r.lesson < 6) {
+        // A magic lesson: its own title and items.
+        const int k = r.lesson;
+        magic_lesson = -1, magic_lesson_phase = -1;
+        blockplanet::ui::set_text("results_title", std::string(magic_lesson_names[k]) + " Lesson Done");
+        blockplanet::ui::set_text("results_where", "Training \u00B7 Magic");
+        blockplanet::ui::set_text("results_line", "Each colour in the hole is one layer of the sphere.");
+        std::vector<blockplanet::ui::ListItem> items;
+        if (k < 5)
+            items.push_back({"next", std::string("Next: ") + magic_lesson_names[k + 1], "", "command:magic_lesson:" + std::to_string(k + 1), true, 1, true});
+        items.push_back({"again", "Try Again", "", "command:magic_lesson:" + std::to_string(k), true, 1, k >= 5});
+        items.push_back({"back", "Back to Training", "", "back", true});
+        blockplanet::ui::set_list("results", items);
+        blockplanet::ui::request_show("results");
+        return;
     }
     blockplanet::ui::set_text("results_title", r.episode ? "Episode " + std::to_string(r.chapter) + " Cleared" : "Stage Cleared");
     blockplanet::ui::set_text("results_where", r.where);
@@ -5643,8 +5677,12 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (command->rfind("research_lab:stripes2", 0) == 0 && guest_rdram != nullptr) {
-                // research_lab:stripes2:N builds N layers (more than the stage's own).
+                // research_lab:stripes2:N builds N layers (more than the stage's own);
+                // ":patch" keeps the stripes to an 18 x 16 patch round the cursor
+                // (six bars or nine squares across), walls elsewhere (the owner,
+                // 2026-11-20: half the sphere is enough, the rest pink walls).
                 const int forced_top = command->size() > 22 ? std::atoi(command->c_str() + 22) : 0;
+                const bool patch = command->find(":patch") != std::string::npos;
                 // Second try (single cells were cleaned up by the game, and the
                 // stage counted as won): real pieces. Layers alternate between
                 // 2 x 2 squares (the one shape that tiles the board) and inert
@@ -5684,7 +5722,15 @@ bool handle_profile_command(const std::string& command) {
                             if (n > 0) bar_num[x] = n;
                         }
                 const std::int16_t bar_v0 = bar ? std::int16_t(guest::load16(rd, bar)) : 0;
-                const int strip = (8 + std::int16_t(guest::load16(rd, 0x80110220u + 0x2B2A)) + 16) % 32;
+                const int cur_x = 8 + std::int16_t(guest::load16(rd, 0x80110220u + 0x2B2A));
+                const int cur_y = 8 + std::int16_t(guest::load16(rd, 0x80110220u + 0x2B2E));
+                const int strip = (cur_x + 16) % 32;
+                const int px0 = cur_x - 9, py0 = cur_y - 8;  // the patch's corner
+                constexpr std::uint32_t cube_table = 0x807F8400u;  // a plain cube, for the walls
+                {
+                    const std::int16_t corners[8] = {81, 14, 94, 14, 81, 1, 94, 1};
+                    for (int i = 0; i < 48; ++i) guest::store16(rd, cube_table + 2u * std::uint32_t(i), std::uint16_t(corners[i % 8]));
+                }
                 // The square's cell number at each (x, y) within a 2 x 2 tile.
                 int num[2][2] = {};
                 for (int x = 0; x < 3; ++x)
@@ -5701,6 +5747,23 @@ bool handle_profile_command(const std::string& command) {
                             continue;
                         }
                         const bool squares = (top - layer) % 2 == 0;
+                        if (patch) {
+                            const int pxr = ((x - px0) % 32 + 32) % 32, pyr = ((y - py0) % 32 + 32) % 32;
+                            if (pxr >= 18 || pyr >= 16 || !bar) {
+                                guest::store16(rd, values + 2u * at, 423);
+                                guest::store32(rd, entries + 4u * at, cube_table);
+                            } else if (squares) {
+                                const int n = num[pxr % 2][pyr % 2];
+                                guest::store16(rd, values + 2u * at, std::int16_t(v0 + n - 1));
+                                guest::store32(rd, entries + 4u * at, square + 0x78u + 96u * std::uint32_t(n - 1));
+                            } else {
+                                const int n = bar_num[pxr % 3];
+                                guest::store16(rd, values + 2u * at, std::int16_t(bar_v0 + n - 1));
+                                guest::store32(rd, entries + 4u * at, bar + 0x78u + 96u * std::uint32_t(n - 1));
+                            }
+                            guest::store8(rd, masks + at, layer == top ? 16 : 0);
+                            continue;
+                        }
                         const int rel = ((x - strip) % 32 + 32) % 32;  // 0, 1: the squares' strip; 2 to 31: ten bars a row
                         if (squares || rel < 2 || !bar) {
                             if (!squares && !bar) {
@@ -5944,6 +6007,17 @@ bool handle_profile_command(const std::string& command) {
                 }
                 continue;
             }
+            if (command->rfind("magic_lesson:", 0) == 0) {
+                // A magic lesson: Casual 1:1 on its own, taken over once in play.
+                const int k = std::atoi(command->c_str() + 13);
+                if (k >= 0 && k < 6) {
+                    magic_lesson = k, magic_lesson_phase = 0;
+                    magic_lesson_at.reset();
+                    blockplanet::ui::send_command("casual");
+                    blockplanet::ui::send_command("stage:1:1");
+                }
+                continue;
+            }
             if (command->rfind("stage:", 0) == 0) {
                 // stage:N:L: one Story stage on its own.
                 const int chapter = std::atoi(command->c_str() + 6);
@@ -6032,6 +6106,47 @@ bool handle_profile_command(const std::string& command) {
             }
         }
         if (!launching() && guest_rdram != nullptr) {
+            // A magic lesson in play (see magic_lesson).
+            if (magic_lesson >= 0 && magic_lesson_phase >= 0) {
+                const auto now_m = std::chrono::steady_clock::now();
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                const std::uint32_t pc = 0x80110220u;
+                const bool in_play = guest::load16(rd, 0x800E121C) == -1 && guest::load16(rd, 0x800E44A8) == 1 &&
+                                     std::int16_t(guest::load16(rd, 0x800E1228)) < 0 && std::int16_t(guest::load16(rd, pc + 0x2D7E)) >= 0;
+                start_card_pending.reset();  // the lesson's own card instead
+                if (magic_lesson_phase == 0) {
+                    if (!in_play || blockplanet::ui::menus_open()) magic_lesson_at.reset();
+                    else if (!magic_lesson_at) magic_lesson_at = now_m;
+                    else if (now_m - *magic_lesson_at > std::chrono::milliseconds(800)) {
+                        blockplanet::ui::send_command("research_lab:stripes2:6:patch");
+                        guest::store8(rd, pc + 0x702, std::uint8_t(magic_lesson));
+                        // The core square needed to win raised to 8 x 8 (the
+                        // largest), so no magic ends the lesson by opening it.
+                        guest::store16(rd, pc + 0x23E4, 8);
+                        magic_lesson_phase = 1;
+                        start_card_requested = now_m;
+                        pause_bridge.request_pause(now_m);
+                    }
+                } else if (magic_lesson_phase == 1) {
+                    if (in_play && !blockplanet::ui::menus_open()) magic_lesson_phase = 2;
+                } else if (magic_lesson_phase >= 2) {
+                    // The drop timer held at its start while the lesson runs.
+                    if (in_play) guest::store32(rd, pc + 0x2408, 0);
+                    if (magic_lesson_phase == 2 && std::int8_t(guest::load8(rd, pc + 0x702)) < 0) {
+                        magic_lesson_phase = 3;
+                        magic_lesson_at = now_m;
+                        // The results to show once play is left, whichever way.
+                        pending_results = StageResults{};
+                        pending_results->lesson = magic_lesson;
+                    }
+                    // The magic keeps working up to about 7 s (the Ray Gun, the Atom).
+                    if (magic_lesson_phase == 3 && now_m - *magic_lesson_at > std::chrono::milliseconds(9000) && !single_stage_quit_at &&
+                        !single_stage_quitting) {
+                        magic_lesson_phase = 4;
+                        single_stage_quit_at = now_m;
+                    }
+                }
+            }
             // The start card: once play has started (a moment in, as the
             // sphere arrives), pause the game; the pause shows the card.
             {
@@ -6306,7 +6421,14 @@ bool handle_profile_command(const std::string& command) {
                     save_profile();
                 }
                 const auto state = read_game_state(guest_rdram);
-                if (start_card_mode == 4) {
+                if (magic_lesson >= 0 && magic_lesson < 6) {
+                    const auto family = active_family.load();
+                    blockplanet::ui::set_text("card_title", std::string("Magic: ") + magic_lesson_names[magic_lesson]);
+                    blockplanet::ui::set_text("card_where", "Training \u00B7 Magic");
+                    blockplanet::ui::set_text("card_goal", std::string(magic_lesson_texts[magic_lesson]) +
+                                                           " The sphere's layers are striped blue and yellow, so you can see how deep it goes. Press " +
+                                                           magic_control_label(family, magic_control()) + " to use it.");
+                } else if (start_card_mode == 4) {
                     blockplanet::ui::set_text("card_title", "Puzzle");
                     blockplanet::ui::set_text("card_where", "Puzzle " + std::to_string(state.level + 1));
                     blockplanet::ui::set_text("card_goal", puzzle_goal());
