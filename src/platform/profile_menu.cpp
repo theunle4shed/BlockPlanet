@@ -303,49 +303,60 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
     // Grouped under headers (the owner's layout, 2026-11-20): The Basics,
     // Magic, Advanced, Other Modes; a lesson builds on those above it. A header is a disabled item, so the
     // focus passes over it. Lessons not built yet are listed, marked Not started.
-    // done: a magic lesson's number (0 to 5), BlockPlanet's own lessons 100+, -1 none.
-    struct Lesson { const char* id; const char* label; const char* action; const char* description; const char* icon; int magic; };
+    // done: a magic lesson's number (0 to 5), BlockPlanet's own lessons 100+,
+    // -1 none (for the focus only: the list shows each lesson's status as the
+    // main menu does, not the player's progress, the owner's choice).
+    enum class Status { NotStarted, InProgress, Viable };
+    struct Lesson { const char* id; const char* label; const char* action; const char* description; const char* icon; int magic; Status status; };
     struct Group { const char* id; const char* title; std::vector<Lesson> lessons; };
+    constexpr auto N = Status::NotStarted, P = Status::InProgress, V = Status::Viable;
     static const std::vector<Group> groups = {
-        // BlockPlanet's own lessons, by what Rescue needs and when (the
+        // BlockPlanet's own lessons, by what the player needs and when (the
         // owner's plan, docs/TRAINING_REDESIGN.md, 2026-11-20). Each: a page
         // on why, then how, then try it or watch it first.
         {"group_basics", "The Basics", {
-            {"goal", "The Goal", "", "What a stage asks: dig through to the picture in the core.", "", -1},
-            {"slide_drop", "Slide and Drop", "command:new_lesson:slide", "Slide two matching pieces together, then drop a third on them.", "\uE1EB", 100},
-            {"hearts", "Hearts and the Drop Timer", "", "Drop on a match before the bar runs out, or lose a heart.", "", -1},
+            {"slide_drop", "Slide and Drop", "command:new_lesson:slide", "Slide two matching pieces together, then drop a third on them.", "\uE1EB", 100, P},
+            {"hearts", "Hearts and the Drop Timer", "", "Drop on a match before the bar runs out, or lose a heart.", "", -1, N},
         }},
         {"group_faster", "Getting Faster", {
-            {"combos", "Combos", "", "Break more than three at once, and why bigger combos help.", "", -1},
-            {"magic", "Earning Magic", "", "A combo of 20 or more earns magic, and how to use it.", "", -1},
-            {"magic_firecracker", "Firecracker", "command:magic_lesson:0", "A round patch of the top layer round your shadow.", "\uE417", 0},
-            {"magic_dynamite", "Dynamite", "command:magic_lesson:1", "Five small blasts in a ring round your shadow.", "\uE417", 1},
-            {"magic_magnet", "Magnet", "command:magic_lesson:2", "Pulls bricks out from under your shadow, as deep as you hold it.", "\uE417", 2},
-            {"magic_atom", "Atom", "command:magic_lesson:3", "Clears the whole top layer of the sphere.", "\uE417", 3},
-            {"magic_bomb", "Bomb", "command:magic_lesson:4", "A wide blast, two layers deep in the middle.", "\uE417", 4},
-            {"magic_ray_gun", "Ray Gun", "command:magic_lesson:5", "Drills straight down to the core under your shadow.", "\uE417", 5},
-            {"mystery", "Mystery Blocks", "", "The flickering yellow and red blocks that give magic.", "", -1},
+            {"combos", "Combos", "", "Break more than three at once, and why bigger combos help.", "", -1, N},
+            {"magic", "Earning Magic", "", "A combo of 20 or more earns magic, and how to use it.", "", -1, N},
+            {"magic_firecracker", "Firecracker", "command:magic_lesson:0", "A round patch of the top layer round your shadow.", "\uE417", 0, P},
+            {"magic_dynamite", "Dynamite", "command:magic_lesson:1", "Five small blasts in a ring round your shadow.", "\uE417", 1, P},
+            {"magic_magnet", "Magnet", "command:magic_lesson:2", "Pulls bricks out from under your shadow, as deep as you hold it.", "\uE417", 2, P},
+            {"magic_atom", "Atom", "command:magic_lesson:3", "Clears the whole top layer of the sphere.", "\uE417", 3, P},
+            {"magic_bomb", "Bomb", "command:magic_lesson:4", "A wide blast, two layers deep in the middle.", "\uE417", 4, P},
+            {"magic_ray_gun", "Ray Gun", "command:magic_lesson:5", "Drills straight down to the core under your shadow.", "\uE417", 5, P},
+            {"mystery", "Mystery Blocks", "", "The flickering yellow and red blocks that give magic.", "", -1, N},
         }},
         {"group_scoring", "Scoring Big", {
-            {"fuse", "Power Pieces and Fuse Combos", "", "Slide a breaking power piece into a match to start a new combo.", "", -1},
-            {"gravity", "Gravity Combos", "", "Slide a piece out from under another so it falls into a match.", "", -1},
-            {"x_count", "X Count", "", "Fuse and gravity combos raise the multiplier on your combo points.", "", -1},
-            {"crystal", "Crystal Bricks", "", "Turn a group of crystal bricks into a power piece.", "", -1},
+            {"fuse", "Power Pieces and Fuse Combos", "", "Slide a breaking power piece into a match to start a new combo.", "", -1, N},
+            {"gravity", "Gravity Combos", "", "Slide a piece out from under another so it falls into a match.", "", -1, N},
+            {"x_count", "X Count", "", "Fuse and gravity combos raise the multiplier on your combo points.", "", -1, N},
+            {"crystal", "Crystal Bricks", "", "Turn a group of crystal bricks into a power piece.", "", -1, N},
         }},
-        {"group_other", "Other Modes", {
-            {"puzzle_new", "Puzzle Controls", "", "Zooming, starting again, and your wildcard piece.", "", -1},
-            {"lines_rules", "Lines", "", "Lining up three in a row to remove bricks.", "", -1},
+        // What each game mode asks of you (the owner: in place of one "goal"
+        // lesson, as the goal differs by mode).
+        {"group_modes", "Game Modes", {
+            {"mode_rescue", "Rescue", "", "Dig through to the core and rescue the friend inside, stage by stage.", "", -1, N},
+            {"mode_hide_seek", "Hide & Seek", "", "Find the pictures hidden in each sphere.", "", -1, N},
+            {"mode_puzzle", "Puzzle", "", "Zooming, starting again, your wildcard piece, and the drops and slides you are given.", "", -1, N},
+            {"mode_lines", "Lines", "", "Line up three bricks in a row to remove them.", "", -1, N},
+            {"mode_minefield", "Minefield", "", "Uncover the grid without setting off a mine.", "", -1, N},
+            {"mode_multiphasic", "Multiphasic", "", "One long run: each core you open becomes the next sphere.", "", -1, N},
+            {"mode_escape", "Escape", "", "From inside the sphere: break your way out.", "", -1, N},
+            {"mode_versus", "Versus", "", "Playing against someone: what your combos send them.", "", -1, N},
         }},
         {"group_original", "Original Lessons", {
             // The game's own lessons, kept playable.
-            {"basics", "Slide and Drop", "command:lesson:1:1", "The original game's first lesson: the shadow, dropping and sliding.", "\uE1EB", -1},
-            {"lives", "Lives", "command:lesson:1:2", "The original game's lesson on hearts and the core picture.", "\uE0F5", -1},
-            {"combos_original", "Combos", "command:lesson:1:3", "The original game's lesson on combos and power pieces.", "\uE1B4", -1},
-            {"magic_original", "Magic", "command:lesson:1:4", "The original game's lesson on earning and using magic.", "\uE417", -1},
-            {"crystal_original", "Crystal Pieces", "command:lesson:2:1", "The original game's lesson on crystal pieces.", "\uE242", -1},
-            {"x_count_original", "X Count", "command:lesson:2:2", "The original game's lesson on the X count and gravity combos.", "\uE1B2", -1},
-            {"fuse_original", "Fuse Combos", "command:lesson:2:3", "The original game's lesson on fuse combos.", "\uE0D7", -1},
-            {"puzzle", "Puzzle", "command:lesson:3:1", "The original game's lesson on puzzle controls.", "\uE1B6", -1},
+            {"basics", "Slide and Drop", "command:lesson:1:1", "The original game's first lesson: the shadow, dropping and sliding.", "\uE1EB", -1, V},
+            {"lives", "Lives", "command:lesson:1:2", "The original game's lesson on hearts and the core picture.", "\uE0F5", -1, V},
+            {"combos_original", "Combos", "command:lesson:1:3", "The original game's lesson on combos and power pieces.", "\uE1B4", -1, V},
+            {"magic_original", "Magic", "command:lesson:1:4", "The original game's lesson on earning and using magic.", "\uE417", -1, V},
+            {"crystal_original", "Crystal Pieces", "command:lesson:2:1", "The original game's lesson on crystal pieces.", "\uE242", -1, V},
+            {"x_count_original", "X Count", "command:lesson:2:2", "The original game's lesson on the X count and gravity combos.", "\uE1B2", -1, V},
+            {"fuse_original", "Fuse Combos", "command:lesson:2:3", "The original game's lesson on fuse combos.", "\uE0D7", -1, V},
+            {"puzzle", "Puzzle", "command:lesson:3:1", "The original game's lesson on puzzle controls.", "\uE1B6", -1, V},
         }},
     };
     // The focus: the first of BlockPlanet's lessons not yet done (the original
@@ -367,15 +378,14 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         header.classes = "list-header";
         items.push_back(header);
         for (const auto& l : g.lessons) {
-            const bool built = l.action[0] != '\0';
-            const bool done = l.magic >= 100 ? lessons_done.count(l.magic) != 0 : l.magic >= 0 && magic_done.count(l.magic) != 0;
             // Selectable even when not built (so the list scrolls to it and its
             // description shows), as the other menus' Not started items;
             // choosing it does nothing yet.
-            blockplanet::ui::ListItem item{l.id, l.label, built ? (done ? "completed" : "") : "(Not started)", l.action, true};
+            const char* note = l.status == V ? "(Viable)" : l.status == P ? "(In progress)" : "(Not started)";
+            blockplanet::ui::ListItem item{l.id, l.label, note, l.action, true};
             item.description = l.description;
             item.icon = l.icon;
-            if (!built) item.classes = "rag-not-started";
+            item.classes = l.status == V ? "rag-viable" : l.status == P ? "rag-in-progress" : "rag-not-started";
             item.focus = l.id == focus_id;
             items.push_back(item);
         }

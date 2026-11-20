@@ -649,7 +649,28 @@ void poll(std::uint8_t* rdram) {
     }
 }
 
-namespace { std::atomic<bool> lesson_hides_marker{false}; }
+namespace {
+std::atomic<bool> lesson_hides_marker{false};
+std::mutex game_jobs_mutex;
+std::vector<std::function<void(std::uint8_t*)>> game_jobs;
+std::atomic<int> game_jobs_pending{0};
+}
+void queue_game_thread_job(std::function<void(std::uint8_t*)> job) {
+    std::lock_guard lock(game_jobs_mutex);
+    game_jobs.push_back(std::move(job));
+    game_jobs_pending.fetch_add(1);
+}
+bool game_thread_job_pending() { return game_jobs_pending.load() > 0; }
+void run_game_thread_jobs(std::uint8_t* rdram) {
+    if (game_jobs_pending.load() == 0) return;
+    std::vector<std::function<void(std::uint8_t*)>> jobs;
+    {
+        std::lock_guard lock(game_jobs_mutex);
+        jobs.swap(game_jobs);
+    }
+    for (auto& job : jobs) job(rdram);
+    game_jobs_pending.fetch_sub(int(jobs.size()));
+}
 void set_lesson_hides_marker(bool hide) { lesson_hides_marker.store(hide); }
 bool hide_cursor_marker() { return active_flag.load() || lesson_hides_marker.load(); }
 
@@ -745,6 +766,7 @@ std::string counter() {
 } // namespace tetrisphere::minefield_sphere
 
 extern "C" bool blockplanet_minefield_hide_marker(std::uint8_t* rdram, recomp_context*) {
+    tetrisphere::minefield_sphere::run_game_thread_jobs(rdram);
     // Also under the game over shell (the piece's shadow showed through it).
     return tetrisphere::minefield_sphere::hide_cursor_marker() || tetrisphere::sphere::game_over_shell_wanted(rdram);
 }

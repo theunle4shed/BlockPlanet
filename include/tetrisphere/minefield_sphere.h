@@ -28,6 +28,7 @@
 #include <atomic>
 #include <optional>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -85,6 +86,12 @@ bool hide_cursor_marker();
 // A Training lesson hides the cursor's shadow while its text is read (the
 // owner, 2026-11-20: it looked as if the player could act already).
 void set_lesson_hides_marker(bool hide);
+// Work on the board run on the game's thread, between its own steps (at the
+// cursor drawing's start, every frame in play), so the game never sees a board
+// half rewritten (moving a lesson's whole board from the main thread let the
+// game act on it midway: pieces split, a miss counted). Pending until run.
+void queue_game_thread_job(std::function<void(std::uint8_t*)> job);
+bool game_thread_job_pending();
 
 // A number, flag or mine to draw over a cell, as an offset in cells from the
 // cursor on screen (dx to the right; dy up, as the board's rows run).

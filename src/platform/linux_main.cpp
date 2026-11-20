@@ -271,6 +271,7 @@ std::vector<std::uint8_t> slide_drop_board;
 // After a choice in a lesson, the game gets no input until every button is let
 // go (the A that chose Try it would otherwise drop at once).
 bool lesson_wait_release = false;
+constexpr std::uint32_t pc_ctx = 0x80110220u;  // player 1's context (for jobs on the game's thread)
 bool slide_lesson_shown() { return (slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14); }
 // The layout: the first square stays, the second slides four cells across
 // to touch it; the pit 8 x 6 round them, the shadow starting between them.
@@ -4459,6 +4460,39 @@ bool slide_nearest_square(int cx, int cy, int out[2]) {
     return best < (1 << 30);
 }
 
+// A place for the shadow on the pit's open floor, clear of the squares (no
+// square cell under it or beside it), nearest the cursor: where the drop stage
+// starts, so the player has to line the shadow up first (the owner).
+bool slide_free_spot(int cx, int cy, int out[2], std::vector<std::pair<int, int>>* all = nullptr) {
+    if (guest_rdram == nullptr || slide_square < 0) return false;
+    const std::uint32_t rec = guest::load32(guest_rdram, 0x8014CBC8u + 4u * std::uint32_t(slide_square));
+    int ax = 9, ay = 9;
+    for (int k = 0; k < 9; ++k)
+        if (std::int16_t(guest::load16(guest_rdram, rec + 0xA + 2u * std::uint32_t(k))) > 0) ax = std::min(ax, k / 3), ay = std::min(ay, k % 3);
+    const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u), masks = guest::load32(guest_rdram, 0x800E44D4u);
+    const auto at = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
+    const auto floor = [&](int x, int y) {  // open floor: nothing on layer 1, the core open
+        const int c = at(x, y);
+        return guest::load16(guest_rdram, values + 2u * std::uint32_t(1024 + c)) == 0 && guest::load8(guest_rdram, masks + std::uint32_t(c)) == 80;
+    };
+    const auto value = [&](int x, int y) { return int(std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(1024 + at(x, y))))); };
+    int best = 1 << 30;
+    for (int oy = cy - 8; oy <= cy + 8; ++oy)
+        for (int ox = cx - 8; ox <= cx + 8; ++ox) {
+            const int x0 = ox + ax - 1, y0 = oy + ay - 1;  // the shadow's 2 x 2 cells
+            bool ok = true;
+            for (int y = y0; y < y0 + 2 && ok; ++y)
+                for (int x = x0; x < x0 + 2 && ok; ++x) ok = floor(x, y);
+            for (int y = y0 - 1; y < y0 + 3 && ok; ++y)
+                for (int x = x0 - 1; x < x0 + 3 && ok; ++x) ok = value(x, y) == 0 || value(x, y) == 423;
+            if (!ok) continue;
+            if (all) all->push_back({ox, oy});
+            const int d = std::abs(ox - cx) + std::abs(oy - cy);
+            if (d < best) best = d, out[0] = ox, out[1] = oy;
+        }
+    return best < (1 << 30);
+}
+
 // The drop stage's demonstration: the shadow steered onto a square (one press
 // each 300 ms), a pause, then A.
 std::uint16_t slide_drop_buttons() {
@@ -6992,20 +7026,53 @@ bool handle_profile_command(const std::string& command) {
                 // The drop stage begins: the board kept as it is (the player's
                 // pair), the shadow where it is.
                 const auto enter_drop = [&] {
-                    lesson_board_save(slide_drop_board);
-                    slide_drop_cursor[0] = std::int16_t(guest::load16(rd, pc + 0x2B2A));
-                    slide_drop_cursor[1] = std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                    // The shadow off the squares: the board moved under it (the
+                    // camera stays still) so it sits on open floor near the pair;
+                    // done on the game's thread, then the board kept as it is.
+                    tetrisphere::minefield_sphere::queue_game_thread_job([](std::uint8_t* g) {
+                        const int cx = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2E));
+                        int spot[2];
+                        if (slide_free_spot(cx, cy, spot) && (spot[0] != cx || spot[1] != cy)) {
+                            std::vector<std::uint8_t> board;
+                            lesson_board_save(board);
+                            lesson_board_restore(board, cx - spot[0], cy - spot[1]);
+                        }
+                        lesson_board_save(slide_drop_board);
+                        slide_drop_cursor[0] = std::int16_t(guest::load16(g, pc_ctx + 0x2B2A));
+                        slide_drop_cursor[1] = std::int16_t(guest::load16(g, pc_ctx + 0x2B2E));
+                    });
                     slide_lesson_phase = 10, slide_lesson_at = now_m;
                     slide_drop_page = 0, slide_drop_watched = false, slide_choice_armed = false;
                 };
                 // The pair put back round where the shadow is now, as it stood
                 // from the shadow when the stage began (the owner: the jump back
                 // spun the sphere round).
+                // Then the shadow on another open spot, chosen at random (the
+                // owner: a bit of variety), the board moved under it again.
                 const auto restore_drop = [&] {
-                    const int dx = std::int16_t(guest::load16(rd, pc + 0x2B2A)) - slide_drop_cursor[0];
-                    const int dy = std::int16_t(guest::load16(rd, pc + 0x2B2E)) - slide_drop_cursor[1];
-                    lesson_board_restore(slide_drop_board, dx, dy);
-                    guest::store16(rd, pc + 0x2D7E, 3);
+                    tetrisphere::minefield_sphere::queue_game_thread_job([](std::uint8_t* g) {
+                        const int dx = std::int16_t(guest::load16(g, pc_ctx + 0x2B2A)) - slide_drop_cursor[0];
+                        const int dy = std::int16_t(guest::load16(g, pc_ctx + 0x2B2E)) - slide_drop_cursor[1];
+                        lesson_board_restore(slide_drop_board, dx, dy);
+                        const int cx = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2E));
+                        std::vector<std::pair<int, int>> spots;
+                        int nearest[2];
+                        slide_free_spot(cx, cy, nearest, &spots);
+                        spots.erase(std::remove_if(spots.begin(), spots.end(),
+                                                   [&](const auto& p) { return std::abs(p.first - cx) + std::abs(p.second - cy) < 2; }),
+                                    spots.end());
+                        if (!spots.empty()) {
+                            static std::mt19937 pick(std::random_device{}());
+                            const auto& spot = spots[std::uniform_int_distribution<std::size_t>(0, spots.size() - 1)(pick)];
+                            std::vector<std::uint8_t> board;
+                            lesson_board_save(board);
+                            lesson_board_restore(board, cx - spot.first, cy - spot.second);
+                            std::fprintf(stdout, "{\"event\":\"drop_spot\",\"cursor\":[%d,%d],\"spot\":[%d,%d],\"spots\":%zu,\"bricks\":%d}\n", cx, cy,
+                                         spot.first, spot.second, spots.size(), count_bricks());
+                            std::fflush(stdout);
+                        }
+                        guest::store16(g, pc_ctx + 0x2D7E, 3);
+                    });
                 };
                 if (slide_lesson_phase == 0) {
                     if (!in_play || blockplanet::ui::menus_open()) slide_lesson_at.reset();
@@ -7017,6 +7084,12 @@ bool handle_profile_command(const std::string& command) {
                         blockplanet::ui::set_text("chapters_subtitle", "Choose a lesson");
                         blockplanet::ui::set_list("chapters", training_lessons(training_done("rescue"), training_done("training_advanced"),
                                                                                magic_lessons_done(), new_lessons_done()));
+                        // Away from the board's seam (cells 31 and 0, where it wraps
+                        // round the back): the lesson's pit is laid round the
+                        // shadow and moved with it, and a square left across the
+                        // seam was removed by the game (a false miss). Moved
+                        // while the sphere flies in, so the swing is not seen.
+                        guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t(16 - 8)));
                         slide_square = square_piece_index();
                         if (slide_square < 0) slide_square = 0;
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit
@@ -7104,7 +7177,7 @@ bool handle_profile_command(const std::string& command) {
                     } else if (b & 0x8000u) {
                         lesson_wait_release = true;
                         slide_lesson_phase = 12, slide_lesson_at = now_m;
-                        slide_drop_score = guest::load32(rd, pc + 0x2AF8), slide_drop_bricks = count_bricks();
+                        slide_drop_bricks = -1;
                     } else if (b & 0x4000u) {
                         const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
                         if (!slide_nearest_square(cx, cy, slide_drop_target)) slide_drop_target[0] = cx, slide_drop_target[1] = cy;
@@ -7126,13 +7199,31 @@ bool handle_profile_command(const std::string& command) {
                     }
                 } else if (slide_lesson_phase == 12) {
                     // A landing scores a moment later: none after 1.5 s is a miss.
+                    // (The board's counts taken once its reset has been done.)
                     static std::optional<std::chrono::steady_clock::time_point> landed;
-                    if (guest::load32(rd, pc + 0x2AF8) != slide_drop_score) {
+                    if (slide_drop_bricks < 0) {
+                        if (!tetrisphere::minefield_sphere::game_thread_job_pending())
+                            slide_drop_score = guest::load32(rd, pc + 0x2AF8), slide_drop_bricks = count_bricks();
+                    } else if (guest::load32(rd, pc + 0x2AF8) != slide_drop_score) {
                         landed.reset();
                         slide_lesson_phase = 14, slide_lesson_at = now_m;
                     } else if (count_bricks() != slide_drop_bricks) {
                         if (!landed) landed = now_m;
-                        else if (now_m - *landed > std::chrono::milliseconds(1500)) landed.reset(), slide_lesson_phase = 13, slide_lesson_at = now_m;
+                        else if (now_m - *landed > std::chrono::milliseconds(1500)) {
+                            landed.reset(), slide_lesson_phase = 13, slide_lesson_at = now_m;
+                            // Research: where the board's bricks are at a miss.
+                            std::string cells;
+                            const std::uint32_t values = guest::load32(rd, 0x800E44D0u);
+                            for (int layer = 1; layer < 9; ++layer)
+                                for (int c = 0; c < 1024; ++c) {
+                                    const int v = std::int16_t(guest::load16(rd, values + 2u * std::uint32_t(layer * 1024 + c)));
+                                    if (v > 0 && v != 423) cells += (cells.empty() ? "" : ",") + std::string("[") + std::to_string(layer) + "," +
+                                                                     std::to_string(c % 32) + "," + std::to_string(c / 32) + "," + std::to_string(v) + "]";
+                                }
+                            std::fprintf(stdout, "{\"event\":\"drop_miss_board\",\"was\":%d,\"now\":%d,\"cells\":[%s]}\n", slide_drop_bricks, count_bricks(),
+                                         cells.c_str());
+                            std::fflush(stdout);
+                        }
                     } else {
                         landed.reset();
                     }
@@ -7140,7 +7231,7 @@ bool handle_profile_command(const std::string& command) {
                     if (since() > 2500) {
                         restore_drop();
                         slide_lesson_phase = 12, slide_lesson_at = now_m;
-                        slide_drop_score = guest::load32(rd, pc + 0x2AF8), slide_drop_bricks = count_bricks();
+                        slide_drop_bricks = -1;
                     }
                 } else if (slide_lesson_phase == 14) {
                     if (since() > 3500 && !pending_results) {
