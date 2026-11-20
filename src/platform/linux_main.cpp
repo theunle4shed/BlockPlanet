@@ -5154,6 +5154,17 @@ bool handle_profile_command(const std::string& command) {
                 launch_mode(type == 2 ? LaunchMode::TrainingAdvanced : type == 3 ? LaunchMode::TrainingPuzzle : LaunchMode::TrainingBasics);
                 continue;
             }
+            if (command->rfind("research_hex:", 0) == 0 && guest_rdram != nullptr) {
+                // Research: N bytes of guest memory as numbers ("research_hex:800E9190:256").
+                const std::uint32_t at = std::uint32_t(std::strtoul(command->c_str() + 13, nullptr, 16));
+                const auto colon = command->find(':', 13);
+                const int n = colon == std::string::npos ? 16 : std::atoi(command->c_str() + colon + 1);
+                std::string out;
+                for (int k = 0; k < n && k < 4096; ++k) out += (k ? "," : "") + std::to_string(guest::load8(guest_rdram, at + std::uint32_t(k)));
+                std::fprintf(stdout, "{\"event\":\"research_hex\",\"at\":\"%08X\",\"bytes\":[%s]}\n", at, out.c_str());
+                std::fflush(stdout);
+                continue;
+            }
             if (command->rfind("research_text:", 0) == 0 && guest_rdram != nullptr) {
                 // Research: the guest's text at an address, up to 300 bytes ("research_text:800EEED0").
                 std::uint32_t a = std::uint32_t(std::strtoul(command->c_str() + 14, nullptr, 16));

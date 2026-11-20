@@ -61,7 +61,7 @@ Use is dispatched in `func_800C719C` by the held magic: three routines serve the
 
 **Points: a magic scores nothing itself.** No routine on the magic's path writes the score (`+0x2AF8`) or the combo (`+0x2AFC`); the per-brick scorer is reached only from the ordinary match routine. What scores is what follows: combos and gravity set off by the hole, and the stage's clear. Consistent with play: on 10:5 the Firecracker, Dynamite and Bomb were followed by small combos only (50, 130 and 90, shown × 10), and the large totals in 1:1 came with the stage won.
 
-**Still to find:** the Atom's table (which cells flash and which go at once). The Atom does not recolour the bricks into one combo, as it looked: it clears the cells directly (`func_8008CA34`).
+The Atom does not recolour the bricks into one combo, as it looked: it clears the cells directly (`func_8008CA34`).
 
 **How long the Magnet and Ray Gun last (measured 2026-11-20, Casual 10:5, `BLOCKPLANET_SCORE_LOG=1`, which now logs the magic's flag `+0x1269` and the time):** the Magnet is active for **4.2 s** (about 250 steps: after its 40-step start, about 42 picks of a random cell of the 3 × 3, which took 73 cells from six layers where held still), the Ray Gun for **7.1 s** (about 425 steps: after its 120-step start, about 7 digs of the whole 3 × 3, which took it down through all seven layers to the bottom one). The test machine drew 14 frames a second; the game counts these in its real-time steps, as the drop timer, so the times should hold at any frame rate (to confirm on a faster machine).
 
@@ -76,3 +76,11 @@ Use is dispatched in `func_800C719C` by the held magic: three routines serve the
 | 5 | +3.3, +3.3 | about 3.3 up and left |
 
 They match the code's flight steps (1/256 of a cell a step) carried on until each stick goes off. Each blast is a disc of radius 2 taking whole bricks, so the cursor's own cell is reached only by bricks that stick into a disc. The blasts' third argument rose with each stick (1,400 to 1,872 in the first use): perhaps a clock, not yet identified.
+
+**The Atom's table and its order (2026-11-20).** The table at `0x800E9190` (dumped with the harness's `research_hex:800E9190:256`) is a **dome** of 16 × 16 values, 240 in the middle falling to 8 at the corners, symmetric, centred on the live cursor (`+0x2B20/+0x2B24`). `func_800C43E8` gives each cell near the cursor a time of t/2 + 281 from it (cells outside 1 to 15 of the cursor in either direction get 0) and compares it with the cell's ripple time (its distance from the Atom's centre × 6 plus a clock at `0x8014D260`). Measured with `research_snap` and `research_diff` every 0.25 s (Casual 10:5, the cursor at 8,8), the Atom empties the board's top bricks in this order:
+
+1. at once, thin lines splitting the board into quarters through the cursor;
+2. over about 1.5 s, the far side of the sphere, in waves moving outwards from those lines;
+3. last, about 2 to 3 s in, the square in view round the cursor, **from its edge inwards: the cell under the cursor breaks last**, as the dome's values say.
+
+So the table times the collapse of the part of the sphere the player sees (the middle last), rather than choosing which cells go.
