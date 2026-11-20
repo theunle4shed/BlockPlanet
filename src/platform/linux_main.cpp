@@ -199,6 +199,7 @@ bool final_finale = false;
 int magic_lesson = -1;
 int magic_lesson_phase = -1;
 std::optional<std::chrono::steady_clock::time_point> magic_lesson_at;
+int magic_lesson_cells = 0;  // the board's bricks as the lesson starts (to see that the magic broke some)
 const char* const magic_lesson_names[6] = {"Firecracker", "Dynamite", "Magnet", "Atom", "Bomb", "Ray Gun"};
 // What each magic does, in BlockPlanet's words (docs/research/blockplanet-score-and-magic.md).
 const char* const magic_lesson_texts[6] = {
@@ -475,9 +476,9 @@ void show_stage_results() {
         // A magic lesson: its own title and items.
         const int k = r.lesson;
         magic_lesson = -1, magic_lesson_phase = -1;
-        blockplanet::ui::set_text("results_title", std::string(magic_lesson_names[k]) + " Lesson Done");
+        blockplanet::ui::set_text("results_title", std::string(magic_lesson_names[k]) + " Complete");
         blockplanet::ui::set_text("results_where", "Training \u00B7 Magic");
-        blockplanet::ui::set_text("results_line", "Each colour in the hole is one layer of the sphere.");
+        blockplanet::ui::set_text("results_line", "");
         std::vector<blockplanet::ui::ListItem> items;
         if (k < 5)
             items.push_back({"next", std::string("Next: ") + magic_lesson_names[k + 1], "", "command:magic_lesson:" + std::to_string(k + 1), true, 1, true});
@@ -659,6 +660,20 @@ std::optional<blockplanet::ui::HudView> last_hud_view;  // what update_hud last 
 std::optional<blockplanet::ui::HudView> last_play_hud;
 void show_hud(std::optional<blockplanet::ui::HudView> view) {
     if (final_finale) view.reset();  // the finale plays with no HUD
+    // A magic lesson's HUD: only the magic (its box, with the model) and how
+    // many are left (the owner, 2026-11-20: show only what the lesson needs).
+    if (view && magic_lesson >= 0 && magic_lesson < 6 && magic_lesson_phase >= 1) {
+        auto& v = *view;
+        v.show_lives = false;
+        v.show_next = false;
+        v.mode = "Training";
+        v.stage = magic_lesson_names[magic_lesson];
+        v.goal_label = "Magic left";
+        v.goal = magic_lesson_phase >= 3 ? "0" : "1";
+        v.time.clear(), v.clock.clear(), v.score.clear(), v.story_score.clear(), v.story_gains.clear();
+        v.score_best.clear(), v.best.clear(), v.time_delta.clear(), v.splits.clear();
+        v.combo = 0, v.multiplier = -1, v.progress = -1.0f, v.drops_left = -1, v.slides_left = -1;
+    }
     if (view) last_play_hud = view;
     last_hud_view = std::move(view);
 }
@@ -3809,6 +3824,19 @@ void publish_audio_settings() {
     blockplanet::ui::set_setting("track", std::to_string(track));
 }
 
+// The board's bricks (layers 1 to 8, walls left out): a magic lesson checks
+// that the magic broke some.
+int count_bricks() {
+    if (guest_rdram == nullptr) return 0;
+    const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);
+    int n = 0;
+    for (int i = 1024; i < 9 * 1024; ++i) {
+        const std::int16_t v = std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(i)));
+        n += v > 0 && v != 423;
+    }
+    return n;
+}
+
 // Training's completed marks: the game's lessons (chapter 0 of a mode) and
 // BlockPlanet's magic lessons (progress "magic_lessons": the magics done).
 bool training_done(const char* mode) {
@@ -6125,6 +6153,17 @@ bool handle_profile_command(const std::string& command) {
                 const bool in_play = guest::load16(rd, 0x800E121C) == -1 && guest::load16(rd, 0x800E44A8) == 1 &&
                                      std::int16_t(guest::load16(rd, 0x800E1228)) < 0 && std::int16_t(guest::load16(rd, pc + 0x2D7E)) >= 0;
                 start_card_pending.reset();  // the lesson's own card instead
+                // Left before the magic was used (Quit): the lesson ends there.
+                {
+                    static std::optional<std::chrono::steady_clock::time_point> out_since;
+                    if (magic_lesson_phase >= 1 && magic_lesson_phase <= 3 && !pending_results &&
+                        std::int16_t(guest::load16(rd, 0x800E121C)) >= 0) {
+                        if (!out_since) out_since = now_m;
+                        else if (now_m - *out_since > std::chrono::milliseconds(1500)) magic_lesson = -1, magic_lesson_phase = -1;
+                    } else {
+                        out_since.reset();
+                    }
+                }
                 if (magic_lesson_phase == 0) {
                     if (!in_play || blockplanet::ui::menus_open()) magic_lesson_at.reset();
                     else if (!magic_lesson_at) magic_lesson_at = now_m;
@@ -6139,13 +6178,21 @@ bool handle_profile_command(const std::string& command) {
                         pause_bridge.request_pause(now_m);
                     }
                 } else if (magic_lesson_phase == 1) {
-                    if (in_play && !blockplanet::ui::menus_open()) magic_lesson_phase = 2;
+                    if (in_play && !blockplanet::ui::menus_open()) magic_lesson_phase = 2, magic_lesson_cells = count_bricks();
                 } else if (magic_lesson_phase >= 2) {
                     // The drop timer held at its start while the lesson runs.
                     if (in_play) guest::store32(rd, pc + 0x2408, 0);
                     if (magic_lesson_phase == 2 && std::int8_t(guest::load8(rd, pc + 0x702)) < 0) {
                         magic_lesson_phase = 3;
                         magic_lesson_at = now_m;
+                    }
+                    // Gone without a blast (lost with a heart, say): given back
+                    // once it is clear no bricks broke, to try again.
+                    if (magic_lesson_phase == 3 && now_m - *magic_lesson_at > std::chrono::milliseconds(6000) && !pending_results &&
+                        count_bricks() >= magic_lesson_cells) {
+                        guest::store8(rd, pc + 0x702, std::uint8_t(magic_lesson));
+                        magic_lesson_phase = 2;
+                    } else if (magic_lesson_phase == 3 && now_m - *magic_lesson_at > std::chrono::milliseconds(6000) && !pending_results) {
                         // Done: marked in the profile, and the Training list
                         // (the menus it returns to) refreshed.
                         if (profile_save && profile_data.progress.chapters_completed["magic_lessons"].insert(magic_lesson).second) {
@@ -6444,8 +6491,9 @@ bool handle_profile_command(const std::string& command) {
                     const auto family = active_family.load();
                     blockplanet::ui::set_text("card_title", std::string("Magic: ") + magic_lesson_names[magic_lesson]);
                     blockplanet::ui::set_text("card_where", "Training \u00B7 Magic");
-                    blockplanet::ui::set_text("card_goal", std::string(magic_lesson_texts[magic_lesson]) +
-                                                           " The sphere's layers are striped blue and yellow, so you can see how deep it goes. Press " +
+                    // What it does and how to fire it; the stripes speak for
+                    // themselves (the owner, 2026-11-20).
+                    blockplanet::ui::set_text("card_goal", std::string(magic_lesson_texts[magic_lesson]) + " Press " +
                                                            magic_control_label(family, magic_control()) + " to use it.");
                 } else if (start_card_mode == 4) {
                     blockplanet::ui::set_text("card_title", "Puzzle");

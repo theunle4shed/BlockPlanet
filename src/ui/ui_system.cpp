@@ -591,6 +591,9 @@ std::string hud_rml_parts(const HudView& hud) {
                "<div id='slides' class='group'><div class='label'>Slides left</div><div class='count'>" +
                std::to_string(std::max(0, hud.slides_left)) + "</div></div></div>";
     } else {
+    // Health (the hearts and the drop timer): left out where not needed (a
+    // magic lesson, 2026-11-20).
+    if (hud.show_lives) {
     rml += "<div id='lives' class='group'><div class='label'>Health" + drop_count(hud) + "</div><div id='hearts'>";
     for (int i = 0; i < 3; ++i) rml += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";
     rml += "</div>";
@@ -602,6 +605,7 @@ std::string hud_rml_parts(const HudView& hud) {
         rml += std::string("<div class='clock-inline") + (hud.clock_low ? " low" : "") + "'>" + digits(escape(hud.clock)) + "</div>";
     rml += "</div>";
     rml += "<div class='rule'><div class='line'/></div>";
+    }
     // Score Attack: the clock, below health (the run ends when it runs out).
     if (!hud.clock.empty())
         rml += std::string("<div id='clock-group' class='group'><div class='label'>Time left</div><div id='clock'") +
