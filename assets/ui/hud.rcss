@@ -429,6 +429,7 @@ div { display: block; }
 /* Next keeps room for three pieces, so the row does not change width with
    the number of shapes a lesson uses (the owner, 2026-11-20). */
 #left.row #next { min-width: 300dp; }
+#left.row #next.compact { min-width: 0dp; }  /* a lesson showing one piece: the box only that wide */
 #left.row .group { height: 122dp; padding: 14dp 20dp 0dp 20dp; }
 #left.row .rule { padding: 14dp 10dp; height: 108dp; }
 #left.row .rule .line { width: 2dp; height: 108dp; }

@@ -649,7 +649,9 @@ void poll(std::uint8_t* rdram) {
     }
 }
 
-bool hide_cursor_marker() { return active_flag.load(); }
+namespace { std::atomic<bool> lesson_hides_marker{false}; }
+void set_lesson_hides_marker(bool hide) { lesson_hides_marker.store(hide); }
+bool hide_cursor_marker() { return active_flag.load() || lesson_hides_marker.load(); }
 
 std::vector<Mark> marks(const std::uint8_t* rdram) {
     std::vector<Mark> out;

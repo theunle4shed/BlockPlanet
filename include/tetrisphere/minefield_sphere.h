@@ -82,6 +82,9 @@ void poll(std::uint8_t* rdram);
 // Whether the game's cursor marker (its shadow of the piece) is hidden: while
 // the field is in play the cell under the cursor shows it instead.
 bool hide_cursor_marker();
+// A Training lesson hides the cursor's shadow while its text is read (the
+// owner, 2026-11-20: it looked as if the player could act already).
+void set_lesson_hides_marker(bool hide);
 
 // A number, flag or mine to draw over a cell, as an offset in cells from the
 // cursor on screen (dx to the right; dy up, as the board's rows run).

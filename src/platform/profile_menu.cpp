@@ -307,18 +307,17 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
     struct Lesson { const char* id; const char* label; const char* action; const char* description; const char* icon; int magic; };
     struct Group { const char* id; const char* title; std::vector<Lesson> lessons; };
     static const std::vector<Group> groups = {
+        // BlockPlanet's own lessons, by what Rescue needs and when (the
+        // owner's plan, docs/TRAINING_REDESIGN.md, 2026-11-20). Each: a page
+        // on why, then how, then try it or watch it first.
         {"group_basics", "The Basics", {
-            // BlockPlanet's own lessons (2026-11-20, docs/TRAINING_REDESIGN.md):
-            // each shows the move, resets the board, then the player does it.
-            // Lesson keys 100+ (lessons_done); Next runs them in order.
             {"goal", "The Goal", "", "What a stage asks: dig through to the picture in the core.", "", -1},
-            {"slide", "Slide", "command:new_lesson:slide", "Hold B to grab a piece and slide it across to another.", "\uE1EB", 101},
-            {"drop", "Drop", "command:new_lesson:drop", "Drop your piece onto two matching pieces to break all three.", "\uE1EB", 100},
+            {"slide_drop", "Slide and Drop", "command:new_lesson:slide", "Slide two matching pieces together, then drop a third on them.", "\uE1EB", 100},
             {"hearts", "Hearts and the Drop Timer", "", "Drop on a match before the bar runs out, or lose a heart.", "", -1},
-            {"combos", "Combos", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4", -1},
         }},
-        {"group_magic", "Magic", {
-            {"magic", "Earning Magic", "command:lesson:1:4", "A combo of 20 or more earns magic, and how to use it.", "\uE417", -1},
+        {"group_faster", "Getting Faster", {
+            {"combos", "Combos", "", "Break more than three at once, and why bigger combos help.", "", -1},
+            {"magic", "Earning Magic", "", "A combo of 20 or more earns magic, and how to use it.", "", -1},
             {"magic_firecracker", "Firecracker", "command:magic_lesson:0", "A round patch of the top layer round your shadow.", "\uE417", 0},
             {"magic_dynamite", "Dynamite", "command:magic_lesson:1", "Five small blasts in a ring round your shadow.", "\uE417", 1},
             {"magic_magnet", "Magnet", "command:magic_lesson:2", "Pulls bricks out from under your shadow, as deep as you hold it.", "\uE417", 2},
@@ -327,28 +326,41 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             {"magic_ray_gun", "Ray Gun", "command:magic_lesson:5", "Drills straight down to the core under your shadow.", "\uE417", 5},
             {"mystery", "Mystery Blocks", "", "The flickering yellow and red blocks that give magic.", "", -1},
         }},
-        {"group_advanced", "Advanced", {
-            // Each builds on the one before (2026-11-20): a fuse needs a power
-            // brick, and the X count adds up gravity combos and fuses.
-            {"gravity", "Gravity Combos", "", "When bricks fall into a new match during a combo.", "", -1},
-            {"crystal", "Crystal Bricks", "command:lesson:2:1", "Turn a group of crystal bricks into a power brick.", "\uE242", -1},
-            {"power_scoring", "Power Bricks and Scoring", "", "How power bricks make a combo pay far more.", "", -1},
-            {"fuse", "Fuse Combos", "command:lesson:2:3", "Slide a flashing brick into a match to keep a combo going.", "\uE0D7", -1},
-            {"x_count", "X Count", "command:lesson:2:2", "The multiplier on your combo score.", "\uE1B2", -1},
+        {"group_scoring", "Scoring Big", {
+            {"fuse", "Power Pieces and Fuse Combos", "", "Slide a breaking power piece into a match to start a new combo.", "", -1},
+            {"gravity", "Gravity Combos", "", "Slide a piece out from under another so it falls into a match.", "", -1},
+            {"x_count", "X Count", "", "Fuse and gravity combos raise the multiplier on your combo points.", "", -1},
+            {"crystal", "Crystal Bricks", "", "Turn a group of crystal bricks into a power piece.", "", -1},
         }},
         {"group_other", "Other Modes", {
-            {"puzzle", "Puzzle Controls", "command:lesson:3:1", "Zooming and the other controls for puzzles.", "\uE1B6", -1},
+            {"puzzle_new", "Puzzle Controls", "", "Zooming, starting again, and your wildcard piece.", "", -1},
             {"lines_rules", "Lines", "", "Lining up three in a row to remove bricks.", "", -1},
         }},
         {"group_original", "Original Lessons", {
-            // The game's own first lessons, kept playable (BlockPlanet's
-            // lessons above replace them).
+            // The game's own lessons, kept playable.
             {"basics", "Slide and Drop", "command:lesson:1:1", "The original game's first lesson: the shadow, dropping and sliding.", "\uE1EB", -1},
             {"lives", "Lives", "command:lesson:1:2", "The original game's lesson on hearts and the core picture.", "\uE0F5", -1},
+            {"combos_original", "Combos", "command:lesson:1:3", "The original game's lesson on combos and power pieces.", "\uE1B4", -1},
+            {"magic_original", "Magic", "command:lesson:1:4", "The original game's lesson on earning and using magic.", "\uE417", -1},
+            {"crystal_original", "Crystal Pieces", "command:lesson:2:1", "The original game's lesson on crystal pieces.", "\uE242", -1},
+            {"x_count_original", "X Count", "command:lesson:2:2", "The original game's lesson on the X count and gravity combos.", "\uE1B2", -1},
+            {"fuse_original", "Fuse Combos", "command:lesson:2:3", "The original game's lesson on fuse combos.", "\uE0D7", -1},
+            {"puzzle", "Puzzle", "command:lesson:3:1", "The original game's lesson on puzzle controls.", "\uE1B6", -1},
         }},
     };
-    // The first lesson not yet done has the focus (the game's own order).
-    const char* focus_id = !lessons_done.count(101) ? "slide" : !lessons_done.count(100) ? "drop" : !basics_done ? "combos" : !advanced_done ? "crystal" : "drop";
+    // The focus: the first of BlockPlanet's lessons not yet done (the original
+    // lessons are not counted), else the first lesson.
+    (void)basics_done, (void)advanced_done;
+    std::string focus_id = "slide_drop";
+    for (const auto& g : groups) {
+        if (std::string(g.id) == "group_original") continue;
+        bool found = false;
+        for (const auto& l : g.lessons) {
+            const bool done = l.magic >= 100 ? lessons_done.count(l.magic) != 0 : l.magic >= 0 && magic_done.count(l.magic) != 0;
+            if (l.action[0] != '\0' && !done) { focus_id = l.id; found = true; break; }
+        }
+        if (found) break;
+    }
     std::vector<blockplanet::ui::ListItem> items;
     for (const auto& g : groups) {
         blockplanet::ui::ListItem header{g.id, g.title, "", "", false};
@@ -364,7 +376,7 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             item.description = l.description;
             item.icon = l.icon;
             if (!built) item.classes = "rag-not-started";
-            item.focus = std::string(l.id) == focus_id;
+            item.focus = l.id == focus_id;
             items.push_back(item);
         }
     }

@@ -570,8 +570,9 @@ std::string hud_rml_parts(const HudView& hud) {
         };
         std::vector<std::string> parts;
         if (hud.show_next)
-            parts.push_back(std::string("<div id='next' class='group") + glow("next") + "'><div class='label'>Next</div>" +
-                            pieces_rml(hud.next, hud.next.size(), 3) + "</div>");
+            parts.push_back(std::string("<div id='next' class='group") + glow("next") + (hud.next_room < 3 ? " compact" : "") +
+                            "'><div class='label'>Next</div>" + pieces_rml(hud.next, hud.next.size(), std::size_t(std::max(1, hud.next_room))) +
+                            "</div>");
         if (hud.show_lives) {
             std::string lives = std::string("<div id='lives' class='group") + glow("lives") + "'><div class='label'>Health" + drop_count(hud) + "</div><div id='hearts'>";
             for (int i = 0; i < 3; ++i) lives += i < hud.hearts ? "<div class='heart'/>" : "<div class='heart lost'/>";

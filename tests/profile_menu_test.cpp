@@ -195,21 +195,18 @@ int main(int argc, char** argv) {
     // disabled items), the first lesson not done focused, lessons not built yet listed as Not started,
     // finished magic lessons marked completed.
     auto all = training_lessons(false, false);
-    assert(all.size() == 27 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
-    assert(all[2].focus && all[2].label == "Slide" && all[2].action == "command:new_lesson:slide" && all[3].label == "Drop");
+    // The Basics (0): The Goal, Slide and Drop, Hearts; Getting Faster (4): Combos, Earning Magic, six magics,
+    // Mystery Blocks; Scoring Big (14); Other Modes (19); Original Lessons (22): eight.
+    assert(all.size() == 31 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
+    assert(all[2].focus && all[2].label == "Slide and Drop" && all[2].action == "command:new_lesson:slide");
     assert(all[1].label == "The Goal" && all[1].action.empty() && all[1].classes == "rag-not-started" && all[1].enabled);
-    assert(all[24].label == "Original Lessons" && all[25].label == "Slide and Drop" && all[25].action == "command:lesson:1:1");
-    assert(all[6].label == "Magic" && !all[6].enabled && all[7].label == "Earning Magic" && all[7].action == "command:lesson:1:4");
-    assert(all[8].action == "command:magic_lesson:0" && all[13].action == "command:magic_lesson:5" && all[14].label == "Mystery Blocks");
-    assert(all[15].label == "Advanced" && all[16].label == "Gravity Combos" && all[20].label == "X Count" && all[21].label == "Other Modes");
+    assert(all[4].label == "Getting Faster" && all[7].action == "command:magic_lesson:0" && all[12].action == "command:magic_lesson:5");
+    assert(all[14].label == "Scoring Big" && all[19].label == "Other Modes" && all[22].label == "Original Lessons");
+    assert(all[23].label == "Slide and Drop" && all[23].action == "command:lesson:1:1" && all[30].action == "command:lesson:3:1");
     {
-        const auto marked = training_lessons(true, true, {0, 4});
-        assert(marked[8].note == "completed" && marked[9].note.empty() && marked[12].note == "completed");
-    }
-    {
-        const auto advanced = training_lessons(true, false, {}, {100, 101});
-        assert(!advanced[2].focus && advanced[17].label == "Crystal Bricks" && advanced[17].focus);
-        assert(advanced[2].note == "completed" && advanced[3].note == "completed" && training_lessons(true, true)[3].note.empty());
+        const auto marked = training_lessons(true, true, {0, 4}, {100});
+        assert(marked[7].note == "completed" && marked[8].note.empty() && marked[11].note == "completed" && marked[2].note == "completed");
+        assert(!marked[2].focus && marked[8].focus);  // the first lesson not done: Dynamite
     }
 
     auto confirm = delete_confirmation(store, "1");

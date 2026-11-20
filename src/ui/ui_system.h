@@ -161,7 +161,8 @@ struct HudView {
     // introduced glows for a moment (`intro`: "next", "lives", "magic",
     // "progress", "xcount", "moves").
     bool bottom_row = false;
-    float row_column = 94.0f;  // the bottom row's centre, a column of the game's 320 (Training's sphere: 94; centred: 160)
+    float row_column = 94.0f;
+    int next_room = 3;  // Next's slots in the bottom row (a lesson showing one piece: 1, the box only that wide)  // the bottom row's centre, a column of the game's 320 (Training's sphere: 94; centred: 160)
     bool show_lives = true, show_magic = true;
     int multiplier = -1;       // the X count, or -1 to hide it
     std::vector<std::string> intro;
