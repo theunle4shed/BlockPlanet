@@ -301,7 +301,7 @@ std::vector<blockplanet::ui::ListItem> story_training(bool basics_done, bool adv
 std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool advanced_done, const std::set<int>& magic_done) {
     struct Lesson { const char* id; const char* label; const char* group; const char* action; const char* description; const char* icon; };
     static const Lesson lessons[] = {
-        {"basics", "The Basics", "Basics", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB"},
+        {"basics", "Slide and Drop", "Basics", "command:lesson:1:1", "Your shadow, dropping and sliding bricks, and how they break.", "\uE1EB"},
         {"lives", "Lives", "Basics", "command:lesson:1:2", "Your hearts, and how a drop that matches nothing costs one.", "\uE0F5"},
         {"combos", "Combos", "Basics", "command:lesson:1:3", "Break three or more bricks at once, and why bigger combos help.", "\uE1B4"},
         {"magic", "Magic", "Basics", "command:lesson:1:4", "A combo of 20 or more earns magic, and how to use it.", "\uE417"},

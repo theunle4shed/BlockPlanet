@@ -6352,7 +6352,7 @@ bool handle_profile_command(const std::string& command) {
                 case 2: where = "Score Attack"; break;
                 case 3: {
                     // The lesson by its name in Training's menu (a lesson is a level of its training).
-                    static const char* basics[] = {"The Basics", "Lives", "Combos", "Magic"};
+                    static const char* basics[] = {"Slide and Drop", "Lives", "Combos", "Magic"};
                     static const char* advanced[] = {"Crystal Bricks", "X Count", "Fuse Combos"};
                     const int lesson = guest::load16(guest_rdram, 0x80110220u + 0x23BA);
                     const char* name = state.training_type == 3 ? "Puzzle Controls"
