@@ -716,3 +716,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - `BLOCKPLANET_SEE_THROUGH_CORE=1` (Extended sphere): the core is not drawn, and the inside of the far side of the sphere is drawn, so a hole dug to the core shows through to the other side. BlockPlanet.bat's power-up test turns it on. Research only for now; details in `docs/ROADMAP.md`.
 - Research: `BLOCKPLANET_SKIP_PASS` skips the sphere's other drawing passes, and `BLOCKPLANET_RESEARCH_HOLE_SIZE` sets the research hole's size.
+
+## 2026-11-21: See-through core set aside; the dark ball in the core
+
+- BlockPlanet.bat's power-up test no longer turns on the see-through core (the owner: more problems than it's worth). The experiment stays, off by default.
+- Research: `BLOCKPLANET_RESEARCH_CORE_VALUE` and `BLOCKPLANET_SEE_THROUGH_KEEP_CORE`, used to find out what the dark ball in an opened core is (`docs/ROADMAP.md`).

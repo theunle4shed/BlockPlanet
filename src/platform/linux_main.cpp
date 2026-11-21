@@ -2298,6 +2298,10 @@ void research_hole(std::uint8_t* rdram) {
             }
             guest::store8(rdram, masks + std::uint32_t(c), 80);
             guest::store8(rdram, columns + std::uint32_t(c), 0);
+            // BLOCKPLANET_RESEARCH_CORE_VALUE=n: the uncovered core cells get
+            // value n (its look; 9 to 17 are not drawn).
+            if (const char* cv = std::getenv("BLOCKPLANET_RESEARCH_CORE_VALUE"))
+                guest::store16(rdram, values + 2u * std::uint32_t(c), static_cast<std::int16_t>(std::atoi(cv)));
         }
     std::fprintf(stdout, "{\"event\":\"research_hole\",\"at\":[%d,%d]}\n", cx, cy);
     std::fflush(stdout);

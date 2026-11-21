@@ -827,6 +827,9 @@ extern "C" bool blockplanet_sphere_pass_begin(std::uint8_t* rdram, recomp_contex
         return bits;
     }();
     // See-through core: 1 (func_800A0ED8) draws the core.
-    if (pass == 1 && inner_shell_ready && see_through_core()) return true;
+    // BLOCKPLANET_SEE_THROUGH_KEEP_CORE=1 keeps it (research: is the core
+    // see-through itself?).
+    static const bool keep_core = std::getenv("BLOCKPLANET_SEE_THROUGH_KEEP_CORE") != nullptr;
+    if (pass == 1 && inner_shell_ready && see_through_core() && !keep_core) return true;
     return (skipped >> pass & 1u) != 0;
 }
