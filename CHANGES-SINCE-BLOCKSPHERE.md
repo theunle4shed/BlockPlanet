@@ -721,3 +721,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - BlockPlanet.bat's power-up test no longer turns on the see-through core (the owner: more problems than it's worth). The experiment stays, off by default.
 - Research: `BLOCKPLANET_RESEARCH_CORE_VALUE` and `BLOCKPLANET_SEE_THROUGH_KEEP_CORE`, used to find out what the dark ball in an opened core is (`docs/ROADMAP.md`).
+
+## 2026-11-21: The dark ball in an opened core drawn black (test)
+
+- `BLOCKPLANET_CORE_BOWL=1`: the dark ball that shows behind the rescued friend when the core is opened is drawn flat black, keeping its round edge and fade, so nothing behind it shows and the friend stands out in front. BlockPlanet.bat's test option turns it on.
+- Research: `BLOCKPLANET_DL_DUMP` with the `research_dl_dump` command saves a frame's display list, and `BLOCKPLANET_DL_MUTE` blanks chosen vertex loads (`src/graphics/dl_research.cpp`).

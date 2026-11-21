@@ -49,6 +49,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
+#include "tetrisphere/dl_research.h"
+#include "tetrisphere/core_bowl.h"
 #include <memory>
 #include <vector>
 
@@ -705,6 +708,11 @@ void record_gfx_task(const std::uint8_t* rdram) {
 // Registers with the runtime when the statistics are turned on.
 [[maybe_unused]] const bool stats_registered = [] {
     if (stats.enabled) tetrisphere::set_gfx_task_observer(record_gfx_task);
+    else if (tetrisphere::dl_research::enabled() || tetrisphere::core_bowl::enabled())
+        tetrisphere::set_gfx_task_observer([](const std::uint8_t* rdram) {
+            if (tetrisphere::core_bowl::enabled()) tetrisphere::core_bowl::observe(rdram);
+            if (tetrisphere::dl_research::enabled()) tetrisphere::dl_research::observe(rdram);
+        });
     return stats.enabled;
 }();
 

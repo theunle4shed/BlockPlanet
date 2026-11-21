@@ -53,6 +53,7 @@
 #include "tetrisphere/pc_settings_hook.h"
 #include "tetrisphere/controls_sdl.h"
 #include "tetrisphere/sphere_quadrants.h"
+#include "tetrisphere/dl_research.h"
 
 #include "librecomp/rsp.hpp"
 #include "ultramodern/input.hpp"
@@ -6849,6 +6850,10 @@ bool handle_profile_command(const std::string& command) {
                 // Research (the test harness): Hide & Seek from level N.
                 game_option_applier->choose_start(0, std::atoi(command->c_str() + 18));
                 launch_mode(LaunchMode::HideAndSeek);
+                continue;
+            }
+            if (*command == "research_dl_dump") {
+                tetrisphere::dl_research::request_dump();
                 continue;
             }
             if (command->starts_with("research_see_through:")) {
