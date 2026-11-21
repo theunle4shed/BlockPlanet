@@ -319,15 +319,12 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             {"hearts", "Hearts and the Drop Timer", "command:new_lesson:hearts", "Drop on a match before the bar runs out, or lose a heart.", "\uE0F5", 103, P},
             // Combos and earning a power-up together (the owner, 2026-11-21: the
             // magic lesson makes a big combo anyway), and essential: in The Basics.
-            {"combos_magic", "Combos and Magic", "", "Break a big group at once: big combos fill your magic meter and earn a power-up.", "", -1, N},
+            {"combos_magic", "Combos and Magic", "command:new_lesson:combos", "Combos top up your magic meter: fill it to unlock a power-up.", "\uE417", 104, P},
         }},
         {"group_faster", "Getting Faster", {
-            {"magic_firecracker", "Firecracker", "command:magic_lesson:0", "A round patch of the top layer round your shadow.", "\uE417", 0, P},
-            {"magic_dynamite", "Dynamite", "command:magic_lesson:1", "Five small blasts in a ring round your shadow.", "\uE417", 1, P},
-            {"magic_magnet", "Magnet", "command:magic_lesson:2", "Pulls bricks out from under your shadow, as deep as you hold it.", "\uE417", 2, P},
-            {"magic_atom", "Atom", "command:magic_lesson:3", "Clears the whole top layer of the sphere.", "\uE417", 3, P},
-            {"magic_bomb", "Bomb", "command:magic_lesson:4", "A wide blast, two layers deep in the middle.", "\uE417", 4, P},
-            {"magic_ray_gun", "Ray Gun", "command:magic_lesson:5", "Drills straight down to the core under your shadow.", "\uE417", 5, P},
+            // The six power-ups as one lesson (the owner, 2026-11-21): for now the
+            // six lessons in turn (each one's Next leads to the next).
+            {"power_ups", "Power-Ups", "command:magic_lesson:0", "What each power-up does: the Firecracker, Dynamite, Magnet, Atom, Bomb and Ray Gun.", "\uE417", 0, P},
             {"mystery", "Mystery Blocks", "", "The flickering yellow and red blocks that give magic.", "", -1, N},
         }},
         {"group_scoring", "Scoring Big", {

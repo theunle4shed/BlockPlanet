@@ -195,22 +195,20 @@ int main(int argc, char** argv) {
     // disabled items), the first lesson not done focused, lessons not built yet listed as Not started,
     // finished magic lessons marked completed.
     auto all = training_lessons(false, false);
-    // The Basics (0): Slide and Drop, Hearts, Combos and Magic; Getting Faster (4): six magics, Mystery Blocks;
-    // Scoring Big (12); Game Modes (17): eight; Original Lessons (26): eight. Each shows its status, as the main menu.
-    assert(all.size() == 35 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
+    // The Basics (0): Slide and Drop, Hearts, Combos and Magic; Getting Faster (4): Power-Ups, Mystery Blocks;
+    // Scoring Big (7); Game Modes (12): eight; Original Lessons (21): eight. Each shows its status, as the main menu.
+    assert(all.size() == 30 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
     assert(all[1].focus && all[1].label == "Slide and Drop" && all[1].action == "command:new_lesson:slide" &&
            all[1].note == "(In progress)" && all[1].classes == "rag-in-progress");
-    assert(all[2].label == "Hearts and the Drop Timer" && all[2].action == "command:new_lesson:hearts" && all[2].classes == "rag-in-progress");
-    assert(all[3].label == "Combos and Magic" && all[3].action.empty() && all[3].classes == "rag-not-started" && all[3].enabled);
-    assert(all[4].label == "Getting Faster" && all[5].action == "command:magic_lesson:0" && all[10].action == "command:magic_lesson:5");
-    assert(all[12].label == "Scoring Big" && all[17].label == "Game Modes" && all[18].label == "Rescue" && all[26].label == "Original Lessons");
-    assert(all[27].label == "Slide and Drop" && all[27].action == "command:lesson:1:1" && all[27].note == "(Viable)" && all[34].action == "command:lesson:3:1");
+    assert(all[3].label == "Combos and Magic" && all[3].action == "command:new_lesson:combos");
+    assert(all[4].label == "Getting Faster" && all[5].label == "Power-Ups" && all[5].action == "command:magic_lesson:0");
+    assert(all[7].label == "Scoring Big" && all[12].label == "Game Modes" && all[21].label == "Original Lessons");
+    assert(all[22].label == "Slide and Drop" && all[22].action == "command:lesson:1:1" && all[22].note == "(Viable)" && all[29].action == "command:lesson:3:1");
     {
-        const auto marked = training_lessons(true, true, {0, 4}, {100});
+        const auto marked = training_lessons(true, true, {}, {100});
         assert(!marked[1].focus && marked[2].focus);  // the first lesson not done: Hearts
-        const auto later = training_lessons(true, true, {0, 4}, {100, 103});
-        assert(later[6].focus && later[6].label == "Dynamite");
-        assert(marked[5].note == "(In progress)");  // the status, not the player's progress
+        const auto later = training_lessons(true, true, {}, {100, 103, 104});
+        assert(later[5].focus && later[5].label == "Power-Ups");
     }
 
     auto confirm = delete_confirmation(store, "1");

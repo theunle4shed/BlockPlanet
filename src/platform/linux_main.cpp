@@ -302,9 +302,33 @@ int hearts_round = 0;
 std::uint32_t hearts_table2_saved = 0;
 int hearts_kinds_saved = -1;  // the stage's number of shapes (0x800E44B8), raised to 3 for the T
 int hearts_shape() { return hearts_round == 0 ? 0 : hearts_round == 1 ? 1 : 2; }
+// Combos and Magic (2026-11-21, the owner's design; docs/TRAINING_REDESIGN.md),
+// run by the same machinery (combos_lesson): phases 30 the pages and the
+// choice, 31 the demonstration, 32 the player's turn, 33 between drops, 34 the
+// ending's pages, 35 leaving. Three layers dug in turn in one pit: blue squares
+// at the top, red Ts, then yellow bars on the floor, five of each; each drop on
+// the group breaks six and tops up the magic meter, which starts at 11 of 14,
+// so the third fills it and a power-up is unlocked.
+bool combos_lesson = false;
+int combos_page = 0;
+constexpr int combos_last_page = 4;
+bool combos_watched = false;
+int combos_step = 0;               // the layer being broken (0 blue, 1 red, 2 yellow)
+int combos_end_page = 0;
+int combos_anchor[2] = {0, 0};     // the stack's place on the board (its first piece's cell)
+int combos_target[2] = {0, 0};     // a piece of the current group (the demonstration aims there)
+int combos_meter_before = 0, combos_bricks = -1;
+std::uint32_t combos_score = 0;
+std::string combos_note;
+bool combos_dropped = false, combos_aimed = false, combos_demo_running = false;
+int combos_slot = -1;
+std::uint16_t combos_held = 0;
+std::optional<std::chrono::steady_clock::time_point> combos_at;
+constexpr int combos_shapes[3] = {0, 2, 1};  // the shape table's entries: the square (blue), the T (red, entry 2), the bar (yellow)
+int combo_shape() { return combos_shapes[std::clamp(combos_step, 0, 2)]; }
 bool slide_lesson_shown() {
     return (slide_lesson_phase >= 1 && slide_lesson_phase <= 6) || (slide_lesson_phase >= 10 && slide_lesson_phase <= 14) ||
-           (slide_lesson_phase >= 20 && slide_lesson_phase <= 24);
+           (slide_lesson_phase >= 20 && slide_lesson_phase <= 24) || (slide_lesson_phase >= 30 && slide_lesson_phase <= 34);
 }
 // The layout: the first square stays, the second slides four cells across
 // to touch it; the pit 8 x 6 round them, the shadow starting between them.
@@ -320,6 +344,9 @@ std::optional<std::chrono::steady_clock::time_point> slide_demo_stage_at;
 std::uint16_t slide_demo_held = 0;
 // Dropping switched off (the player's A taken out), in the Slide lesson.
 std::atomic<bool> lesson_no_drop{false};
+// Sliding switched off (the player's B taken out), in Combos and Magic (the
+// owner, 2026-11-21: each layer laid out to break whole; a slide could spoil it).
+std::atomic<bool> lesson_no_slide{false};
 // Research (what each magic does): research_magic:K gives player 1 magic K
 // (0 to 5) and presses the magic button (N64 0x0004) a moment later.
 std::optional<std::chrono::steady_clock::time_point> research_magic_press;
@@ -587,6 +614,18 @@ void show_stage_results() {
         if (r.best_before <= 0.0 || r.value < r.best_before) line += "  \u00B7  New best";
         else line += "  \u00B7  Best " + hud_time(r.best_before) + " (" + hud_delta(r.value - r.best_before) + ")";
     }
+    if (r.lesson == 104) {
+        slide_lesson_phase = -1, combos_lesson = false;
+        blockplanet::ui::set_text("results_title", "Combos and Magic Complete");
+        blockplanet::ui::set_text("results_where", "Training \u00B7 The Basics");
+        blockplanet::ui::set_text("results_line", "");
+        std::vector<blockplanet::ui::ListItem> items;
+        items.push_back({"again", "Try Again", "", "command:new_lesson:combos", true, 1, false});
+        items.push_back({"back", "Back to Training", "", "back", true, 1, true});
+        blockplanet::ui::set_list("results", items);
+        blockplanet::ui::request_show("results");
+        return;
+    }
     if (r.lesson == 103) {
         slide_lesson_phase = -1, hearts_lesson = false;
         if (hearts_table2_saved && guest_rdram) guest::store32(const_cast<std::uint8_t*>(guest_rdram), 0x8014CBC8u + 8u, hearts_table2_saved);
@@ -853,11 +892,15 @@ void show_hud(std::optional<blockplanet::ui::HudView> view) {
         v.show_lives = false;
         v.show_magic = false;
         v.mode = "Training";
-        v.stage = hearts_lesson && slide_lesson_phase >= 1 ? "Hearts" : slide_lesson_phase >= 1 ? "Slide and Drop" : "Drop";
+        v.stage = combos_lesson && slide_lesson_phase >= 1 ? "Combos and Magic"
+                  : hearts_lesson && slide_lesson_phase >= 1 ? "Hearts" : slide_lesson_phase >= 1 ? "Slide and Drop" : "Drop";
+        if (combos_lesson && slide_lesson_phase >= 30) v.show_magic = true;  // the magic meter's ring
         if (hearts_lesson && slide_lesson_phase >= 20) v.show_lives = true;  // the hearts and the drop timer's bar
         // Only as many next pieces as the lesson needs (the owner: Slide shows one).
-        if (slide_lesson_phase >= 1 && v.next.size() > 1) v.next.resize(1);
-        if (slide_lesson_phase >= 1) v.next_room = 1;  // and the box only as wide as one (the owner: keep the HUD small)
+        // (Combos and Magic shows three: the layers' shapes in order.)
+        const std::size_t room = combos_lesson ? 3 : 1;
+        if (slide_lesson_phase >= 1 && v.next.size() > room) v.next.resize(room);
+        if (slide_lesson_phase >= 1) v.next_room = int(room);  // and the box only as wide as one (the owner: keep the HUD small)
         v.goal_label = "Now";
         v.goal = drop_lesson_say;
         v.time.clear(), v.clock.clear(), v.score.clear(), v.story_score.clear(), v.story_gains.clear();
@@ -1255,7 +1298,8 @@ void update_hud() {
         }
     }
     update_training_scissor(story && state.mode == 3);
-    update_lesson_viewport(((drop_lesson_phase >= 1 && drop_lesson_phase <= 7) || slide_lesson_shown() || slide_lesson_phase == 7 || slide_lesson_phase == 15 || slide_lesson_phase == 25) &&
+    update_lesson_viewport(((drop_lesson_phase >= 1 && drop_lesson_phase <= 7) || slide_lesson_shown() || slide_lesson_phase == 7 || slide_lesson_phase == 15 || slide_lesson_phase == 25 ||
+                            slide_lesson_phase == 35) &&
                            state.mode == 1);
     if (story && state.mode == 3) {  // Training
         update_training_hud(state);
@@ -3189,7 +3233,53 @@ void publish_game_text() {
                     else if (move[c] == ']' && depth) --depth;
                     else if (!depth) move[c] = char(std::tolower(static_cast<unsigned char>(move[c])));
                 }
-                if (ph >= 20) {
+                const auto bullets = [&](const std::vector<std::string>& lines) {
+                    Block block{false, {}};
+                    for (std::size_t i = 0; i < lines.size(); ++i) {
+                        if (i) block.runs.push_back({"\n", orange});
+                        block.runs.push_back({"\u2022 " + lines[i], orange});
+                    }
+                    panel.blocks.push_back(block);
+                };
+                const int meter_now = guest_rdram ? int(guest::load16(guest_rdram, pc_ctx + 0x2AEC)) : 0;
+                const int meter_full = guest_rdram ? int(guest::load16(guest_rdram, pc_ctx + 0x2AEE)) : 14;
+                if (ph >= 30) {
+                    // Combos and Magic (the owner's script, 2026-11-21).
+                    if (ph == 30 && combos_page <= 1) {
+                        heading("Combos and Magic");
+                        para("Break more than three pieces at once and you've made a combo: the more you break together, the more rewarding it is.");
+                        if (combos_page >= 1) bullets({"Fill your magic meter faster", "Clear the sphere faster", "Score more points"});
+                        panel.hint = buttons("%A%") + " Next";
+                    } else if (ph == 30 && combos_page == 2) {
+                        heading("Earning Power-Ups");
+                        bullets({"Combos of 6 or more top up your magic meter: fill it up for a power-up.",
+                                 "Break 20 or more at once for an instant power-up."});
+                        panel.hint = buttons("%A%") + " Next";
+                    } else if (ph == 30 && combos_page == 3) {
+                        heading("Combos and Magic");
+                        para("In this lesson you'll top up your magic meter with combos and unlock a power-up.");
+                        panel.hint = buttons("%A%") + " Next";
+                    } else if (ph == 30) {
+                        heading("Top Up Your Meter");
+                        para("Drop your piece on the top group to break all six. Each combo of 6 or more tops up your magic meter.");
+                        para("Your meter is nearly full: three combos will fill it.");
+                        panel.hint = buttons("%A%") + " Try it\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + buttons("%B%") +
+                                     (combos_watched ? " Show me again" : " Show me");
+                    } else if (ph == 34) {
+                        heading("Well Done");
+                        para("Congratulations, you've unlocked a power-up.");
+                        if (combos_end_page >= 1) para("Get a combo of 20+ to unlock one instantly!");
+                        panel.hint = buttons("%A%") + (combos_end_page >= 1 ? " Done" : " Next");
+                    } else {
+                        heading(ph == 31 || (ph == 33 && combos_demo_running) ? "Watch" : "Your Turn");
+                        para("Drop on the top group: six break, and your magic meter tops up.");
+                        // (The game empties the meter as it gives the power-up.)
+                        if (meter_now == 0 && combos_step >= 2 && ph == 33) para("Magic meter full! A power-up is unlocked.");
+                        else para("Magic meter: " + std::to_string(meter_now) + " of " + std::to_string(meter_full));
+                        if (!combos_note.empty() && ph == 32) para(combos_note);
+                        if (ph == 31 || (ph == 33 && combos_demo_running)) panel.hint = "Watching\u2026";
+                    }
+                } else if (ph >= 20) {
                     // Hearts and the Drop Timer (2026-11-20): why, then how,
                     // a line at a time, then try it or show me.
                     if (ph == 20 && hearts_page <= 1) {
@@ -3654,6 +3744,7 @@ bool get_input(int port, std::uint16_t* buttons, float* x, float* y) {
     if (minefield_frozen.load() || game_over_frozen.load()) {*buttons=0;*x=0;*y=0;return true;}
     *buttons = port == 0 ? tetrisphere::minefield_sphere::filter_input(mapped.buttons | mouse_bits) : mapped.buttons;
     if (port == 0 && lesson_no_drop.load()) *buttons = static_cast<std::uint16_t>(*buttons & ~0x8000u);  // the Slide lesson: no dropping
+    if (port == 0 && lesson_no_slide.load()) *buttons = static_cast<std::uint16_t>(*buttons & ~0x4000u);  // Combos and Magic: no sliding
     note_start(mapped.buttons);
     if (own_pause_mask.load() && (*buttons & 0x1000u)) {  // Start in play: BlockPlanet's pause, not the game's
         *buttons = static_cast<std::uint16_t>(*buttons & ~0x1000u);
@@ -4643,6 +4734,174 @@ std::uint16_t hearts_demo_buttons() {
     }
     if (hearts_held == 0x8000 && within >= 150) hearts_demo_part = 3, hearts_demo_at = std::chrono::steady_clock::now();
     return within < 150 ? hearts_held : 0;
+}
+
+// A compact group of `count` pieces of the shape table's entry `index`, each
+// touching another (at the shape's own fitting places, record +0x74A/+0x74C),
+// as cursor cells from (0, 0): each piece added where the group stays smallest.
+std::vector<std::pair<int, int>> compact_group(int index, int count) {
+    std::vector<std::pair<int, int>> group{{0, 0}};
+    if (guest_rdram == nullptr) return group;
+    const std::uint32_t rec = guest::load32(guest_rdram, 0x8014CBC8u + 4u * std::uint32_t(index));
+    int layout[9];
+    for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(guest_rdram, rec + 0xA + 2u * std::uint32_t(k)));
+    std::vector<std::pair<int, int>> fit;
+    const int fits = std::int16_t(guest::load16(guest_rdram, rec + 0x74A));
+    for (int k = 0; k < fits && k < 14; ++k)
+        fit.push_back({std::int8_t(guest::load8(guest_rdram, rec + 0x74C + 2u * std::uint32_t(k))),
+                       std::int8_t(guest::load8(guest_rdram, rec + 0x74D + 2u * std::uint32_t(k)))});
+    const auto cells = [&](int ox, int oy) {
+        std::vector<std::pair<int, int>> out;
+        for (int x = 0; x < 3; ++x)
+            for (int y = 0; y < 3; ++y)
+                if (layout[x * 3 + y] > 0) out.push_back({ox + x - 1, oy + y - 1});
+        return out;
+    };
+    std::set<std::pair<int, int>> taken;
+    for (const auto& c : cells(0, 0)) taken.insert(c);
+    while (int(group.size()) < count) {
+        int best = 1 << 30;
+        std::pair<int, int> pick{0, 0};
+        for (const auto& [gx, gy] : group)
+            for (const auto& [fx, fy] : fit)
+                for (const int sgn : {1, -1}) {
+                    const int ox = gx + sgn * fx, oy = gy + sgn * fy;
+                    bool clash = false;
+                    const auto mine = cells(ox, oy);
+                    for (const auto& c : mine) clash |= taken.count(c) != 0;
+                    if (clash) continue;
+                    int x0 = ox, y0 = oy, x1 = ox, y1 = oy;
+                    for (const auto& c : taken) x0 = std::min(x0, c.first), y0 = std::min(y0, c.second), x1 = std::max(x1, c.first), y1 = std::max(y1, c.second);
+                    for (const auto& c : mine) x0 = std::min(x0, c.first), y0 = std::min(y0, c.second), x1 = std::max(x1, c.first), y1 = std::max(y1, c.second);
+                    const int size = std::max(x1 - x0, y1 - y0) * 1000 + (x1 - x0 + 1) * (y1 - y0 + 1) * 10 + std::abs(ox) + std::abs(oy);
+                    if (size < best) best = size, pick = {ox, oy};
+                }
+        if (best == (1 << 30)) break;
+        group.push_back(pick);
+        for (const auto& c : cells(pick.first, pick.second)) taken.insert(c);
+    }
+    return group;
+}
+
+// A pit dug into a raised floor (Combos and Magic): walls in layers 1 to 4
+// everywhere but the pit (x0, y0, w, h), where they reach only up to the layer
+// below `group_layer`; the group's pieces (shape entry `index`, at `origins`)
+// lie at `group_layer`. A spare piece far round the sphere keeps the board
+// from emptying. The faces, columns and the core as build_pit_board's.
+void build_layer_pit(int x0, int y0, int w, int h, int group_layer, int index, const std::vector<std::pair<int, int>>& origins) {
+    auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+    if (rd == nullptr) return;
+    // Four layers of walls, the deepest group on a floor of walls at layer 1:
+    // the core is never opened (a wide open patch of it counted as the stage
+    // cleared, and the core's picture showed mid-lesson).
+    constexpr int surface = 4;
+    constexpr std::uint32_t flat_wall = 0x807F8600u;
+    {
+        const std::int16_t flat[8] = {1, 14, 14, 14, 1, 1, 14, 1};
+        for (int i = 0; i < 48; ++i) guest::store16(rd, flat_wall + 2u * std::uint32_t(i), std::uint16_t(flat[i % 8]));
+    }
+    const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(index));
+    const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
+                        entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
+    const std::int16_t v0 = std::int16_t(guest::load16(rd, rec));
+    int layout[9];
+    for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k)));
+    const auto cell = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
+    // Each column's height (its top filled layer), and what each layer holds.
+    std::vector<int> top(1024, surface);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) top[std::size_t(cell(x0 + x, y0 + y))] = group_layer - 1;
+    std::vector<std::array<std::int16_t, 9>> value(1024);
+    std::vector<std::array<std::uint32_t, 9>> entry(1024);
+    for (int c = 0; c < 1024; ++c)
+        for (int layer = 1; layer < 9; ++layer) {
+            const bool wall = layer <= top[std::size_t(c)];
+            value[std::size_t(c)][std::size_t(layer)] = wall ? 423 : 0;
+            entry[std::size_t(c)][std::size_t(layer)] = wall ? flat_wall : 0;
+        }
+    auto all = origins;
+    all.push_back({x0 + w / 2 + 16, y0 + h / 2});  // the spare, on the far side
+    for (std::size_t g = 0; g < all.size(); ++g) {
+        const int layer = g + 1 == all.size() ? surface + 1 : group_layer;
+        for (int x = 0; x < 3; ++x)
+            for (int y = 0; y < 3; ++y) {
+                const int n = layout[x * 3 + y];
+                if (n <= 0) continue;
+                const int c = cell(all[g].first + x - 1, all[g].second + y - 1);
+                value[std::size_t(c)][std::size_t(layer)] = std::int16_t(v0 + n - 1);
+                entry[std::size_t(c)][std::size_t(layer)] = rec + 0x78u + 96u * std::uint32_t(n - 1);
+                top[std::size_t(c)] = std::max(top[std::size_t(c)], layer);
+            }
+    }
+    for (int c = 0; c < 1024; ++c) {
+        const int x = c % 32, y = c / 32, t = top[std::size_t(c)];
+        for (int layer = 1; layer < 9; ++layer) {
+            guest::store16(rd, values + 2u * std::uint32_t(layer * 1024 + c), std::uint16_t(value[std::size_t(c)][std::size_t(layer)]));
+            guest::store32(rd, entries + 4u * std::uint32_t(layer * 1024 + c), entry[std::size_t(c)][std::size_t(layer)]);
+            std::uint8_t m = 0;
+            if (value[std::size_t(c)][std::size_t(layer)] != 0) {
+                if (layer == t) m |= 16;
+                // A side shows where the neighbouring column is lower.
+                if (top[std::size_t(cell(x + 1, y))] < layer) m |= 8;
+                if (top[std::size_t(cell(x - 1, y))] < layer) m |= 4;
+                if (top[std::size_t(cell(x, y + 1))] < layer) m |= 2;
+                if (top[std::size_t(cell(x, y - 1))] < layer) m |= 1;
+            }
+            guest::store8(rd, masks + std::uint32_t(layer * 1024 + c), m);
+        }
+        guest::store8(rd, columns + std::uint32_t(c), std::uint8_t((t << 4) | t));
+        guest::store8(rd, masks + std::uint32_t(c), t == 0 ? 80 : 0);
+        if (t == 0) guest::store16(rd, values + 2u * std::uint32_t(c), 87);
+    }
+}
+
+// Combos and Magic's demonstration: the shadow steered onto a piece of the
+// group (one press each 300 ms), a pause, then A.
+std::uint16_t combos_demo_buttons() {
+    if (slide_lesson_phase != 31 || combos_dropped || guest_rdram == nullptr || !combos_at) return 0;
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *combos_at).count();
+    if (ms < 700) return 0;
+    const int slot = int((ms - 700) / 300), within = int((ms - 700) % 300);
+    if (slot != combos_slot) {
+        combos_slot = slot;
+        const int dx = combos_target[0] - (8 + std::int16_t(guest::load16(guest_rdram, pc_ctx + 0x2B2A)));
+        const int dy = combos_target[1] - (8 + std::int16_t(guest::load16(guest_rdram, pc_ctx + 0x2B2E)));
+        if (dx != 0) combos_held = dx > 0 ? 0x0200 : 0x0100;
+        else if (dy != 0) combos_held = dy > 0 ? 0x0800 : 0x0400;
+        else if (!combos_aimed) combos_aimed = true, combos_held = 0;
+        else combos_held = 0x8000;
+    }
+    if (combos_held == 0x8000 && within >= 150) combos_dropped = true, combos_at = std::chrono::steady_clock::now();
+    return within < 150 ? combos_held : 0;
+}
+
+// Combos and Magic's board for the current layer, built on the game's thread:
+// the same pit each time, one layer deeper (blue at the top, then red, then
+// yellow on the floor), the queue set to the layer's shape and the ones after.
+void combos_build_step() {
+    tetrisphere::minefield_sphere::queue_game_thread_job([](std::uint8_t* g) {
+        // The three groups, laid out once from the anchor; the pit round all of them.
+        std::vector<std::pair<int, int>> groups[3];
+        int x0 = 99, y0 = 99, x1 = -99, y1 = -99;
+        for (int k = 0; k < 3; ++k) {
+            groups[k] = compact_group(combos_shapes[k], 5);
+            const std::uint32_t rec = guest::load32(g, 0x8014CBC8u + 4u * std::uint32_t(combos_shapes[k]));
+            for (auto& [ox, oy] : groups[k]) {
+                ox += combos_anchor[0], oy += combos_anchor[1];
+                for (int q = 0; q < 9; ++q)
+                    if (std::int16_t(guest::load16(g, rec + 0xA + 2u * std::uint32_t(q))) > 0) {
+                        const int cx = ox + q / 3 - 1, cy = oy + q % 3 - 1;
+                        x0 = std::min(x0, cx), y0 = std::min(y0, cy), x1 = std::max(x1, cx), y1 = std::max(y1, cy);
+                    }
+            }
+        }
+        const int k = std::clamp(combos_step, 0, 2);
+        build_layer_pit(x0 - 1, y0 - 1, x1 - x0 + 3, y1 - y0 + 3, 4 - k, combos_shapes[k], groups[k]);
+        combos_target[0] = groups[k][0].first, combos_target[1] = groups[k][0].second;
+        for (int q = 0; q < 4; ++q)
+            guest::store16(g, pc_ctx + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(combos_shapes[std::min(2, k + q)]));
+        guest::store32(g, pc_ctx + 0x2408, 0);
+    });
 }
 
 // The drop stage's demonstration: the shadow steered onto a square (one press
@@ -6922,8 +7181,10 @@ bool handle_profile_command(const std::string& command) {
                 }
                 continue;
             }
-            if (*command == "new_lesson:slide" || *command == "new_lesson:drop" || *command == "new_lesson:hearts") {
+            if (*command == "new_lesson:slide" || *command == "new_lesson:drop" || *command == "new_lesson:hearts" ||
+                *command == "new_lesson:combos") {
                 hearts_lesson = *command == "new_lesson:hearts";
+                combos_lesson = *command == "new_lesson:combos";
                 // Slide and Drop: Casual 1:1 on its own, taken over once in play;
                 // Drop (from the list) starts at the drop stage, the pair together.
                 magic_lesson = -1, magic_lesson_phase = -1, drop_lesson_phase = -1;
@@ -7134,15 +7395,17 @@ bool handle_profile_command(const std::string& command) {
             }
             // The Slide lesson in play (see slide_lesson_phase).
             lesson_no_drop.store(slide_lesson_phase >= 1 && slide_lesson_phase <= 6);  // the drop stage (10 on) drops
+            lesson_no_slide.store(combos_lesson && slide_lesson_phase >= 30 && slide_lesson_phase <= 35);
             if (lesson_wait_release && (player_buttons_now() & 0xF000u) == 0) lesson_wait_release = false;
             // The shadow hidden while a lesson's text is read and the choice
             // waits (and after a step is done): shown only to watch or to play.
             tetrisphere::minefield_sphere::set_lesson_hides_marker(slide_lesson_phase == 1 || slide_lesson_phase == 6 || slide_lesson_phase == 10 ||
                                                                    slide_lesson_phase == 14 || slide_lesson_phase == 20 || slide_lesson_phase == 24 ||
+                                                                   slide_lesson_phase == 30 || slide_lesson_phase == 34 ||
                                                                    drop_lesson_phase == 1);
             // The stage's shape table and count put back once Hearts is over,
             // however it ended (quit, restart into another lesson, done).
-            if (!(hearts_lesson && slide_lesson_phase >= 0) && guest_rdram != nullptr) {
+            if (!((hearts_lesson || combos_lesson) && slide_lesson_phase >= 0) && guest_rdram != nullptr) {
                 auto* rd = const_cast<std::uint8_t*>(guest_rdram);
                 if (hearts_table2_saved) guest::store32(rd, 0x8014CBC8u + 8u, hearts_table2_saved), hearts_table2_saved = 0;
                 if (hearts_kinds_saved >= 0) guest::store16(rd, 0x800E44B8u, std::uint16_t(hearts_kinds_saved)), hearts_kinds_saved = -1;
@@ -7230,7 +7493,12 @@ bool handle_profile_command(const std::string& command) {
                     }
                     // The piece in hand always the square, so every square can be grabbed.
                     const int held = hearts_lesson ? hearts_shape() : slide_square;
-                    if (held >= 0)
+                    if (combos_lesson) {
+                        // The layers' shapes in order (the Next row shows what is coming).
+                        if (!tetrisphere::minefield_sphere::game_thread_job_pending())
+                            for (int q = 0; q < 4; ++q)
+                                guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(combos_shapes[std::min(2, combos_step + q)]));
+                    } else if (held >= 0)
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(held));
                 }
                 // The drop stage begins: the board kept as it is (the player's
@@ -7299,12 +7567,25 @@ bool handle_profile_command(const std::string& command) {
                         // shadow and moved with it, and a square left across the
                         // seam was removed by the game (a false miss). Moved
                         // while the sphere flies in, so the swing is not seen.
-                        guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t((hearts_lesson ? 10 : 16) - 8)));
+                        guest::store16(rd, pc + 0x2B2A, std::uint16_t(std::int16_t((hearts_lesson ? 10 : combos_lesson ? 12 : 16) - 8)));
                         slide_square = square_piece_index();
                         if (slide_square < 0) slide_square = 0;
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
-                        if (hearts_lesson) {
+                        if (combos_lesson) {
+                            if (!hearts_table2_saved) hearts_table2_saved = guest::load32(rd, 0x8014CBC8u + 8u);
+                            guest::store32(rd, 0x8014CBC8u + 8u, guest::load32(rd, 0x800E4508u + 4u * 5u));  // the red T, as Hearts
+                            if (hearts_kinds_saved < 0) hearts_kinds_saved = guest::load16(rd, 0x800E44B8u);
+                            guest::store16(rd, 0x800E44B8u, 3);
+                            combos_anchor[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)) + 3;  // the stack just on the shadow's left (on screen), in view
+                            combos_anchor[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                            combos_step = 0;
+                            combos_build_step();
+                            guest::store16(rd, pc + 0x2AEC, 11);  // the magic meter: three combos from full
+                            guest::store8(rd, pc + 0x702, 0xFF);   // no power-up held
+                            slide_lesson_phase = 30, slide_lesson_at = now_m;
+                            combos_page = 0, combos_watched = false, slide_choice_armed = false;
+                        } else if (hearts_lesson) {
                             if (!hearts_table2_saved) hearts_table2_saved = guest::load32(rd, 0x8014CBC8u + 8u);
                             guest::store32(rd, 0x8014CBC8u + 8u, guest::load32(rd, 0x800E4508u + 4u * 5u));
                             if (hearts_kinds_saved < 0) hearts_kinds_saved = guest::load16(rd, 0x800E44B8u);
@@ -7568,6 +7849,92 @@ bool handle_profile_command(const std::string& command) {
                         pending_results->lesson = 103;
                         slide_lesson_phase = 25;
                         if (!single_stage_quit_at && !single_stage_quitting) single_stage_quit_at = now_m;
+                    }
+                } else if (slide_lesson_phase == 30 || slide_lesson_phase == 34) {
+                    // The pages (A on), the choice (A try it, B show me), and the
+                    // ending's two lines.
+                    const std::uint16_t b = player_buttons_now();
+                    if (!in_play || blockplanet::ui::menus_open()) slide_choice_armed = false;
+                    else if (!slide_choice_armed) slide_choice_armed = (b & 0xF000u) == 0;
+                    else if (b & 0x1000u) slide_choice_armed = false, pause_bridge.request_pause(now_m);
+                    else if (slide_lesson_phase == 34) {
+                        if (b & 0x8000u) {
+                            slide_choice_armed = false;
+                            if (combos_end_page < 1) ++combos_end_page;
+                            else if (!pending_results) {
+                                if (profile_save && profile_data.progress.chapters_completed["lessons"].insert(104).second) profile_dirty = true, save_profile();
+                                blockplanet::ui::set_list("chapters", training_lessons(training_done("rescue"), training_done("training_advanced"),
+                                                                                       magic_lessons_done(), new_lessons_done()));
+                                pending_results = StageResults{};
+                                pending_results->lesson = 104;
+                                slide_lesson_phase = 35;
+                                if (!single_stage_quit_at && !single_stage_quitting) single_stage_quit_at = now_m;
+                            }
+                        }
+                    } else if (combos_page < combos_last_page) {
+                        if (b & 0x8000u) ++combos_page, slide_choice_armed = false;
+                    } else if (b & 0x8000u) {
+                        lesson_wait_release = true;
+                        combos_bricks = -1, combos_note.clear();
+                        slide_lesson_phase = 32, slide_lesson_at = now_m;
+                    } else if (b & 0x4000u) {
+                        combos_dropped = false, combos_aimed = false, combos_slot = -1, combos_held = 0, combos_at = now_m;
+                        slide_lesson_phase = 31, slide_lesson_at = now_m;
+                    }
+                } else if (slide_lesson_phase == 31 || slide_lesson_phase == 32) {
+                    // A drop on the group breaks six and tops up the meter; then a
+                    // moment, and the next layer down. A drop away from it: the
+                    // layer set up again.
+                    const int meter = guest::load16(rd, pc + 0x2AEC);
+                    static std::optional<std::chrono::steady_clock::time_point> landed;
+                    if (combos_bricks < 0) {
+                        if (!tetrisphere::minefield_sphere::game_thread_job_pending())
+                            combos_bricks = count_bricks(), combos_score = guest::load32(rd, pc + 0x2AF8), combos_meter_before = meter;
+                    } else if (guest::load32(rd, pc + 0x2AF8) != combos_score || guest::load32(rd, pc + 0x2AFC) != 0) {
+                        // (A combo of six takes a while to score: its start counts.)
+                        landed.reset();
+                        combos_note.clear();
+                        combos_at = now_m;
+                        slide_lesson_phase = 33, slide_lesson_at = now_m;
+                    } else if (count_bricks() != combos_bricks) {
+                        if (!landed) landed = now_m;
+                        else if (now_m - *landed > std::chrono::milliseconds(2500)) {
+                            landed.reset();
+                            combos_note = "No match there, so the piece stacked up. Drop it on the group.";
+                            std::fprintf(stdout, "{\"event\":\"combos_miss\",\"step\":%d,\"hand\":%d,\"queue0\":%d,\"cursor\":[%d,%d],\"target\":[%d,%d]}\n",
+                                         combos_step, int(std::int16_t(guest::load16(rd, pc + 0x2386))), int(std::int16_t(guest::load16(rd, pc + 0x2374))),
+                                         8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E)), combos_target[0], combos_target[1]);
+                            std::fflush(stdout);
+                            combos_build_step();
+                            combos_bricks = -1;
+                        }
+                    }
+                    combos_demo_running = slide_lesson_phase == 33 ? combos_demo_running : slide_lesson_phase == 31;
+                } else if (slide_lesson_phase == 33) {
+                    // The combo plays out; then the next layer, or the end.
+                    if (since() > 2500 && guest::load32(rd, pc + 0x2AFC) == 0) {
+                        if (combos_step < 2) {
+                            ++combos_step;
+                            combos_build_step();
+                            combos_bricks = -1;
+                            combos_dropped = false, combos_aimed = false, combos_slot = -1, combos_held = 0, combos_at = now_m;
+                            slide_lesson_phase = combos_demo_running ? 31 : 32, slide_lesson_at = now_m;
+                        } else if (combos_demo_running) {
+                            // The demonstration done: a moment with the meter full and the
+                            // power-up shown, then all set up again for the player.
+                            if (since() > 5000) {
+                                combos_step = 0;
+                                combos_build_step();
+                                guest::store16(rd, pc + 0x2AEC, 11);
+                                guest::store8(rd, pc + 0x702, 0xFF);
+                                combos_demo_running = false;
+                                slide_lesson_phase = 30, slide_lesson_at = now_m;
+                                combos_watched = true, slide_choice_armed = false, combos_page = combos_last_page;
+                            }
+                        } else {
+                            combos_end_page = 0;
+                            slide_lesson_phase = 34, slide_lesson_at = now_m, slide_choice_armed = false;
+                        }
                     }
                 }
             }
@@ -8277,12 +8644,14 @@ bool handle_profile_command(const std::string& command) {
                                    : drop_lesson_phase == 1 || slide_lesson_phase == 1 || slide_lesson_phase == 10 || lesson_wait_release ||
                                              // done or missed: no second press until the board is reset or the lesson ends (the owner)
                                              slide_lesson_phase == 6 || slide_lesson_phase == 13 || (slide_lesson_phase >= 14 && slide_lesson_phase <= 20) ||
-                                             slide_lesson_phase >= 23 || (slide_lesson_phase == 21 && hearts_demo_part != 2) ||
+                                             (slide_lesson_phase >= 23 && slide_lesson_phase <= 30) || slide_lesson_phase >= 33 ||
+                                             (slide_lesson_phase == 21 && hearts_demo_part != 2) ||
                                              drop_lesson_phase >= 5
                                          ? 0x10000u  // choosing: the game waits
                                    : slide_lesson_phase == 2 ? (0x30000u | slide_lesson_buttons())
                                    : slide_lesson_phase == 11 ? (0x30000u | slide_drop_buttons())
                                    : slide_lesson_phase == 21 ? (0x30000u | hearts_demo_buttons())
+                                   : slide_lesson_phase == 31 ? (0x30000u | combos_demo_buttons())
                                    : drop_lesson_phase == 2 || drop_lesson_phase == 3 ? (0x30000u | drop_lesson_buttons())
                                    : research_fuse_buttons() != 0 ? (0x10000u | research_fuse_buttons())
                                    : research_magic_press && std::chrono::steady_clock::now() >= *research_magic_press &&
