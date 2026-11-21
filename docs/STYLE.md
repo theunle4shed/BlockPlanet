@@ -170,4 +170,4 @@ Not used: weapon, item, spell, guide.
 ## Power-up names (the owner, 2026-11-21)
 
 Four power-ups once levels are built: the **Missile** (the game's Firecracker and Bomb, merged: a small blast, a wider one, then a barrage), **Dynamite**, the **Magnet** (the game's Magnet and Ray Gun, merged: level 3 is the Ray Gun) and the **Atom**. Each has levels 1 to 3 (blue trim at 2, gold at 3); level names proposed: Missile, Big Missile, Missile Barrage; Magnet, Power Magnet, Ray Gun. Never "Rocket" (a robot's name).
-Instant bonuses (rare, from mystery blocks, never in the Magic box): an **extra life** (only when a heart is lost), a **time out** (the drop timer held), a **wildcard** (the next piece), **points**.
+Instant bonuses (rare, from mystery blocks, never in the Magic box): an **extra life** (only when a heart is lost), a **time out** (the drop timer held), a **wildcard** (the next 3 pieces), **points**.
