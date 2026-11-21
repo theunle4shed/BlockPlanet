@@ -40,7 +40,10 @@ div { display: block; }
 #left { width: 196dp; }  /* its parts 148dp, the three hearts' width, and the dividers with them (the owner, 2026-11-21) */
 #right { width: 248dp; text-align: right; }
 
-.group, .rule, #magic .band, #magic .edge { background-color: #0b1020c0; }
+/* Solid (the owner, 2026-11-21: a box still showed round a held power-up):
+   the game draws the same solid colour behind the power-up's model, and two
+   see-through layers blended differently, so the box showed. */
+.group, .rule, #magic .band, #magic .edge { background-color: #0b1020ff; }
 .group { padding: 16dp 24dp 20dp 24dp; }
 
 /* Floating numbers: points rising from where blocks cleared. */
@@ -172,7 +175,7 @@ div { display: block; }
 /* No box: the panel's own colour behind the ring (the game draws the same
    behind a held power-up), and the ring as wide as the panel's other parts
    (200dp across). */
-#item.ringed { border-width: 0dp; border-radius: 0dp; background-color: #0b1020c0; }
+#item.ringed { border-width: 0dp; border-radius: 0dp; background-color: #0b1020ff; }
 #item.ringed.held { background-color: transparent; }
 /* As wide as the three hearts above (148dp: three 44dp hearts, 8dp apart;
    the owner), lined up under them, the rest of the row the panel's own. */

@@ -158,14 +158,18 @@ void store_word(std::uint8_t* rdram, std::uint32_t address, std::uint32_t value)
 // span, so it is part of the game's picture and truly behind the model. The
 // HUD's own tint would sit in front of the model and dim it.
 void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, float centre_y) {
-    const float w = box_w.load(), h = box_h.load();
+    // With the ring meter the panel is solid and the same colour, so the
+    // rectangle is drawn a little larger than the box: no gap at its edges
+    // where it fell a few pixels short (the owner saw a line round it).
+    const float grow = blockplanet::box_plain.load() ? 1.08f : 1.0f;
+    const float w = box_w.load() * grow, h = box_h.load() * grow;
     if (w <= 0.0f || h <= 0.0f) return;
     static const int alpha = [] {  // research: BLOCKPLANET_MAGIC_TINT (0 to 255)
         const char* v = std::getenv("BLOCKPLANET_MAGIC_TINT");
         return v ? std::atoi(v) : 0xFF;  // solid (the owner, 2026-11-18: the box was see-through); was 0xB0
     }();
     if (alpha <= 0) return;
-    const int a = blockplanet::box_plain.load() ? 0xC0 : alpha;  // the panel's own colour, no box (the ring meter)
+    const int a = blockplanet::box_plain.load() ? 0xFF : alpha;  // the panel's own colour, solid as the panel, no box (the ring meter)
     // Picture heights to the 320 x 240 frame (240 units per picture height).
     const auto to_x = [](float v) { return static_cast<int>(std::lround(160.0f + v * 240.0f)); };
     const auto to_y = [](float v) { return static_cast<int>(std::lround(120.0f + v * 240.0f)); };
