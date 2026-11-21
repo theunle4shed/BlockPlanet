@@ -149,3 +149,14 @@ Every way out says where it goes: **Exit to <place>**, where the place is the ti
 ## Title Case for labels (the owner, 2026-11-11)
 
 Menu item labels are in Title Case: each word capitalised but for short joining words in the middle (a, an, and, as, at, by, for, from, in, of, on, or, the, to, with), and the last word always ("Try Again", "Restart Chapter", "Play as Guest", "Exit to Main Menu", "Fly In"). Descriptions, notes ("coming later"), hints, option values, the screens' subtitles and every other sentence stay in sentence case.
+
+## Magic words (the owner, 2026-11-21)
+
+Three terms, kept apart everywhere (Training, the HUD, menus, help):
+
+- **Magic**: what collects. Big combos fill your **magic meter** with magic. ("Magic" is the game's own word: its controls list names the button Magic, and its Training says a combo of 20 or more gives a magic power-up.)
+- **Magic meter**: the gauge that fills (the HUD's Magic box charging up).
+- **Power-up** (or **magic power-up**): what you earn when the meter is full and fire with the Magic button: the Firecracker, Dynamite, Magnet, Atom, Bomb and Ray Gun. Say "magic power-ups clear a lot of bricks at once", never "magic clears…". (These six names are not in the game's text; the game shows them only as pictures and models.)
+- **The Magic button** keeps its name, as in the game's controls list: "Press [Magic] to use your power-up."
+
+Not used: weapon, item, spell, guide.

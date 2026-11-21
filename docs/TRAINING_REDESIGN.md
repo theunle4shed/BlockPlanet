@@ -135,3 +135,13 @@ So something in the game as it runs here clears Training's bricks, which real ha
 - Ten later runs with the same script did not reproduce it. Every filler cell was checked, and each found its origin at its own centre and passed. The board loads identically in good and bad runs. So the starting point is still unknown: something occasionally makes a filler cell fail the check, and from then on the checker eats the band. The origin is always set, so it isn't reading leftover stack.
 
 Next, when it shows again: trap `func_800924E0`'s result in `func_800CC0D0` to see which cell fails first, and what is around it. Until then, the drawing fills single-cell gaps outside the pit (`sphere_cell.cpp`), which hides the stripes but not the cause. The watch log (`BLOCKPLANET_WATCH`) prints the time of each change.
+
+## Earning Magic (draft, 2026-11-21; terms as docs/STYLE.md, Magic words)
+
+**Page 1, "Earning Magic"** (why, a line at a time): "Magic power-ups clear a lot of bricks at once: your best way to dig quickly, or to get out of trouble." / "Big combos fill your magic meter. Break 20 or more pieces in one go and you earn a power-up." / new page: "In this lesson you'll make a big combo, earn a power-up, and use it."
+
+**Page 2, "How to Earn a Power-Up"**: "A large group of matching pieces is ready. Drop your piece next to it to break the whole group." / "When the combo reaches 20, a power-up appears in your Magic box." / "Press [Magic] to use your power-up where your shadow is." / [A] Try it, [B] Show me.
+
+**Board**: a larger pit with about 20 matching squares and one gap; the HUD shows Next, the combo count and the Magic box. **Show me**: drop into the gap, the count passes 20, the power-up appears, then it is used, with a pause to see it. **Try it**: the same; done once the power-up is earned and used.
+
+**To check first**: whether a 20+ combo always gives the same power-up or a random one; whether smaller combos part-fill the magic meter (a line if so); and the magic lessons' known issues (a second power-up arriving after one is used; the wrong one given).
