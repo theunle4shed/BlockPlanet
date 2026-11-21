@@ -169,4 +169,4 @@ Not used: weapon, item, spell, guide.
 
 ## Power-up names (the owner, 2026-11-21)
 
-Five power-ups once levels are built: the **Missile** (the game's Firecracker and Bomb, merged: a small blast, a wider one, then a barrage), **Dynamite**, the **Magnet**, the **Atom** and the **Ray Gun**. Each has levels 1 to 3 (blue trim at 2, gold at 3). Never "Rocket" (a robot's name).
+Four power-ups once levels are built: the **Missile** (the game's Firecracker and Bomb, merged: a small blast, a wider one, then a barrage), **Dynamite**, the **Magnet** (the game's Magnet and Ray Gun, merged: level 3 is the Ray Gun) and the **Atom**. Each has levels 1 to 3 (blue trim at 2, gold at 3); level names proposed: Missile, Big Missile, Missile Barrage; Magnet, Power Magnet, Ray Gun. Never "Rocket" (a robot's name).
