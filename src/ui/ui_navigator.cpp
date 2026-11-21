@@ -290,6 +290,9 @@ void Navigator::handle(Action action) {
         activate(screen);
         break;
     case Action::Back:
+        // data-back="none": Back does nothing (the end-of-stage panels: there is
+        // no game to go back to, only their own items; the owner, 2026-11-21).
+        if (screen.document->GetAttribute<Rml::String>("data-back", "") == "none") break;
         // On the first screen, the document's data-back (a command) when it
         // has one: the start-up screens go back through each other.
         if (stack_.size() == 1 && screen.document->HasAttribute("data-back")) {
