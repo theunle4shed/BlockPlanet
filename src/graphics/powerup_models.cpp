@@ -246,12 +246,20 @@ std::vector<Part> dynamite(int level) {
 // Electro Magnet: its claws point along -z (to about -3,700) from a green
 // ring at about z 150 to 730, about 940 across.
 std::vector<Part> horseshoe(float s, std::uint32_t tip, bool sparks_on) {
+    // Round arms and a smooth U at the bottom (the owner, 2026-11-21: square
+    // bars looked like two towers), pale round tips.
     Part arms{red, {}}, tips{tip, {}}, sparks{spark_blue, {}};
-    box(arms, place_at(V3{-650 * s, 0, -900 * s}), 280 * s, 320 * s, 1500 * s);
-    box(arms, place_at(V3{650 * s, 0, -900 * s}), 280 * s, 320 * s, 1500 * s);
-    box(arms, place_at(V3{0, 0, 520 * s}), 930 * s, 320 * s, 260 * s);
-    box(tips, place_at(V3{-650 * s, 0, -2700 * s}), 300 * s, 340 * s, 300 * s);
-    box(tips, place_at(V3{650 * s, 0, -2700 * s}), 300 * s, 340 * s, 300 * s);
+    const float half = 720 * s, r = 380 * s, bend = 420 * s;
+    for (int side = -1; side <= 1; side += 2) {
+        tube(arms, place_at(V3{side * half, 0, 0}), bend, -1700 * s, r, r, 10, false);
+        tube(tips, place_at(V3{side * half, 0, 0}), -1700 * s, -2300 * s, r * 1.04f, r * 1.04f, 10, true);
+    }
+    std::vector<V3> u;
+    for (int i = 0; i <= 10; ++i) {
+        const float t = 3.14159265f * float(i) / 10.0f;
+        u.push_back(V3{half * std::cos(t), 0, bend + half * std::sin(t)});
+    }
+    chain(arms, u, r);
     if (sparks_on)
         for (int side = -1; side <= 1; side += 2)
             chain(sparks, {V3{side * 1300 * s, 0, -1800 * s}, V3{side * 1600 * s, 0, -1500 * s}, V3{side * 1350 * s, 0, -1200 * s}, V3{side * 1650 * s, 0, -900 * s}}, 55 * s);
@@ -263,11 +271,11 @@ std::vector<Part> magnet(int level) {
     // at the top (the owner); all on the green ring.
     Part base{ring_green, {}};
     if (level == 1) {
-        ring(base, place_at(V3{0, 0, 900}), 950.0f, 180.0f);
+        ring(base, place_at(V3{0, 0, 1350}), 950.0f, 180.0f);
         return merged(horseshoe(1.0f, pink_tip, true), {base});
     }
     if (level == 2) {
-        ring(base, place_at(V3{0, 0, 900}), 1500.0f, 200.0f);
+        ring(base, place_at(V3{0, 0, 1350}), 1500.0f, 200.0f);
         auto out = placed(horseshoe(0.8f, trim(2, pink_tip), false), turned(0, -18, 0, V3{-950, 0, 300}), 1.0f);
         out = merged(out, placed(horseshoe(0.8f, trim(2, pink_tip), false), turned(0, 18, 0, V3{950, 0, 300}), 1.0f));
         return merged(out, {base});
