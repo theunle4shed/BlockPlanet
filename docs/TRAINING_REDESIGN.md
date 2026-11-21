@@ -171,3 +171,21 @@ The fourth lesson of The Basics (Mystery Blocks merged in; the owner asked for a
 **Every reset lays the board out from where the shadow is** (the board moves, not the camera), three cells along the bars from it, on the side away from the board's seam.
 
 **To decide (the owner):** the name; whether the mystery block should give a set power-up (it gave the Firecracker when none was held); whether Part 2 should also show a combo next to a mystery block freeing it.
+
+## Power-Ups (draft for the owner, 2026-11-21; not built yet)
+
+One entry in Getting Faster for the six power-ups, in the new pattern, replacing the six one-card lessons (`magic_lesson`, still what the entry runs).
+
+**Shape:** one opening page, then one short part per power-up, each on its own board, with Try it / Show me; the player can move on after each part, so it never feels long. Order as the game upgrades them: Firecracker, Dynamite, Magnet, Atom, Bomb, Ray Gun.
+
+**Opening page, "Power-Ups"** (draft): "Power-ups clear a lot of pieces at once. You get one by filling your magic meter, by a combo of 20 or more, or from a mystery block." ([A]) "Press [Magic] to use it where your shadow is. Each one clears in its own way." ([A]) "Earn another while you hold one and it upgrades to the next." (to confirm first, below).
+
+**Each part:** a heading with the power-up's name, one or two lines on what it does (from the current cards, `magic_lesson_texts`), then a board built to show it off, the power-up given (`+0x702`), Try it / Show me. Done once it has been used and the board has settled. Board ideas: Firecracker and Dynamite, a pit full of mixed pieces, the shadow in the middle (the round patch and the ring of holes show clearly); Magnet, a deep stack, "hold it still to dig deep"; Atom, a pit several layers deep, its whole top layer gone; Bomb, a wide pit, the wide blast then the second layer; Ray Gun, a deep pit and "move the shadow to drill elsewhere".
+
+**The roadmap's fixes, in the rebuild:**
+- **The Atom lesson gave the Bomb**, and **a new power-up after firing one**: probably the upgrade rule. A filled magic meter or a 20+ combo while one is held raises the held power-up by one (Atom 3 → Bomb 4), and the lessons' boards can set off combos. The fix: no combos possible on the boards (walls only round the shapes in hand, or the queue held to a shape that matches nothing), the meter held at 0, and `+0x702` checked each frame: anything but the lesson's own power-up (before it is used) or none (after) is put back.
+- **The shadow a bar on a board of squares**: the queue held to one shape, as the other new lessons do.
+- **A combo winning the stage**: the win square at 16, as the other new lessons.
+- **Ray Gun's Back to Training**: goes away with the one results panel at the end ("Power-Ups Complete": Try Again, Back to Training), as the other new lessons.
+
+**To check first:** that a second power-up upgrades the one held (fill the meter with the Firecracker held: does it become Dynamite?); what the Bomb's second layer and the Ray Gun's seven seconds look like on a pit, for the wording.
