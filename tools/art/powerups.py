@@ -188,14 +188,73 @@ def raygun(level):
             f'<path d="M46 19 H52 V27 H46" fill="#f2c53d" {O}/>' + beam)
 
 
+# The four power-ups (the owner, 2026-11-21: the Firecracker and Bomb merged as
+# the Missile, the Magnet and Ray Gun as the Magnet). Each level its own form,
+# its trim blue at level 2 and gold at level 3, level 3 with its power surge.
+
+def missile_family(level):
+    if level == 1:
+        return missile(34, 31, 45, 0.85)                                   # Missile
+    if level == 2:
+        return missile(33, 31, 45, 1.08, 1.6, accent(2, ''))              # Big Missile
+    # Missile Barrage: three strikes, each with a shockwave.
+    g = accent(3, '')
+    waves = ''.join(f'<path d="M{x - r} {y} A{r} {r * 0.55} 0 0 1 {x + r} {y}" fill="none" stroke="{GOLD}" stroke-width="2.2" stroke-linecap="round"/>'
+                    for x, y, r in [(13, 56, 8), (32, 60, 9), (51, 56, 8)])
+    return (waves + missile(13, 34, 0, 0.6, 1.2, g) + missile(51, 34, 0, 0.6, 1.2, g) + missile(32, 30, 0, 0.7, 1.4, g))
+
+
+def dynamite_family(level):
+    if level < 3:
+        return dynamite(level)
+    # Cluster sticks: five sticks, a gold band, and bomblets hopping out evenly
+    # round them, inside and out.
+    out = dynamite(2).replace(BLUE, GOLD)
+    for x, y in [(5, 14), (59, 20), (5, 34), (59, 40), (14, 59), (50, 59)]:
+        out += (f'<circle cx="{x}" cy="{y}" r="4.4" fill="#ff7a2e" {O} stroke-width="1.8"/>'
+                f'<circle cx="{x - 1.3}" cy="{y - 1.3}" r="1.5" fill="#ffd23f"/>')
+    return out
+
+
+def magnet_family(level):
+    if level < 3:
+        return magnet(level)                                               # Magnet, Power Magnet
+    # Ray Gun: hits harder, faster, deeper; pulses round its beam.
+    pulses = ''.join(f'<ellipse cx="58" cy="23" rx="{r}" ry="{r * 1.4}" fill="none" stroke="{c}" stroke-width="2"/>'
+                     for r, c in [(4, '#d8ffe9'), (7, GOLD)])
+    return raygun(3) + pulses
+
+
+def atom_family(level):
+    if level == 1:
+        return atom(1)
+    if level == 2:
+        # The crater: a bowl under a smaller atom.
+        crater = (f'<ellipse cx="32" cy="52" rx="27" ry="8" fill="#8a6a4a" {O}/>'
+                  f'<ellipse cx="32" cy="53" rx="20" ry="5" fill="#2a1c12"/>'
+                  f'<path d="M14 49 L10 45 M50 49 L55 45 M32 44 L32 41" stroke="#c9a57a" stroke-width="2" stroke-linecap="round"/>')
+        return crater + f'<g transform="translate(7 -4) scale(0.78)">{atom(2)}</g>'
+    # Splitting the sphere: a purple and gold ring round the atom.
+    ring_back = (f'<path d="M3 38 A29 9 0 0 1 61 26" fill="none" stroke="#b84dff" stroke-width="5" stroke-linecap="round"/>'
+                 f'<path d="M5 37 A27 8 0 0 1 59 27" fill="none" stroke="{GOLD}" stroke-width="2"/>')
+    ring_front = (f'<path d="M61 26 A29 9 0 0 1 3 38" fill="none" stroke="#b84dff" stroke-width="5" stroke-linecap="round"/>'
+                  f'<path d="M59 27 A27 8 0 0 1 5 37" fill="none" stroke="{GOLD}" stroke-width="2"/>')
+    return ring_back + f'<g transform="translate(5 5) scale(0.84)">{atom(3)}</g>' + ring_front
+
+
+FAMILIES = {'missile': missile_family, 'dynamite': dynamite_family, 'magnet': magnet_family, 'atom': atom_family}
+
 ICONS = {'firecracker': firecracker, 'dynamite': dynamite, 'magnet': magnet, 'atom': atom, 'bomb': bomb, 'raygun': raygun}
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for name, draw in ICONS.items():
-        for level in (1, 2, 3):
-            file = f'{name}.svg' if level == 1 else f'{name}-{level}.svg'
-            with open(os.path.join(OUT, file), 'w') as out:
-                out.write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">\n'
-                          f'<!-- BlockPlanet power-up icon: {name}, level {level} (tools/art/powerups.py) -->\n'
-                          f'{draw(level)}\n</svg>\n')
+    # The game's six (shown in the HUD until the merges are built), then the
+    # four families (the same names win for Dynamite, the Magnet and the Atom).
+    for table in (ICONS, FAMILIES):
+        for name, draw in table.items():
+            for level in (1, 2, 3):
+                file = f'{name}.svg' if level == 1 else f'{name}-{level}.svg'
+                with open(os.path.join(OUT, file), 'w') as out:
+                    out.write('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">\n'
+                              f'<!-- BlockPlanet power-up icon: {name}, level {level} (tools/art/powerups.py) -->\n'
+                              f'{draw(level)}\n</svg>\n')
