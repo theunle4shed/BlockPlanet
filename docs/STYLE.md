@@ -166,3 +166,7 @@ Not used: weapon, item, spell, guide.
 - **Crystals** (a crystal): the single blocks in the gaps between pieces, turned into a piece of the shadow's shape with B (the game's own lesson: crystal pieces). Not "rubble" (BlockPlanet's earlier word).
 - **Mystery block**: the glowing block hidden among them that holds a power-up; released by a combo next to it or by sliding a piece into it.
 - **Glass**: the blocks of Hide & Seek's **Glass Tower** (the game's Crystal Tower), which must not be broken. Never "crystal", so the two are not confused.
+
+## Power-up names (the owner, 2026-11-21)
+
+Five power-ups once levels are built: the **Missile** (the game's Firecracker and Bomb, merged: a small blast, a wider one, then a barrage), **Dynamite**, the **Magnet**, the **Atom** and the **Ray Gun**. Each has levels 1 to 3 (blue trim at 2, gold at 3). Never "Rocket" (a robot's name).
