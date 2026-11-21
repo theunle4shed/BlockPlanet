@@ -26,19 +26,20 @@ if "%CURRENT%"=="%MAIN%" (echo  Build: main) else (echo  Build: %CURRENT%  ^(try
 if "%BEHIND%"=="0" (echo  Up to date: choose 1 to play.) else (echo  %BEHIND% new change^(s^) waiting: choose 3 to get them.)
 if not "%CURRENT%"=="%MAIN%" echo  Finished trying it? Choose 5 to go back to main.
 echo.
+rem Kept short for now (the owner, 2026-11-21): play, the power-ups being
+rem worked on, update, quit. The others still work if typed: 4 try a branch,
+rem 5 back to main, 7 developer tools, 8 classic, 9 developer tools frozen,
+rem E the Escape prototype.
 echo   1  Play
+echo   2  Play with the new power-ups (test)
 echo   3  Get the latest changes and rebuild
-echo   4  Try a branch (pick from a list)
-echo   5  Back to the main build
+if not "%CURRENT%"=="%MAIN%" echo   5  Back to the main build
 echo   6  Quit
-echo   7  Play with developer tools (F1 opens them in the game)
-echo   8  Play classic: the game's own sphere drawing and HUD (to compare)
-echo   9  Developer tools, frozen at start (F7 a frame on, F6 run or freeze)
-echo   E  Escape prototype: the sphere seen from inside (the view only)
 echo.
 set CHOICE=
-set /p CHOICE=Choose 1-9 or E: 
+set /p CHOICE=Choose 1, 2, 3 or 6: 
 if "%CHOICE%"=="1" goto play
+if "%CHOICE%"=="2" goto powerups
 if "%CHOICE%"=="3" goto update
 if "%CHOICE%"=="4" goto branch
 if "%CHOICE%"=="5" goto main
@@ -51,6 +52,12 @@ goto menu
 
 :play
 call :run
+goto menu
+:powerups
+rem The power-ups as they are being worked on: BlockPlanet's own 3D models.
+set BLOCKPLANET_MODELS3D=1
+call :run
+set BLOCKPLANET_MODELS3D=
 goto menu
 :developer
 call :run --developer
