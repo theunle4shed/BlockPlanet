@@ -9252,11 +9252,6 @@ bool handle_profile_command(const std::string& command) {
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();
                 single_stage_quitting = true;
-                // A lesson's end: the grid flies in over the way out, as Exit's
-                // does (the owner, 2026-11-21: the game's old menus showed for a
-                // moment before the lesson's Complete panel).
-                if (pending_results && pending_results->lesson >= 0 && !grid_quit_at)
-                    grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = false;
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
             }
             if (single_stage_quitting && pause_bridge.hide_original()) {
