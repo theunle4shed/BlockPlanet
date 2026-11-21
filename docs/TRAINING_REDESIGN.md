@@ -140,7 +140,11 @@ Next, when it shows again: trap `func_800924E0`'s result in `func_800CC0D0` to s
 
 Combos and earning a power-up in one lesson (the owner: the magic lesson makes a big combo anyway, so no separate Combos lesson; power pieces and fuse combos stay in Scoring Big).
 
-**Page 1, "Combos and Magic"** (why, a line at a time): "Break more than three pieces at once and you've made a combo: the more you break together, the bigger it is." / "Big combos also score far more and clear the sphere faster: good for Time Attack and Score Attack." / "Magic power-ups clear a lot of bricks at once: your best way to dig quickly, or to get out of trouble." / "Big combos fill your magic meter. Break 20 or more pieces in one go and you earn a power-up." / new page: "In this lesson you'll make a big combo, earn a power-up, and use it."
+**Page 1, "Combos and Magic"** (why, a line at a time; the owner's layout, 2026-11-21):
+- "Break more than three pieces at once and you've made a combo: the more you break together, the bigger it is."
+- "Big combos:" then a bullet list (one [A]): "• fill your magic meter faster" / "• clear the sphere faster: good for Time Attack" / "• score far more points: good for Score Attack".
+
+**Page 2** (fresh): "Magic power-ups clear a lot of bricks at once: your best way to dig quickly, or to get out of trouble." / "Break 20 or more pieces in one go and you earn a power-up." / new page: "In this lesson you'll make a big combo, earn a power-up, and use it."
 
 **Page 2, "How to Earn a Power-Up"**: "A large group of matching pieces is ready. Drop your piece next to it to break the whole group." / "When the combo reaches 20, a power-up appears in your Magic box." / "Press [Magic] to use your power-up where your shadow is." / [A] Try it, [B] Show me.
 
