@@ -483,7 +483,6 @@ extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ct
 }
 
 extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx) {
-
     if (flight_log_pending) {
         flight_log_pending = false;
         const std::uint32_t end = load32_at(rdram, 0x800F22B4u);
