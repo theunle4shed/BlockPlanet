@@ -142,7 +142,7 @@ Combos and earning a power-up in one lesson (the owner: the magic lesson makes a
 
 **Page 1, "Combos and Magic"** (the owner's layout, 2026-11-21): the line "Break more than three pieces at once and you've made a combo: the more you break together, the more rewarding it is." as plain text, then ([A]) three bullets: "• Fill your magic meter faster" / "• Clear the sphere faster" / "• Score more points".
 
-**Page 2** (fresh): "Magic power-ups clear a lot of bricks at once: your best way to dig quickly, or to get out of trouble." / "Break 20 or more pieces in one go and you earn a power-up." / new page: "In this lesson you'll make a big combo, earn a power-up, and use it."
+**Page 2, "Earning Power-Ups"** (fresh page; the owner's choice, 2026-11-21): two bullets, "• Combos of 6 or more top up your magic meter: fill it up for a power-up." / "• Break 20 or more at once for an instant power-up." (From the research: 6 to 19 pieces add 1 to the meter, which holds 14, 9 in VS; gravity and fuse combos add 3; 3 to 5 add nothing; 20 or more give a power-up at once, the meter left as it was plus 1. To be confirmed in play, with whether a second power-up upgrades the one held.) Then a new page: "In this lesson you'll make a big combo, earn a power-up, and use it."
 
 **Page 2, "How to Earn a Power-Up"**: "A large group of matching pieces is ready. Drop your piece next to it to break the whole group." / "When the combo reaches 20, a power-up appears in your Magic box." / "Press [Magic] to use your power-up where your shadow is." / [A] Try it, [B] Show me.
 
