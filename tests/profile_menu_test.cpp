@@ -195,14 +195,14 @@ int main(int argc, char** argv) {
     // disabled items), the first lesson not done focused, lessons not built yet listed as Not started,
     // finished magic lessons marked completed.
     auto all = training_lessons(false, false);
-    // The Basics (0): Slide and Drop, Hearts; Getting Faster (3): Combos and Magic, six magics, Mystery Blocks;
+    // The Basics (0): Slide and Drop, Hearts, Combos and Magic; Getting Faster (4): six magics, Mystery Blocks;
     // Scoring Big (12); Game Modes (17): eight; Original Lessons (26): eight. Each shows its status, as the main menu.
     assert(all.size() == 35 && !all[0].enabled && all[0].classes == "list-header" && all[0].label == "The Basics");
     assert(all[1].focus && all[1].label == "Slide and Drop" && all[1].action == "command:new_lesson:slide" &&
            all[1].note == "(In progress)" && all[1].classes == "rag-in-progress");
     assert(all[2].label == "Hearts and the Drop Timer" && all[2].action == "command:new_lesson:hearts" && all[2].classes == "rag-in-progress");
-    assert(all[4].label == "Combos and Magic" && all[4].action.empty() && all[4].classes == "rag-not-started" && all[4].enabled);
-    assert(all[3].label == "Getting Faster" && all[5].action == "command:magic_lesson:0" && all[10].action == "command:magic_lesson:5");
+    assert(all[3].label == "Combos and Magic" && all[3].action.empty() && all[3].classes == "rag-not-started" && all[3].enabled);
+    assert(all[4].label == "Getting Faster" && all[5].action == "command:magic_lesson:0" && all[10].action == "command:magic_lesson:5");
     assert(all[12].label == "Scoring Big" && all[17].label == "Game Modes" && all[18].label == "Rescue" && all[26].label == "Original Lessons");
     assert(all[27].label == "Slide and Drop" && all[27].action == "command:lesson:1:1" && all[27].note == "(Viable)" && all[34].action == "command:lesson:3:1");
     {

@@ -115,7 +115,7 @@ div { display: block; }
 /* The drop timer, below the hearts: a bar in thirds (split where the game's
    warning ticks start), green, then amber, then red, with a marker at the
    fill's edge (ui_system.cpp, drop_bar). */
-#drop { margin-top: 12dp; }
+#drop { margin-top: 12dp; width: 148dp; }  /* as wide as the three hearts above (the owner, 2026-11-21) */
 .drop-bar { position: relative; }
 .drop-bar .fill { background-color: #4cc860; }
 .drop-bar.third-2 .fill { background-color: #f5c21f; }
@@ -167,23 +167,36 @@ div { display: block; }
 /* The magic meter as a ring of segments round the power-up (ui_system.cpp,
    meter_ring): grey, lit purple one by one; the box's own fill and frame give
    way to it. */
-#item.ringed { border-color: transparent; }  /* solid, as the game draws it behind a held power-up */
+/* No box: the panel's own colour behind the ring (the game draws the same
+   behind a held power-up), and the ring as wide as the panel's other parts
+   (200dp across). */
+#item.ringed { border-width: 0dp; border-radius: 0dp; background-color: #0b1020c0; }
+#item.ringed.held { background-color: transparent; }
+/* As wide as the three hearts above (148dp: three 44dp hearts, 8dp apart;
+   the owner), lined up under them, the rest of the row the panel's own. */
+#magic.ringed .window { height: 152dp; }
+#magic.ringed .edge { height: 152dp; }
+#magic.ringed .edge:last-child { width: 76dp; }
+#magic.ringed #item { width: 148dp; height: 152dp; }
+#magic.ringed #item .name { top: 58dp; }
 #item.ringed #item-fill { display: none; }
 #item .ring { position: absolute; left: 0dp; top: 0dp; width: 100%; height: 100%; }
 #item .pip {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 18dp;
-    height: 7dp;
-    margin-left: -9dp;
-    margin-top: -3.5dp;
+    width: 24dp;
+    height: 8dp;
+    margin-left: -12dp;
+    margin-top: -4dp;
     border-radius: 2dp;
     background-color: #46505f;
     transform-origin: 50% 50%;
 }
 #item .pip.on { background-color: #b07cff; }
 #left.row #item .pip { width: 11dp; height: 5dp; margin-left: -5.5dp; margin-top: -2.5dp; border-radius: 1.5dp; }
+#left.row #magic.ringed .window, #left.row #magic.ringed .edge { height: 86dp; }
+#left.row #magic.ringed #item { height: 82dp; }
 #item .name {
     position: absolute;
     left: 0dp;

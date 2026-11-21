@@ -20,6 +20,9 @@ void set_magic_box(bool shown, float x, float y, float scale, float x_anchored, 
 // The magic meter, 0 to 1: drawn by the game as the charge inside the box's
 // tint, behind the model (the HUD's own fill would lie over it).
 void set_magic_charge(float level);
+// The ring meter (2026-11-21): no box, so the tint behind a held power-up is the
+// HUD panel's own colour (#0b1020 at 0xC0) and the power-up sits on the panel.
+void set_magic_box_plain(bool plain);
 
 // True while the held magic's model is being drawn in the item box.
 bool magic_box_active();

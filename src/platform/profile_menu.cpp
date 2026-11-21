@@ -317,11 +317,11 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
         {"group_basics", "The Basics", {
             {"slide_drop", "Slide and Drop", "command:new_lesson:slide", "Slide two matching pieces together, then drop a third on them.", "\uE1EB", 100, P},
             {"hearts", "Hearts and the Drop Timer", "command:new_lesson:hearts", "Drop on a match before the bar runs out, or lose a heart.", "\uE0F5", 103, P},
+            // Combos and earning a power-up together (the owner, 2026-11-21: the
+            // magic lesson makes a big combo anyway), and essential: in The Basics.
+            {"combos_magic", "Combos and Magic", "", "Break a big group at once: big combos fill your magic meter and earn a power-up.", "", -1, N},
         }},
         {"group_faster", "Getting Faster", {
-            // Combos and earning a power-up together (the owner, 2026-11-21:
-            // the magic lesson makes a big combo anyway).
-            {"combos_magic", "Combos and Magic", "", "Break a big group at once: big combos fill your magic meter and earn a power-up.", "", -1, N},
             {"magic_firecracker", "Firecracker", "command:magic_lesson:0", "A round patch of the top layer round your shadow.", "\uE417", 0, P},
             {"magic_dynamite", "Dynamite", "command:magic_lesson:1", "Five small blasts in a ring round your shadow.", "\uE417", 1, P},
             {"magic_magnet", "Magnet", "command:magic_lesson:2", "Pulls bricks out from under your shadow, as deep as you hold it.", "\uE417", 2, P},

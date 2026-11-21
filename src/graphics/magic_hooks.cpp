@@ -135,6 +135,8 @@ void set_magic_box(bool shown, float x, float y, float scale, float x_anchored, 
 }
 
 void set_magic_charge(float level) { charge.store(std::clamp(level, 0.0f, 1.0f)); }
+namespace { std::atomic<bool> box_plain{false}; }
+void set_magic_box_plain(bool plain) { box_plain.store(plain); }
 
 bool magic_box_active() {
     return enabled.load() && !std::isnan(box_x.load()) && !std::isnan(box_y.load()) && !research().set;
@@ -163,6 +165,7 @@ void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, flo
         return v ? std::atoi(v) : 0xFF;  // solid (the owner, 2026-11-18: the box was see-through); was 0xB0
     }();
     if (alpha <= 0) return;
+    const int a = blockplanet::box_plain.load() ? 0xC0 : alpha;  // the panel's own colour, no box (the ring meter)
     // Picture heights to the 320 x 240 frame (240 units per picture height).
     const auto to_x = [](float v) { return static_cast<int>(std::lround(160.0f + v * 240.0f)); };
     const auto to_y = [](float v) { return static_cast<int>(std::lround(120.0f + v * 240.0f)); };
@@ -172,7 +175,7 @@ void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, flo
     store_word(rdram, sp + 0x10, 0x0B);
     store_word(rdram, sp + 0x14, 0x10);
     store_word(rdram, sp + 0x18, 0x20);
-    store_word(rdram, sp + 0x1C, static_cast<std::uint32_t>(std::clamp(alpha, 0, 255)));
+    store_word(rdram, sp + 0x1C, static_cast<std::uint32_t>(std::clamp(a, 0, 255)));
     ctx->r4 = to_x(centre_x - w / 2.0f);
     ctx->r5 = to_y(centre_y - h / 2.0f);
     ctx->r6 = to_x(centre_x + w / 2.0f);
