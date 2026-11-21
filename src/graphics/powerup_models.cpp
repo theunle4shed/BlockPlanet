@@ -19,15 +19,25 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 namespace tetrisphere::powerup_models {
 namespace {
 
 constexpr std::uint32_t display_list_pointer = 0x800F22B4u;  // the game's next free command
-constexpr std::uint32_t model_memory = 0x807FA000u;          // vertices and lights (free upper memory)
-constexpr std::uint32_t model_memory_end = 0x807FFF00u;
+// Each model is built once into this memory as a display list of its own
+// (lights, vertices, commands) and called from the frame's list. Unused: it
+// was all zeros in memory dumps of Rescue 3:1, a lesson and Hide & Seek 29 in
+// play (inside zeros from about 0x80608000 to 0x8073E000; the title's scenes
+// start at 0x80740000). (0x807E0000, tried first, is written every frame in
+// play.) A model is checked by its first word before reuse, and built again if
+// something has written over it.
+constexpr std::uint32_t model_memory = 0x80700000u;
+constexpr std::uint32_t model_memory_end = 0x8073C000u;
 
 std::uint32_t load32(const std::uint8_t* rdram, std::uint32_t a) {
     std::uint32_t v;
@@ -48,61 +58,294 @@ V3 unit(V3 a) {
     return l > 0 ? a * (1.0f / l) : V3{0, 0, 1};
 }
 
-struct Tri { V3 p[3]; };
+// A triangle, with the centre of the shape it belongs to (the outline grows
+// each shape about its own centre).
+struct Tri { V3 p[3]; V3 c; };
 // A part: one colour, flat-shaded triangles (each its own normal).
 struct Part {
     std::uint32_t rgb;
     std::vector<Tri> tris;
 };
 
-// Shapes along the z axis (the game's models point along z): a tube and a
-// cone, `sides` faces round.
-void tube(Part& part, float z0, float z1, float r, int sides = 8, bool caps = true) {
+// A placement: a rotation (rows) and an offset; shapes are built about the
+// origin along z, then placed.
+struct Place {
+    float m[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    V3 at{0, 0, 0};
+    V3 apply(V3 p) const {
+        return V3{m[0][0] * p.x + m[0][1] * p.y + m[0][2] * p.z, m[1][0] * p.x + m[1][1] * p.y + m[1][2] * p.z,
+                  m[2][0] * p.x + m[2][1] * p.y + m[2][2] * p.z} + at;
+    }
+};
+Place place_at(V3 at) { Place p; p.at = at; return p; }
+// Turned by `deg` about x, then y, then z (in that order), then moved.
+Place turned(float rx, float ry, float rz, V3 at = {0, 0, 0}) {
+    const float d = 3.14159265f / 180.0f;
+    const float cx = std::cos(rx * d), sx = std::sin(rx * d), cy = std::cos(ry * d), sy = std::sin(ry * d), cz = std::cos(rz * d), sz = std::sin(rz * d);
+    const float X[3][3] = {{1, 0, 0}, {0, cx, -sx}, {0, sx, cx}}, Y[3][3] = {{cy, 0, sy}, {0, 1, 0}, {-sy, 0, cy}}, Z[3][3] = {{cz, -sz, 0}, {sz, cz, 0}, {0, 0, 1}};
+    float yx[3][3] = {}, out[3][3] = {};
+    for (int r = 0; r < 3; ++r)
+        for (int c = 0; c < 3; ++c)
+            for (int k = 0; k < 3; ++k) yx[r][c] += Y[r][k] * X[k][c];
+    for (int r = 0; r < 3; ++r)
+        for (int c = 0; c < 3; ++c)
+            for (int k = 0; k < 3; ++k) out[r][c] += Z[r][k] * yx[k][c];
+    Place p;
+    std::memcpy(p.m, out, sizeof out);
+    p.at = at;
+    return p;
+}
+
+void add(Part& part, const Place& pl, V3 a, V3 b, V3 c, V3 centre) {
+    part.tris.push_back({{pl.apply(a), pl.apply(b), pl.apply(c)}, pl.apply(centre)});
+}
+// A tube along z from z0 to z1 (radius r0 at z0, r1 at z1: a cone when one is 0).
+void tube(Part& part, const Place& pl, float z0, float z1, float r0, float r1, int sides = 8, bool caps = true) {
+    const V3 centre{0, 0, (z0 + z1) / 2};
     for (int i = 0; i < sides; ++i) {
         const float a0 = 6.2831853f * float(i) / float(sides), a1 = 6.2831853f * float(i + 1) / float(sides);
-        const V3 p00{r * std::cos(a0), r * std::sin(a0), z0}, p01{r * std::cos(a1), r * std::sin(a1), z0};
-        const V3 p10{r * std::cos(a0), r * std::sin(a0), z1}, p11{r * std::cos(a1), r * std::sin(a1), z1};
-        part.tris.push_back({{p00, p01, p11}});
-        part.tris.push_back({{p00, p11, p10}});
-        if (caps) {
-            part.tris.push_back({{V3{0, 0, z0}, p01, p00}});
-            part.tris.push_back({{V3{0, 0, z1}, p10, p11}});
+        const V3 p00{r0 * std::cos(a0), r0 * std::sin(a0), z0}, p01{r0 * std::cos(a1), r0 * std::sin(a1), z0};
+        const V3 p10{r1 * std::cos(a0), r1 * std::sin(a0), z1}, p11{r1 * std::cos(a1), r1 * std::sin(a1), z1};
+        if (r0 > 0 || r1 > 0) {
+            if (r0 > 0) add(part, pl, p00, p01, p11, centre);
+            if (r1 > 0) add(part, pl, p00, p11, p10, centre);
+        }
+        if (caps && r0 > 0) add(part, pl, V3{0, 0, z0}, p01, p00, centre);
+        if (caps && r1 > 0) add(part, pl, V3{0, 0, z1}, p10, p11, centre);
+    }
+}
+void tube(Part& part, float z0, float z1, float r, int sides = 8, bool caps = true) { tube(part, Place{}, z0, z1, r, r, sides, caps); }
+void cone(Part& part, float z0, float z1, float r, int sides = 8) { tube(part, Place{}, z0, z1, r, 0.0f, sides, true); }
+// A box, half sizes hx, hy, hz.
+void box(Part& part, const Place& pl, float hx, float hy, float hz) {
+    const V3 v[8] = {{-hx, -hy, -hz}, {hx, -hy, -hz}, {hx, hy, -hz}, {-hx, hy, -hz}, {-hx, -hy, hz}, {hx, -hy, hz}, {hx, hy, hz}, {-hx, hy, hz}};
+    const int f[6][4] = {{0, 3, 2, 1}, {4, 5, 6, 7}, {0, 1, 5, 4}, {2, 3, 7, 6}, {1, 2, 6, 5}, {0, 4, 7, 3}};
+    for (const auto& q : f) {
+        add(part, pl, v[q[0]], v[q[1]], v[q[2]], V3{0, 0, 0});
+        add(part, pl, v[q[0]], v[q[2]], v[q[3]], V3{0, 0, 0});
+    }
+}
+// A ball (low: `rings` bands, `sides` round).
+void ball(Part& part, const Place& pl, float r, int rings = 4, int sides = 8) {
+    for (int i = 0; i < rings; ++i) {
+        const float t0 = 3.14159265f * float(i) / float(rings), t1 = 3.14159265f * float(i + 1) / float(rings);
+        for (int j = 0; j < sides; ++j) {
+            const float a0 = 6.2831853f * float(j) / float(sides), a1 = 6.2831853f * float(j + 1) / float(sides);
+            const auto pt = [&](float t, float a) { return V3{r * std::sin(t) * std::cos(a), r * std::sin(t) * std::sin(a), r * std::cos(t)}; };
+            const V3 p00 = pt(t0, a0), p01 = pt(t0, a1), p10 = pt(t1, a0), p11 = pt(t1, a1);
+            if (i > 0) add(part, pl, p00, p01, p11, V3{0, 0, 0});
+            if (i < rings - 1) add(part, pl, p00, p11, p10, V3{0, 0, 0});
         }
     }
 }
-void cone(Part& part, float z0, float z1, float r, int sides = 8) {
+// A ring (torus) about z: radius R, thickness r.
+void ring(Part& part, const Place& pl, float R, float r, int sides = 16, int round = 4) {
     for (int i = 0; i < sides; ++i) {
         const float a0 = 6.2831853f * float(i) / float(sides), a1 = 6.2831853f * float(i + 1) / float(sides);
-        const V3 p0{r * std::cos(a0), r * std::sin(a0), z0}, p1{r * std::cos(a1), r * std::sin(a1), z0};
-        part.tris.push_back({{p0, p1, V3{0, 0, z1}}});
-        part.tris.push_back({{V3{0, 0, z0}, p1, p0}});
+        for (int j = 0; j < round; ++j) {
+            const float b0 = 6.2831853f * float(j) / float(round), b1 = 6.2831853f * float(j + 1) / float(round);
+            const auto pt = [&](float a, float b) { return V3{(R + r * std::cos(b)) * std::cos(a), (R + r * std::cos(b)) * std::sin(a), r * std::sin(b)}; };
+            const V3 c{R * std::cos((a0 + a1) / 2), R * std::sin((a0 + a1) / 2), 0};
+            add(part, pl, pt(a0, b0), pt(a1, b0), pt(a1, b1), c);
+            add(part, pl, pt(a0, b0), pt(a1, b1), pt(a0, b1), c);
+        }
     }
 }
+// A curved claw: a chain of tubes through the points.
+void chain(Part& part, const std::vector<V3>& pts, float r) {
+    for (std::size_t i = 0; i + 1 < pts.size(); ++i) {
+        const V3 d = pts[i + 1] - pts[i];
+        const float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+        const V3 z = unit(d);
+        const V3 x = unit(std::abs(z.x) < 0.9f ? cross(V3{1, 0, 0}, z) : cross(V3{0, 1, 0}, z));
+        const V3 y = cross(z, x);
+        Place pl;
+        pl.m[0][0] = x.x, pl.m[0][1] = y.x, pl.m[0][2] = z.x;
+        pl.m[1][0] = x.y, pl.m[1][1] = y.y, pl.m[1][2] = z.y;
+        pl.m[2][0] = x.z, pl.m[2][1] = y.z, pl.m[2][2] = z.z;
+        pl.at = pts[i];
+        tube(part, pl, 0.0f, len, r, r, 6, true);
+    }
+}
+// Every triangle of a model moved and scaled (a level's bigger or extra form).
+std::vector<Part> placed(std::vector<Part> parts, const Place& pl, float scale) {
+    for (auto& part : parts)
+        for (auto& t : part.tris) {
+            for (auto& p : t.p) p = pl.apply(p * scale);
+            t.c = pl.apply(t.c * scale);
+        }
+    return parts;
+}
+std::vector<Part> merged(std::vector<Part> a, const std::vector<Part>& b) {
+    for (const auto& part : b) {
+        bool found = false;
+        for (auto& q : a)
+            if (q.rgb == part.rgb) q.tris.insert(q.tris.end(), part.tris.begin(), part.tris.end()), found = true;
+        if (!found) a.push_back(part);
+    }
+    return a;
+}
 
-// The models, in the first part's space of the game's own (its units; the
-// Firecracker runs along z from about +1,600, the fuse's end, to -5,800, the
-// cone's tip, about 1,000 across).
-std::vector<Part> firecracker(int /*level*/) {
-    Part body{0x8A3DF0, {}}, stripes{0xC9A2FF, {}}, tip{0xF28A2E, {}}, fuse{0xF3DC9C, {}};
+// The colours (the flat icons', tools/art/powerups.py).
+constexpr std::uint32_t purple = 0x8A3DF0, lilac = 0xC9A2FF, orange = 0xF28A2E, fuse_tan = 0xF3DC9C, red = 0xD93636, bright_red = 0xEF4A4A,
+                        gold = 0xF2C53D, pink_tip = 0xF0D0F0, ring_green = 0x2FCF4A, atom_purple = 0xA24BFF, orbit = 0xB78CFF, electron = 0xFFD23F,
+                        white = 0xF4F1EA, flame = 0xFFA63F, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF;
+
+// The models, each in the first part's space of the game's own (its units).
+// Firecracker: along z from about +1,600 (the fuse's end) to -5,800 (the
+// cone's tip), about 1,000 across.
+std::vector<Part> one_rocket() {
+    Part body{purple, {}}, stripes{lilac, {}}, tip{orange, {}}, fuse{fuse_tan, {}};
     tube(body, 0.0f, -4200.0f, 620.0f);
     for (int s = 0; s < 3; ++s) tube(stripes, -900.0f - 1200.0f * float(s), -1300.0f - 1200.0f * float(s), 650.0f, 8, false);
     cone(tip, -4200.0f, -5800.0f, 820.0f);
     tube(fuse, 1500.0f, 0.0f, 120.0f, 6);
     return {body, stripes, tip, fuse};
 }
+std::vector<Part> firecracker(int level) {
+    if (level == 1) return one_rocket();
+    if (level == 2) return placed(one_rocket(), place_at(V3{0, 0, 600}), 1.2f);
+    // Three rockets, side by side, the middle one higher.
+    auto out = placed(one_rocket(), turned(0, -12, 0, V3{-1500, 0, 400}), 0.8f);
+    out = merged(out, placed(one_rocket(), turned(0, 12, 0, V3{1500, 0, 400}), 0.8f));
+    return merged(out, placed(one_rocket(), place_at(V3{0, 0, -300}), 0.85f));
+}
+
+// Dynamite: sticks along y, from about -1,500 to 1,500, fuses above to 2,100,
+// across x and z about ±770.
+std::vector<Part> dynamite(int level) {
+    Part sticks{red, {}}, front{bright_red, {}}, band{gold, {}}, fuse{fuse_tan, {}}, spark{electron, {}};
+    std::vector<std::pair<float, float>> at;  // x, z of each stick
+    if (level == 1) at = {{-640, 0}, {0, 0}, {640, 0}};
+    else if (level == 2) at = {{-1280, 0}, {-640, 0}, {0, 0}, {640, 0}, {1280, 0}};
+    else at = {{-1280, -330}, {-640, -330}, {0, -330}, {640, -330}, {1280, -330}, {-320, 330}, {320, 330}};
+    const Place up = turned(-90, 0, 0);  // tubes along y
+    float x0 = 0, x1 = 0;
+    for (const auto& [x, z] : at) {
+        Place pl = up;
+        pl.at = V3{x, 0, z};
+        tube(x == 0 ? front : sticks, pl, -1500.0f, 1500.0f, 310.0f, 310.0f);
+        x0 = std::min(x0, x), x1 = std::max(x1, x);
+    }
+    box(band, place_at(V3{(x0 + x1) / 2, 300, at.size() > 5 ? 0.0f : 0.0f}), (x1 - x0) / 2 + 360.0f, 260.0f, at.size() > 5 ? 720.0f : 380.0f);
+    const int fuses = level;
+    for (int f = 0; f < fuses; ++f) {
+        const float x = f == 0 ? 0.0f : f == 1 ? -640.0f : 640.0f;
+        chain(fuse, {V3{x, 1500, 0}, V3{x + 150, 1850, 0}, V3{x + 400, 2100, 0}}, 70.0f);
+        ball(spark, place_at(V3{x + 430, 2160, 0}), 170.0f, 3, 6);
+    }
+    return {sticks, front, band, fuse, spark};
+}
+
+// Electro Magnet: its claws point along -z (to about -3,700) from a green
+// ring at about z 150 to 730, about 940 across.
+std::vector<Part> horseshoe(float s) {
+    Part arms{red, {}}, tips{pink_tip, {}}, base{ring_green, {}}, sparks{spark_blue, {}};
+    box(arms, place_at(V3{-650 * s, 0, -900 * s}), 280 * s, 320 * s, 1500 * s);
+    box(arms, place_at(V3{650 * s, 0, -900 * s}), 280 * s, 320 * s, 1500 * s);
+    box(arms, place_at(V3{0, 0, 520 * s}), 930 * s, 320 * s, 260 * s);
+    box(tips, place_at(V3{-650 * s, 0, -2700 * s}), 300 * s, 340 * s, 300 * s);
+    box(tips, place_at(V3{650 * s, 0, -2700 * s}), 300 * s, 340 * s, 300 * s);
+    ring(base, place_at(V3{0, 0, 900 * s}), 950 * s, 180 * s);
+    for (int side = -1; side <= 1; side += 2)
+        chain(sparks, {V3{side * 1300 * s, 0, -1800 * s}, V3{side * 1600 * s, 0, -1500 * s}, V3{side * 1350 * s, 0, -1200 * s}, V3{side * 1650 * s, 0, -900 * s}}, 55 * s);
+    return {arms, tips, base, sparks};
+}
+std::vector<Part> magnet(int level) {
+    if (level < 3) return horseshoe(level == 1 ? 1.0f : 1.2f);
+    // The game's own form: four claws curving up and out of the ring.
+    Part claws{red, {}}, tips{pink_tip, {}}, base{ring_green, {}};
+    for (int k = 0; k < 4; ++k) {
+        const float a = 6.2831853f * (float(k) + 0.5f) / 4.0f, cx = std::cos(a), cy = std::sin(a);
+        const std::vector<V3> pts{V3{cx * 500, cy * 500, 600}, V3{cx * 700, cy * 700, -500}, V3{cx * 1100, cy * 1100, -1700}, V3{cx * 1600, cy * 1600, -2700}};
+        chain(claws, pts, 230.0f);
+        ball(tips, place_at(pts.back() + V3{cx * 80, cy * 80, -150}), 300.0f, 3, 6);
+    }
+    ring(base, place_at(V3{0, 0, 700}), 900.0f, 200.0f);
+    return {claws, tips, base};
+}
+
+// Atom: about its middle, the nucleus about 1,000 across, its electrons about
+// 1,400 out.
+std::vector<Part> atom(int level) {
+    Part nucleus{atom_purple, {}}, orbits{orbit, {}}, electrons{electron, {}};
+    ball(nucleus, Place{}, level == 1 ? 480.0f : 560.0f, 5, 10);
+    const int n_orbits = level < 3 ? 3 : 4, per = level == 1 ? 1 : 2;
+    for (int o = 0; o < n_orbits; ++o) {
+        const float tilt = 180.0f * float(o) / float(n_orbits);
+        const Place pl = turned(70, 0, tilt);
+        ring(orbits, pl, 1400.0f, 60.0f, 20, 3);
+        for (int e = 0; e < per; ++e) {
+            const float a = 6.2831853f * (float(e) / float(per) + 0.15f * float(o));
+            ball(electrons, place_at(pl.apply(V3{1400 * std::cos(a), 1400 * std::sin(a), 0})), 180.0f, 3, 6);
+        }
+    }
+    return {nucleus, orbits, electrons};
+}
+
+// Bomb: a missile along z, its nose to -z (about -4,000), fins about ±1,500.
+std::vector<Part> missile(float flame_len) {
+    Part body{white, {}}, reds{red, {}}, fire{flame, {}};
+    tube(body, 1100.0f, -2400.0f, 700.0f);
+    tube(reds, Place{}, -2400.0f, -3900.0f, 700.0f, 0.0f, 8, true);
+    tube(reds, -700.0f, -1100.0f, 730.0f, 8, false);
+    for (int k = 0; k < 4; ++k) {
+        const Place pl = turned(0, 0, 45.0f + 90.0f * float(k));
+        Place fin = pl;
+        fin.at = pl.apply(V3{1050, 0, 1100});
+        box(reds, fin, 450.0f, 70.0f, 400.0f);
+    }
+    tube(fire, Place{}, 1100.0f, 1100.0f + flame_len, 450.0f, 0.0f, 8, true);
+    return {body, reds, fire};
+}
+std::vector<Part> bomb(int level) {
+    if (level == 1) return missile(700.0f);
+    if (level == 2) return placed(missile(1200.0f), Place{}, 1.15f);
+    return merged(placed(missile(900.0f), place_at(V3{-1100, 0, 200}), 0.72f), placed(missile(900.0f), place_at(V3{1100, 0, -200}), 0.72f));
+}
+
+// Ray Gun: its barrel to -z, about ±1,800 across, -3,500 to 900 along z.
+std::vector<Part> raygun(int level) {
+    Part body{gun_green, {}}, grip{grip_green, {}}, rings{gold, {}}, ray{beam, {}};
+    tube(body, Place{}, 900.0f, -900.0f, 900.0f, 800.0f, 10, true);
+    tube(rings, Place{}, -900.0f, -2300.0f, 500.0f, 260.0f, 8, true);
+    for (int r = 0; r < (level == 1 ? 2 : 3); ++r) tube(rings, 400.0f - 500.0f * float(r), 150.0f - 500.0f * float(r), 940.0f, 10, true);
+    box(grip, turned(-20, 0, 0, V3{0, -1200, 500}), 280.0f, 700.0f, 300.0f);
+    const float reach = level == 1 ? 900.0f : level == 2 ? 1200.0f : 1500.0f, width = level == 1 ? 90.0f : level == 2 ? 150.0f : 220.0f;
+    tube(ray, -2300.0f, -2300.0f - reach, width, 6);
+    if (level == 3) ball(ray, place_at(V3{0, 0, -2400}), 380.0f, 3, 8);
+    return {body, grip, rings, ray};
+}
 
 std::vector<Part> model(int kind, int level) {
     switch (kind) {
     case 0: return firecracker(level);
+    case 1: return dynamite(level);
+    case 2: return magnet(level);
+    case 3: return atom(level);
+    case 4: return bomb(level);
+    case 5: return raygun(level);
     default: return {};
     }
 }
 
 // Writes the parts as F3D commands at `at` (lit vertices: position, then the
 // normal in the colour bytes), the vertices in model memory; returns the end.
-std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, const std::vector<Part>& parts, std::uint32_t light_dir) {
-    std::uint32_t mem = model_memory;
+// Writes the model at `mem` onwards: its commands first (`dl_room` bytes kept
+// for them), then its lights and vertices. Returns the end, or 0 if it does
+// not fit before `limit`.
+std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t dl_room, std::uint32_t limit, const std::vector<Part>& parts,
+                          std::uint32_t light_dir) {
+    const std::uint32_t model_memory_end = limit;
+    bool full = false;
+    static const float outline = [] {  // research: BLOCKPLANET_MODEL_OUTLINE (model units)
+        const char* v = std::getenv("BLOCKPLANET_MODEL_OUTLINE");
+        return v ? std::strtof(v, nullptr) : 110.0f;
+    }();
+    std::uint32_t mem = at + dl_room;
+    const std::uint32_t dl_end = mem - 8u;  // room for the end command
     const auto cmd = [&](std::uint32_t w0, std::uint32_t w1) {
+        if (at >= dl_end) { full = true; return; }
         store32(rdram, at, w0), store32(rdram, at + 4u, w1);
         at += 8u;
     };
@@ -113,7 +356,7 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, const std::vect
     cmd(0xFCFFFFFFu, 0xFFFE793Cu);           // G_CC_SHADE
     cmd(0xB7000000u, 0x00020000u);           // lighting on
     const auto lights = [&](std::uint32_t rgb, float ambient) {
-        if (mem + 32u > model_memory_end) return;
+        if (mem + 32u > model_memory_end) { full = true; return; }
         const std::uint8_t r = std::uint8_t(rgb >> 16), g = std::uint8_t(rgb >> 8), b = std::uint8_t(rgb);
         const std::uint32_t l = mem;
         mem += 32u;
@@ -131,18 +374,25 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, const std::vect
         // Five triangles a load (15 vertices of the 16).
         for (std::size_t i = 0; i < part.tris.size(); i += 5) {
             const std::size_t n = std::min<std::size_t>(5, part.tris.size() - i);
-            if (mem + 48u * std::uint32_t(n) > model_memory_end) return;
+            if (mem + 48u * std::uint32_t(n) > model_memory_end) { full = true; return; }
             const std::uint32_t base = mem;
             for (std::size_t t = 0; t < n; ++t) {
-                // Wound the other way round from the shapes' order (their outer
-                // faces are front faces), the normal outwards.
+                // Each triangle wound to face away from its shape's centre (the
+                // front faces; checked in the game: cross(q1 - q0, q2 - q0)
+                // pointing out), the normal outwards.
                 const Tri& tri = part.tris[i + t];
-                const V3 q[3] = {tri.p[0], tri.p[2], tri.p[1]};
+                V3 q[3] = {tri.p[0], tri.p[1], tri.p[2]};
+                {
+                    const V3 mid = (q[0] + q[1] + q[2]) * (1.0f / 3.0f) - tri.c;
+                    const V3 n = cross(q[1] - q[0], q[2] - q[0]);
+                    if (n.x * mid.x + n.y * mid.y + n.z * mid.z < 0.0f) std::swap(q[1], q[2]);
+                }
                 const V3 normal = unit(cross(q[1] - q[0], q[2] - q[0]));
                 for (int k = 0; k < 3; ++k) {
-                    // Grown outwards (the outline) from the shape's own axis.
+                    // Grown outwards (the outline) from its shape's centre, by a set
+                    // thickness.
                     V3 p = q[k];
-                    if (grow != 1.0f) p = V3{p.x * grow, p.y * grow, p.z} + V3{0, 0, p.z > 0 ? 60.0f : -60.0f} * (grow - 1.0f) * 10.0f;
+                    if (grow > 0.0f) p = p + unit(p - tri.c) * grow;
                     const std::uint32_t v = mem;
                     mem += 16u;
                     store16(rdram, v, std::uint16_t(std::int16_t(std::lround(std::clamp(p.x, -32000.0f, 32000.0f)))));
@@ -165,21 +415,28 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, const std::vect
     cmd(0xB6000000u, 0x00002000u);  // back faces not culled
     cmd(0xB7000000u, 0x00001000u);  // front faces culled
     lights(0x1A1033, 1.0f);
-    for (const auto& part : parts) draw(part, 1.07f);
+    for (const auto& part : parts) draw(part, outline);
     // The parts, their front faces.
     cmd(0xB6000000u, 0x00001000u);
     cmd(0xB7000000u, 0x00002000u);
     for (const auto& part : parts) {
         lights(part.rgb, 0.45f);
-        draw(part, 1.0f);
+        draw(part, 0.0f);
     }
-    return at;
+    store32(rdram, at, 0xB8000000u), store32(rdram, at + 4u, 0);  // G_ENDDL
+    return full ? 0u : mem;
 }
 
 }  // namespace
 
+namespace {
+struct Built { std::uint32_t at = 0, marker = 0, light_dir = 0; };
+Built built[6][4];
+std::uint32_t next_free = model_memory;
+}  // namespace
+
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level) {
-    if (rdram == nullptr || start < 0x80000000u) return false;
+    if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > 5 || level < 1 || level > 3) return false;
     const std::uint32_t end = load32(rdram, display_list_pointer);
     if (end <= start || end - start > 0x10000u) return false;
     // The geometry starts at the first vertex load; the light's direction
@@ -193,10 +450,36 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level) {
             break;
         }
     }
-    const auto parts = model(kind, level);
-    if (first_vtx == 0 || parts.empty()) return false;
-    const std::uint32_t new_end = write_parts(rdram, first_vtx, parts, light_dir);
-    store32(rdram, display_list_pointer, new_end);
+    if (first_vtx == 0) return false;
+    Built& b = built[kind][level];
+    const std::uint32_t marker = 0xB10C0000u | std::uint32_t(kind) << 8 | std::uint32_t(level);
+    if (b.at == 0 || load32(rdram, b.at) != marker) {  // (the light's direction as first seen)
+        const auto parts = model(kind, level);
+        if (parts.empty()) return false;
+        std::size_t tris = 0;
+        for (const auto& part : parts) tris += part.tris.size();
+        // Commands: two passes, a vertex load each five triangles, the lights.
+        const std::uint32_t dl_room = std::uint32_t(tris * 2u * 8u + tris * 2u / 5u * 8u + 64u * parts.size() + 256u);
+        const std::uint32_t need = 8u + dl_room + std::uint32_t(tris * 2u * 48u) + 32u * std::uint32_t(parts.size() + 1u) + 64u;
+        if (need > model_memory_end - model_memory) return false;
+        if (next_free + need > model_memory_end) {
+            // Full: start again (every model is built again when next drawn).
+            next_free = model_memory;
+            for (auto& k : built)
+                for (auto& l : k) l = Built{};
+        }
+        const std::uint32_t at = next_free;
+        store32(rdram, at, marker), store32(rdram, at + 4u, 0);
+        const std::uint32_t used = write_parts(rdram, at + 8u, dl_room, at + need, parts, light_dir);
+        if (used == 0) return false;
+        next_free = (used + 15u) & ~15u;
+        b = Built{at, marker, light_dir};
+        std::fprintf(stdout, "{\"event\":\"powerup_model\",\"kind\":%d,\"level\":%d,\"triangles\":%zu,\"bytes\":%u}\n", kind, level, tris, used - at);
+        std::fflush(stdout);
+    }
+    // The game's geometry cut; a call to the model in its place.
+    store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, b.at + 8u);
+    store32(rdram, display_list_pointer, first_vtx + 8u);
     return true;
 }
 

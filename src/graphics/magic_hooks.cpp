@@ -452,7 +452,9 @@ extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ct
 
 extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx) {
     if (model3d_kind >= 0) {
-        tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, 1);
+        // Research: the level from guest byte 0x807FFF00 (1 to 3; a poke), else 1.
+        const int poked = rdram[(0x807FFF00u ^ 3u) & 0x007FFFFFu];
+        tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, poked >= 1 && poked <= 3 ? poked : 1);
         model3d_kind = -1;
     }
     if (dl_log_kind >= 0) {
