@@ -73,12 +73,43 @@ def arcs(n):
     return out
 
 
-def magnet(level):
-    glow = '<circle cx="32" cy="30" r="27" fill="#6fd3ff" fill-opacity="0.16"/>' if level == 3 else ''
-    body = (f'<path d="M14 10 H26 V34 A6 6 0 0 0 38 34 V10 H50 V34 A18 18 0 0 1 14 34 Z" fill="#d93636" {O}/>'
+def ring_base(cx, cy, rx, ry):
+    # The game's model's base: a bright green ring.
+    return (f'<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" fill="#2a9e3a" {O}/>'
+            f'<ellipse cx="{cx}" cy="{cy - 1.5}" rx="{rx * 0.62}" ry="{ry * 0.5}" fill="#123d1a" stroke="#7dff8a" stroke-width="1.5"/>')
+
+
+def horseshoe(cx, top, scale):
+    # A red horseshoe opening upwards, pale pink tips (the model's colours).
+    return (f'<g transform="translate({cx} {top}) scale({scale}) translate(-32 -8)">'
+            f'<path d="M14 10 H26 V34 A6 6 0 0 0 38 34 V10 H50 V34 A18 18 0 0 1 14 34 Z" fill="#d93636" {O}/>'
             f'<rect x="14" y="8" width="12" height="9" fill="#f0d0f0" {O}/>'
-            f'<rect x="38" y="8" width="12" height="9" fill="#f0d0f0" {O}/>')
-    return glow + body + arcs(level)
+            f'<rect x="38" y="8" width="12" height="9" fill="#f0d0f0" {O}/>'
+            f'</g>')
+
+
+def claw(d):
+    # A curved red claw (dark edge, then red), its pale tip drawn after.
+    return (f'<path d="{d}" fill="none" stroke="{INK}" stroke-width="9" stroke-linecap="round"/>'
+            f'<path d="{d}" fill="none" stroke="#d93636" stroke-width="5.5" stroke-linecap="round"/>')
+
+
+def magnet(level):
+    # Level 1 a horseshoe magnet, level 2 a bigger one, level 3 the game's own
+    # form (the owner, 2026-11-21): four red claws curving up and out of a
+    # green ring, pale pink tips; all on the green ring.
+    if level == 3:
+        out = '<circle cx="32" cy="30" r="27" fill="#6fd3ff" fill-opacity="0.14"/>'
+        claws = ["M24 48 C18 40 12 28 9 16", "M29 47 C27 36 24 24 23 10", "M35 47 C37 36 40 24 41 10", "M40 48 C46 40 52 28 55 16"]
+        out += ''.join(claw(d) for d in claws[1:3]) + ''.join(claw(d) for d in (claws[0], claws[3]))
+        for x, y in [(9, 16), (23, 10), (41, 10), (55, 16)]:
+            out += f'<circle cx="{x}" cy="{y}" r="4" fill="#f0d0f0" {O} stroke-width="2"/>'
+        return out + ring_base(32, 52, 15, 6) + arcs(3)
+    # The magnet's bend sits in the ring (the ring drawn first, behind it).
+    scale = 0.8 if level == 1 else 0.95
+    top = 11 if level == 1 else 6
+    bottom = top + 44 * scale
+    return ring_base(32, bottom, 19 if level == 1 else 22, 6.5) + horseshoe(32, top, scale) + arcs(level)
 
 
 def atom(level):
