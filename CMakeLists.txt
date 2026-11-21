@@ -319,6 +319,7 @@ set(TETRISPHERE_BUILD_INPUTS
     src/graphics/brick_sky.cpp
     src/graphics/escape_view.cpp
     src/graphics/magic_hooks.cpp
+    src/graphics/powerup_models.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
     src/graphics/direct_start_hooks.cpp
@@ -484,6 +485,7 @@ add_executable(tetrisphere_diag
     src/graphics/brick_sky.cpp
     src/graphics/escape_view.cpp
     src/graphics/magic_hooks.cpp
+    src/graphics/powerup_models.cpp
     src/graphics/title_hooks.cpp
     src/graphics/audio_hooks.cpp
     src/graphics/direct_start_hooks.cpp
@@ -1242,6 +1244,7 @@ if(TETRISPHERE_GAME_ENABLED)
         src/graphics/brick_sky.cpp
         src/graphics/escape_view.cpp
         src/graphics/magic_hooks.cpp
+        src/graphics/powerup_models.cpp
         src/graphics/title_hooks.cpp
         src/graphics/audio_hooks.cpp
         src/graphics/direct_start_hooks.cpp

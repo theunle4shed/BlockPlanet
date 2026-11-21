@@ -28,6 +28,7 @@
 // drawn through the matrix after use.
 
 #include "tetrisphere/magic_model.h"
+#include "tetrisphere/powerup_models.h"
 #include "tetrisphere/recomp_support.h"
 
 #include <algorithm>
@@ -206,7 +207,52 @@ void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, flo
 
 } // namespace
 
+// Research (BLOCKPLANET_MAGIC_DL_LOG, 2026-11-21, for BlockPlanet's own 3D
+// power-up models): the display list the model helper writes for each held
+// power-up, once per kind, with the lists it calls.
+namespace {
+std::uint32_t dl_log_start = 0;
+int dl_log_kind = -1;
+bool dl_logged[6] = {};
+std::uint32_t load32_at(const std::uint8_t* rdram, std::uint32_t a) {
+    std::uint32_t v;
+    std::memcpy(&v, rdram + (a & 0x007FFFFCu), 4);
+    return v;
+}
+void dl_dump(const std::uint8_t* rdram, std::uint32_t from, std::uint32_t to, int depth) {
+    for (std::uint32_t a = from; a + 8u <= to && a < from + 8u * 400u; a += 8u) {
+        const std::uint32_t w0 = load32_at(rdram, a), w1 = load32_at(rdram, a + 4u);
+        std::fprintf(stdout, "MDL %d %08X %08X %08X\n", depth, a, w0, w1);
+        if ((w0 >> 24) == 0x04u) {  // G_VTX: the vertices' bounds (model units) and their normals' range
+            const int n = int((w0 >> 20) & 0xFu) + 1;
+            int lo[3] = {99999, 99999, 99999}, hi[3] = {-99999, -99999, -99999};
+            for (int v = 0; v < n; ++v) {
+                const std::uint32_t at = w1 + 16u * std::uint32_t(v);
+                const std::uint32_t xy = load32_at(rdram, at), zf = load32_at(rdram, at + 4u);
+                const int c[3] = {std::int16_t(xy >> 16), std::int16_t(xy & 0xFFFF), std::int16_t(zf >> 16)};
+                for (int k = 0; k < 3; ++k) lo[k] = std::min(lo[k], c[k]), hi[k] = std::max(hi[k], c[k]);
+            }
+            std::fprintf(stdout, "MVB %d %d %d %d %d %d %d\n", n, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
+        }
+        if ((w0 >> 24) == 0x03u && ((w0 >> 16) & 0xFFu) >= 0x86u) {  // a light: its colour and direction
+            const std::uint32_t c0 = load32_at(rdram, w1), d0 = load32_at(rdram, w1 + 8u);
+            std::fprintf(stdout, "MLT %02X %08X %08X\n", (w0 >> 16) & 0xFFu, c0, d0);
+        }
+        if ((w0 >> 24) == 0x06u && depth < 2 && (w1 & 0xFF000000u) == 0x80000000u) {
+            std::uint32_t end = w1;
+            while (end < w1 + 8u * 600u && (load32_at(rdram, end) >> 24) != 0xB8u) end += 8u;
+            dl_dump(rdram, w1, end + 8u, depth + 1);
+        }
+    }
+}
+}  // namespace
+
 extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context* ctx) {
+    {
+        static const bool log = std::getenv("BLOCKPLANET_MAGIC_DL_LOG") != nullptr;
+        const int k = held(rdram);
+        if (log && k >= 0 && k < 6 && !dl_logged[k]) dl_log_start = load32_at(rdram, 0x800F22B4u), dl_log_kind = k;
+    }
     const auto& r = research();
     constexpr std::uint32_t m = translation_matrix;
     if (r.set) {
@@ -335,7 +381,22 @@ Clock::time_point flight_start{};
 bool span_open = false;
 } // namespace
 
+// BlockPlanet's own 3D models (powerup_models.cpp): the power-up's draw is
+// marked at the model helper's start and its geometry replaced at its end.
+// Research for now: BLOCKPLANET_MODELS3D=1 (with BLOCKPLANET_MAGIC_MODELS=1 to
+// see it in the box).
+namespace {
+std::uint32_t model3d_start = 0;
+int model3d_kind = -1;
+}  // namespace
+
 extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ctx) {
+    {
+        static const bool on = std::getenv("BLOCKPLANET_MODELS3D") != nullptr;
+        const int k = held(rdram);
+        if (on && k >= 0 && static_cast<std::uint32_t>(ctx->r7) == translation_matrix)
+            model3d_start = load32_at(rdram, 0x800F22B4u), model3d_kind = k;
+    }
     const std::int8_t now_held = held(rdram);
     const auto now = Clock::now();
     const auto model = static_cast<std::uint32_t>(ctx->r4);
@@ -390,6 +451,18 @@ extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ct
 }
 
 extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx) {
+    if (model3d_kind >= 0) {
+        tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, 1);
+        model3d_kind = -1;
+    }
+    if (dl_log_kind >= 0) {
+        std::fprintf(stdout, "MDL_BEGIN %d\n", dl_log_kind);
+        dl_dump(rdram, dl_log_start, load32_at(rdram, 0x800F22B4u), 0);
+        std::fprintf(stdout, "MDL_END %d\n", dl_log_kind);
+        std::fflush(stdout);
+        dl_logged[dl_log_kind] = true;
+        dl_log_kind = -1;
+    }
     if (!span_open) return;
     span_open = false;
     tetrisphere_ui_span_end(rdram, ctx, 0x8002D93Cu);
