@@ -338,14 +338,80 @@ std::vector<Part> raygun(int level) {
     return {body, grip, rings, nozzle, ray};
 }
 
+// The four power-ups (the owner, 2026-11-21; as the icons, powerups.py): the
+// Missile (the game's Firecracker and Bomb), Dynamite, the Magnet (the game's
+// Magnet and Ray Gun; level 3 is the Ray Gun) and the Atom. Each level its own
+// form, blue trim at level 2, gold at level 3 with its power surge.
+std::vector<Part> missile_family(int level) {
+    if (level == 1) return placed(missile(700.0f), Place{}, 0.9f);                 // Missile
+    if (level == 2) return placed(missile(1300.0f, trim(2, red)), Place{}, 1.15f); // Big Missile
+    // Missile Barrage: three, each with a gold shockwave ring at its tail.
+    std::vector<Part> out;
+    const V3 at[3] = {{-1500, 0, 300}, {1500, 0, 300}, {0, 0, -300}};
+    for (int k = 0; k < 3; ++k) {
+        auto one = missile(900.0f, trim(3, red));
+        Part wave{0xFFC53D, {}};
+        ring(wave, place_at(V3{0, 0, 1700}), 900.0f, 90.0f, 14, 3);
+        one.push_back(wave);
+        out = merged(out, placed(one, place_at(at[k]), k == 2 ? 0.7f : 0.6f));
+    }
+    return out;
+}
+
+std::vector<Part> dynamite_family(int level) {
+    if (level < 3) return dynamite(level);
+    // Cluster sticks: five sticks (a gold band), bomblets round them evenly,
+    // inside and just outside.
+    auto out = dynamite(2);
+    for (auto& part : out)
+        if (part.rgb == trim(2, gold)) part.rgb = trim(3, gold);
+    Part bomblets{0xFF7A2E, {}}, glints{electron, {}};
+    for (int k = 0; k < 6; ++k) {
+        const float a = 6.2831853f * (float(k) + 0.5f) / 6.0f;
+        const V3 p{2300.0f * std::cos(a), (k % 2 ? 900.0f : -900.0f), 1100.0f * std::sin(a)};
+        ball(bomblets, place_at(p), 320.0f, 3, 6);
+        ball(glints, place_at(p + V3{-120, 200, 0}), 110.0f, 2, 4);
+    }
+    out.push_back(bomblets);
+    out.push_back(glints);
+    return out;
+}
+
+std::vector<Part> magnet_family(int level) {
+    if (level < 3) return magnet(level);  // Magnet, Power Magnet
+    // Ray Gun: harder, faster, deeper; pulse rings round its beam.
+    auto out = raygun(3);
+    Part pulses{0xFFC53D, {}}, inner{0xD8FFE9, {}};
+    ring(pulses, place_at(V3{0, 0, -3000}), 900.0f, 80.0f, 14, 3);
+    ring(inner, place_at(V3{0, 0, -2700}), 550.0f, 70.0f, 12, 3);
+    out.push_back(pulses);
+    out.push_back(inner);
+    return out;
+}
+
+std::vector<Part> atom_family(int level) {
+    if (level == 1) return atom(1);
+    // (Level 2's crater is the icon's alone: on the turning model it read as a
+    // dark disc beside the atom.)
+    if (level == 2) return atom(2);
+    // Splitting the sphere: inside a wide purple and gold ring.
+    auto out = placed(atom(3), Place{}, 0.85f);
+    Part outer{0xB84DFF, {}}, gold_ring{0xFFC53D, {}};
+    ring(outer, turned(80, 0, 15), 2000.0f, 150.0f, 28, 4);
+    ring(gold_ring, turned(80, 0, 15), 1750.0f, 80.0f, 28, 3);
+    out.push_back(outer);
+    out.push_back(gold_ring);
+    return out;
+}
+
 std::vector<Part> model(int kind, int level) {
+    // The game's six, shown as the four (until the merges are built): the
+    // Firecracker and Bomb as the Missile, the Magnet and Ray Gun as the Magnet.
     switch (kind) {
-    case 0: return firecracker(level);
-    case 1: return dynamite(level);
-    case 2: return magnet(level);
-    case 3: return atom(level);
-    case 4: return bomb(level);
-    case 5: return raygun(level);
+    case 0: case 4: return missile_family(level);
+    case 1: return dynamite_family(level);
+    case 2: case 5: return magnet_family(level);
+    case 3: return atom_family(level);
     default: return {};
     }
 }
