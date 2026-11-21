@@ -221,7 +221,7 @@ What each draws:
 - **`func_8009AB60` is the cursor and shadow, the landing marker and the held piece's anchor: the one to wrap in the inside camera.** Its marker cells use `func_8008E5B0` (the column top). Its helpers are `func_80099F98`, `func_8009A044` (faces through `func_8009C330`) and `func_8009A348`.
 - `func_80097E3C` sets up one cell's or one layer's corners; `func_8009AB60` and the magic effects use it.
 - **`func_80098D8C` maps a board point to a 3D position** for things above the sphere. The falling piece uses it (`func_800C090C`, `func_800C0EE8`, drawn from `func_800CD3B8` after `func_800A348C`), and so do particles. **This is the likely lavender quad.**
-- `func_800A0ED8`: a per-cell overlay pass.
+- `func_800A0ED8`: a per-cell overlay pass. It draws the core and the rescued friend in it (2026-11-21: skipping it removed both, and nothing else seen).
 - `func_800A18F4`: deferred type-63 bricks (queued by `func_80097848`).
 - `func_800A1E58`: bricks queued by magic (`func_80096488`).
 

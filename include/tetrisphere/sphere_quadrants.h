@@ -38,4 +38,13 @@ class ExtendedSphere;
 void draw_extended_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant,
                             const ExtendedSphere& sphere);
 
+// See-through core (research, BLOCKPLANET_SEE_THROUGH_CORE=1): the inside of
+// the shell all round the sphere, every cell of `sphere` (built with a ring of
+// up to 8, so it reaches round to the far side) drawn by the inner face of
+// its lowest block, far cells first. Drawn before the sphere itself, with the
+// core left out, so the far side shows through the core.
+void draw_inner_shell(std::uint8_t* rdram, recomp_context* ctx, const ExtendedSphere& sphere);
+bool see_through_core();
+void set_see_through_core(bool on);
+
 } // namespace tetrisphere::sphere

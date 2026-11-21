@@ -103,6 +103,30 @@ func = "func_8009D570"
 before_vram = 0x8009D904
 text = "blockplanet_sphere_face_end(rdram, ctx, 5);"
 
+# Research: the sphere's other drawing passes, each skippable
+# (BLOCKPLANET_SKIP_PASS), to find which draws what; the see-through core
+# skips the core's.
+[[patches.hook]]
+func = "func_8009FA20"
+text = "if (blockplanet_sphere_pass_begin(rdram, ctx, 0)) return;"
+
+[[patches.hook]]
+func = "func_800A0ED8"
+text = "if (blockplanet_sphere_pass_begin(rdram, ctx, 1)) return;"
+
+[[patches.hook]]
+func = "func_800A18F4"
+text = "if (blockplanet_sphere_pass_begin(rdram, ctx, 2)) return;"
+
+[[patches.hook]]
+func = "func_800A1E58"
+text = "if (blockplanet_sphere_pass_begin(rdram, ctx, 3)) return;"
+
+[[patches.hook]]
+func = "func_800A2E88"
+text = "if (blockplanet_sphere_pass_begin(rdram, ctx, 4)) return;"
+
+
 # Stage 1: the four quadrant passes, which walk the cells and draw the faces.
 [[patches.hook]]
 func = "func_8009E630"

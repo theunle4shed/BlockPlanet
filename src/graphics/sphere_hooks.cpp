@@ -448,6 +448,10 @@ bool extended_ready = false;  // built this frame, single player
 // alone, only while the game is over.
 ExtendedSphere shell_sphere;
 bool shell_ready = false;
+// See-through core (research): the inside of the shell all round.
+constexpr int inner_shell_ring = 8;
+ExtendedSphere inner_shell_sphere;
+bool inner_shell_ready = false;
 
 bool extended_test() {
     static const bool on = std::getenv("BLOCKPLANET_SPHERE_EXTENDED_TEST") != nullptr;
@@ -501,6 +505,13 @@ extern "C" bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_contex
         static const ExtendedBaseGrid grid(base_table(rdram), largest_ring);
         extended_sphere.build(ring, gather(rdram, ctx, false), grid);
         extended_ready = true;
+    }
+    // See-through core: the whole board's mesh, reaching round to the far side.
+    inner_shell_ready = false;
+    if (extended_ready && see_through_core()) {
+        static const ExtendedBaseGrid grid(base_table(rdram), inner_shell_ring);
+        inner_shell_sphere.build(inner_shell_ring, gather(rdram, ctx, false), grid);
+        inner_shell_ready = true;
     }
     shell_ready = false;
     if (!extended_ready && load16(rdram, player_count) < 2 && game_over_shell_wanted(rdram)) {
@@ -760,7 +771,10 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
         return false;
     }
     if (extended_ready) {
-        if (quadrant == 0) begin_extended_vertices(rdram);
+        if (quadrant == 0) {
+            begin_extended_vertices(rdram);
+            if (inner_shell_ready) draw_inner_shell(rdram, ctx, inner_shell_sphere);
+        }
         draw_extended_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant), extended_sphere);
         if (quadrant == 3) {
             draw_game_over_shell(rdram, extended_sphere);  // game_over_shell.cpp
@@ -798,4 +812,21 @@ extern "C" void blockplanet_sphere_quadrant_end(std::uint8_t* rdram, recomp_cont
         originals[quadrant](r, c);
         replaying_original = false;
     });
+}
+
+// Research: BLOCKPLANET_SKIP_PASS=n[,n...] skips the sphere's other drawing
+// passes (0 func_8009FA20, 1 func_800A0ED8, 2 func_800A18F4, 3 func_800A1E58,
+// 4 func_800A2E88), to find which draws what.
+extern "C" bool blockplanet_sphere_pass_begin(std::uint8_t* rdram, recomp_context* ctx, int pass) {
+    (void)rdram, (void)ctx;
+    static const unsigned skipped = [] {
+        unsigned bits = 0;
+        if (const char* v = std::getenv("BLOCKPLANET_SKIP_PASS"))
+            for (const char* p = v; *p; ++p)
+                if (*p >= '0' && *p <= '9') bits |= 1u << (*p - '0');
+        return bits;
+    }();
+    // See-through core: 1 (func_800A0ED8) draws the core.
+    if (pass == 1 && inner_shell_ready && see_through_core()) return true;
+    return (skipped >> pass & 1u) != 0;
 }

@@ -2263,8 +2263,15 @@ void research_hole(std::uint8_t* rdram) {
     // floating over the hole with all its faces exposed, as the Atom can
     // leave them (to check how blocks are drawn from below).
     static const bool floating = std::getenv("BLOCKPLANET_RESEARCH_HOLE_FLOAT") != nullptr;
-    for (int dy = -8; dy < 8; ++dy)
-        for (int dx = -8; dx < 8; ++dx) {
+    // BLOCKPLANET_RESEARCH_HOLE_SIZE=n: an n x n hole (16 by default), smaller
+    // than the stage's goal so the stage goes on.
+    static const int size = [] {
+        const char* v = std::getenv("BLOCKPLANET_RESEARCH_HOLE_SIZE");
+        const int n = v ? std::atoi(v) : 16;
+        return n < 1 ? 1 : (n > 16 ? 16 : n);
+    }();
+    for (int dy = -size / 2; dy < size - size / 2; ++dy)
+        for (int dx = -size / 2; dx < size - size / 2; ++dx) {
             const int c = ((cy + dy) & 31) * 32 + ((cx + dx) & 31);
             if (floating) {
                 // Layer 1 stays (so the core is not reached and the stage
@@ -6838,6 +6845,10 @@ bool handle_profile_command(const std::string& command) {
                 // Research (the test harness): Hide & Seek from level N.
                 game_option_applier->choose_start(0, std::atoi(command->c_str() + 18));
                 launch_mode(LaunchMode::HideAndSeek);
+                continue;
+            }
+            if (command->starts_with("research_see_through:")) {
+                tetrisphere::sphere::set_see_through_core(command->back() == '1');
                 continue;
             }
             if (command->starts_with("research_undersides:")) {

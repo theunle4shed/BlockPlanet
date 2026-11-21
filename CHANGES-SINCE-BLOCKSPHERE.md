@@ -711,3 +711,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - With the Extended sphere, a block with nothing under it (left floating over a hole, for example by the Atom) now has its underside drawn. The game never draws undersides, so near the edge of the view such a block showed only as a thin sliver. `BLOCKPLANET_SPHERE_UNDERSIDES=0` turns this off.
 - Research: `BLOCKPLANET_RESEARCH_HOLE_FLOAT=1` makes the research hole leave floating blocks over layer 1, and `research_undersides:0|1` switches the undersides while running.
 - The power-up test only gives power-ups in a game (not on the title, in the menus or in the attract demo).
+
+## 2026-11-21: See-through core experiment
+
+- `BLOCKPLANET_SEE_THROUGH_CORE=1` (Extended sphere): the core is not drawn, and the inside of the far side of the sphere is drawn, so a hole dug to the core shows through to the other side. BlockPlanet.bat's power-up test turns it on. Research only for now; details in `docs/ROADMAP.md`.
+- Research: `BLOCKPLANET_SKIP_PASS` skips the sphere's other drawing passes, and `BLOCKPLANET_RESEARCH_HOLE_SIZE` sets the research hole's size.

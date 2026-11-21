@@ -5,6 +5,9 @@
 #include "tetrisphere/sphere_extended.h"
 
 #include <array>
+#include <utility>
+#include <vector>
+#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 #include <string_view>
@@ -267,6 +270,76 @@ void draw_extended_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant q
         rdram, ctx, quadrant, sphere.ring(),
         [&] { prepare_extended_cell(memory, sphere, load16(rdram, cell_row), load16(rdram, cell_column)); },
         [&] { return load32(rdram, display_list_current) - load32(rdram, display_list_start) < display_list_budget; });
+}
+
+
+std::atomic<int> see_through{-1};
+bool see_through_core() {
+    int on = see_through.load(std::memory_order_relaxed);
+    if (on < 0) {
+        const char* v = std::getenv("BLOCKPLANET_SEE_THROUGH_CORE");
+        on = v != nullptr && std::string_view(v) != "0";
+        see_through.store(on, std::memory_order_relaxed);
+    }
+    return on != 0;
+}
+void set_see_through_core(bool on) { see_through.store(on ? 1 : 0, std::memory_order_relaxed); }
+
+void draw_inner_shell(std::uint8_t* rdram, recomp_context* ctx, const ExtendedSphere& sphere) {
+    LiveMemory memory(rdram);
+    const int ring = sphere.ring();
+    // Cells from -ring to 14 + ring, farthest from the middle of the view
+    // (cell 7) first.
+    std::vector<std::pair<int, int>> cells;
+    for (int row = -ring; row <= 14 + ring; ++row)
+        for (int column = -ring; column <= 14 + ring; ++column) cells.emplace_back(row, column);
+    auto distance = [](const std::pair<int, int>& c) { return std::max(std::abs(c.first - 7), std::abs(c.second - 7)); };
+    std::stable_sort(cells.begin(), cells.end(), [&](const auto& a, const auto& b) { return distance(a) > distance(b); });
+    constexpr std::uint32_t display_list_start = 0x800F22B8u;
+    constexpr std::uint32_t display_list_current = 0x800F22B4u;
+    constexpr std::uint32_t display_list_budget = 0x14000u;
+    constexpr std::int32_t original_frame_bytes = 0x40;
+    ctx->r29 = static_cast<std::int32_t>(ctx->r29) - original_frame_bytes;
+    for (const auto& [row, column] : cells) {
+        if (load32(rdram, display_list_current) - load32(rdram, display_list_start) >= display_list_budget) break;
+        store16(rdram, cell_row, static_cast<std::int16_t>(row));
+        store16(rdram, cell_column, static_cast<std::int16_t>(column));
+        prepare_extended_cell(memory, sphere, row, column);
+        // As draw_inside: the setup leaves the planes one layer below the
+        // column's first drawn layer; move them to layer 0, then lift to the
+        // lowest block above the core.
+        const int first = load16(rdram, first_layer);
+        const int lift = 0 - (first - 1);
+        for (int k = 0; k < lift; ++k) lift_one_layer(rdram);
+        for (int k = 0; k > lift; --k) {
+            store32(rdram, block_value_pointer, load32(rdram, block_value_pointer) - 2 * layer_cells);
+            store32(rdram, face_mask_pointer, load32(rdram, face_mask_pointer) - layer_cells);
+            store32(rdram, block_extra_pointer, load32(rdram, block_extra_pointer) - 4 * layer_cells);
+            for (const Lift& l : layer_lifts)
+                store16(rdram, l.coordinate, static_cast<std::int16_t>(load16(rdram, l.coordinate) - load16(rdram, l.step)));
+        }
+        // The far side's higher layers lie beyond the 16-bit coordinates
+        // (the top of layer 8 is about 1.03 x the grid point's length, which
+        // reaches 43,620 behind the core), so only layers up to 5 there.
+        const int highest = distance({row, column}) > 11 ? 5 : 8;
+        std::int16_t value = 0;
+        int layer = 0;
+        while (value == 0 && layer < highest) {
+            lift_one_layer(rdram);
+            ++layer;
+            value = load16(rdram, load32(rdram, block_value_pointer));
+        }
+        if (value == 0 || value / 9 == 10) continue;
+        store16(rdram, cell_layer, static_cast<std::int16_t>(layer));
+        const std::uint8_t faces = load8(rdram, load32(rdram, face_mask_pointer));
+        store16(rdram, face_mask, faces);
+        store16(rdram, block_type, static_cast<std::int16_t>(value / 9));
+        ctx->r4 = faces;
+        func_8009E314(rdram, ctx);
+        func_8009E214(rdram, ctx);
+        func_8009C6D4(rdram, ctx);
+    }
+    ctx->r29 = static_cast<std::int32_t>(ctx->r29) + original_frame_bytes;
 }
 
 } // namespace tetrisphere::sphere
