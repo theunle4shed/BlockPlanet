@@ -616,9 +616,9 @@ public:
             // again rather than an older file reused (Crafted 2: square, bevelled; 3:
             // the crystal drawn as a block with circles; 4: the circles without rims; 5: outlines from the
             // palette indices, so palettes without a darker outline get one; 6: the highlight sheet left as the original;
-            // 7: the crystal tile (first called rubble) drawn as a cut gem with shards).
+            // 7: the crystal tile (first called rubble) drawn as a cut gem with shards; 8: in fixed colours).
             static const bool mark = std::getenv("BLOCKPLANET_BRICK_MARK") != nullptr;  // research
-            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? (mark ? 99 : 7) : 1;
+            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? (mark ? 99 : 8) : 1;
             char name[48];
             std::snprintf(name, sizeof name, "%016llx-v%d.dds", static_cast<unsigned long long>(hash), version);
             const auto path = bricks_dir_ / name;

@@ -308,7 +308,13 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
                     if (n > best && c != colours.front()) best = n, common = c;
                 }
             }
-            const std::uint32_t dark = colours.front(), light = colours.back();
+            // Fixed colours since 2026-11-21 (the owner chose the tile as drawn
+            // with the yellow bricks' palette: a near-black block, a yellow gem
+            // with teal-green facets), whatever palette the stage gives it. Only
+            // looks: the game tells blocks apart by their cell values, not colours.
+            // (So stages whose crystal palette cycles no longer shimmer.)
+            const std::uint32_t dark = 0xFF022A2Au, light = 0xFF12DCE2u;  // (ABGR) #2a2a02, #e2dc12
+            common = 0xFF22222Au;                                          // #2a2222
             const auto mix = [](std::uint32_t a, std::uint32_t b, double f) {
                 std::uint32_t out = 0xFF000000u;
                 for (int k = 0; k < 3; ++k) {
