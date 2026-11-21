@@ -135,8 +135,9 @@ void set_magic_box(bool shown, float x, float y, float scale, float x_anchored, 
 }
 
 void set_magic_charge(float level) { charge.store(std::clamp(level, 0.0f, 1.0f)); }
-namespace { std::atomic<bool> box_plain{false}; }
+namespace { std::atomic<bool> box_plain{false}, models_hidden{false}; }
 void set_magic_box_plain(bool plain) { box_plain.store(plain); }
+void set_magic_models_hidden(bool hidden) { models_hidden.store(hidden); }
 
 bool magic_box_active() {
     return enabled.load() && !std::isnan(box_x.load()) && !std::isnan(box_y.load()) && !research().set;
@@ -229,6 +230,14 @@ extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context*
     }();
     const float bx = anchored_x.load() + extra_x, by = box_y.load() + extra_y;
     if (std::isnan(bx) || std::isnan(by)) return;
+    if (blockplanet::models_hidden.load()) {
+        // The flat icons: the model drawn at no size (every point on one spot,
+        // so nothing shows), no tint; the HUD draws the icon.
+        for (int i = 0; i < 15; ++i) store_float(rdram, m + std::uint32_t(4 * i), 0.0f);
+        store_float(rdram, m + 0x3C, 1.0f);
+        ctx->r5 = 0;
+        return;
+    }
     draw_box_tint(rdram, ctx, box_x.load() + shift_2d.load(), by);
     // The model's own position (model units), the turn and the size.
     static const float pz_set = [] {  // research: the model's own depth offset

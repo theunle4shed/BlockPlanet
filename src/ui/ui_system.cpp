@@ -561,6 +561,14 @@ std::string meter_ring(const HudView& hud) {
     return rml + "</div>";
 }
 
+// The held power-up as BlockPlanet's flat icon (assets/ui/powerups, the
+// owner, 2026-11-21), in place of the game's spinning model.
+std::string power_icon(const HudView& hud) {
+    static const char* names[6] = {"firecracker", "dynamite", "magnet", "atom", "bomb", "raygun"};
+    if (!hud.magic_icon || hud.magic < 0 || hud.magic > 5) return {};
+    return std::string("<div class='power p-") + names[hud.magic] + "'/>";
+}
+
 std::string item_classes(const HudView& hud) {
     std::string c;
     if (hud.meter_steps > 0) c += " ringed";
@@ -605,7 +613,8 @@ std::string hud_rml_parts(const HudView& hud) {
             parts.push_back(std::string("<div id='magic' class='") + glow("magic") +
                             "'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'" +
                             item_classes(hud) + "><div id='item-fill'/>" + meter_ring(hud) +
-                            (hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "") +
+                            power_icon(hud) +
+                            (hud.magic >= 0 && !hud.magic_model && !hud.magic_icon ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "") +
                             "</div><div class='edge'/></div><div class='band foot'/></div>");
         }
         if (hud.multiplier >= 1)
@@ -666,7 +675,8 @@ std::string hud_rml_parts(const HudView& hud) {
            item_classes(hud) + "><div id='item-fill'/>" + meter_ring(hud);
     // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
     // its name is shown only when it is not.
-    rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
+    rml += power_icon(hud);
+    rml += hud.magic >= 0 && !hud.magic_model && !hud.magic_icon ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";
     rml += "</div><div class='edge'/></div><div class='band foot'/></div>";
     }
     if (hud.show_next) {

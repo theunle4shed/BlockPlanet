@@ -24,6 +24,11 @@ void set_magic_charge(float level);
 // HUD panel's own colour (#0b1020 at 0xC0) and the power-up sits on the panel.
 void set_magic_box_plain(bool plain);
 
+// BlockPlanet's flat power-up icons (the owner, 2026-11-21): the game's
+// spinning model in the box is drawn at no size, and no tint behind it; the
+// HUD shows the icon instead. (The model's flight when fired is kept.)
+void set_magic_models_hidden(bool hidden);
+
 // True while the held magic's model is being drawn in the item box.
 bool magic_box_active();
 

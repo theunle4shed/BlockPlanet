@@ -1171,6 +1171,13 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     }
     view.magic = state.magic;
     view.magic_model = view.show_magic && blockplanet::magic_box_active();
+    {
+        // BlockPlanet's flat power-up icons (the owner, 2026-11-21); the game's
+        // spinning models with BLOCKPLANET_MAGIC_MODELS=1 (research).
+        static const bool models = std::getenv("BLOCKPLANET_MAGIC_MODELS") != nullptr;
+        blockplanet::set_magic_models_hidden(!models);
+        if (!models) view.magic_icon = true, view.magic_model = false;
+    }
     view.meter = state.meter;
     view.meter_count = state.meter_count, view.meter_steps = state.meter_steps;
     blockplanet::set_magic_charge(state.meter_steps > 0 ? 0.0f : state.meter);  // the ring shows the meter: no fill behind the model
@@ -1559,6 +1566,13 @@ void update_hud() {
     }
     view.magic = state.magic;
     view.magic_model = blockplanet::magic_box_active();
+    {
+        // BlockPlanet's flat power-up icons (the owner, 2026-11-21); the game's
+        // spinning models with BLOCKPLANET_MAGIC_MODELS=1 (research).
+        static const bool models = std::getenv("BLOCKPLANET_MAGIC_MODELS") != nullptr;
+        blockplanet::set_magic_models_hidden(!models);
+        if (!models) view.magic_icon = true, view.magic_model = false;
+    }
     view.meter = state.meter;
     view.meter_count = state.meter_count, view.meter_steps = state.meter_steps;
     blockplanet::set_magic_charge(state.meter_steps > 0 ? 0.0f : state.meter);  // the ring shows the meter: no fill behind the model

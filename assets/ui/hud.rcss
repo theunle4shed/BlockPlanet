@@ -202,6 +202,28 @@ div { display: block; }
 #left.row #item .pip { width: 11dp; height: 5dp; margin-left: -5.5dp; margin-top: -2.5dp; border-radius: 1.5dp; }
 #left.row #magic.ringed .window, #left.row #magic.ringed .edge { height: 86dp; }
 #left.row #magic.ringed #item { height: 82dp; }
+/* The held power-up's flat icon (assets/ui/powerups, tools/art/powerups.py), in
+   the middle of the box or ring; -2 and -3 are its level 2 and 3 pictures. */
+#item .power { position: absolute; left: 50%; top: 50%; width: 96dp; height: 96dp; margin-left: -48dp; margin-top: -48dp; }
+#left.row #item .power { width: 56dp; height: 56dp; margin-left: -28dp; margin-top: -28dp; }
+.p-firecracker { decorator: image(/blockplanet-ui/powerups/firecracker.png); }
+.p-firecracker-2 { decorator: image(/blockplanet-ui/powerups/firecracker-2.png); }
+.p-firecracker-3 { decorator: image(/blockplanet-ui/powerups/firecracker-3.png); }
+.p-dynamite { decorator: image(/blockplanet-ui/powerups/dynamite.png); }
+.p-dynamite-2 { decorator: image(/blockplanet-ui/powerups/dynamite-2.png); }
+.p-dynamite-3 { decorator: image(/blockplanet-ui/powerups/dynamite-3.png); }
+.p-magnet { decorator: image(/blockplanet-ui/powerups/magnet.png); }
+.p-magnet-2 { decorator: image(/blockplanet-ui/powerups/magnet-2.png); }
+.p-magnet-3 { decorator: image(/blockplanet-ui/powerups/magnet-3.png); }
+.p-atom { decorator: image(/blockplanet-ui/powerups/atom.png); }
+.p-atom-2 { decorator: image(/blockplanet-ui/powerups/atom-2.png); }
+.p-atom-3 { decorator: image(/blockplanet-ui/powerups/atom-3.png); }
+.p-bomb { decorator: image(/blockplanet-ui/powerups/bomb.png); }
+.p-bomb-2 { decorator: image(/blockplanet-ui/powerups/bomb-2.png); }
+.p-bomb-3 { decorator: image(/blockplanet-ui/powerups/bomb-3.png); }
+.p-raygun { decorator: image(/blockplanet-ui/powerups/raygun.png); }
+.p-raygun-2 { decorator: image(/blockplanet-ui/powerups/raygun-2.png); }
+.p-raygun-3 { decorator: image(/blockplanet-ui/powerups/raygun-3.png); }
 #item .name {
     position: absolute;
     left: 0dp;
@@ -323,6 +345,7 @@ div { display: block; }
     #magic .edge { width: 16dp; height: 86dp; }
     #item { width: 116dp; height: 82dp; }
     #item .name { top: 32dp; font-size: 20dp; }
+    #item .power { width: 56dp; height: 56dp; margin-left: -28dp; margin-top: -28dp; }
     #next .piece { display: inline-block; vertical-align: top; margin: 0dp 18dp 0dp 0dp; }
     #stage { font-size: 40dp; line-height: 44dp; }
     #time { font-size: 40dp; }
