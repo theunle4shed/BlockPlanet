@@ -17,6 +17,8 @@
 #include <csignal>
 #include <execinfo.h>
 #include <fcntl.h>
+#include <sys/prctl.h>
+#include <ucontext.h>
 #include <unistd.h>
 #endif
 
@@ -83,7 +85,71 @@ void write_all(int fd, const char* text) {
     }
 }
 
-void write_report(const char* what, const void* address) {
+// The executable parts of /proc/self/maps, read at crash time into static
+// memory: start, end, file offset and name, so code addresses (the faulting
+// one and any return addresses found on the stack) can be named even when
+// backtrace() finds nothing (code without frame info, such as a driver's
+// generated shader code).
+struct code_map { unsigned long start, end, offset; char name[96]; };
+code_map maps[384];
+int map_count = 0;
+unsigned long stack_end = 0;  // the end of the mapping holding the stack pointer
+char maps_text[1 << 17];
+
+unsigned long hex(const char*& p) {
+    unsigned long v = 0;
+    for (;; ++p) {
+        const char c = *p;
+        if (c >= '0' && c <= '9') v = v * 16 + unsigned(c - '0');
+        else if (c >= 'a' && c <= 'f') v = v * 16 + unsigned(c - 'a' + 10);
+        else return v;
+    }
+}
+
+void read_maps(unsigned long sp) {
+    map_count = 0;
+    stack_end = 0;
+    const int fd = ::open("/proc/self/maps", O_RDONLY);
+    if (fd < 0) return;
+    std::size_t used = 0;
+    for (ssize_t n; used + 1 < sizeof maps_text && (n = ::read(fd, maps_text + used, sizeof maps_text - 1 - used)) > 0;) used += std::size_t(n);
+    ::close(fd);
+    maps_text[used] = 0;
+    for (const char* p = maps_text; *p && map_count < int(sizeof maps / sizeof maps[0]);) {
+        code_map m{};
+        m.start = hex(p); ++p; m.end = hex(p); ++p;
+        const bool exec = p[2] == 'x';
+        p += 5; m.offset = hex(p);
+        int spaces = 0;  // skip device and inode
+        while (*p && *p != '\n' && spaces < 3) { if (*p == ' ') { ++spaces; while (*p == ' ') ++p; } else ++p; }
+        int k = 0;
+        while (*p && *p != '\n') { if (k + 1 < int(sizeof m.name)) m.name[k++] = *p; ++p; }
+        m.name[k] = 0;
+        if (*p) ++p;
+        if (sp >= m.start && sp < m.end) stack_end = m.end;
+        if (exec) maps[map_count++] = m;
+    }
+}
+
+const code_map* code_at(unsigned long a) {
+    for (int i = 0; i < map_count; ++i)
+        if (a >= maps[i].start && a < maps[i].end) return &maps[i];
+    return nullptr;
+}
+
+void write_code_line(int fd, const char* label, unsigned long a) {
+    char line[256];
+    const code_map* m = code_at(a);
+    if (m == nullptr) std::snprintf(line, sizeof line, "%s 0x%lx (not in any code mapping)\n", label, a);
+    else {
+        const char* base = std::strrchr(m->name, '/');
+        std::snprintf(line, sizeof line, "%s 0x%lx  %s+0x%lx\n", label, a, m->name[0] ? (base ? base + 1 : m->name) : "[anonymous code]",
+                      a - m->start + m->offset);
+    }
+    write_all(fd, line);
+}
+
+void write_report(const char* what, const void* address, const void* context = nullptr, const void* signal_info = nullptr) {
     const int fd = ::open(report_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) return;
     char line[256];
@@ -92,17 +158,45 @@ void write_report(const char* what, const void* address) {
     write_all(fd, line);
     write_all(fd, "Doing: ");
     write_all(fd, context_current == 0 ? context_a : context_b);
-    write_all(fd, "\nStack:\n");
+    if (signal_info != nullptr) {
+        const auto* si = static_cast<const siginfo_t*>(signal_info);
+        // si_code above 0 is a fault the kernel found; 0 or below a signal sent by a process.
+        std::snprintf(line, sizeof line, "\nSignal code: %d%s", si->si_code, si->si_code <= 0 ? " (sent by a process)" : "");
+        write_all(fd, line);
+    }
+    char thread[17] = {};
+    prctl(PR_GET_NAME, thread, 0, 0, 0);
+    std::snprintf(line, sizeof line, "\nThread: %s\n", thread);
+    write_all(fd, line);
+#if defined(__x86_64__)
+    if (context != nullptr) {
+        const auto* uc = static_cast<const ucontext_t*>(context);
+        read_maps(static_cast<unsigned long>(uc->uc_mcontext.gregs[REG_RSP]));
+        write_code_line(fd, "Code:", static_cast<unsigned long>(uc->uc_mcontext.gregs[REG_RIP]));
+        // Return addresses left on the stack, nearest first: a rough stack
+        // where backtrace() has none.
+        const auto* sp = reinterpret_cast<const unsigned long*>(uc->uc_mcontext.gregs[REG_RSP]);
+        write_all(fd, "Code addresses on the stack:\n");
+        int shown = 0;
+        for (int i = 0; i < 1024 && shown < 24 && reinterpret_cast<unsigned long>(sp + i + 1) <= stack_end; ++i) {
+            const unsigned long v = sp[i];
+            if (code_at(v) != nullptr) { write_code_line(fd, " ", v); ++shown; }
+        }
+    }
+#else
+    (void)context;
+#endif
+    write_all(fd, "Stack:\n");
     void* frames[48];
     const int count = backtrace(frames, 48);
     backtrace_symbols_fd(frames, count, fd);
     ::close(fd);
 }
 
-void on_signal(int number, siginfo_t* info, void*) {
+void on_signal(int number, siginfo_t* info, void* context) {
     const char* name = number == SIGSEGV ? "SIGSEGV (bad memory access)" : number == SIGBUS ? "SIGBUS" : number == SIGILL ? "SIGILL"
                      : number == SIGFPE ? "SIGFPE" : number == SIGABRT ? "SIGABRT (aborted)" : "signal";
-    write_report(name, info ? info->si_addr : nullptr);
+    write_report(name, info ? info->si_addr : nullptr, context, info);
     // Then the usual end: the default action for this signal.
     std::signal(number, SIG_DFL);
     std::raise(number);
