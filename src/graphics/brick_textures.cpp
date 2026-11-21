@@ -269,8 +269,8 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
         for (int k = 0; k < 3; ++k) out |= std::uint32_t(std::clamp(double((c >> (8 * k)) & 0xFFu) * f, 0.0, 255.0)) << (8 * k);
         return out;
     };
-    // The patterned tiles (more than three colours: rubble, crystals and the
-    // like) keep Sharp's look.
+    // The patterned tiles (more than three colours, such as the power piece's
+    // pattern) keep Sharp's look; the crystal tile is drawn below.
     std::vector<std::uint8_t> sharp = source;
     for (int i = 0, sw2 = sw, sh2 = sh; i < 3; ++i, sw2 *= 2, sh2 *= 2) sharp = scale2x(sharp, sw2, sh2);
     // The highlight sheet (the drop highlight laid over the bricks: black
@@ -289,10 +289,13 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
         for (int y = 0; y < tile; ++y)
             for (int x = 0; x < tile; ++x)
                 if (std::find(colours.begin(), colours.end(), colour(tx + x, y)) == colours.end()) colours.push_back(colour(tx + x, y));
-        // Rubble (the 13th tile: a dark block with a glowing orb, blurry in
-        // the original): the owner's design, 2026-11-19: a square block with
-        // bevelled edges, a circle in the middle and a small one in each
-        // corner, in the tile's own colours.
+        // A crystal (the 13th tile: a dark block with a glowing orb, blurry in
+        // the original; first called rubble): a square block with bevelled
+        // edges (the owner's design, 2026-11-19), and since 2026-11-21 (the
+        // owner: crystal-like, not too far from the original, coloured shards
+        // inside) a cut gem where the orb was and a small shard in each
+        // corner, its facets lit from the top left, some tinted, in the tile's
+        // own colours (so palettes that cycle still cycle).
         if (t == 12 && sh == tile && colours.size() >= 3) {
             std::sort(colours.begin(), colours.end(), [&](std::uint32_t a, std::uint32_t b) { return tone(a) < tone(b); });
             std::uint32_t common = colours[colours.size() / 2];
@@ -315,8 +318,46 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
                 return out;
             };
             constexpr int edge = 7, band = 11;
-            struct Circle { double x, y, r; };
-            const Circle circles[5] = {{64, 64, 27}, {30, 30, 9}, {98, 30, 9}, {30, 98, 9}, {98, 98, 9}};
+            constexpr double pi = 3.14159265358979323846;
+            // A tint for some facets: the light colour with its channels turned
+            // round (red to green to blue), a quarter of the way.
+            const std::uint32_t tint = 0xFF000000u | ((light & 0xFFu) << 8) | (((light >> 8) & 0xFFu) << 16) | ((light >> 16) & 0xFFu);
+            // How lit a point is (0 dark to 1 light), or -1 outside the gem and shards.
+            // The gem: an octagon (radius 31), its table an octagon of radius 14;
+            // between them eight facets, each split in two, lit by which way it
+            // faces (light from the top left). Shards: a long diamond in each
+            // corner, pointing to the middle, its two halves light and dark.
+            const auto facet = [&](double px, double py, bool& tinted) -> double {
+                tinted = false;
+                const double dx = px - 64.0, dy = py - 64.0, r = std::sqrt(dx * dx + dy * dy);
+                const double a = std::atan2(dy, dx);
+                // The octagon's edge distance at this angle (radius to a corner R).
+                const auto oct = [&](double R) {
+                    const double sector = std::fmod(a + 2.0 * pi + pi / 8.0, pi / 4.0) - pi / 8.0;
+                    return R * std::cos(pi / 8.0) / std::cos(sector);
+                };
+                if (r <= oct(31.0)) {
+                    if (r <= oct(14.0)) return 0.78 + 0.12 * (-(dx + dy) / 28.0);  // the table, brighter to the top left
+                    const int k = int(std::floor((a + 2.0 * pi + pi / 8.0) / (pi / 4.0))) % 8;  // which facet
+                    const double mid = k * pi / 4.0;
+                    const double half = std::fmod(a - mid + 3.0 * pi, 2.0 * pi) - pi > 0 ? 1.0 : -1.0;
+                    const double nx = std::cos(mid + half * 0.18), ny = std::sin(mid + half * 0.18);
+                    tinted = (k % 3) == 1;
+                    return std::clamp(0.5 + 0.45 * (-0.7071 * nx - 0.7071 * ny) + 0.06 * half, 0.05, 0.98);
+                }
+                const double corners[4][2] = {{28, 28}, {100, 28}, {28, 100}, {100, 100}};
+                for (const auto& c : corners) {
+                    const double ux = (64.0 - c[0]) / 50.9, uy = (64.0 - c[1]) / 50.9;  // towards the middle
+                    const double qx = px - c[0], qy = py - c[1];
+                    const double along = qx * ux + qy * uy, across = -qx * uy + qy * ux;
+                    if (std::abs(along) / 13.0 + std::abs(across) / 6.0 > 1.0) continue;
+                    // Its halves face either side of the diagonal.
+                    const double nx = across > 0 ? -uy : uy, ny = across > 0 ? ux : -ux;
+                    tinted = c[0] > 64.0 && c[1] < 64.0;
+                    return std::clamp(0.5 + 0.45 * (-0.7071 * nx - 0.7071 * ny) + (along > 0 ? -0.08 : 0.08), 0.05, 0.98);
+                }
+                return -1.0;
+            };
             for (int y = 0; y < big; ++y)
                 for (int x = 0; x < big; ++x) {
                     double rgb[3] = {0, 0, 0};
@@ -335,14 +376,10 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
                                     const double nearest = std::min({up, left, down, right});
                                     c = scaled(c, nearest == up ? 1.24 : nearest == left ? 1.12 : nearest == down ? 0.78 : 0.88);
                                 }
-                                for (const Circle& o : circles) {
-                                    const double dx = (px - o.x) / o.r, dy = (py - o.y) / o.r, d = std::sqrt(dx * dx + dy * dy);
-                                    if (d > 1.0) continue;
-                                    // A dome lit from the top left, sitting on the block (no rim:
-                                    // the owner, 2026-11-19).
-                                    const double lit = std::clamp(0.55 - 0.5 * (0.7 * dx + 0.7 * dy) + 0.25 * (1.0 - d * d), 0.0, 1.0);
+                                bool tinted = false;
+                                if (const double lit = facet(px, py, tinted); lit >= 0.0) {
                                     c = lit < 0.5 ? mix(dark, common, lit * 2.0) : mix(common, light, (lit - 0.5) * 2.0);
-                                    break;
+                                    if (tinted) c = mix(c, tint, 0.28);
                                 }
                             }
                             for (int k = 0; k < 3; ++k) rgb[k] += double((c >> (8 * k)) & 0xFFu);
