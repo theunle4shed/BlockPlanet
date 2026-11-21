@@ -320,12 +320,14 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             // Combos and earning a power-up together (the owner, 2026-11-21: the
             // magic lesson makes a big combo anyway), and essential: in The Basics.
             {"combos_magic", "Combos and Magic", "command:new_lesson:combos", "Combos top up your magic meter: fill it to unlock a power-up.", "\uE417", 104, P},
+            // Rubble turned into pieces for a combo, then a power-up freed from a
+            // mystery block (the owner's idea, 2026-11-21; Mystery Blocks merged in).
+            {"rubble", "Rubble and Mystery Blocks", "command:new_lesson:rubble", "Turn rubble into pieces for bigger combos, and free the power-up in a mystery block.", "\uE242", 105, P},
         }},
         {"group_faster", "Getting Faster", {
             // The six power-ups as one lesson (the owner, 2026-11-21): for now the
             // six lessons in turn (each one's Next leads to the next).
             {"power_ups", "Power-Ups", "command:magic_lesson:0", "What each power-up does: the Firecracker, Dynamite, Magnet, Atom, Bomb and Ray Gun.", "\uE417", 0, P},
-            {"mystery", "Mystery Blocks", "", "The flickering yellow and red blocks that give magic.", "", -1, N},
         }},
         {"group_scoring", "Scoring Big", {
             {"fuse", "Power Pieces and Fuse Combos", "", "Slide a breaking power piece into a match to start a new combo.", "", -1, N},

@@ -155,3 +155,19 @@ Combos and earning a power-up in one lesson (the owner: the magic lesson makes a
 **To check first**: whether a 20+ combo always gives the same power-up or a random one; whether smaller combos part-fill the magic meter (a line if so); and the magic lessons' known issues (a second power-up arriving after one is used; the wrong one given).
 
 **Combos and Magic, built (2026-11-21), the owner's layout:** an 8 x 8 pit with the white floor, one wall high, and three separate stacks in it, each one shape piled five high (blue squares, red Ts, yellow bars). A drop on top breaks the stack as one combo going down: five and the dropped piece, six, which tops up the meter (checked in play: x6, the meter +1). The meter starts at 11 of 14, so the three stacks fill it. Sliding is off. The pieces come blue, red, yellow. Done once all three are cleared: the two ending lines, then Complete.
+
+## Rubble and Mystery Blocks (built 2026-11-21, from the owner's idea)
+
+The fourth lesson of The Basics (Mystery Blocks merged in; the owner asked for a name, this is the suggestion). Cell values and what B and sliding do: `docs/research/blockplanet-game-state.md` (Rubble).
+
+**Part 1, pages:** "Rubble and Mystery Blocks": rubble is the single dark blocks with a glowing orb, often in patches between pieces, and never matches anything ([A]) / but you can turn it into pieces, to join groups into bigger combos. "How to Convert Rubble": move the shadow over rubble the same shape as your piece ([A]) / press [B] to turn it into a piece like yours. "Convert the Rubble": three yellow pieces split by two lines of rubble; convert both, then drop to break them all in one combo. [A] Try it, [B] Show me.
+
+**Part 1, board:** a pit with the white floor and a column across the yellow bars: bar, rubble line, bar, rubble line, bar; the shadow starts on the floor beside the middle bar. Converting both lines and dropping makes a combo of 6 (the five pieces and the one dropped; the owner's "combo of 5" counted the pieces on the board). Fewer than 6 (a line not converted): "Only N broke…" and the board is set up again. The panel counts the rubble lines left.
+
+**Part 2, pages:** "Mystery Blocks": it flickers yellow and red, hidden among the pieces and rubble, with a power-up inside ([A]) / free it with a combo right next to it, or by sliding a piece into it. "Find the Power-Up": a mystery block is buried in this rubble; hold [B] on the yellow piece and slide it through the rubble to reach it. Try it, Show me.
+
+**Part 2, board:** a yellow bar with three lines of rubble beyond it, a mystery block in the middle of the middle line. Sliding the bar through frees it; done when a power-up is held. Dropping is off in this part. Then "Well Done": you found a power-up! ([A]) / press [Magic] to use it; the Power-Ups lessons show what each one does. Then "Rubble and Mystery Blocks Complete".
+
+**Every reset lays the board out from where the shadow is** (the board moves, not the camera), three cells along the bars from it, on the side away from the board's seam.
+
+**To decide (the owner):** the name; whether the mystery block should give a set power-up (it gave the Firecracker when none was held); whether Part 2 should also show a combo next to a mystery block freeing it.
