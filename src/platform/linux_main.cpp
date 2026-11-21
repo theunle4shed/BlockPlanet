@@ -220,6 +220,10 @@ int drop_lesson_phase = -1;
 // original Training's (index 25, its fixed table 0x800E949C) in place of 1:1's
 // (Rescue's table by episode, 0x800E94C4); put back once in play (-1: not changed).
 int drop_lesson_saved_background = -1;
+// A new lesson's stage (Casual 1:1) waiting to start: tried each frame until
+// the game takes it (the owner, 2026-11-21: once a lesson left him on Casual's
+// episode list, the start refused while the game was still busy).
+std::optional<std::chrono::steady_clock::time_point> lesson_launch_pending;
 std::optional<std::chrono::steady_clock::time_point> drop_lesson_at;
 int drop_lesson_home[2] = {0, 0};    // the cursor's cell as the lesson starts
 int drop_lesson_target[2] = {0, 0};  // the hole beside the pair
@@ -7504,8 +7508,12 @@ bool handle_profile_command(const std::string& command) {
                     if (drop_lesson_saved_background < 0) drop_lesson_saved_background = guest::load16(rd, 0x800E94C4u);
                     guest::store16(rd, 0x800E94C4u, guest::load16(rd, 0x800E949Cu));
                 }
-                blockplanet::ui::send_command("casual");
-                blockplanet::ui::send_command("stage:1:1");
+                // Casual 1:1 started directly, not through Casual's episode list
+                // (which showed if the start was refused).
+                menu_lines = false;
+                menu_variant = PlayVariant::Casual;
+                campaign_source.clear();
+                lesson_launch_pending = std::chrono::steady_clock::now();
                 continue;
             }
             if (*command == "new_lesson:drop") {
@@ -7575,6 +7583,38 @@ bool handle_profile_command(const std::string& command) {
                 continue;
             }
             if (const auto mode = launch_mode_for_command(*command)) launch_mode(*mode);
+        }
+        // A new lesson's stage: started as stage:1:1 does, again each frame
+        // until the game takes it (10 s at most).
+        if (lesson_launch_pending && game_option_applier && guest_rdram != nullptr) {
+            const auto now_l = std::chrono::steady_clock::now();
+            static std::optional<std::chrono::steady_clock::time_point> tried;
+            if (launching() || slide_lesson_phase > 0) {
+                // Started, or the lesson took over a stage already in play.
+                lesson_launch_pending.reset(), tried.reset();
+            } else if (now_l - *lesson_launch_pending > std::chrono::seconds(10)) {
+                std::fprintf(stdout, "{\"event\":\"lesson_launch\",\"status\":\"gave_up\"}\n");
+                std::fflush(stdout);
+                lesson_launch_pending.reset(), tried.reset();
+                show_error("The lesson could not start. Please try again.");
+            } else if (!tried || now_l - *tried > std::chrono::milliseconds(500)) {
+                if (tried) {
+                    std::fprintf(stdout, "{\"event\":\"lesson_launch\",\"status\":\"retry\"}\n");
+                    std::fflush(stdout);
+                }
+                tried = now_l;
+                menu_lines = false;
+                menu_variant = PlayVariant::Casual;
+                continue_mode.reset();
+                attack_episode_results.reset();
+                single_stage = std::pair{1, 1};
+                play_variant = menu_variant;
+                single_stage_quit_at.reset();
+                single_stage_result.reset();
+                game_option_applier->choose_start(1, 1);
+                launch_mode(LaunchMode::Rescue);
+                if (launching()) lesson_launch_pending.reset(), tried.reset();
+            }
         }
         // A profile change's cartridge save has been swapped: a profile
         // deleted while it was playing can go now.
@@ -9212,6 +9252,11 @@ bool handle_profile_command(const std::string& command) {
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();
                 single_stage_quitting = true;
+                // A lesson's end: the grid flies in over the way out, as Exit's
+                // does (the owner, 2026-11-21: the game's old menus showed for a
+                // moment before the lesson's Complete panel).
+                if (pending_results && pending_results->lesson >= 0 && !grid_quit_at)
+                    grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = false;
                 pause_bridge.request_pause(std::chrono::steady_clock::now());
             }
             if (single_stage_quitting && pause_bridge.hide_original()) {
