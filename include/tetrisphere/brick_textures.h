@@ -32,6 +32,9 @@ struct Draw {
     std::uint16_t width = 0, height = 0;
     std::uint32_t tlut = 0;
     std::array<std::uint8_t, 4096> tmem{};
+    // Where in RDRAM the draw's palette slot 8 was loaded from (the crystal's
+    // sparkle mark, with_crystal_phase), or 0 if not known.
+    std::uint32_t slot8_source = 0;
 };
 
 // Reads a big-endian 32-bit word of guest memory at a physical address.
@@ -71,6 +74,15 @@ enum class Style { Sharp, Crafted };
 // 2026-11-19: square bevelled corners, not rounded), with a gentle light from
 // above. Patterned tiles keep Sharp's look. RGBA8, 8 times larger.
 std::vector<std::uint8_t> crafted(const Draw& draw);
+
+// The crystal's sparkle (Crafted): the frame is marked in palette slot 8's two
+// lowest blue bits (an invisible change; slot 8 is used only by the crystal tile
+// and one other patterned tile), stepped by BlockPlanet every few seconds, so
+// each frame is its own texture. with_crystal_phase gives the same draw marked
+// as another frame (to make every frame's replacement at once);
+// has_crystal_tile, whether a draw's sheet holds the crystal tile.
+Draw with_crystal_phase(const Draw& draw, int phase);
+bool has_crystal_tile(const Draw& draw);
 
 // The replacement for a draw in a style: 8 times larger, mipmaps down to the
 // original size, as a DDS file.

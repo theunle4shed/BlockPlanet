@@ -1,5 +1,7 @@
 #include "tetrisphere/rt64_context.h"
 #include <tuple>
+#include <chrono>
+#include <map>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -558,6 +560,7 @@ public:
     std::set<std::uint64_t> bricks_done_;
     ::tetrisphere::bricks::Style bricks_style_ = ::tetrisphere::bricks::Style::Sharp;
     std::string bricks_current_;
+    std::map<std::uint32_t, unsigned> crystal_slots_;  // crystal palette slot 8 addresses, by the frame last seen
     // The style's pack: "original" none; "sharp" and "crafted" each their own
     // folder in the data folder, filled as the bricks are drawn.
     // BLOCKPLANET_BRICKS overrides the setting, for testing.
@@ -567,6 +570,7 @@ public:
         if (style == bricks_current_) return;
         bricks_current_ = style;
         bricks_done_.clear();
+        crystal_slots_.clear();
         if (style == "original") {
             if (bricks_ready_) app_->textureCache->loadReplacementDirectories({});
             bricks_ready_ = false;
@@ -596,6 +600,31 @@ public:
             if (style) sharp_bricks_apply(*style);
         }
         if (!bricks_ready_ || research_rdram_ == nullptr) return;
+        // The crystal's sparkle (Crafted; the owner, 2026-11-21): every 3.2 s
+        // three short frames (a small star, a larger one, the star fading),
+        // marked in the crystal palette's slot 8 (two invisible bits), where the
+        // walk below last saw it loaded from. Each frame is its own texture, all
+        // made as soon as the sheet is seen. Only the look changes: the game
+        // tells blocks apart by their cell values.
+        static unsigned frames_seen = 0;
+        ++frames_seen;
+        if (bricks_style_ == ::tetrisphere::bricks::Style::Crafted && !crystal_slots_.empty()) {
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() % 3200;
+            const std::uint32_t phase = ms < 2700 ? 0u : ms < 2830 ? 1u : ms < 3030 ? 2u : 3u;
+            for (auto it = crystal_slots_.begin(); it != crystal_slots_.end();) {
+                if (frames_seen - it->second > 120u) {  // not seen for two seconds: no longer a palette we know
+                    it = crystal_slots_.erase(it);
+                    continue;
+                }
+                std::uint32_t word;
+                std::uint8_t* at = research_rdram_ + (it->first & 0x007FFFFCu);
+                std::memcpy(&word, at, 4);
+                const std::uint32_t shift = (it->first & 2u) ? 0u : 16u;  // the half the colour is in (words big-endian)
+                word = (word & ~(0x6u << shift)) | ((phase << 1) << shift);
+                std::memcpy(at, &word, 4);
+                ++it;
+            }
+        }
         // Every 15th frame: new brick colours come with a stage or a new
         // piece, and are sharpened within a quarter of a second. Walking every
         // frame cost 0.46 ms a frame on the test machine (Rescue 1:1).
@@ -603,7 +632,7 @@ public:
         if (frame++ % 15u != 0u) return;
         const std::uint8_t* m = research_rdram_;
         const auto read32 = [m](std::uint32_t at) { std::uint32_t v; std::memcpy(&v, m + (at & 0x007FFFFCu), 4); return v; };
-        ::tetrisphere::bricks::find_draws(read32, task->t.data_ptr, [&](const ::tetrisphere::bricks::Draw& d) {
+        const auto add = [&](const ::tetrisphere::bricks::Draw& d) {
             RT64::LoadTile tile{};
             tile.fmt = d.tile.fmt;
             tile.siz = d.tile.siz;
@@ -616,9 +645,10 @@ public:
             // again rather than an older file reused (Crafted 2: square, bevelled; 3:
             // the crystal drawn as a block with circles; 4: the circles without rims; 5: outlines from the
             // palette indices, so palettes without a darker outline get one; 6: the highlight sheet left as the original;
-            // 7: the crystal tile (first called rubble) drawn as a cut gem with shards; 8: in fixed colours).
+            // 7: the crystal tile (first called rubble) drawn as a cut gem with shards; 8: in fixed colours;
+            // 9: with its sparkle frames; 10: a larger, whiter sparkle).
             static const bool mark = std::getenv("BLOCKPLANET_BRICK_MARK") != nullptr;  // research
-            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? (mark ? 99 : 8) : 1;
+            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? (mark ? 99 : 10) : 1;
             char name[48];
             std::snprintf(name, sizeof name, "%016llx-v%d.dds", static_cast<unsigned long long>(hash), version);
             const auto path = bricks_dir_ / name;
@@ -632,6 +662,14 @@ public:
             std::fprintf(stdout, "{\"event\":\"sharp_brick\",\"hash\":\"%016llx\",\"palette\":%u,\"made\":%s,\"added\":%s}\n",
                          static_cast<unsigned long long>(hash), unsigned(d.tile.palette), made ? "true" : "false", added ? "true" : "false");
             std::fflush(stdout);
+        };
+        ::tetrisphere::bricks::find_draws(read32, task->t.data_ptr, [&](const ::tetrisphere::bricks::Draw& d) {
+            if (bricks_style_ == ::tetrisphere::bricks::Style::Crafted && d.slot8_source != 0u && ::tetrisphere::bricks::has_crystal_tile(d)) {
+                crystal_slots_[d.slot8_source] = frames_seen;
+                for (int phase = 0; phase < 4; ++phase) add(::tetrisphere::bricks::with_crystal_phase(d, phase));
+            } else {
+                add(d);
+            }
         });
     }
 

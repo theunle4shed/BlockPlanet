@@ -18,6 +18,7 @@ void find_draws(const Read32& read32, std::uint32_t list, const std::function<vo
     std::array<Tile, 8> tiles{};
     std::array<std::uint32_t, 16> segments{};
     std::uint32_t image = 0, image_siz = 0, image_width = 1;
+    std::uint32_t tlut_image = 0, tlut_to = 0, tlut_count = 0;  // the last palette load (G_LOADTLUT)
     std::uint32_t other_h = 0;
     std::uint32_t size_uls = 0, size_ult = 0, size_lrs = 0, size_lrt = 0;  // tile 0's size
     const auto resolve = [&](std::uint32_t a) { return (segments[(a >> 24) & 0xFu] + (a & 0x00FFFFFFu)) & 0x007FFFFFu; };
@@ -75,6 +76,7 @@ void find_draws(const Read32& read32, std::uint32_t list, const std::function<vo
                 const Tile& t = tiles[(w1 >> 24) & 7u];
                 const std::uint32_t count = ((w1 >> 14) & 0x3FFu) + 1u;
                 const std::uint32_t to = std::uint32_t(t.tmem) * 8u;
+                tlut_image = image, tlut_to = to, tlut_count = count;
                 for (std::uint32_t i = 0; i < count && i < 256u; ++i) {
                     const std::uint8_t hi = byte(image + 2u * i), lo = byte(image + 2u * i + 1u);
                     for (std::uint32_t k = 0; k < 4; ++k) {
@@ -95,6 +97,10 @@ void find_draws(const Read32& read32, std::uint32_t list, const std::function<vo
                     d.height = std::uint16_t(height);
                     d.tlut = other_h & 0xC000u;
                     d.tmem = tmem;
+                    {
+                        const std::uint32_t at = 0x800u + std::uint32_t(t.palette) * 0x80u + 8u * 8u;  // slot 8 in TMEM
+                        if (tlut_count != 0u && at >= tlut_to && (at - tlut_to) / 8u < tlut_count) d.slot8_source = tlut_image + 2u * ((at - tlut_to) / 8u);
+                    }
                     found(d);
                 }
                 break;
@@ -254,6 +260,25 @@ std::uint32_t palette_colour(const Draw& d, std::uint32_t index) {
     return five((c >> 11) & 31u) | five((c >> 6) & 31u) << 8 | five((c >> 1) & 31u) << 16 | ((c & 1u) ? 0xFF000000u : 0u);
 }
 
+// The crystal's sparkle frame, marked in palette slot 8 (used only by the
+// crystal tile and one other patterned tile): its two lowest blue bits.
+constexpr std::uint32_t crystal_slot = 8;
+
+Draw with_crystal_phase(const Draw& d, int phase) {
+    Draw out = d;
+    const std::uint32_t p = 0x800u + std::uint32_t(d.tile.palette) * 0x80u + crystal_slot * 8u;
+    // The TLUT entry, repeated four times in TMEM (as the hardware loads it).
+    for (std::uint32_t k = 0; k < 8u; k += 2u) {
+        const std::uint32_t at = (p + k) & tmem_mask;
+        std::uint16_t c = std::uint16_t(out.tmem[at] << 8 | out.tmem[(at + 1u) & tmem_mask]);
+        c = std::uint16_t((c & ~0x6u) | ((std::uint32_t(phase) & 3u) << 1));
+        out.tmem[at] = std::uint8_t(c >> 8), out.tmem[(at + 1u) & tmem_mask] = std::uint8_t(c);
+    }
+    return out;
+}
+
+bool has_crystal_tile(const Draw& d) { return d.height == 16 && d.width >= 13 * 16; }
+
 std::vector<std::uint8_t> crafted(const Draw& d) {
     const std::vector<std::uint8_t> source = decode(d);
     const int sw = d.width, sh = d.height, scale = 8, tile = 16, big = tile * scale;
@@ -315,6 +340,28 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
             // (So stages whose crystal palette cycles no longer shimmer.)
             const std::uint32_t dark = 0xFF022A2Au, light = 0xFF12DCE2u;  // (ABGR) #2a2a02, #e2dc12
             common = 0xFF22222Au;                                          // #2a2222
+            // The sparkle (the owner, 2026-11-21: a glimmer every few seconds):
+            // the frame is marked in palette slot 8's lowest blue bits
+            // (crystal_phase); 0 none, 1 a small star on the gem, 2 a larger one
+            // and a glint on the top-right shard, 3 the star fading.
+            const int phase = int((palette_colour(d, crystal_slot) >> 19) & 3u);
+            const auto star = [](double px, double py, double cx, double cy, double size) {
+                const double dx = std::abs(px - cx), dy = std::abs(py - cy);
+                const auto ray = [&](double along, double across) {  // a thin ray fading to its tip
+                    return along < size ? std::max(0.0, 1.0 - along / size) * std::max(0.0, 1.0 - across / (2.0 + 0.12 * size)) : 0.0;
+                };
+                const double d1 = (dx + dy) * 0.7071, d2 = std::abs(dx - dy) * 0.7071;
+                const double glow = std::max(0.0, 1.0 - std::sqrt(dx * dx + dy * dy) / (size * 0.35));
+                return std::min(1.0, std::max({ray(dx, dy), ray(dy, dx), 0.6 * ray(d1 * 1.6, d2), 0.6 * ray(d2 * 1.6, d1)}) + 1.3 * glow);
+            };
+            const auto sparkle = [&](double px, double py) {
+                switch (phase) {
+                case 1: return star(px, py, 54, 52, 26);
+                case 2: return std::max(star(px, py, 54, 52, 46), star(px, py, 100, 28, 20));
+                case 3: return 0.6 * star(px, py, 54, 52, 32);
+                default: return 0.0;
+                }
+            };
             const auto mix = [](std::uint32_t a, std::uint32_t b, double f) {
                 std::uint32_t out = 0xFF000000u;
                 for (int k = 0; k < 3; ++k) {
@@ -387,6 +434,7 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
                                     c = lit < 0.5 ? mix(dark, common, lit * 2.0) : mix(common, light, (lit - 0.5) * 2.0);
                                     if (tinted) c = mix(c, tint, 0.28);
                                 }
+                                if (const double glint = sparkle(px, py); glint > 0.0) c = mix(c, 0xFFFFFFFFu, glint);
                             }
                             for (int k = 0; k < 3; ++k) rgb[k] += double((c >> (8 * k)) & 0xFFu);
                         }
