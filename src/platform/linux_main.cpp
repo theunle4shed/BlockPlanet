@@ -3261,7 +3261,8 @@ void publish_game_text() {
                         panel.hint = buttons("%A%") + " Next";
                     } else if (ph == 30) {
                         heading("Top Up Your Meter");
-                        para("Drop your piece on the top group to break all six. Each combo of 6 or more tops up your magic meter.");
+                        para("Drop your piece on the stack of the same shape: the whole stack breaks, six pieces in all. "
+                             "Each combo of 6 or more tops up your magic meter.");
                         para("Your meter is nearly full: three combos will fill it.");
                         panel.hint = buttons("%A%") + " Try it\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + buttons("%B%") +
                                      (combos_watched ? " Show me again" : " Show me");
@@ -3272,7 +3273,7 @@ void publish_game_text() {
                         panel.hint = buttons("%A%") + (combos_end_page >= 1 ? " Done" : " Next");
                     } else {
                         heading(ph == 31 || (ph == 33 && combos_demo_running) ? "Watch" : "Your Turn");
-                        para("Drop on the top group: six break, and your magic meter tops up.");
+                        para("Drop on the matching stack: six break, and your magic meter tops up.");
                         // (The game empties the meter as it gives the power-up.)
                         if (meter_now == 0 && combos_step >= 2 && ph == 33) para("Magic meter full! A power-up is unlocked.");
                         else para("Magic meter: " + std::to_string(meter_now) + " of " + std::to_string(meter_full));
@@ -4783,55 +4784,49 @@ std::vector<std::pair<int, int>> compact_group(int index, int count) {
     return group;
 }
 
-// A pit dug into a raised floor (Combos and Magic): walls in layers 1 to 4
-// everywhere but the pit (x0, y0, w, h), where they reach only up to the layer
-// below `group_layer`; the group's pieces (shape entry `index`, at `origins`)
-// lie at `group_layer`. A spare piece far round the sphere keeps the board
-// from emptying. The faces, columns and the core as build_pit_board's.
-void build_layer_pit(int x0, int y0, int w, int h, int group_layer, int index, const std::vector<std::pair<int, int>>& origins) {
+// Stacks in a shallow pit (Combos and Magic, the owner's layout, 2026-11-21):
+// walls one layer high round the pit (x0, y0, w, h), its floor the white
+// core, and each stack a piece of one shape piled `height` high at its
+// origin (so a drop on top makes a combo going down). A spare piece far
+// round the sphere keeps the board from emptying.
+void build_stack_pit(int x0, int y0, int w, int h, int height, const std::vector<std::pair<int, std::pair<int, int>>>& stacks) {
     auto* rd = const_cast<std::uint8_t*>(guest_rdram);
     if (rd == nullptr) return;
-    // Four layers of walls, the deepest group on a floor of walls at layer 1:
-    // the core is never opened (a wide open patch of it counted as the stage
-    // cleared, and the core's picture showed mid-lesson).
-    constexpr int surface = 4;
     constexpr std::uint32_t flat_wall = 0x807F8600u;
     {
         const std::int16_t flat[8] = {1, 14, 14, 14, 1, 1, 14, 1};
         for (int i = 0; i < 48; ++i) guest::store16(rd, flat_wall + 2u * std::uint32_t(i), std::uint16_t(flat[i % 8]));
     }
-    const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(index));
     const std::uint32_t values = guest::load32(rd, 0x800E44D0u), masks = guest::load32(rd, 0x800E44D4u),
                         entries = guest::load32(rd, 0x800E44D8u), columns = guest::load32(rd, 0x800E44DCu);
-    const std::int16_t v0 = std::int16_t(guest::load16(rd, rec));
-    int layout[9];
-    for (int k = 0; k < 9; ++k) layout[k] = std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(k)));
     const auto cell = [](int x, int y) { return ((y % 32 + 32) % 32) * 32 + ((x % 32 + 32) % 32); };
-    // Each column's height (its top filled layer), and what each layer holds.
-    std::vector<int> top(1024, surface);
-    for (int y = 0; y < h; ++y)
-        for (int x = 0; x < w; ++x) top[std::size_t(cell(x0 + x, y0 + y))] = group_layer - 1;
+    std::vector<int> top(1024, 1);
     std::vector<std::array<std::int16_t, 9>> value(1024);
     std::vector<std::array<std::uint32_t, 9>> entry(1024);
-    for (int c = 0; c < 1024; ++c)
-        for (int layer = 1; layer < 9; ++layer) {
-            const bool wall = layer <= top[std::size_t(c)];
-            value[std::size_t(c)][std::size_t(layer)] = wall ? 423 : 0;
-            entry[std::size_t(c)][std::size_t(layer)] = wall ? flat_wall : 0;
+    for (int c = 0; c < 1024; ++c) value[std::size_t(c)][1] = 423, entry[std::size_t(c)][1] = flat_wall;
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            const int c = cell(x0 + x, y0 + y);
+            top[std::size_t(c)] = 0, value[std::size_t(c)][1] = 0, entry[std::size_t(c)][1] = 0;
         }
-    auto all = origins;
-    all.push_back({x0 + w / 2 + 16, y0 + h / 2});  // the spare, on the far side
-    for (std::size_t g = 0; g < all.size(); ++g) {
-        const int layer = g + 1 == all.size() ? surface + 1 : group_layer;
-        for (int x = 0; x < 3; ++x)
-            for (int y = 0; y < 3; ++y) {
-                const int n = layout[x * 3 + y];
-                if (n <= 0) continue;
-                const int c = cell(all[g].first + x - 1, all[g].second + y - 1);
+    auto all = stacks;
+    all.push_back({stacks.empty() ? 0 : stacks.front().first, {x0 + w / 2 + 16, y0 + h / 2}});  // the spare
+    for (std::size_t s2 = 0; s2 < all.size(); ++s2) {
+        const int index = all[s2].first;
+        const std::uint32_t rec = guest::load32(rd, 0x8014CBC8u + 4u * std::uint32_t(index));
+        const std::int16_t v0 = std::int16_t(guest::load16(rd, rec));
+        const bool spare = s2 + 1 == all.size();
+        for (int q = 0; q < 9; ++q) {
+            const int n = std::int16_t(guest::load16(rd, rec + 0xA + 2u * std::uint32_t(q)));
+            if (n <= 0) continue;
+            const int c = cell(all[s2].second.first + q / 3 - 1, all[s2].second.second + q % 3 - 1);
+            const int from = spare ? 2 : 1, to = spare ? 2 : height;
+            for (int layer = from; layer <= to; ++layer) {
                 value[std::size_t(c)][std::size_t(layer)] = std::int16_t(v0 + n - 1);
                 entry[std::size_t(c)][std::size_t(layer)] = rec + 0x78u + 96u * std::uint32_t(n - 1);
-                top[std::size_t(c)] = std::max(top[std::size_t(c)], layer);
             }
+            top[std::size_t(c)] = std::max(top[std::size_t(c)], to);
+        }
     }
     for (int c = 0; c < 1024; ++c) {
         const int x = c % 32, y = c / 32, t = top[std::size_t(c)];
@@ -4841,7 +4836,6 @@ void build_layer_pit(int x0, int y0, int w, int h, int group_layer, int index, c
             std::uint8_t m = 0;
             if (value[std::size_t(c)][std::size_t(layer)] != 0) {
                 if (layer == t) m |= 16;
-                // A side shows where the neighbouring column is lower.
                 if (top[std::size_t(cell(x + 1, y))] < layer) m |= 8;
                 if (top[std::size_t(cell(x - 1, y))] < layer) m |= 4;
                 if (top[std::size_t(cell(x, y + 1))] < layer) m |= 2;
@@ -4875,31 +4869,34 @@ std::uint16_t combos_demo_buttons() {
     return within < 150 ? combos_held : 0;
 }
 
-// Combos and Magic's board for the current layer, built on the game's thread:
-// the same pit each time, one layer deeper (blue at the top, then red, then
-// yellow on the floor), the queue set to the layer's shape and the ones after.
+// Combos and Magic's board (the owner's layout, 2026-11-21): an 8 x 8 pit with
+// the white floor, one wall high, and the stacks still to break, each a shape
+// piled five high (five and the dropped piece: a combo of six, which tops up
+// the meter), apart from each other in a triangle: the blue squares and the
+// red Ts side by side, the yellow bars beyond them, the shadow below.
+// Built on the game's thread; the queue set to the stacks' shapes in order.
 void combos_build_step() {
     tetrisphere::minefield_sphere::queue_game_thread_job([](std::uint8_t* g) {
-        // The three groups, laid out once from the anchor; the pit round all of them.
-        std::vector<std::pair<int, int>> groups[3];
-        int x0 = 99, y0 = 99, x1 = -99, y1 = -99;
-        for (int k = 0; k < 3; ++k) {
-            groups[k] = compact_group(combos_shapes[k], 5);
+        // Each stack's place, by its shape's outline's top-left corner in the pit.
+        // In the pit's upper half on screen (its higher rows), the shadow
+        // starting below them: the stacks stand tall, and low in the view they
+        // were half behind the HUD's row. (Higher columns are on screen left.)
+        constexpr int corner[3][2] = {{5, 4}, {1, 4}, {3, 7}};
+        const int x0 = combos_anchor[0] - 4, y0 = combos_anchor[1] - 1;
+        std::vector<std::pair<int, std::pair<int, int>>> stacks;
+        for (int k = std::clamp(combos_step, 0, 3); k < 3; ++k) {
             const std::uint32_t rec = guest::load32(g, 0x8014CBC8u + 4u * std::uint32_t(combos_shapes[k]));
-            for (auto& [ox, oy] : groups[k]) {
-                ox += combos_anchor[0], oy += combos_anchor[1];
-                for (int q = 0; q < 9; ++q)
-                    if (std::int16_t(guest::load16(g, rec + 0xA + 2u * std::uint32_t(q))) > 0) {
-                        const int cx = ox + q / 3 - 1, cy = oy + q % 3 - 1;
-                        x0 = std::min(x0, cx), y0 = std::min(y0, cy), x1 = std::max(x1, cx), y1 = std::max(y1, cy);
-                    }
-            }
+            int ax = 9, ay = 9;
+            for (int q = 0; q < 9; ++q)
+                if (std::int16_t(guest::load16(g, rec + 0xA + 2u * std::uint32_t(q))) > 0) ax = std::min(ax, q / 3), ay = std::min(ay, q % 3);
+            // A cell sits at origin + (x - 1, y - 1): the outline's corner at origin + (ax - 1, ay - 1).
+            const int ox = x0 + corner[k][0] - (ax - 1), oy = y0 + corner[k][1] - (ay - 1);
+            stacks.push_back({combos_shapes[k], {ox, oy}});
+            if (k == combos_step) combos_target[0] = ox, combos_target[1] = oy;
         }
-        const int k = std::clamp(combos_step, 0, 2);
-        build_layer_pit(x0 - 1, y0 - 1, x1 - x0 + 3, y1 - y0 + 3, 4 - k, combos_shapes[k], groups[k]);
-        combos_target[0] = groups[k][0].first, combos_target[1] = groups[k][0].second;
+        build_stack_pit(x0, y0, 8, 8, 5, stacks);
         for (int q = 0; q < 4; ++q)
-            guest::store16(g, pc_ctx + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(combos_shapes[std::min(2, k + q)]));
+            guest::store16(g, pc_ctx + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(combos_shapes[std::min(2, combos_step + q)]));
         guest::store32(g, pc_ctx + 0x2408, 0);
     });
 }
@@ -6612,6 +6609,19 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
                 continue;
             }
+            if (command->rfind("research_lab:stack", 0) == 0 && guest_rdram != nullptr) {
+                // Research (2026-11-21): a stack of the piece in hand's shape,
+                // H high (default 5), two cells right of the cursor in a pit.
+                auto* rd = const_cast<std::uint8_t*>(guest_rdram);
+                int height = 5;
+                std::sscanf(command->c_str(), "research_lab:stack:%d", &height);
+                const std::uint32_t pc = 0x80110220u;
+                const int cx = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
+                const int index = std::int16_t(guest::load16(rd, pc + 0x2374));
+                guest::store16(rd, pc + 0x23E4, 16);
+                build_stack_pit(cx - 4, cy - 4, 8, 8, std::clamp(height, 1, 7), {{index, {cx - 2, cy}}});
+                continue;
+            }
             if (*command == "research_lab:gravity" && guest_rdram != nullptr) {
                 // Research (2026-11-20, the gravity lab): stage 1:1 rebuilt so
                 // one drop makes a combo that drops a piece into a second one.
@@ -7577,7 +7587,7 @@ bool handle_profile_command(const std::string& command) {
                             guest::store32(rd, 0x8014CBC8u + 8u, guest::load32(rd, 0x800E4508u + 4u * 5u));  // the red T, as Hearts
                             if (hearts_kinds_saved < 0) hearts_kinds_saved = guest::load16(rd, 0x800E44B8u);
                             guest::store16(rd, 0x800E44B8u, 3);
-                            combos_anchor[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)) + 3;  // the stack just on the shadow's left (on screen), in view
+                            combos_anchor[0] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2A));  // the pit centred on the shadow
                             combos_anchor[1] = 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E));
                             combos_step = 0;
                             combos_build_step();
@@ -7900,7 +7910,7 @@ bool handle_profile_command(const std::string& command) {
                         if (!landed) landed = now_m;
                         else if (now_m - *landed > std::chrono::milliseconds(2500)) {
                             landed.reset();
-                            combos_note = "No match there, so the piece stacked up. Drop it on the group.";
+                            combos_note = "No match there, so the piece stacked up. Drop it on the matching stack.";
                             std::fprintf(stdout, "{\"event\":\"combos_miss\",\"step\":%d,\"hand\":%d,\"queue0\":%d,\"cursor\":[%d,%d],\"target\":[%d,%d]}\n",
                                          combos_step, int(std::int16_t(guest::load16(rd, pc + 0x2386))), int(std::int16_t(guest::load16(rd, pc + 0x2374))),
                                          8 + std::int16_t(guest::load16(rd, pc + 0x2B2A)), 8 + std::int16_t(guest::load16(rd, pc + 0x2B2E)), combos_target[0], combos_target[1]);
