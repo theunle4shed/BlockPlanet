@@ -427,7 +427,7 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
     bool full = false;
     static const float outline = [] {  // research: BLOCKPLANET_MODEL_OUTLINE (model units)
         const char* v = std::getenv("BLOCKPLANET_MODEL_OUTLINE");
-        return v ? std::strtof(v, nullptr) : 110.0f;
+        return v ? std::strtof(v, nullptr) : 0.0f;
     }();
     std::uint32_t mem = at + dl_room;
     const std::uint32_t dl_end = mem - 8u;  // room for the end command
@@ -498,16 +498,20 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
             for (std::uint32_t t = 0; t < n; ++t) cmd(0xBF000000u, ((t * 3u) * 10u) << 16 | ((t * 3u + 1u) * 10u) << 8 | ((t * 3u + 2u) * 10u));
         }
     };
-    // The outline: each part a little larger, its inside faces only, dark.
-    cmd(0xB6000000u, 0x00002000u);  // back faces not culled
-    cmd(0xB7000000u, 0x00001000u);  // front faces culled
-    lights(0x1A1033, 1.0f);
-    for (const auto& part : parts) draw(part, outline);
-    // The parts, their front faces.
-    cmd(0xB6000000u, 0x00001000u);
-    cmd(0xB7000000u, 0x00002000u);
+    // The parts, drawn from both sides: the effect's draws can mirror the model
+    // (the Magnet pulling bricks showed its dark outline shell instead of its
+    // colours), which turns front faces round. The outline (each part a little
+    // larger, its inside faces, dark) is off by default for the same reason;
+    // BLOCKPLANET_MODEL_OUTLINE (model units) brings it back (research).
+    if (outline > 0.0f) {
+        cmd(0xB6000000u, 0x00002000u);
+        cmd(0xB7000000u, 0x00001000u);
+        lights(0x1A1033, 1.0f);
+        for (const auto& part : parts) draw(part, outline);
+    }
+    cmd(0xB6000000u, 0x00003000u);  // no culling
     for (const auto& part : parts) {
-        lights(part.rgb, 0.45f);
+        lights(part.rgb, 0.65f);  // (0.45 left the models dim in the effect)
         draw(part, 0.0f);
     }
     store32(rdram, at, 0xB8000000u), store32(rdram, at + 4u, 0);  // G_ENDDL
@@ -522,7 +526,7 @@ Built built[6][4];
 std::uint32_t next_free = model_memory;
 }  // namespace
 
-bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level) {
+bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source) {
     if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > 5 || level < 1 || level > 3) return false;
     const std::uint32_t end = load32(rdram, display_list_pointer);
     if (end <= start || end - start > 0x10000u) return false;
@@ -538,6 +542,9 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level) {
         }
     }
     if (first_vtx == 0) return false;
+    const std::uint32_t vtx_source = load32(rdram, first_vtx + 4u);
+    if (source != nullptr) *source = vtx_source;
+    if (only_source != 0 && vtx_source != only_source) return false;
     Built& b = built[kind][level];
     const std::uint32_t marker = 0xB10C0000u | std::uint32_t(kind) << 8 | std::uint32_t(level);
     if (b.at == 0 || load32(rdram, b.at) != marker) {  // (the light's direction as first seen)

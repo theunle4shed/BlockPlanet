@@ -211,6 +211,11 @@ void draw_box_tint(std::uint8_t* rdram, recomp_context* ctx, float centre_x, flo
 // power-up models): the display list the model helper writes for each held
 // power-up, once per kind, with the lists it calls.
 namespace {
+// Set just before the game draws the held power-up (func_800C78A0's call, the
+// hook blockplanet_held_magic_draw): the next model draw is the power-up. (The
+// core's character is drawn through the same matrix while it is held, so
+// "through the matrix while held" is not enough.)
+bool held_draw_next = false;
 std::uint32_t dl_log_start = 0;
 int dl_log_kind = -1;
 bool dl_logged[6] = {};
@@ -248,6 +253,7 @@ void dl_dump(const std::uint8_t* rdram, std::uint32_t from, std::uint32_t to, in
 }  // namespace
 
 extern "C" void blockplanet_held_magic_draw(std::uint8_t* rdram, recomp_context* ctx) {
+    held_draw_next = true;
     {
         static const bool log = std::getenv("BLOCKPLANET_MAGIC_DL_LOG") != nullptr;
         const int k = held(rdram);
@@ -388,15 +394,41 @@ bool span_open = false;
 namespace {
 std::uint32_t model3d_start = 0;
 int model3d_kind = -1;
+// After use: the flying model (and any draw of the same model), told by its
+// first vertices' source, recorded while held, for up to 10 seconds.
+std::uint32_t held_source[6] = {};
+int used_kind = -1;
+Clock::time_point used_time{};
+bool model3d_after_use = false;
+// Research (BLOCKPLANET_MAGIC_FLIGHT_LOG): after a power-up is used, each model
+// drawn through its matrix: the object, its first vertices' source, the time.
+std::uint32_t flight_log_start = 0, flight_log_model = 0;
+bool flight_log_pending = false;
+Clock::time_point flight_log_used{};
 }  // namespace
 
 extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ctx) {
     {
         static const bool on = std::getenv("BLOCKPLANET_MODELS3D") != nullptr;
         const int k = held(rdram);
-        if (on && k >= 0 && static_cast<std::uint32_t>(ctx->r7) == translation_matrix)
-            model3d_start = load32_at(rdram, 0x800F22B4u), model3d_kind = k;
+        static int last_k = -1;
+        if (on && last_k >= 0 && k < 0) used_kind = last_k, used_time = Clock::now();
+        last_k = k;
+        const bool through = static_cast<std::uint32_t>(ctx->r7) == translation_matrix;
+        if (on && k >= 0 && through && held_draw_next) model3d_start = load32_at(rdram, 0x800F22B4u), model3d_kind = k, model3d_after_use = false;
+        else if (on && k < 0 && through && used_kind >= 0 && held_source[used_kind] != 0 &&
+                 std::chrono::duration<double>(Clock::now() - used_time).count() < 10.0)
+            model3d_start = load32_at(rdram, 0x800F22B4u), model3d_kind = used_kind, model3d_after_use = true;
+        static const bool flog = std::getenv("BLOCKPLANET_MAGIC_FLIGHT_LOG") != nullptr;
+        static int prev = -1;
+        if (flog && prev >= 0 && k < 0) flight_log_used = Clock::now();
+        prev = k;
+        if (flog && k < 0 && flight_log_used != Clock::time_point{} &&
+            std::chrono::duration<double>(Clock::now() - flight_log_used).count() < 10.0 &&
+            static_cast<std::uint32_t>(ctx->r7) == translation_matrix)
+            flight_log_start = load32_at(rdram, 0x800F22B4u), flight_log_model = static_cast<std::uint32_t>(ctx->r4), flight_log_pending = true;
     }
+    held_draw_next = false;
     const std::int8_t now_held = held(rdram);
     const auto now = Clock::now();
     const auto model = static_cast<std::uint32_t>(ctx->r4);
@@ -451,10 +483,37 @@ extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ct
 }
 
 extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* ctx) {
+    if (flight_log_pending) {
+        flight_log_pending = false;
+        const std::uint32_t end = load32_at(rdram, 0x800F22B4u);
+        std::uint32_t vtx = 0, verts = 0, cmds = 0;
+        for (std::uint32_t a = flight_log_start; a < end && a < flight_log_start + 8u * 4000u; a += 8u, ++cmds) {
+            const std::uint32_t w0 = load32_at(rdram, a);
+            if ((w0 >> 24) == 0x04u) {
+                if (vtx == 0) vtx = load32_at(rdram, a + 4u);
+                verts += ((w0 >> 20) & 0xFu) + 1u;
+            }
+        }
+        std::fprintf(stdout, "{\"event\":\"magic_after_use\",\"ms\":%lld,\"model\":\"0x%08X\",\"vtx\":\"0x%08X\",\"verts\":%u,\"cmds\":%u}\n",
+                     (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - flight_log_used).count(), flight_log_model, vtx, verts, cmds);
+        std::fflush(stdout);
+    }
     if (model3d_kind >= 0) {
         // Research: the level from guest byte 0x807FFF00 (1 to 3; a poke), else 1.
         const int poked = rdram[(0x807FFF00u ^ 3u) & 0x007FFFFFu];
-        tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, poked >= 1 && poked <= 3 ? poked : 1);
+        const int level = poked >= 1 && poked <= 3 ? poked : 1;
+        std::uint32_t seen = 0;
+        bool done;
+        if (model3d_after_use)
+            done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen);
+        else
+            done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, 0, &held_source[model3d_kind]);
+        static const bool log = std::getenv("BLOCKPLANET_MODELS3D_LOG") != nullptr;  // research
+        if (log) {
+            std::fprintf(stdout, "{\"event\":\"model3d\",\"kind\":%d,\"after_use\":%d,\"done\":%d,\"held_source\":\"0x%08X\",\"seen\":\"0x%08X\"}\n",
+                         model3d_kind, int(model3d_after_use), int(done), held_source[model3d_kind], seen);
+            std::fflush(stdout);
+        }
         model3d_kind = -1;
     }
     if (dl_log_kind >= 0) {
