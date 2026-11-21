@@ -13,6 +13,17 @@ INK = '#1a1033'
 O = f'stroke="{INK}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"'
 
 
+# The level's trim (the owner, 2026-11-21: "different colour stripes", one rule
+# for levelling up; level 2 more blue): each power-up's trim (stripes, band,
+# tips, orbits, rings) is its own colour at level 1 (as the game's models), blue
+# at level 2 and gold at level 3, the same parts on every power-up.
+BLUE, GOLD = '#4fb4ff', '#ffc53d'
+
+
+def accent(level, base, yellow=False):
+    return base if level == 1 else BLUE if level == 2 else GOLD
+
+
 def fuse(d):
     # A light fuse with a dark edge, so it shows on the dark panel.
     return (f'<path d="{d}" fill="none" stroke="{INK}" stroke-width="6" stroke-linecap="round"/>'
@@ -25,12 +36,12 @@ def spark(x, y, r=8):
             f'fill="#ffd23f" {O} stroke-width="2"/>')
 
 
-def rocket(cx, cy, angle, scale=1.0):
+def rocket(cx, cy, angle, scale=1.0, stripe='#c9a2ff'):
     # A firework rocket: a purple tube with light stripes, an orange cone, a fuse.
     return (f'<g transform="translate({cx} {cy}) rotate({angle}) scale({scale})">'
             f'{fuse("M0 22 C0 27 -4 29 -6 31")}'
             f'<rect x="-7" y="-12" width="14" height="34" rx="2" fill="#8a3df0" {O}/>'
-            f'<path d="M-7 -4 L7 -9 M-7 6 L7 1 M-7 16 L7 11" stroke="#c9a2ff" stroke-width="3"/>'
+            f'<path d="M-7 -4 L7 -9 M-7 6 L7 1 M-7 16 L7 11" stroke="{stripe}" stroke-width="3"/>'
             f'<rect x="-7" y="-12" width="14" height="34" rx="2" fill="none" {O}/>'
             f'<path d="M-10 -12 L0 -28 L10 -12 Z" fill="#f28a2e" {O}/>'
             f'</g>')
@@ -40,8 +51,9 @@ def firecracker(level):
     if level == 1:
         return rocket(34, 31, 35) + spark(16, 52, 6)
     if level == 2:
-        return rocket(34, 31, 35, 1.1) + spark(15, 54, 7) + spark(55, 9, 5)
-    return (rocket(20, 38, 0, 0.85) + rocket(44, 38, 35, 0.85) + rocket(32, 34, 15, 0.95)
+        return rocket(34, 31, 35, 1.1, accent(2, '')) + spark(15, 54, 7) + spark(55, 9, 5)
+    g = accent(3, '')
+    return (rocket(20, 38, 0, 0.85, g) + rocket(44, 38, 35, 0.85, g) + rocket(32, 34, 15, 0.95, g)
             + spark(54, 8, 6) + spark(9, 12, 5))
 
 
@@ -61,7 +73,7 @@ def dynamite(level):
         fuses = (fuse("M32 22 C32 14 38 12 42 8") + spark(45, 7, 7) + fuse("M22 23 C21 17 17 15 14 12") + spark(12, 10, 6)
                  + fuse("M41 24 C44 18 50 18 54 15") + spark(56, 14, 5))
     body = ''.join(stick(x, 22 if c == '#ef4a4a' else 24, 34 if c == '#ef4a4a' else 32, c) for x, c in xs)
-    return fuses + body + f'<rect x="{min(x for x, _ in xs) - 2}" y="38" width="{max(x for x, _ in xs) - min(x for x, _ in xs) + 15}" height="7" rx="2" fill="#f2c53d" {O}/>'
+    return fuses + body + f'<rect x="{min(x for x, _ in xs) - 2}" y="38" width="{max(x for x, _ in xs) - min(x for x, _ in xs) + 15}" height="7" rx="2" fill="{accent(level, '#f2c53d', True)}" {O}/>'
 
 
 def arcs(n):
@@ -79,12 +91,12 @@ def ring_base(cx, cy, rx, ry):
             f'<ellipse cx="{cx}" cy="{cy - 1.5}" rx="{rx * 0.62}" ry="{ry * 0.5}" fill="#123d1a" stroke="#7dff8a" stroke-width="1.5"/>')
 
 
-def horseshoe(cx, top, scale):
+def horseshoe(cx, top, scale, tip='#f0d0f0'):
     # A red horseshoe opening upwards, pale pink tips (the model's colours).
     return (f'<g transform="translate({cx} {top}) scale({scale}) translate(-32 -8)">'
             f'<path d="M14 10 H26 V34 A6 6 0 0 0 38 34 V10 H50 V34 A18 18 0 0 1 14 34 Z" fill="#d93636" {O}/>'
-            f'<rect x="14" y="8" width="12" height="9" fill="#f0d0f0" {O}/>'
-            f'<rect x="38" y="8" width="12" height="9" fill="#f0d0f0" {O}/>'
+            f'<rect x="14" y="8" width="12" height="9" fill="{tip}" {O}/>'
+            f'<rect x="38" y="8" width="12" height="9" fill="{tip}" {O}/>'
             f'</g>')
 
 
@@ -95,26 +107,31 @@ def claw(d):
 
 
 def magnet(level):
-    # Level 1 a horseshoe magnet, level 2 a bigger one, level 3 the game's own
-    # form (the owner, 2026-11-21): four red claws curving up and out of a
-    # green ring, pale pink tips; all on the green ring.
+    # Level 1 a horseshoe magnet; level 2 two, fanned out (the owner: a clear
+    # step from level 1); level 3 the game's own form, four red claws that curve
+    # out and hook back in at the top, like a claw (the owner); all on the
+    # game's green ring.
     if level == 3:
         out = '<circle cx="32" cy="30" r="27" fill="#6fd3ff" fill-opacity="0.14"/>'
-        claws = ["M24 48 C18 40 12 28 9 16", "M29 47 C27 36 24 24 23 10", "M35 47 C37 36 40 24 41 10", "M40 48 C46 40 52 28 55 16"]
+        claws = ["M25 48 C15 40 8 27 11 14 C12 9 16 8 19 11",
+                 "M29 47 C24 36 20 24 23 12 C24 8 27 7 29 10",
+                 "M35 47 C40 36 44 24 41 12 C40 8 37 7 35 10",
+                 "M39 48 C49 40 56 27 53 14 C52 9 48 8 45 11"]
         out += ''.join(claw(d) for d in claws[1:3]) + ''.join(claw(d) for d in (claws[0], claws[3]))
-        for x, y in [(9, 16), (23, 10), (41, 10), (55, 16)]:
-            out += f'<circle cx="{x}" cy="{y}" r="4" fill="#f0d0f0" {O} stroke-width="2"/>'
-        return out + ring_base(32, 52, 15, 6) + arcs(3)
-    # The magnet's bend sits in the ring (the ring drawn first, behind it).
-    scale = 0.8 if level == 1 else 0.95
-    top = 11 if level == 1 else 6
-    bottom = top + 44 * scale
-    return ring_base(32, bottom, 19 if level == 1 else 22, 6.5) + horseshoe(32, top, scale) + arcs(level)
+        for x, y in [(19, 11), (29, 10), (35, 10), (45, 11)]:
+            out += f'<circle cx="{x}" cy="{y}" r="3.6" fill="{accent(3, "")}" {O} stroke-width="2"/>'
+        return out + ring_base(32, 52, 15, 6)
+    if level == 2:
+        tip = accent(2, '')
+        left = f'<g transform="rotate(-16 32 54)">{horseshoe(22, 13, 0.62, tip)}</g>'
+        right = f'<g transform="rotate(16 32 54)">{horseshoe(42, 13, 0.62, tip)}</g>'
+        return ring_base(32, 44, 24, 7) + left + right
+    return ring_base(32, 46, 19, 6.5) + horseshoe(32, 11, 0.8, accent(1, '#f0d0f0')) + arcs(1)
 
 
 def atom(level):
     orbits = 3 if level < 3 else 4
-    out = '<g fill="none" stroke="#b78cff" stroke-width="3.5">'
+    out = f'<g fill="none" stroke="{accent(level, "#b78cff")}" stroke-width="3.5">'
     for i in range(orbits):
         out += f'<ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate({i * 180 / orbits} 32 32)"/>'
     out += '</g>'
@@ -134,14 +151,14 @@ def atom(level):
     return out
 
 
-def missile(cx, cy, angle, scale=1.0, flame=1.0):
+def missile(cx, cy, angle, scale=1.0, flame=1.0, band='#d93636'):
     return (f'<g transform="translate({cx} {cy}) rotate({angle}) scale({scale})">'
             f'<path d="M-4 18 L0 {18 + 10 * flame} L4 18 Z" fill="#ffa63f" {O} stroke-width="2"/>'
             f'<path d="M-8 14 L-16 24 L-8 22 Z" fill="#d93636" {O}/>'
             f'<path d="M8 14 L16 24 L8 22 Z" fill="#d93636" {O}/>'
             f'<path d="M-8 18 V-10 C-8 -20 0 -28 0 -28 C0 -28 8 -20 8 -10 V18 Z" fill="#f4f1ea" {O}/>'
             f'<path d="M-7.5 -12 C-7 -19 0 -27 0 -27 C0 -27 7 -19 7.5 -12 Z" fill="#d93636" {O}/>'
-            f'<rect x="-8" y="2" width="16" height="5" fill="#d93636" {O} stroke-width="2"/>'
+            f'<rect x="-8" y="2" width="16" height="5" fill="{band}" {O} stroke-width="2"/>'
             f'</g>')
 
 
@@ -149,8 +166,8 @@ def bomb(level):
     if level == 1:
         return missile(34, 30, 45, 0.95)
     if level == 2:
-        return missile(33, 31, 45, 1.08, 1.6)
-    return missile(20, 36, 20, 0.72, 1.4) + missile(44, 30, 20, 0.72, 1.4)
+        return missile(33, 31, 45, 1.08, 1.6, accent(2, ''))
+    return missile(20, 36, 20, 0.72, 1.4, accent(3, '')) + missile(44, 30, 20, 0.72, 1.4, accent(3, ''))
 
 
 def raygun(level):
@@ -161,11 +178,12 @@ def raygun(level):
             3: '<circle cx="58" cy="23" r="7" fill="#6fffb0" fill-opacity="0.35"/>'
                '<path d="M53 23 H64" stroke="#d8ffe9" stroke-width="6" stroke-linecap="round"/>'
                '<path d="M55 14 L63 8 M55 32 L63 38 M56 19 L64 17 M56 27 L64 29" stroke="#6fffb0" stroke-width="3" stroke-linecap="round"/>'}[level]
-    rings = '' if level == 1 else f'<rect x="39" y="15" width="4" height="16" fill="#f2c53d" {O} stroke-width="2"/>'
+    ring_colour = accent(level, '#f2c53d', True)
+    rings = '' if level == 1 else f'<rect x="39" y="15" width="4" height="16" fill="{ring_colour}" {O} stroke-width="2"/>'
     return (f'<path d="M18 34 L14 54 H24 L28 38 Z" fill="#1f8a4c" {O}/>'
             f'<path d="M8 22 C8 16 14 14 20 14 H40 C44 14 46 18 46 22 C46 28 44 34 40 34 H20 C14 34 8 30 8 22 Z" fill="#2fbf68" {O}/>'
-            f'<rect x="21" y="13" width="5" height="22" fill="#f2c53d" {O} stroke-width="2.5"/>'
-            f'<rect x="30" y="13" width="5" height="22" fill="#f2c53d" {O} stroke-width="2.5"/>'
+            f'<rect x="21" y="13" width="5" height="22" fill="{ring_colour}" {O} stroke-width="2.5"/>'
+            f'<rect x="30" y="13" width="5" height="22" fill="{ring_colour}" {O} stroke-width="2.5"/>'
             + rings +
             f'<path d="M46 19 H52 V27 H46" fill="#f2c53d" {O}/>' + beam)
 

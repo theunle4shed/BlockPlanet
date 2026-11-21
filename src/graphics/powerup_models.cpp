@@ -191,11 +191,16 @@ constexpr std::uint32_t purple = 0x8A3DF0, lilac = 0xC9A2FF, orange = 0xF28A2E, 
                         gold = 0xF2C53D, pink_tip = 0xF0D0F0, ring_green = 0x2FCF4A, atom_purple = 0xA24BFF, orbit = 0xB78CFF, electron = 0xFFD23F,
                         white = 0xF4F1EA, flame = 0xFFA63F, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF;
 
+// The level's trim (the owner, 2026-11-21: one rule for levelling up): each
+// power-up's trim (stripes, band, tips, orbits, rings) is its own colour at
+// level 1, blue at level 2 and gold at level 3 (as the icons, powerups.py).
+std::uint32_t trim(int level, std::uint32_t base) { return level == 1 ? base : level == 2 ? 0x4FB4FFu : 0xFFC53Du; }
+
 // The models, each in the first part's space of the game's own (its units).
 // Firecracker: along z from about +1,600 (the fuse's end) to -5,800 (the
 // cone's tip), about 1,000 across.
-std::vector<Part> one_rocket() {
-    Part body{purple, {}}, stripes{lilac, {}}, tip{orange, {}}, fuse{fuse_tan, {}};
+std::vector<Part> one_rocket(std::uint32_t stripe = lilac) {
+    Part body{purple, {}}, stripes{stripe, {}}, tip{orange, {}}, fuse{fuse_tan, {}};
     tube(body, 0.0f, -4200.0f, 620.0f);
     for (int s = 0; s < 3; ++s) tube(stripes, -900.0f - 1200.0f * float(s), -1300.0f - 1200.0f * float(s), 650.0f, 8, false);
     cone(tip, -4200.0f, -5800.0f, 820.0f);
@@ -204,17 +209,18 @@ std::vector<Part> one_rocket() {
 }
 std::vector<Part> firecracker(int level) {
     if (level == 1) return one_rocket();
-    if (level == 2) return placed(one_rocket(), place_at(V3{0, 0, 600}), 1.2f);
+    const std::uint32_t t = trim(level, lilac);
+    if (level == 2) return placed(one_rocket(t), place_at(V3{0, 0, 600}), 1.2f);
     // Three rockets, side by side, the middle one higher.
-    auto out = placed(one_rocket(), turned(0, -12, 0, V3{-1500, 0, 400}), 0.8f);
-    out = merged(out, placed(one_rocket(), turned(0, 12, 0, V3{1500, 0, 400}), 0.8f));
-    return merged(out, placed(one_rocket(), place_at(V3{0, 0, -300}), 0.85f));
+    auto out = placed(one_rocket(t), turned(0, -12, 0, V3{-1500, 0, 400}), 0.8f);
+    out = merged(out, placed(one_rocket(t), turned(0, 12, 0, V3{1500, 0, 400}), 0.8f));
+    return merged(out, placed(one_rocket(t), place_at(V3{0, 0, -300}), 0.85f));
 }
 
 // Dynamite: sticks along y, from about -1,500 to 1,500, fuses above to 2,100,
 // across x and z about ±770.
 std::vector<Part> dynamite(int level) {
-    Part sticks{red, {}}, front{bright_red, {}}, band{gold, {}}, fuse{fuse_tan, {}}, spark{electron, {}};
+    Part sticks{red, {}}, front{bright_red, {}}, band{trim(level, gold), {}}, fuse{fuse_tan, {}}, spark{electron, {}};
     std::vector<std::pair<float, float>> at;  // x, z of each stick
     if (level == 1) at = {{-640, 0}, {0, 0}, {640, 0}};
     else if (level == 2) at = {{-1280, 0}, {-640, 0}, {0, 0}, {640, 0}, {1280, 0}};
@@ -239,27 +245,41 @@ std::vector<Part> dynamite(int level) {
 
 // Electro Magnet: its claws point along -z (to about -3,700) from a green
 // ring at about z 150 to 730, about 940 across.
-std::vector<Part> horseshoe(float s) {
-    Part arms{red, {}}, tips{pink_tip, {}}, base{ring_green, {}}, sparks{spark_blue, {}};
+std::vector<Part> horseshoe(float s, std::uint32_t tip, bool sparks_on) {
+    Part arms{red, {}}, tips{tip, {}}, sparks{spark_blue, {}};
     box(arms, place_at(V3{-650 * s, 0, -900 * s}), 280 * s, 320 * s, 1500 * s);
     box(arms, place_at(V3{650 * s, 0, -900 * s}), 280 * s, 320 * s, 1500 * s);
     box(arms, place_at(V3{0, 0, 520 * s}), 930 * s, 320 * s, 260 * s);
     box(tips, place_at(V3{-650 * s, 0, -2700 * s}), 300 * s, 340 * s, 300 * s);
     box(tips, place_at(V3{650 * s, 0, -2700 * s}), 300 * s, 340 * s, 300 * s);
-    ring(base, place_at(V3{0, 0, 900 * s}), 950 * s, 180 * s);
-    for (int side = -1; side <= 1; side += 2)
-        chain(sparks, {V3{side * 1300 * s, 0, -1800 * s}, V3{side * 1600 * s, 0, -1500 * s}, V3{side * 1350 * s, 0, -1200 * s}, V3{side * 1650 * s, 0, -900 * s}}, 55 * s);
-    return {arms, tips, base, sparks};
+    if (sparks_on)
+        for (int side = -1; side <= 1; side += 2)
+            chain(sparks, {V3{side * 1300 * s, 0, -1800 * s}, V3{side * 1600 * s, 0, -1500 * s}, V3{side * 1350 * s, 0, -1200 * s}, V3{side * 1650 * s, 0, -900 * s}}, 55 * s);
+    return {arms, tips, sparks};
 }
 std::vector<Part> magnet(int level) {
-    if (level < 3) return horseshoe(level == 1 ? 1.0f : 1.2f);
-    // The game's own form: four claws curving up and out of the ring.
-    Part claws{red, {}}, tips{pink_tip, {}}, base{ring_green, {}};
+    // Level 1 a horseshoe; level 2 two, fanned out (the owner: a clear step);
+    // level 3 the game's own form, four claws that curve out and hook back in
+    // at the top (the owner); all on the green ring.
+    Part base{ring_green, {}};
+    if (level == 1) {
+        ring(base, place_at(V3{0, 0, 900}), 950.0f, 180.0f);
+        return merged(horseshoe(1.0f, pink_tip, true), {base});
+    }
+    if (level == 2) {
+        ring(base, place_at(V3{0, 0, 900}), 1500.0f, 200.0f);
+        auto out = placed(horseshoe(0.8f, trim(2, pink_tip), false), turned(0, -18, 0, V3{-950, 0, 300}), 1.0f);
+        out = merged(out, placed(horseshoe(0.8f, trim(2, pink_tip), false), turned(0, 18, 0, V3{950, 0, 300}), 1.0f));
+        return merged(out, {base});
+    }
+    Part claws{red, {}}, tips{trim(3, pink_tip), {}};
     for (int k = 0; k < 4; ++k) {
         const float a = 6.2831853f * (float(k) + 0.5f) / 4.0f, cx = std::cos(a), cy = std::sin(a);
-        const std::vector<V3> pts{V3{cx * 500, cy * 500, 600}, V3{cx * 700, cy * 700, -500}, V3{cx * 1100, cy * 1100, -1700}, V3{cx * 1600, cy * 1600, -2700}};
+        // Out from the ring, round, and back in at the top, the tip pointing inwards.
+        const std::vector<V3> pts{V3{cx * 500, cy * 500, 600}, V3{cx * 1100, cy * 1100, -400}, V3{cx * 1550, cy * 1550, -1500},
+                                  V3{cx * 1450, cy * 1450, -2500}, V3{cx * 900, cy * 900, -3100}};
         chain(claws, pts, 230.0f);
-        ball(tips, place_at(pts.back() + V3{cx * 80, cy * 80, -150}), 300.0f, 3, 6);
+        ball(tips, place_at(pts.back() + V3{-cx * 150, -cy * 150, 60}), 300.0f, 3, 6);
     }
     ring(base, place_at(V3{0, 0, 700}), 900.0f, 200.0f);
     return {claws, tips, base};
@@ -268,7 +288,7 @@ std::vector<Part> magnet(int level) {
 // Atom: about its middle, the nucleus about 1,000 across, its electrons about
 // 1,400 out.
 std::vector<Part> atom(int level) {
-    Part nucleus{atom_purple, {}}, orbits{orbit, {}}, electrons{electron, {}};
+    Part nucleus{atom_purple, {}}, orbits{trim(level, orbit), {}}, electrons{electron, {}};
     ball(nucleus, Place{}, level == 1 ? 480.0f : 560.0f, 5, 10);
     const int n_orbits = level < 3 ? 3 : 4, per = level == 1 ? 1 : 2;
     for (int o = 0; o < n_orbits; ++o) {
@@ -284,11 +304,11 @@ std::vector<Part> atom(int level) {
 }
 
 // Bomb: a missile along z, its nose to -z (about -4,000), fins about ±1,500.
-std::vector<Part> missile(float flame_len) {
-    Part body{white, {}}, reds{red, {}}, fire{flame, {}};
+std::vector<Part> missile(float flame_len, std::uint32_t band_colour = red) {
+    Part body{white, {}}, reds{red, {}}, band{band_colour, {}}, fire{flame, {}};
     tube(body, 1100.0f, -2400.0f, 700.0f);
     tube(reds, Place{}, -2400.0f, -3900.0f, 700.0f, 0.0f, 8, true);
-    tube(reds, -700.0f, -1100.0f, 730.0f, 8, false);
+    tube(band, -700.0f, -1100.0f, 730.0f, 8, false);
     for (int k = 0; k < 4; ++k) {
         const Place pl = turned(0, 0, 45.0f + 90.0f * float(k));
         Place fin = pl;
@@ -296,25 +316,26 @@ std::vector<Part> missile(float flame_len) {
         box(reds, fin, 450.0f, 70.0f, 400.0f);
     }
     tube(fire, Place{}, 1100.0f, 1100.0f + flame_len, 450.0f, 0.0f, 8, true);
-    return {body, reds, fire};
+    return {body, reds, band, fire};
 }
 std::vector<Part> bomb(int level) {
     if (level == 1) return missile(700.0f);
-    if (level == 2) return placed(missile(1200.0f), Place{}, 1.15f);
-    return merged(placed(missile(900.0f), place_at(V3{-1100, 0, 200}), 0.72f), placed(missile(900.0f), place_at(V3{1100, 0, -200}), 0.72f));
+    if (level == 2) return placed(missile(1200.0f, trim(2, red)), Place{}, 1.15f);
+    return merged(placed(missile(900.0f, trim(3, red)), place_at(V3{-1100, 0, 200}), 0.72f),
+                  placed(missile(900.0f, trim(3, red)), place_at(V3{1100, 0, -200}), 0.72f));
 }
 
 // Ray Gun: its barrel to -z, about ±1,800 across, -3,500 to 900 along z.
 std::vector<Part> raygun(int level) {
-    Part body{gun_green, {}}, grip{grip_green, {}}, rings{gold, {}}, ray{beam, {}};
+    Part body{gun_green, {}}, grip{grip_green, {}}, rings{trim(level, gold), {}}, nozzle{gold, {}}, ray{beam, {}};
     tube(body, Place{}, 900.0f, -900.0f, 900.0f, 800.0f, 10, true);
-    tube(rings, Place{}, -900.0f, -2300.0f, 500.0f, 260.0f, 8, true);
+    tube(nozzle, Place{}, -900.0f, -2300.0f, 500.0f, 260.0f, 8, true);
     for (int r = 0; r < (level == 1 ? 2 : 3); ++r) tube(rings, 400.0f - 500.0f * float(r), 150.0f - 500.0f * float(r), 940.0f, 10, true);
     box(grip, turned(-20, 0, 0, V3{0, -1200, 500}), 280.0f, 700.0f, 300.0f);
     const float reach = level == 1 ? 900.0f : level == 2 ? 1200.0f : 1500.0f, width = level == 1 ? 90.0f : level == 2 ? 150.0f : 220.0f;
     tube(ray, -2300.0f, -2300.0f - reach, width, 6);
     if (level == 3) ball(ray, place_at(V3{0, 0, -2400}), 380.0f, 3, 8);
-    return {body, grip, rings, ray};
+    return {body, grip, rings, nozzle, ray};
 }
 
 std::vector<Part> model(int kind, int level) {
