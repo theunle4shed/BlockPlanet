@@ -3369,7 +3369,7 @@ void publish_game_text() {
                     } else if (ph == 47) {
                         heading("Well Done");
                         para("You found a power-up!");
-                        if (rubble_end_page >= 1) para("Press " + buttons("%C#%") + " to use it. The Power-Ups lessons show what each one does.");
+                        if (rubble_end_page >= 1) para("In the next lesson you'll find out about the different types of power-ups, and how to use them.");
                         panel.hint = buttons("%A%") + (rubble_end_page >= 1 ? " Done" : " Next");
                     } else if (ph >= 45) {
                         const bool watching = ph == 45;
