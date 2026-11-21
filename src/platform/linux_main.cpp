@@ -347,8 +347,21 @@ std::optional<std::chrono::steady_clock::time_point> rubble_at;
 int rubble_slot = -1, rubble_step = 0, rubble_pushes = 0;
 bool rubble_aimed = false;
 std::uint16_t rubble_held = 0;
-constexpr int rubble_shape = 1;  // the bar (yellow)
-constexpr int rubble_last_page = 4, rubble_last_page2 = 2;
+constexpr int rubble_shape = 1;  // the bar (yellow): part 2's piece
+// Part 1 three times, a shape each (the owner, 2026-11-21: different block
+// types): yellow bars (five groups: bar, crystals, bar, crystals, bar), then
+// blue squares and red Ts (three groups: piece, crystals, piece; taller
+// shapes, so shorter columns to stay in view). The T is put in the shape
+// table as entry 2, as Combos and Magic does.
+constexpr int rubble_round_shapes[3] = {1, 0, 2};
+int rubble_round = 0;
+int rubble_round_shape() { return rubble_round_shapes[std::clamp(rubble_round, 0, 2)]; }
+int rubble_groups() { return rubble_round == 0 ? 5 : 3; }
+std::vector<std::pair<int, int>> rubble_lines_at, rubble_pieces_at;  // origins on the board now (for the demonstration)
+int rubble_step_size = 1;      // a group's depth across the column
+int rubble_demos = 0;          // part 2's demonstrations so far: they alternate between sliding and a combo
+bool rubble_saw_combo = false;
+constexpr int rubble_last_page = 4, rubble_last_page2 = 5;
 // A shape's cells as offsets from its origin (layout cell (x, y) sits at the
 // origin + (x - 1, y - 1)), in layout order.
 std::vector<std::pair<int, int>> lesson_shape_cells(int index) {
@@ -668,7 +681,7 @@ void show_stage_results() {
     }
     if (r.lesson == 105) {
         slide_lesson_phase = -1, rubble_lesson = false;
-        blockplanet::ui::set_text("results_title", "Rubble and Mystery Blocks Complete");
+        blockplanet::ui::set_text("results_title", "Crystals and Mystery Blocks Complete");
         blockplanet::ui::set_text("results_where", "Training \u00B7 The Basics");
         blockplanet::ui::set_text("results_line", "");
         std::vector<blockplanet::ui::ListItem> items;
@@ -919,7 +932,7 @@ std::string hide_and_seek_goal(int goal) {
     case 7: return "Drop a brick";
     case 9: return "Connect";
     case 10: return "Around the tower";
-    case 11: return "Crystal tower";
+    case 11: return "Glass tower";
     default: return "";
     }
 }
@@ -956,7 +969,7 @@ void show_hud(std::optional<blockplanet::ui::HudView> view) {
         v.show_lives = false;
         v.show_magic = false;
         v.mode = "Training";
-        v.stage = rubble_lesson && slide_lesson_phase >= 1 ? "Rubble and Mystery Blocks"
+        v.stage = rubble_lesson && slide_lesson_phase >= 1 ? "Crystals and Mystery Blocks"
                   : combos_lesson && slide_lesson_phase >= 1 ? "Combos and Magic"
                   : hearts_lesson && slide_lesson_phase >= 1 ? "Hearts" : slide_lesson_phase >= 1 ? "Slide and Drop" : "Drop";
         if (combos_lesson && slide_lesson_phase >= 30) v.show_magic = true;  // the magic meter's ring
@@ -2579,7 +2592,7 @@ std::string hide_and_seek_title(const std::string& card) {
     static const std::pair<const char*, const char*> titles[] = {
         {"-1MULTI-0", "Any Picture"}, {"-1DRILL-0", "Five Drills"}, {"-1HIDE -1AND -1SEEK-0", "Help Them Escape"},
         {"-1SHIFT-0", "Four Parts"}, {"-1UNIQUE-0", "Unique Shape"}, {"-1BRICK-0", "Brick Drop"},
-        {"-1CONNECT-0", "Connected Pictures"}, {"-1TOWER-0", "Tower"}, {"-1CRYSTAL -1TOWER-0", "Crystal Tower"}};
+        {"-1CONNECT-0", "Connected Pictures"}, {"-1TOWER-0", "Tower"}, {"-1CRYSTAL -1TOWER-0", "Glass Tower"}};
     for (const auto& [start, title] : titles)
         if (card.rfind(start, 0) == 0) return title;
     return {};
@@ -2620,7 +2633,7 @@ std::string hide_and_seek_goal_text(int goal) {
     case 7: return "Brick Drop: clear the bricks under a red brick until it falls to the core.";
     case 9: return "Connected Pictures: under the drill is a picture with lines. Follow them to find and uncover every picture.";
     case 10: return "Tower: a picture lies under the tower. Clear around it to show the whole picture.";
-    case 11: return "Crystal Tower: uncover the picture under the crystal tower, without breaking the tower.";
+    case 11: return "Glass Tower: uncover the picture under the glass tower, without breaking the glass.";
     default: return "";
     }
 }
@@ -3310,32 +3323,44 @@ void publish_game_text() {
                 const int meter_now = guest_rdram ? int(guest::load16(guest_rdram, pc_ctx + 0x2AEC)) : 0;
                 const int meter_full = guest_rdram ? int(guest::load16(guest_rdram, pc_ctx + 0x2AEE)) : 14;
                 if (ph >= 40) {
-                    // Rubble and Mystery Blocks (2026-11-21, from the owner's idea).
+                    // Crystals and Mystery Blocks (2026-11-21, the owner's script).
                     const std::string show = rubble_watched ? " Show me again" : " Show me";
                     const std::string choice = buttons("%A%") + " Try it\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0" + buttons("%B%") + show;
-                    const int lines_left = rubble_cells_left() / std::max<std::size_t>(1, lesson_shape_cells(rubble_shape).size());
+                    const int shape_cells = int(std::max<std::size_t>(1, lesson_shape_cells(ph >= 44 ? rubble_shape : rubble_round_shape()).size()));
+                    const int lines_left = rubble_cells_left() / shape_cells;
+                    const char* pieces = rubble_round == 0 ? "yellow pieces" : rubble_round == 1 ? "blue squares" : "red Ts";
+                    const bool held = guest_rdram && std::int8_t(guest::load8(guest_rdram, pc_ctx + 0x702)) >= 0;
                     if (ph == 40 && rubble_page <= 1) {
-                        heading("Rubble and Mystery Blocks");
-                        para("Rubble is the single dark blocks with a glowing orb, often found in patches between pieces. It never matches anything.");
-                        if (rubble_page >= 1) para("But you can turn rubble into pieces, to join groups up into bigger combos.");
+                        heading("Crystals and Mystery Blocks");
+                        para("Crystals are single blocks, often found in patches between pieces. They never match anything.");
+                        if (rubble_page >= 1) para("But you can turn crystals into pieces, to join groups up into bigger combos.");
                         panel.hint = buttons("%A%") + " Next";
                     } else if (ph == 40 && rubble_page <= 3) {
-                        heading("How to Convert Rubble");
-                        para("Move your shadow with " + move + " over rubble in the same shape as your piece.");
-                        if (rubble_page >= 3) para("Press " + buttons("%B%") + " to turn the rubble into a piece like yours.");
+                        heading("How to Convert Crystals");
+                        para("Move your shadow with " + move + " over crystals in the same shape as your piece.");
+                        if (rubble_page >= 3) para("Press " + buttons("%B%") + " to turn the crystals into a piece like yours.");
                         panel.hint = buttons("%A%") + " Next";
                     } else if (ph == 40) {
-                        heading("Convert the Rubble");
-                        para("Three yellow pieces are split by two lines of rubble. Convert both lines, then drop on the yellow pieces to break them all in one combo.");
+                        heading("Convert the Crystals");
+                        para("Three yellow pieces are split by two lines of crystals. Convert both lines, then drop on the yellow pieces to break them all in one combo.");
                         panel.hint = choice;
                     } else if (ph == 44 && rubble_page <= 1) {
                         heading("Mystery Blocks");
-                        para("A mystery block flickers yellow and red, hidden among the pieces and rubble. Inside is a power-up.");
-                        if (rubble_page >= 1) para("Free it with a combo right next to it, or by sliding a piece into it.");
+                        para("Glowing mystery blocks can be found throughout the sphere.");
+                        if (rubble_page >= 1) para("Releasing these gives you an instant power-up.");
+                        panel.hint = buttons("%A%") + " Next";
+                    } else if (ph == 44 && rubble_page <= 4) {
+                        heading("Releasing a Power-Up");
+                        para("To release the power-up you can either:");
+                        if (rubble_page >= 3) para(buttons("%A%") + " Clear blocks next to the mystery block.");
+                        if (rubble_page >= 4) para(buttons("%B%") + " Slide a piece through the crystals and the mystery block.");
                         panel.hint = buttons("%A%") + " Next";
                     } else if (ph == 44) {
                         heading("Find the Power-Up");
-                        para("A mystery block is buried in this rubble. Hold " + buttons("%B%") + " on the yellow piece and slide it through the rubble to reach it.");
+                        para("A mystery block is buried among the crystals. Decide how to release the power-up:");
+                        para("Convert the crystals with " + buttons("%B%") + " and clear them with " + buttons("%A%") + ".");
+                        para("OR");
+                        para("Slide the yellow piece through the crystals and the mystery block with " + buttons("%B%") + ".");
                         panel.hint = choice;
                     } else if (ph == 47) {
                         heading("Well Done");
@@ -3345,16 +3370,17 @@ void publish_game_text() {
                     } else if (ph >= 45) {
                         const bool watching = ph == 45;
                         heading(watching ? "Watch" : "Your Turn");
-                        para("Hold " + buttons("%B%") + " on the yellow piece and slide it through the rubble into the mystery block.");
-                        if (std::int8_t(guest_rdram ? guest::load8(guest_rdram, pc_ctx + 0x702) : 0xFF) >= 0) para("A power-up! It's in your Magic box.");
+                        para("Release the power-up: convert the crystals with " + buttons("%B%") + " and clear them with " + buttons("%A%") +
+                             ", or slide the yellow piece through with " + buttons("%B%") + ".");
+                        if (held) para("A power-up! It's in your Magic box.");
                         else if (!rubble_note.empty() && !watching) para(buttons(rubble_note));
                         if (watching) panel.hint = "Watching\u2026";
                     } else {
                         const bool watching = ph == 41 || (ph == 43 && rubble_demo_running);
                         heading(watching ? "Watch" : "Your Turn");
-                        para("Press " + buttons("%B%") + " over each line of rubble to convert it. Then drop on the yellow pieces.");
+                        para("Press " + buttons("%B%") + " over each line of crystals to convert it. Then drop on the " + pieces + ".");
                         if (ph == 43) para("Combo!");
-                        else para(lines_left <= 0 ? "All the rubble is converted: now drop!" : "Rubble lines left: " + std::to_string(lines_left));
+                        else para(lines_left <= 0 ? "All the crystals are converted: now drop!" : "Crystal lines left: " + std::to_string(lines_left));
                         if (!rubble_note.empty() && ph == 42) para(rubble_note);
                         if (watching) panel.hint = "Watching\u2026";
                     }
@@ -4984,38 +5010,54 @@ void build_stack_pit(int x0, int y0, int w, int h, int height, const std::vector
 // seam (cells 31 and 0).
 void rubble_build(int part) {
     tetrisphere::minefield_sphere::queue_game_thread_job([part](std::uint8_t* g) {
-        const auto cells = lesson_shape_cells(rubble_shape);
-        const bool along_x = cells.size() > 1 && cells[0].first != cells[1].first;
-        rubble_across[0] = along_x ? 0 : 1, rubble_across[1] = along_x ? 1 : 0;
+        const int shape = part == 1 ? rubble_round_shape() : rubble_shape;
+        const auto cells = lesson_shape_cells(shape);
+        int x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+        for (const auto& [x, y] : cells) x0 = std::min(x0, x), x1 = std::max(x1, x), y0 = std::min(y0, y), y1 = std::max(y1, y);
+        // The column runs across the shape's long side (a lying bar: up the screen).
+        const bool across_y = x1 - x0 >= y1 - y0;
+        rubble_across[0] = across_y ? 0 : 1, rubble_across[1] = across_y ? 1 : 0;
+        const int step = across_y ? y1 - y0 + 1 : x1 - x0 + 1, width = across_y ? x1 - x0 + 1 : y1 - y0 + 1;
+        rubble_step_size = step;
         const int cx = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2A)), cy = 8 + std::int16_t(guest::load16(g, pc_ctx + 0x2B2E));
-        const int along = along_x ? cx : cy;
-        rubble_side = along + 8 > 29 ? -1 : 1;
-        rubble_anchor[0] = cx + (along_x ? 3 * rubble_side : 0);
-        rubble_anchor[1] = cy + (along_x ? 0 : 3 * rubble_side);
+        rubble_side = (across_y ? cx : cy) + 8 > 29 ? -1 : 1;
+        rubble_anchor[0] = cx + (across_y ? width * rubble_side : 0);
+        rubble_anchor[1] = cy + (across_y ? 0 : width * rubble_side);
         const int ax = rubble_anchor[0], ay = rubble_anchor[1], px = rubble_across[0], py = rubble_across[1];
         std::vector<std::pair<int, std::pair<int, int>>> pieces;
         std::vector<LessonCell> singles;
-        const auto line = [&](int k, int mystery_at) {
+        rubble_lines_at.clear(), rubble_pieces_at.clear();
+        const auto line = [&](int ox, int oy, int mystery_at) {
+            rubble_lines_at.push_back({ox, oy});
             for (std::size_t i = 0; i < cells.size(); ++i) {
                 const bool m = int(i) == mystery_at;
-                singles.push_back({ax + px * k + cells[i].first, ay + py * k + cells[i].second, m ? mystery_value : rubble_value,
-                                   m ? mystery_entry : rubble_entry});
+                singles.push_back({ox + cells[i].first, oy + cells[i].second, m ? mystery_value : rubble_value, m ? mystery_entry : rubble_entry});
             }
         };
+        const auto piece = [&](int ox, int oy) { pieces.push_back({shape, {ox, oy}}); rubble_pieces_at.push_back({ox, oy}); };
         if (part == 1) {
-            for (int k = -2; k <= 2; ++k)
-                if (k % 2 == 0) pieces.push_back({rubble_shape, {ax + px * k, ay + py * k}});
-                else line(k, -1);
+            const int groups = rubble_groups();
+            for (int i = 0; i < groups; ++i) {
+                const int k = i - (groups - 1) / 2;
+                if (i % 2 == 0) piece(ax + px * k * step, ay + py * k * step);
+                else line(ax + px * k * step, ay + py * k * step, -1);
+            }
         } else {
-            pieces.push_back({rubble_shape, {ax - 2 * px, ay - 2 * py}});
-            for (int k = -1; k <= 1; ++k) line(k, k == 0 ? int(cells.size()) / 2 : -1);
+            piece(ax - 2 * px * step, ay - 2 * py * step);
+            for (int k = -1; k <= 1; ++k) line(ax + px * k * step, ay + py * k * step, k == 0 ? int(cells.size()) / 2 : -1);
         }
-        // Along the bars: 5 cells on the shadow's side, 2 beyond; across: 3 each way.
-        const int back = rubble_side > 0 ? 5 : 2;
-        if (along_x) build_stack_pit(ax - back, ay - 3, 8, 7, 1, pieces, singles);
-        else build_stack_pit(ax - 3, ay - back, 7, 8, 1, pieces, singles);
+        // The pit: round everything and the shadow, a cell spare, at least 8 x 8.
+        int bx0 = cx + x0, bx1 = cx + x1, by0 = cy + y0, by1 = cy + y1;
+        for (const auto& pc : pieces)
+            for (const auto& [x, y] : cells) bx0 = std::min(bx0, pc.second.first + x), bx1 = std::max(bx1, pc.second.first + x),
+                                             by0 = std::min(by0, pc.second.second + y), by1 = std::max(by1, pc.second.second + y);
+        for (const auto& one : singles) bx0 = std::min(bx0, one.x), bx1 = std::max(bx1, one.x), by0 = std::min(by0, one.y), by1 = std::max(by1, one.y);
+        --bx0, ++bx1, --by0, ++by1;
+        for (bool lo = true; bx1 - bx0 + 1 < 8; lo = !lo) (lo ? --bx0 : ++bx1);
+        for (bool lo = true; by1 - by0 + 1 < 8; lo = !lo) (lo ? --by0 : ++by1);
+        build_stack_pit(bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1, 1, pieces, singles);
         guest::store16(g, pc_ctx + 0x23E4, 16);  // no win from the open pit
-        for (int q = 0; q < 4; ++q) guest::store16(g, pc_ctx + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(rubble_shape));
+        for (int q = 0; q < 4; ++q) guest::store16(g, pc_ctx + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(shape));
         guest::store32(g, pc_ctx + 0x2408, 0);
     });
 }
@@ -5031,10 +5073,20 @@ std::uint16_t rubble_demo_buttons() {
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - *rubble_at).count();
     if (ms < 700) return 0;
     struct Step { int x, y, action; };  // 0: press B, 1: press A, 2: slide across
-    const int ax = rubble_anchor[0], ay = rubble_anchor[1], px = rubble_across[0], py = rubble_across[1];
+    const int px = rubble_across[0];
     std::vector<Step> steps;
-    if (slide_lesson_phase == 41) steps = {{ax - px, ay - py, 0}, {ax + px, ay + py, 0}, {ax, ay, 1}};
-    else steps = {{ax - 2 * px, ay - 2 * py, 2}};
+    if (rubble_pieces_at.empty() || rubble_lines_at.empty()) return 0;
+    if (slide_lesson_phase == 41) {
+        for (const auto& [x, y] : rubble_lines_at) steps.push_back({x, y, 0});
+        const auto& mid = rubble_pieces_at[rubble_pieces_at.size() / 2];
+        steps.push_back({mid.first, mid.second, 1});
+    } else if (rubble_demos % 2 == 1) {
+        // Convert the crystals beside the piece, then drop on them: the combo
+        // is next to the mystery block.
+        steps = {{rubble_lines_at[0].first, rubble_lines_at[0].second, 0}, {rubble_lines_at[0].first, rubble_lines_at[0].second, 1}};
+    } else {
+        steps = {{rubble_pieces_at[0].first, rubble_pieces_at[0].second, 2}};
+    }
     if (rubble_step >= int(steps.size())) return 0;
     const Step& st = steps[std::size_t(rubble_step)];
     const std::uint16_t push = px != 0 ? 0x0200 : 0x0800;  // +x is left, +y is up
@@ -7651,7 +7703,10 @@ bool handle_profile_command(const std::string& command) {
             }
             // The Slide lesson in play (see slide_lesson_phase).
             lesson_no_drop.store((slide_lesson_phase >= 1 && slide_lesson_phase <= 6) ||  // the drop stage (10 on) drops
-                                 (rubble_lesson && slide_lesson_phase >= 44 && slide_lesson_phase <= 47));  // the mystery block: slide only
+                                 // Crystals: no drop until every line is converted (the owner),
+                                 // nor on the pages
+                                 (rubble_lesson && (slide_lesson_phase == 41 || slide_lesson_phase == 42) && rubble_cells_left() > 0) ||
+                                 (rubble_lesson && (slide_lesson_phase == 44 || slide_lesson_phase == 47)));
             lesson_no_slide.store(combos_lesson && slide_lesson_phase >= 30 && slide_lesson_phase <= 35);
             if (lesson_wait_release && (player_buttons_now() & 0xF000u) == 0) lesson_wait_release = false;
             // The shadow hidden while a lesson's text is read and the choice
@@ -7663,7 +7718,7 @@ bool handle_profile_command(const std::string& command) {
                                                                    drop_lesson_phase == 1);
             // The stage's shape table and count put back once Hearts is over,
             // however it ended (quit, restart into another lesson, done).
-            if (!((hearts_lesson || combos_lesson) && slide_lesson_phase >= 0) && guest_rdram != nullptr) {
+            if (!((hearts_lesson || combos_lesson || rubble_lesson) && slide_lesson_phase >= 0) && guest_rdram != nullptr) {
                 auto* rd = const_cast<std::uint8_t*>(guest_rdram);
                 if (hearts_table2_saved) guest::store32(rd, 0x8014CBC8u + 8u, hearts_table2_saved), hearts_table2_saved = 0;
                 if (hearts_kinds_saved >= 0) guest::store16(rd, 0x800E44B8u, std::uint16_t(hearts_kinds_saved)), hearts_kinds_saved = -1;
@@ -7752,7 +7807,13 @@ bool handle_profile_command(const std::string& command) {
                     // The piece in hand always the square, so every square can be grabbed.
                     const int held = hearts_lesson ? hearts_shape() : slide_square;
                     if (rubble_lesson) {
-                        for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(rubble_shape));
+                        // The piece in hand the round's shape; the drop timer held
+                        // (the owner: the piece dropped by itself while thinking).
+                        if (!tetrisphere::minefield_sphere::game_thread_job_pending()) {
+                            const int shape = slide_lesson_phase >= 44 ? rubble_shape : rubble_round_shape();
+                            for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(shape));
+                        }
+                        guest::store32(rd, pc + 0x2408, 0);
                     } else if (combos_lesson) {
                         // The layers' shapes in order (the Next row shows what is coming).
                         if (!tetrisphere::minefield_sphere::game_thread_job_pending())
@@ -7833,6 +7894,11 @@ bool handle_profile_command(const std::string& command) {
                         guest::store16(rd, pc + 0x23E4, 16);  // no win from the open pit
                         for (int q = 0; q < 4; ++q) guest::store16(rd, pc + 0x2374 + 2u * std::uint32_t(q), std::uint16_t(slide_square));
                         if (rubble_lesson) {
+                            if (!hearts_table2_saved) hearts_table2_saved = guest::load32(rd, 0x8014CBC8u + 8u);
+                            guest::store32(rd, 0x8014CBC8u + 8u, guest::load32(rd, 0x800E4508u + 4u * 5u));  // the red T, as Hearts
+                            if (hearts_kinds_saved < 0) hearts_kinds_saved = guest::load16(rd, 0x800E44B8u);
+                            guest::store16(rd, 0x800E44B8u, 3);
+                            rubble_round = 0, rubble_demos = 0;
                             rubble_build(1);
                             guest::store8(rd, pc + 0x702, 0xFF);  // no power-up held
                             slide_lesson_phase = 40, slide_lesson_at = now_m;
@@ -8225,13 +8291,13 @@ bool handle_profile_command(const std::string& command) {
                         }
                     } else if (b & 0x8000u) {
                         lesson_wait_release = true;
-                        rubble_bricks = -1, rubble_note.clear(), rubble_at = now_m;
+                        rubble_bricks = -1, rubble_note.clear(), rubble_at = now_m, rubble_saw_combo = false;
                         slide_lesson_phase = part2 ? 46 : 42, slide_lesson_at = now_m;
                     } else if (b & 0x4000u) {
                         lesson_wait_release = true;
                         rubble_bricks = -1, rubble_note.clear(), rubble_at = now_m;
                         rubble_step = 0, rubble_slot = -1, rubble_pushes = 0, rubble_aimed = false, rubble_held = 0;
-                        rubble_demo_running = true;
+                        rubble_demo_running = true, rubble_saw_combo = false;
                         slide_lesson_phase = part2 ? 45 : 41, slide_lesson_at = now_m;
                     }
                 } else if (slide_lesson_phase == 41 || slide_lesson_phase == 42) {
@@ -8239,6 +8305,15 @@ bool handle_profile_command(const std::string& command) {
                     // +0x2AE0; a conversion scores, so not the points) goes on to
                     // 43. A drop that lands without one: the board set up again.
                     static std::optional<std::chrono::steady_clock::time_point> landed;
+                    {
+                        static int last_b = -1, last_c = -1;
+                        const int b = count_bricks(), c = rubble_cells_left();
+                        if (b != last_b || c != last_c) {
+                            last_b = b, last_c = c;
+                            std::fprintf(stdout, "{\"event\":\"rubble_board\",\"bricks\":%d,\"crystals\":%d,\"start\":%d}\n", b, c, rubble_bricks);
+                            std::fflush(stdout);
+                        }
+                    }
                     if (rubble_bricks < 0) {
                         if (!tetrisphere::minefield_sphere::game_thread_job_pending()) rubble_bricks = count_bricks();
                     } else if (guest::load16(rd, pc + 0x2AE0) != 0) {
@@ -8246,13 +8321,17 @@ bool handle_profile_command(const std::string& command) {
                         rubble_note.clear();
                         slide_lesson_phase = 43, slide_lesson_at = now_m;
                     } else if (count_bricks() != rubble_bricks) {
+                        // (Held for 2.5 s: the count also jumps for a moment as the
+                        // game works, which is not a landing.)
                         if (!landed) landed = now_m;
                         else if (now_m - *landed > std::chrono::milliseconds(2500)) {
                             landed.reset();
-                            rubble_note = "No match there, so the piece stacked up. Convert the rubble, then drop on the yellow pieces.";
+                            rubble_note = "No match there, so the piece stacked up. Drop on the pieces once the crystals are converted.";
                             rubble_build(1);
                             rubble_bricks = -1;
                         }
+                    } else if (landed) {
+                        landed.reset();  // back as it was: no landing
                     } else if (slide_lesson_phase == 41 && since() > 30000) {
                         rubble_build(1);
                         rubble_demo_running = false;
@@ -8267,8 +8346,8 @@ bool handle_profile_command(const std::string& command) {
                             std::fprintf(stdout, "{\"event\":\"rubble_combo\",\"combo\":%d,\"demo\":%d}\n", rubble_combo, int(rubble_demo_running));
                             std::fflush(stdout);
                         }
-                        if (rubble_combo < 6) {
-                            rubble_note = "Only " + std::to_string(rubble_combo) + " broke. Convert both lines of rubble first, then drop.";
+                        if (rubble_combo < rubble_groups() + 1) {
+                            rubble_note = "Only " + std::to_string(rubble_combo) + " broke. Convert every line of crystals first, then drop.";
                             rubble_build(1);
                             rubble_bricks = -1;
                             slide_lesson_phase = rubble_demo_running ? 40 : 42, slide_lesson_at = now_m;
@@ -8280,6 +8359,13 @@ bool handle_profile_command(const std::string& command) {
                                 slide_lesson_phase = 40, slide_lesson_at = now_m;
                                 rubble_watched = true, slide_choice_armed = false, rubble_page = rubble_last_page;
                             }
+                        } else if (since() > 4000 && rubble_round < 2) {
+                            // Again with the next shape: blue squares, then red Ts.
+                            ++rubble_round;
+                            rubble_note = rubble_round == 1 ? "Well done! Now with blue squares." : "Well done! Now with red Ts.";
+                            rubble_build(1);
+                            rubble_bricks = -1;
+                            slide_lesson_phase = 42, slide_lesson_at = now_m;
                         } else if (since() > 4000) {
                             // On to the mystery block, on a new board.
                             rubble_build(2);
@@ -8305,7 +8391,7 @@ bool handle_profile_command(const std::string& command) {
                             if (slide_lesson_phase == 45) {
                                 rubble_build(2);
                                 guest::store8(rd, pc + 0x702, 0xFF);
-                                rubble_demo_running = false;
+                                rubble_demo_running = false, ++rubble_demos;
                                 slide_lesson_phase = 44, slide_lesson_at = now_m;
                                 rubble_watched = true, slide_choice_armed = false, rubble_page = rubble_last_page2;
                             } else {
@@ -8313,12 +8399,54 @@ bool handle_profile_command(const std::string& command) {
                                 slide_lesson_phase = 47, slide_lesson_at = now_m, slide_choice_armed = false;
                             }
                         }
-                    } else if (since() > (slide_lesson_phase == 45 ? 20000 : 40000) && !(player_buttons_now() & 0x4000u)) {
-                        found.reset();
-                        rubble_build(2);
-                        if (slide_lesson_phase == 46) rubble_note = "Hold %B% on the yellow piece and slide it through the rubble.";
-                        rubble_demo_running = false;
-                        slide_lesson_phase = slide_lesson_phase == 45 ? 44 : 46, slide_lesson_at = now_m, slide_choice_armed = false;
+                    } else {
+                        // Either way works (the owner): convert and drop for a combo
+                        // beside the mystery block, or slide through. A combo that
+                        // ends with no power-up, or a drop on nothing: set up again.
+                        static std::optional<std::chrono::steady_clock::time_point> landed;
+                        const bool combo_now = guest::load16(rd, pc + 0x2AE0) != 0 || guest::load32(rd, pc + 0x2AFC) != 0;
+                        if (rubble_bricks < 0) {
+                            if (!tetrisphere::minefield_sphere::game_thread_job_pending()) rubble_bricks = count_bricks();
+                        } else if (guest::load16(rd, pc + 0x2AE0) != 0) {
+                            rubble_saw_combo = true, landed.reset();
+                        }
+                        const bool settle = rubble_bricks >= 0 && !combo_now && !(player_buttons_now() & 0x4000u);
+                        const bool missed_drop = settle && !rubble_saw_combo && count_bricks() > rubble_bricks;
+                        if (!((settle && rubble_saw_combo) || missed_drop)) landed.reset();
+                        if ((settle && rubble_saw_combo) || missed_drop) {
+                            if (!landed) landed = now_m;
+                            else if (now_m - *landed > std::chrono::milliseconds(2500)) {
+                                landed.reset();
+                                rubble_note = rubble_saw_combo ? "That combo wasn't next to the mystery block. Try again."
+                                                               : "No match there, so the piece stacked up. Try again.";
+                                rubble_build(2);
+                                rubble_bricks = -1, rubble_saw_combo = false;
+                            }
+                        }
+                        // Stuck (a slide stopped short, crystals converted but no drop):
+                        // the board changed and nothing pressed for 15 s.
+                        static std::optional<std::chrono::steady_clock::time_point> last_input;
+                        static int crystals_at_start = -1;
+                        if (rubble_bricks < 0 || !last_input) last_input = now_m, crystals_at_start = rubble_cells_left();
+                        if (player_buttons_now() & 0xFF00u) last_input = now_m;
+                        const bool changed = rubble_cells_left() != crystals_at_start;
+                        if (slide_lesson_phase == 46 && changed && !combo_now && now_m - *last_input > std::chrono::seconds(15)) {
+                            landed.reset(), last_input.reset();
+                            rubble_note = "Let's set that up again.";
+                            rubble_build(2);
+                            rubble_bricks = -1, rubble_saw_combo = false;
+                        } else if (since() > (slide_lesson_phase == 45 ? 20000 : 600000) && !(player_buttons_now() & 0x4000u)) {
+                            landed.reset();
+                            rubble_build(2);
+                            rubble_bricks = -1, rubble_saw_combo = false;
+                            rubble_demo_running = false;
+                            if (slide_lesson_phase == 45) {
+                                ++rubble_demos;
+                                slide_lesson_phase = 44, slide_lesson_at = now_m, slide_choice_armed = false;
+                            } else {
+                                slide_lesson_at = now_m;
+                            }
+                        }
                     }
                 }
             }

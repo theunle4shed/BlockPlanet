@@ -320,9 +320,10 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             // Combos and earning a power-up together (the owner, 2026-11-21: the
             // magic lesson makes a big combo anyway), and essential: in The Basics.
             {"combos_magic", "Combos and Magic", "command:new_lesson:combos", "Combos top up your magic meter: fill it to unlock a power-up.", "\uE417", 104, P},
-            // Rubble turned into pieces for a combo, then a power-up freed from a
-            // mystery block (the owner's idea, 2026-11-21; Mystery Blocks merged in).
-            {"rubble", "Rubble and Mystery Blocks", "command:new_lesson:rubble", "Turn rubble into pieces for bigger combos, and free the power-up in a mystery block.", "\uE242", 105, P},
+            // Crystals turned into pieces for a combo, then a power-up freed from a
+            // mystery block (the owner's idea, 2026-11-21; Mystery Blocks and the
+            // game's Crystal Pieces lesson merged in).
+            {"crystals", "Crystals and Mystery Blocks", "command:new_lesson:rubble", "Turn crystals into pieces for bigger combos, and release the power-up in a mystery block.", "\uE242", 105, P},
         }},
         {"group_faster", "Getting Faster", {
             // The six power-ups as one lesson (the owner, 2026-11-21): for now the
@@ -333,7 +334,6 @@ std::vector<blockplanet::ui::ListItem> training_lessons(bool basics_done, bool a
             {"fuse", "Power Pieces and Fuse Combos", "", "Slide a breaking power piece into a match to start a new combo.", "", -1, N},
             {"gravity", "Gravity Combos", "", "Slide a piece out from under another so it falls into a match.", "", -1, N},
             {"x_count", "X Count", "", "Fuse and gravity combos raise the multiplier on your combo points.", "", -1, N},
-            {"crystal", "Crystal Bricks", "", "Turn a group of crystal bricks into a power piece.", "", -1, N},
         }},
         // What each game mode asks of you (the owner: in place of one "goal"
         // lesson, as the goal differs by mode).
