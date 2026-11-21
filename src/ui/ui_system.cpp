@@ -541,8 +541,28 @@ std::string drop_count(const HudView& hud) {
 
 // The item box's classes: held (the game draws the model and its tint) and
 // full (the meter full, the next magic coming).
+// The magic meter as a ring of segments round the power-up (the owner's
+// design, 2026-11-21): one segment per step of the game's meter (14; 9 in VS),
+// lit from the top, clockwise, as combos fill it. Each segment is a short bar
+// set at the box's middle, turned to its angle and pushed out to the ring.
+std::string meter_ring(const HudView& hud) {
+    if (hud.meter_steps <= 0) return {};
+    std::string rml = "<div class='ring'>";
+    for (int i = 0; i < hud.meter_steps; ++i) {
+        const float angle = 360.0f * (float(i) + 0.5f) / float(hud.meter_steps);
+        char pip[160];
+        // The ring fits the box: 50dp out in the side panel's, 31 in the
+        // smaller box of the bottom row.
+        std::snprintf(pip, sizeof pip, "<div class='pip%s' style='transform: rotate(%.1fdeg) translateY(-%ddp);'/>",
+                      i < hud.meter_count ? " on" : "", angle, hud.bottom_row ? 31 : 50);
+        rml += pip;
+    }
+    return rml + "</div>";
+}
+
 std::string item_classes(const HudView& hud) {
     std::string c;
+    if (hud.meter_steps > 0) c += " ringed";
     if (hud.magic >= 0 && hud.magic_model) c += " held";
     if (hud.meter >= 0.999f) c += " full";
     return c.empty() ? std::string() : " class='" + c.substr(1) + "'";
@@ -583,7 +603,7 @@ std::string hud_rml_parts(const HudView& hud) {
             const bool model = hud.magic >= 0 && hud.magic_model;
             parts.push_back(std::string("<div id='magic' class='") + glow("magic") +
                             "'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'" +
-                            item_classes(hud) + "><div id='item-fill'/>" +
+                            item_classes(hud) + "><div id='item-fill'/>" + meter_ring(hud) +
                             (hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "") +
                             "</div><div class='edge'/></div><div class='band foot'/></div>");
         }
@@ -642,7 +662,7 @@ std::string hud_rml_parts(const HudView& hud) {
     // Left out where not needed (the Drop lesson, 2026-11-20).
     if (hud.show_magic) {
     rml += "<div id='magic'><div class='band'><div class='label'>Magic</div></div><div class='window'><div class='edge'/><div id='item'" +
-           item_classes(hud) + "><div id='item-fill'/>";
+           item_classes(hud) + "><div id='item-fill'/>" + meter_ring(hud);
     // The magic's 3D model is drawn in the box by the game (magic_hooks.cpp);
     // its name is shown only when it is not.
     rml += hud.magic >= 0 && !hud.magic_model ? "<div class='name'>" + std::string(magic_name(hud.magic)) + "</div>" : "";

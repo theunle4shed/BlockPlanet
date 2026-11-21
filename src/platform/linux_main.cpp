@@ -1046,7 +1046,8 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
     view.magic = state.magic;
     view.magic_model = view.show_magic && blockplanet::magic_box_active();
     view.meter = state.meter;
-    blockplanet::set_magic_charge(state.meter);
+    view.meter_count = state.meter_count, view.meter_steps = state.meter_steps;
+    blockplanet::set_magic_charge(state.meter_steps > 0 ? 0.0f : state.meter);  // the ring shows the meter: no fill behind the model
     for (const auto& piece : state.next) {
         blockplanet::ui::HudPieceView p;
         p.random_block = piece.random_block;
@@ -1431,7 +1432,8 @@ void update_hud() {
     view.magic = state.magic;
     view.magic_model = blockplanet::magic_box_active();
     view.meter = state.meter;
-    blockplanet::set_magic_charge(state.meter);
+    view.meter_count = state.meter_count, view.meter_steps = state.meter_steps;
+    blockplanet::set_magic_charge(state.meter_steps > 0 ? 0.0f : state.meter);  // the ring shows the meter: no fill behind the model
     for (const auto& piece : state.next) {
         blockplanet::ui::HudPieceView p;
         p.random_block = piece.random_block;

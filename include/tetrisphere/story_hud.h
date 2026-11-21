@@ -24,6 +24,7 @@ struct StoryHudState {
     float drop_left = 1.0f;    // the drop timer's time left, 1 (full) to 0
     int magic = -1;            // -1 none, 0 to 5 the held magic
     float meter = 0.0f;        // the magic meter, 0 to 1
+    int meter_count = 0, meter_steps = 0;  // its steps filled, and its size (14; 9 in VS)
     std::vector<HudPiece> next;  // the next pieces, next first
     int chapter = 0;           // 1-based
     int level = 0;             // 1-based

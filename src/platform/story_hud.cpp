@@ -98,6 +98,8 @@ bool read_story_hud(const std::uint8_t* rdram, ProgressTracker& progress, StoryH
     const int meter_full = load16(rdram, player1 + 0x2AEE);
     const int meter = static_cast<std::uint16_t>(load16(rdram, player1 + 0x2AEC));
     out.meter = meter_full > 0 ? std::clamp(float(meter) / float(meter_full), 0.0f, 1.0f) : 0.0f;
+    out.meter_steps = std::clamp(meter_full, 0, 32);
+    out.meter_count = std::clamp(meter, 0, out.meter_steps);
     for (int slot = 0; slot < 3; ++slot) {
         const int index = load16(rdram, player1 + 0x2374 + 2u * slot);
         if (index < 0 || index >= 48) continue;
