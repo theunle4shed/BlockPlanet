@@ -22,6 +22,9 @@ enum class Quadrant { RowsUpColumnsUp, RowsDownColumnsUp, RowsUpColumnsDown, Row
 // Does what the original pass for `quadrant` does, calling the same game
 // functions in the same order.
 void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant);
+// The undersides of blocks with nothing under them (on unless
+// BLOCKPLANET_SPHERE_UNDERSIDES=0); research can switch them while running.
+void set_undersides(bool on);
 
 // The Escape view (research, include/tetrisphere/escape_view.h): every cell
 // of the game's patch drawn by the inner face of its first block above the

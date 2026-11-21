@@ -52,6 +52,7 @@
 #include "tetrisphere/window_placement.h"
 #include "tetrisphere/pc_settings_hook.h"
 #include "tetrisphere/controls_sdl.h"
+#include "tetrisphere/sphere_quadrants.h"
 
 #include "librecomp/rsp.hpp"
 #include "ultramodern/input.hpp"
@@ -2258,9 +2259,31 @@ void research_hole(std::uint8_t* rdram) {
     const std::uint32_t values = guest::load32(rdram, 0x800E44D0u), masks = guest::load32(rdram, 0x800E44D4u),
                         entries = guest::load32(rdram, 0x800E44D8u), columns = guest::load32(rdram, 0x800E44DCu);
     const int cx = 8 + guest::load16(rdram, 0x80110220u + 0x2B2A), cy = 8 + guest::load16(rdram, 0x80110220u + 0x2B2E);
+    // BLOCKPLANET_RESEARCH_HOLE_FLOAT=1: every third cell keeps its top block,
+    // floating over the hole with all its faces exposed, as the Atom can
+    // leave them (to check how blocks are drawn from below).
+    static const bool floating = std::getenv("BLOCKPLANET_RESEARCH_HOLE_FLOAT") != nullptr;
     for (int dy = -8; dy < 8; ++dy)
         for (int dx = -8; dx < 8; ++dx) {
             const int c = ((cy + dy) & 31) * 32 + ((cx + dx) & 31);
+            if (floating) {
+                // Layer 1 stays (so the core is not reached and the stage
+                // goes on); above it, only the top block of every third cell.
+                int top = 0;
+                for (int layer = 8; layer >= 2 && top == 0; --layer)
+                    if (guest::load16(rdram, values + 2u * std::uint32_t(layer * 1024 + c)) != 0) top = layer;
+                if ((dx + dy + 16) % 3 != 0) top = 0;
+                for (int layer = 2; layer < 9; ++layer) {
+                    if (layer == top) continue;
+                    guest::store16(rdram, values + 2u * std::uint32_t(layer * 1024 + c), 0);
+                    guest::store8(rdram, masks + std::uint32_t(layer * 1024 + c), 0);
+                    guest::store32(rdram, entries + 4u * std::uint32_t(layer * 1024 + c), 0);
+                }
+                guest::store8(rdram, masks + std::uint32_t(1024 + c), 0x10);
+                if (top != 0) guest::store8(rdram, masks + std::uint32_t(top * 1024 + c), 0x1F);
+                guest::store8(rdram, columns + std::uint32_t(c), std::uint8_t(1 << 4 | (top != 0 ? top : 1)));
+                continue;
+            }
             for (int layer = 1; layer < 9; ++layer) {
                 guest::store16(rdram, values + 2u * std::uint32_t(layer * 1024 + c), 0);
                 guest::store8(rdram, masks + std::uint32_t(layer * 1024 + c), 0);
@@ -6815,6 +6838,10 @@ bool handle_profile_command(const std::string& command) {
                 // Research (the test harness): Hide & Seek from level N.
                 game_option_applier->choose_start(0, std::atoi(command->c_str() + 18));
                 launch_mode(LaunchMode::HideAndSeek);
+                continue;
+            }
+            if (command->starts_with("research_undersides:")) {
+                tetrisphere::sphere::set_undersides(command->back() == '1');
                 continue;
             }
             if (*command == "research_magic_retry" && guest_rdram != nullptr) {

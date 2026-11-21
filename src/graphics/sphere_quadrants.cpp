@@ -5,6 +5,9 @@
 #include "tetrisphere/sphere_extended.h"
 
 #include <array>
+#include <atomic>
+#include <cstdlib>
+#include <string_view>
 
 // Game functions called by the passes (generated code).
 extern "C" {
@@ -105,6 +108,18 @@ void lift_one_layer(std::uint8_t* rdram) {
     }
 }
 
+// BLOCKPLANET_SPHERE_UNDERSIDES=0 turns the undersides off (to compare).
+std::atomic<int> undersides{-1};
+bool draw_undersides() {
+    int on = undersides.load(std::memory_order_relaxed);
+    if (on < 0) {
+        const char* v = std::getenv("BLOCKPLANET_SPHERE_UNDERSIDES");
+        on = v == nullptr || std::string_view(v) != "0";
+        undersides.store(on, std::memory_order_relaxed);
+    }
+    return on != 0;
+}
+
 void draw_block(std::uint8_t* rdram, recomp_context* ctx, const QuadrantShape& shape) {
     const std::uint8_t faces = load8(rdram, load32(rdram, face_mask_pointer));
     store16(rdram, face_mask, faces);
@@ -133,6 +148,13 @@ void draw_block(std::uint8_t* rdram, recomp_context* ctx, const QuadrantShape& s
     auto marked = [&](std::uint32_t bit) {
         return (static_cast<std::uint16_t>(load16(rdram, face_mask)) & bit) != 0;
     };
+    // BlockPlanet: the underside of a block with nothing under it (a hole
+    // dug beneath it, by the Atom for example). The game never draws it, so
+    // near the edge of the view, where blocks are seen from below, such a
+    // block showed only a sliver. It is the farthest face, so it goes first.
+    if (draw_undersides() && load16(rdram, cell_layer) >= 2 &&
+        load16(rdram, load32(rdram, block_value_pointer) - 2 * layer_cells) == 0)
+        func_8009C6D4(rdram, ctx);
     if (marked(outer_face_bit)) func_8009C330(rdram, ctx);
     if (marked(shape.first_side.bit)) shape.first_side.draw(rdram, ctx);
     if (marked(shape.second_side.bit)) shape.second_side.draw(rdram, ctx);
@@ -226,6 +248,8 @@ void draw_inside(std::uint8_t* rdram, recomp_context* ctx) {
         }
     ctx->r29 = static_cast<std::int32_t>(ctx->r29) + original_frame_bytes;
 }
+
+void set_undersides(bool on) { undersides.store(on ? 1 : 0, std::memory_order_relaxed); }
 
 void draw_quadrant(std::uint8_t* rdram, recomp_context* ctx, Quadrant quadrant) {
     walk_quadrant(rdram, ctx, quadrant, 0, [&] { func_8009D90C(rdram, ctx); }, [] { return true; });

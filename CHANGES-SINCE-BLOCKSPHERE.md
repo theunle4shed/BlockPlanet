@@ -705,3 +705,9 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - `BLOCKPLANET_POWERUP_TEST=1` (set by BlockPlanet.bat's "Play with the new power-ups (test)"): in a game, when no power-up is held, the next one is given two seconds later, round the four power-ups at levels 1 to 3 (Missile, Dynamite, Magnet with the Ray Gun at level 3, Atom). Only the look follows the level so far; the effects are still the game's own.
 - The HUD's flat icon shows the four power-ups' icons at their level in this mode.
+
+## 2026-11-21: Undersides of floating blocks
+
+- With the Extended sphere, a block with nothing under it (left floating over a hole, for example by the Atom) now has its underside drawn. The game never draws undersides, so near the edge of the view such a block showed only as a thin sliver. `BLOCKPLANET_SPHERE_UNDERSIDES=0` turns this off.
+- Research: `BLOCKPLANET_RESEARCH_HOLE_FLOAT=1` makes the research hole leave floating blocks over layer 1, and `research_undersides:0|1` switches the undersides while running.
+- The power-up test only gives power-ups in a game (not on the title, in the menus or in the attract demo).
