@@ -126,6 +126,15 @@ bool log_game_events = false;
 
 // Every Story episode and stage open in the menus (--unlock-all, testing).
 bool unlock_all_testing = false;
+// The power-up test (BlockPlanet.bat's "Play with the new power-ups",
+// BLOCKPLANET_POWERUP_TEST=1, the owner, 2026-11-21): in play, with no power-up
+// held, the next one is given after two seconds, round the four power-ups at
+// levels 1 to 3 (the game's six for now: the Missile is the Firecracker at
+// level 1 and the Bomb at 2 and 3, the Magnet the Magnet at 1 and 2 and the
+// Ray Gun at 3). The level shows in the icon and the 3D model (guest byte
+// 0x807FFF00, read by magic_hooks.cpp); the effects are still the game's.
+int powerup_test_step = 0, powerup_test_shown_level = 0;
+int powerup_test_level() { return powerup_test_shown_level; }
 // Start-up screens (the owner's choice, 2026-11-08): title, then who is
 // playing (P1), then the main menu; Back goes back through them.
 bool profile_picked = false;  // P1 chosen this session (or given on the command line)
@@ -1177,6 +1186,7 @@ void update_training_hud(const tetrisphere::StoryHudState& state) {
         static const bool models = std::getenv("BLOCKPLANET_MAGIC_MODELS") != nullptr;
         blockplanet::set_magic_models_hidden(!models);
         if (!models) view.magic_icon = true, view.magic_model = false;
+        view.magic_level = powerup_test_level();
     }
     view.meter = state.meter;
     view.meter_count = state.meter_count, view.meter_steps = state.meter_steps;
@@ -1572,6 +1582,7 @@ void update_hud() {
         static const bool models = std::getenv("BLOCKPLANET_MAGIC_MODELS") != nullptr;
         blockplanet::set_magic_models_hidden(!models);
         if (!models) view.magic_icon = true, view.magic_model = false;
+        view.magic_level = powerup_test_level();
     }
     view.meter = state.meter;
     view.meter_count = state.meter_count, view.meter_steps = state.meter_steps;
@@ -9246,6 +9257,35 @@ bool handle_profile_command(const std::string& command) {
                 }
             }
             publish_game_text();
+            {
+                static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
+                static std::optional<std::chrono::steady_clock::time_point> empty_since;
+                auto* g = const_cast<std::uint8_t*>(guest_rdram);
+                // In a game (not the title, the menus or the attract demo), the board up.
+                const bool playing = test && guest::load16(g, 0x800E44A8) != 10 &&
+                                     tetrisphere::box_art::phase().load() != tetrisphere::box_art::Phase::Demo &&
+                                     guest::load16(g, 0x800E121C) == -1 && std::int16_t(guest::load16(g, 0x800E1228)) < 0 &&
+                                     std::int16_t(guest::load16(g, 0x80112F9E)) != -1 && !blockplanet::ui::menus_open() &&
+                                     !launching() && slide_lesson_phase < 0 && magic_lesson_phase < 0 && drop_lesson_phase < 0;
+                const bool held = std::int8_t(guest::load8(g, 0x80110220u + 0x702)) >= 0;
+                if (!test || !playing || held) {
+                    empty_since.reset();
+                    if (!test) powerup_test_shown_level = 0;
+                } else if (!empty_since) {
+                    empty_since = std::chrono::steady_clock::now();
+                } else if (std::chrono::steady_clock::now() - *empty_since > std::chrono::seconds(2)) {
+                    empty_since.reset();
+                    // Missile 1-3, Dynamite 1-3, Magnet 1-2 and the Ray Gun, Atom 1-3.
+                    static constexpr int kinds[12] = {0, 4, 4, 1, 1, 1, 2, 2, 5, 3, 3, 3};
+                    static constexpr int levels[12] = {1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3};
+                    const int i = powerup_test_step++ % 12;
+                    guest::store8(g, 0x807FFF00u, std::uint8_t(levels[i]));
+                    guest::store8(g, 0x80110220u + 0x702, std::uint8_t(kinds[i]));
+                    powerup_test_shown_level = levels[i];
+                    std::fprintf(stdout, "{\"event\":\"powerup_test\",\"kind\":%d,\"level\":%d}\n", kinds[i], levels[i]);
+                    std::fflush(stdout);
+                }
+            }
             update_training_presses(blockplanet::recent_card_box().has_value());
             // A lesson chosen on its own: once the game moves on to the next
             // lesson (its level counts on), leave through the pause.

@@ -566,6 +566,13 @@ std::string meter_ring(const HudView& hud) {
 std::string power_icon(const HudView& hud) {
     static const char* names[6] = {"firecracker", "dynamite", "magnet", "atom", "bomb", "raygun"};
     if (!hud.magic_icon || hud.magic < 0 || hud.magic > 5) return {};
+    if (hud.magic_level >= 1 && hud.magic_level <= 3) {
+        // The four power-ups (the game's Firecracker and Bomb are the Missile,
+        // its Magnet and Ray Gun the Magnet), at their level.
+        static const char* families[6] = {"missile", "dynamite", "magnet", "atom", "missile", "magnet"};
+        const std::string level = hud.magic_level == 1 ? "" : "-" + std::to_string(hud.magic_level);
+        return std::string("<div class='power p-") + families[hud.magic] + level + "'/>";
+    }
     return std::string("<div class='power p-") + names[hud.magic] + "'/>";
 }
 

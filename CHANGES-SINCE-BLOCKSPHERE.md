@@ -700,3 +700,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 - 2026-11-21, Power-ups (research, off by default): BlockPlanet's 3D models now also replace the power-up as it flies and works on the sphere (told apart by its vertices from the core's character, which is drawn the same way); drawn from both sides and a little brighter. The four power-ups to be equally likely (the owner).
 - 2026-11-21, Power-ups (research, off by default): the 3D Magnet redrawn as a proper horseshoe (the owner: the square bars looked like two towers): round, chunkier arms and a smooth U at the bottom, round pale tips, on the green ring; its level 2 pair likewise.
 - 2026-11-21, BlockPlanet.bat: the menu cut to what the owner needs for now: 1 Play, 2 Play with the new power-ups (test: BlockPlanet's 3D power-up models switched on), 3 Get the latest changes and rebuild, 6 Quit. The others (4 try a branch, 5 back to main, 7 and 9 developer tools, 8 classic, E Escape) still work if typed, and 5 is still shown when on a branch.
+
+## 2026-11-21: Power-up test mode
+
+- `BLOCKPLANET_POWERUP_TEST=1` (set by BlockPlanet.bat's "Play with the new power-ups (test)"): in a game, when no power-up is held, the next one is given two seconds later, round the four power-ups at levels 1 to 3 (Missile, Dynamite, Magnet with the Ray Gun at level 3, Atom). Only the look follows the level so far; the effects are still the game's own.
+- The HUD's flat icon shows the four power-ups' icons at their level in this mode.

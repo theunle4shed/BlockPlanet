@@ -115,6 +115,7 @@ struct HudView {
     int magic = -1;            // -1 none, 0 to 5
     bool magic_model = false;  // the game draws the magic's model in the box
     bool magic_icon = false;   // BlockPlanet's flat icon for the held power-up instead
+    int magic_level = 0;       // the power-up's level (1 to 3): the four power-ups' icons; 0 the game's six
     float meter = 0.0f;        // the magic meter, 0 to 1
     int meter_count = 0, meter_steps = 0;  // the meter as steps: a ring of segments round the power-up (0 steps: none)
     std::vector<HudPieceView> next;  // next first

@@ -206,6 +206,9 @@ div { display: block; }
    the middle of the box or ring; -2 and -3 are its level 2 and 3 pictures. */
 #item .power { position: absolute; left: 50%; top: 50%; width: 96dp; height: 96dp; margin-left: -48dp; margin-top: -48dp; }
 #left.row #item .power { width: 56dp; height: 56dp; margin-left: -28dp; margin-top: -28dp; }
+.p-missile { decorator: image(/blockplanet-ui/powerups/missile.png); }
+.p-missile-2 { decorator: image(/blockplanet-ui/powerups/missile-2.png); }
+.p-missile-3 { decorator: image(/blockplanet-ui/powerups/missile-3.png); }
 .p-firecracker { decorator: image(/blockplanet-ui/powerups/firecracker.png); }
 .p-firecracker-2 { decorator: image(/blockplanet-ui/powerups/firecracker-2.png); }
 .p-firecracker-3 { decorator: image(/blockplanet-ui/powerups/firecracker-3.png); }

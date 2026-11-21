@@ -55,9 +55,12 @@ call :run
 goto menu
 :powerups
 rem The power-ups as they are being worked on: BlockPlanet's own 3D models.
+rem A power-up is given whenever none is held, round all four at each level.
 set BLOCKPLANET_MODELS3D=1
+set BLOCKPLANET_POWERUP_TEST=1
 call :run
 set BLOCKPLANET_MODELS3D=
+set BLOCKPLANET_POWERUP_TEST=
 goto menu
 :developer
 call :run --developer
