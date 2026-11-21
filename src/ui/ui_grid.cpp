@@ -542,7 +542,13 @@ void MenuGrid::place(double now) {
     // 16:9, the tiles still cover nearly all their usual part of the screen at
     // 0.7 of the way in place, about half at 0.5 and almost none by 0.4, so
     // it fades between 0.4 and 0.75.
-    const float present = std::clamp((presence() - 0.4f) / 0.35f, 0.0f, 1.0f);
+    // Flying in, though, the middle tiles land last (at 1.0): the backdrop
+    // faded in by 0.75 showed through where they had not yet arrived, a dark
+    // cross in the sphere's middle for a few frames (the owner, 2026-11-21,
+    // after a lesson's Complete panel: "the old menu flickered"). So flying
+    // in it fades between 0.85 and 1.0, as the last tiles land.
+    const float present = leaving_ ? std::clamp((presence() - 0.4f) / 0.35f, 0.0f, 1.0f)
+                                   : std::clamp((presence() - 0.85f) / 0.15f, 0.0f, 1.0f);
     const float far_alpha = (leaving_ && into_cover_) ? 1.0f : present * present * (3.0f - 2.0f * present);
     far_alpha_ = show_far_ ? far_alpha : 0.0f;
     std::string far = css(turned(mix(far_from_, far_to_, ease_in_out(fade))), 1.0f);

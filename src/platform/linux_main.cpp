@@ -9249,6 +9249,15 @@ bool handle_profile_command(const std::string& command) {
                 end_track_override(), return_to_menu_chapter = 0;
             }
             // A single stage finished: pause, then quit to the menu.
+            // A lesson's end: the grid flies in first and the stage is left once it
+            // is whole (0.7 s), so the game's own way out to its menus (garbled
+            // frames) is never seen (the owner, 2026-11-21: "the old menu
+            // flickered" before the Complete panel).
+            if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at && pending_results &&
+                pending_results->lesson >= 0 && !grid_quit_at) {
+                grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = false;
+                single_stage_quit_at = std::chrono::steady_clock::now() + std::chrono::milliseconds(900);
+            }
             if (single_stage_quit_at && std::chrono::steady_clock::now() >= *single_stage_quit_at) {
                 single_stage_quit_at.reset();
                 single_stage_quitting = true;
