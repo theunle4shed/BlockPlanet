@@ -140,7 +140,7 @@ Next, when it shows again: trap `func_800924E0`'s result in `func_800CC0D0` to s
 
 Combos and earning a power-up in one lesson (the owner: the magic lesson makes a big combo anyway, so no separate Combos lesson; power pieces and fuse combos stay in Scoring Big).
 
-**Page 1, "Combos and Magic"** (the owner's layout, 2026-11-21): the line "Break more than three pieces at once and you've made a combo: the more you break together, the more rewarding it is." as plain text, then ([A]) three bullets: "• Fill your magic meter faster" / "• Clear the sphere faster: good for Time Attack" / "• Score more points: good for Score Attack".
+**Page 1, "Combos and Magic"** (the owner's layout, 2026-11-21): the line "Break more than three pieces at once and you've made a combo: the more you break together, the more rewarding it is." as plain text, then ([A]) three bullets: "• Fill your magic meter faster" / "• Clear the sphere faster" / "• Score more points".
 
 **Page 2** (fresh): "Magic power-ups clear a lot of bricks at once: your best way to dig quickly, or to get out of trouble." / "Break 20 or more pieces in one go and you earn a power-up." / new page: "In this lesson you'll make a big combo, earn a power-up, and use it."
 
