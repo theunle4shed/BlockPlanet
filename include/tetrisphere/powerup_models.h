@@ -26,12 +26,15 @@ constexpr int last_kind = 9;
 // model memory when first asked for), or 0.
 std::uint32_t model_list(std::uint8_t* rdram, int kind, int level, std::uint32_t light_dir = 0x5A33C500u);
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source = 0, std::uint32_t* source = nullptr,
-             bool whole = false, int draw_kind = -1);  // draw_kind: the model drawn, if not kind's
+             bool whole = false, int draw_kind = -1, double turn_degrees = 0.0);  // draw_kind: the model drawn, if not kind's
 
 // Whether the power-up drawn from `start` flies nose backwards (our models'
 // front is -z), from its movement since the last call; `restart` for a new
 // flight.
 bool nose_backwards(const std::uint8_t* rdram, std::uint32_t start, bool restart);
+// How far the power-up's nose (-z) points at the camera, -1 to 1 (eye space
+// z of its direction); -2 if unknown.
+double nose_towards_camera(const std::uint8_t* rdram, std::uint32_t start);
 // The game's geometry in the draw from `start` blanked (nothing drawn).
 bool hide(std::uint8_t* rdram, std::uint32_t start);
 

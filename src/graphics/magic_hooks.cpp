@@ -488,7 +488,11 @@ extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ct
     const float t = static_cast<float>(since / flight_seconds);
     const float fade = 1.0f - t * t * (3.0f - 2.0f * t);
     const float shift = anchor_shift.load();
-    const float dx = ((box_x.load() - box_correction - bowl_x) * fade + shift) * units_per_height;
+    // With BlockPlanet's models it comes in from off the screen's left edge
+    // (the owner, 2026-11-22: it appeared beside the HUD), not from the box.
+    static const bool models3d = std::getenv("BLOCKPLANET_MODELS3D") != nullptr;
+    const float from_x = models3d ? box_x.load() - 0.9f : box_x.load();
+    const float dx = ((from_x - box_correction - bowl_x) * fade + shift) * units_per_height;
     const float dy = -(box_y.load() - bowl_y) * fade * units_per_height;
     constexpr std::uint32_t m = translation_matrix;
     store_float(rdram, m + 0x30, load_float(rdram, m + 0x30) + dx);
@@ -525,6 +529,7 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
             // against its movement, so it always flies nose first (the owner,
             // 2026-11-22).
             int draw_kind = -1;
+            double turn = 0.0;  // degrees about the model's own x axis
             // (Only for the flying bomb's own draws: other models drawn now,
             // the core's character, have their own matrices.)
             std::uint32_t first_source = 0;
@@ -534,10 +539,25 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                     break;
                 }
             if (model3d_kind == 4 && first_source == held_source[4]) {
+                // Rolled over in step with the game's own turn: as the game
+                // swings its nose round towards the camera (from into the screen,
+                // about -0.3, to facing it, about 0.4), ours rolls half a turn
+                // about its own axis, so it never flips in one frame (the owner,
+                // 2026-11-22) and always dives nose first. Never rolls back.
                 static Clock::time_point flight{};
-                const bool restart = flight != used_time;
+                // (It flies in nose up, side on to the camera, so the roll waits
+                // until it has first pointed into the screen.)
+                static double rolled = 0.0;
+                static bool into_screen = false;
+                if (flight != used_time) rolled = 0.0, into_screen = false;
                 flight = used_time;
-                if (tetrisphere::powerup_models::nose_backwards(rdram, model3d_start, restart)) draw_kind = tetrisphere::powerup_models::dive_kind;
+                const double nz = tetrisphere::powerup_models::nose_towards_camera(rdram, model3d_start);
+                if (nz > -1.5 && nz < -0.5) into_screen = true;
+                if (nz > -1.5 && into_screen) {
+                    const double u = std::clamp((nz + 0.3) / 0.7, 0.0, 1.0);
+                    rolled = std::max(rolled, 180.0 * u * u * (3.0 - 2.0 * u));
+                }
+                turn = rolled;
             }
             // Level 3: the scene draws the launcher (barrage_scene.cpp), so
             // the game's flight is not drawn.
@@ -545,7 +565,7 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                 done = tetrisphere::powerup_models::hide(rdram, model3d_start);
             else
                 done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen, false,
-                                                            draw_kind);
+                                                            draw_kind, turn);
             // Dynamite splits into five sticks, each its own model of one
             // vertex load of 32 (2026-11-22): each drawn as one of ours.
             // The Bomb's second model (our Missile at levels 2 and 3, about

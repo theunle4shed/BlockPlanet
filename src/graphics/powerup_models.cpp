@@ -608,7 +608,7 @@ std::uint32_t model_list(std::uint8_t* rdram, int draw_kind, int level, std::uin
 }
 
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole,
-             int draw_kind) {
+             int draw_kind, double turn_degrees) {
     if (draw_kind < 0) draw_kind = kind;
     if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > last_kind || draw_kind > last_kind || level < 1 || level > 3) return false;
     const std::uint32_t end = load32(rdram, display_list_pointer);
@@ -674,7 +674,32 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
             if (op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, a, 0), store32(rdram, a + 4u, 0);
         }
     }
-    store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, list);
+    // Turned about its own x axis: a short list that multiplies a rotation
+    // onto the game's matrix, calls the model and pops it (one per draw, in
+    // a ring of slots so a frame still being drawn keeps its own).
+    std::uint32_t call = list;
+    if (std::abs(turn_degrees) > 0.01) {
+        static std::uint32_t slot = 0;
+        constexpr std::uint32_t turn_memory = 0x80770000u, slot_bytes = 0x60u, slots = 64u;
+        const std::uint32_t at = turn_memory + (slot++ % slots) * slot_bytes;
+        const double a = turn_degrees * 3.14159265358979 / 180.0, c = std::cos(a), sn = std::sin(a);
+        // Row vectors: x stays; y' = (0, c, s), z' = (0, -s, c).
+        const double m[4][4] = {{1, 0, 0, 0}, {0, c, sn, 0}, {0, -sn, c, 0}, {0, 0, 0, 1}};
+        const std::uint32_t mtx = at + 0x20u;
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j) {
+                const std::int32_t fixed = std::int32_t(std::lround(m[i][j] * 65536.0));
+                const std::uint32_t k = std::uint32_t(i * 4 + j);
+                store16(rdram, mtx + 2u * k, std::uint16_t(fixed >> 16));
+                store16(rdram, mtx + 32u + 2u * k, std::uint16_t(fixed & 0xFFFF));
+            }
+        store32(rdram, at, 0x01040040u), store32(rdram, at + 4u, mtx);      // G_MTX: modelview, multiply, push
+        store32(rdram, at + 8u, 0x06000000u), store32(rdram, at + 12u, list);
+        store32(rdram, at + 16u, 0xBD000000u), store32(rdram, at + 20u, 0);  // G_POPMTX
+        store32(rdram, at + 24u, 0xB8000000u), store32(rdram, at + 28u, 0);  // end
+        call = at;
+    }
+    store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, call);
     return true;
 }
 
@@ -707,6 +732,28 @@ Mat multiply(const Mat& a, const Mat& b) {
     return r;
 }
 }  // namespace
+
+double nose_towards_camera(const std::uint8_t* rdram, std::uint32_t start) {
+    const std::uint32_t end = load32(rdram, display_list_pointer);
+    if (end <= start || end - start > 0x10000u) return -2.0;
+    Mat m{};
+    for (int i = 0; i < 4; ++i) m[i][i] = 1;
+    bool any = false;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+        if ((w0 >> 24) == 0x04u) break;
+        if ((w0 >> 24) != 0x01u) continue;
+        const std::uint32_t params = (w0 >> 16) & 0xFFu;
+        if (params & 1u) continue;
+        const Mat t = read_matrix(rdram, w1);
+        m = (params & 2u) ? t : multiply(t, m);
+        any = true;
+    }
+    if (!any) return -2.0;
+    const double nose[3] = {-m[2][0], -m[2][1], -m[2][2]};
+    const double l = std::sqrt(nose[0] * nose[0] + nose[1] * nose[1] + nose[2] * nose[2]);
+    return l > 0 ? nose[2] / l : -2.0;
+}
 
 bool nose_backwards(const std::uint8_t* rdram, std::uint32_t start, bool restart) {
     static bool backwards = false, have = false;

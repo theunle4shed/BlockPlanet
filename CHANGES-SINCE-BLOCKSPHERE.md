@@ -779,3 +779,7 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 
 - The game's own target is back by default (the owner); BlockPlanet's crosshairs stay in the code behind `BLOCKPLANET_CROSSHAIRS=1`, with three fixes not yet tried: set at the press itself (the game's target showed for a frame or two first), earlier strikes' crosshairs cleared at a new press (one left over could take the new one's place), and gliding with the view while aiming (snapped to whole cells, they lagged as the sphere turned), snapping to the blast's cell at the launch.
 - The barrage's missiles leave the launcher smoothly (the owner: they pointed down, then all turned at once): each slides out of its tube nose down, as it sat, then follows a curve over the surface onto its strike point, turned along its path, at the size it had in the launcher. The launcher is smaller (it filled the view).
+
+## 2026-11-22: The Missile flies in from off screen and rolls over smoothly (3D models)
+
+- From the owner's recording (Missile level 2, frames 38 and 75): the flight started beside the Magic box; it now comes in from off the screen's left edge. The rocket turned round in one frame for its dive; it now rolls half a turn about its own axis in step with the game's own turn (its nose going from into the screen to facing the camera), drawn through a short list that multiplies a rotation onto the game's matrix (`replace(..., turn_degrees)`), so it dives nose first with no jump.
