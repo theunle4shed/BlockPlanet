@@ -7437,7 +7437,18 @@ bool handle_profile_command(const std::string& command) {
                     const int a = guest::load8(guest_rdram, attrs + std::uint32_t(i)) & 0x60;
                     power += a == 0x40, crystal += a == 0x20;
                 }
-                out += "],\"power\":" + std::to_string(power) + ",\"crystal\":" + std::to_string(crystal) + "}";
+                // Floating cells: filled with an empty layer right under them (by value).
+                std::map<int, int> floating;
+                for (int layer = 2; layer < 9; ++layer)
+                    for (int c = 0; c < 1024; ++c) {
+                        const std::int16_t v = std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t(layer * 1024 + c)));
+                        const std::int16_t under = std::int16_t(guest::load16(guest_rdram, values + 2u * std::uint32_t((layer - 1) * 1024 + c)));
+                        if (v > 0 && under <= 0) ++floating[v];
+                    }
+                out += "],\"power\":" + std::to_string(power) + ",\"crystal\":" + std::to_string(crystal) + ",\"floating\":{";
+                bool first = true;
+                for (const auto& [v, n] : floating) out += (first ? "\"" : ",\"") + std::to_string(v) + "\":" + std::to_string(n), first = false;
+                out += "}}";
                 std::fprintf(stdout, "%s\n", out.c_str());
                 std::fflush(stdout);
                 continue;

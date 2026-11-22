@@ -805,3 +805,7 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 ## 2026-11-22: The Missile's flame (3D models)
 
 - The owner: levels 2 and 3 had a still yellow-orange spike at the tail, while level 1 flies with animated fire. Level 1's fire is the game's own effect (kept: only the body is replaced); the original's level 2 (the Bomb) has none, its spike part of its model. Now a flying missile at level 2 (and its dive), and each of the barrage's released missiles, has a flame that flickers: yellow at the nozzle running into an orange tip, drawn at full brightness, in four frames of different lengths and widths shown in turn (a new one every 70 ms; each frame its own built model, `model_list(..., phase)`). No flame while held in the Magic box, strapped in the launcher, or at level 1 (the game's fire).
+
+## 2026-11-22: Floating crystals after the Missile: not on the board
+
+- The owner saw crystal blocks hanging in mid-air after level 2 and 3 Missiles. Checked with the board itself (`research_board` now also counts **floating** cells: filled with an empty layer right under, by value): none in 10:5 before or after a level 2 blast, the original's or ours, nor after two level 3 barrages. The game's gravity does its job; what was seen was drawn, not on the board. Most likely the display-list overflow fixed earlier today (the owner's build predated it, his log shows the game's own buffers): a frame's list running into the other frame's buffer leaves that frame drawing stale commands. To confirm on the owner's next build.
