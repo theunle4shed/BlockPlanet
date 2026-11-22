@@ -288,7 +288,8 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
     const std::uint32_t buffer = matrix_memory + (draw_count++ & 1u) * 0x800u;
     std::uint32_t slot = 0;
     const auto place = [&](int kind, V x, V y, V z, double scale, V at) {
-        const std::uint32_t list = powerup_models::model_list(rdram, kind, 3);
+        const std::uint32_t list = powerup_models::model_list(rdram, kind, 3, 0x5A33C500u,
+                                                              kind == powerup_models::barrage_missile_kind ? powerup_models::flame_frame() : -1);
         if (list == 0 || slot >= 30) return;
         const std::uint32_t m = buffer + 64u * slot++;
         write_matrix(rdram, m, x, y, z, scale, at);

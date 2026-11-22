@@ -16,6 +16,7 @@
 #include "tetrisphere/powerup_models.h"
 
 #include <algorithm>
+#include <chrono>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -192,7 +193,7 @@ std::vector<Part> merged(std::vector<Part> a, const std::vector<Part>& b) {
 // The colours (the flat icons', tools/art/powerups.py).
 constexpr std::uint32_t purple = 0x8A3DF0, lilac = 0xC9A2FF, orange = 0xF28A2E, fuse_tan = 0xF3DC9C, red = 0xD93636, bright_red = 0xEF4A4A,
                         gold = 0xF2C53D, pink_tip = 0xF0D0F0, ring_green = 0x2FCF4A, atom_purple = 0xA24BFF, orbit = 0xB78CFF, electron = 0xFFD23F,
-                        white = 0xF4F1EA, flame = 0xFFA63F, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF;
+                        white = 0xF4F1EA, flame = 0xFF8A1F, flame_core = 0xFFF07A, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF;
 
 // The level's trim (the owner, 2026-11-21: one rule for levelling up): each
 // power-up's trim (stripes, band, tips, orbits, rings) is its own colour at
@@ -316,8 +317,13 @@ std::vector<Part> atom(int level) {
 }
 
 // Bomb: a missile along z, its nose to -z (about -4,000), fins about ±1,500.
+// The flame behind a flying missile (the owner, 2026-11-22: level 1 flies
+// with the game's own animated fire; levels 2 and 3 had a still spike). -1
+// none (held in the Magic box, strapped in the launcher, or level 1, whose
+// fire is the game's), 0 to 3 a frame of the flicker, each its own model.
+int flame_phase = -1;
 std::vector<Part> missile(float flame_len, std::uint32_t band_colour = red) {
-    Part body{white, {}}, reds{red, {}}, band{band_colour, {}}, fire{flame, {}};
+    Part body{white, {}}, reds{red, {}}, band{band_colour, {}}, fire{flame, {}}, core{flame_core, {}};
     tube(body, 1100.0f, -2400.0f, 700.0f);
     tube(reds, Place{}, -2400.0f, -3900.0f, 700.0f, 0.0f, 8, true);
     tube(band, -700.0f, -1100.0f, 730.0f, 8, false);
@@ -327,8 +333,17 @@ std::vector<Part> missile(float flame_len, std::uint32_t band_colour = red) {
         fin.at = pl.apply(V3{1050, 0, 1100});
         box(reds, fin, 450.0f, 70.0f, 400.0f);
     }
-    tube(fire, Place{}, 1100.0f, 1100.0f + flame_len, 450.0f, 0.0f, 8, true);
-    return {body, reds, band, fire};
+    if (flame_phase < 0) return {body, reds, band};
+    // Two cones, an orange one round a shorter yellow one, their lengths and
+    // widths changing frame to frame.
+    static const float longer[4] = {0.8f, 1.15f, 0.95f, 1.35f}, wider[4] = {1.0f, 0.9f, 1.08f, 0.95f};
+    const float len = flame_len * longer[flame_phase], r = 450.0f * wider[flame_phase];
+    // Yellow at the nozzle, running into an orange tip; both drawn at full
+    // brightness (see the lights in write_parts).
+    const float split = 1100.0f + 0.32f * len;
+    tube(core, Place{}, 1100.0f, split, r, 0.82f * r, 8, true);
+    tube(fire, Place{}, split, 1100.0f + len, 0.82f * r, 0.0f, 8, true);
+    return {body, reds, band, core, fire};
 }
 std::vector<Part> bomb(int level) {
     if (level == 1) return missile(700.0f);
@@ -367,7 +382,12 @@ std::vector<Part> launcher(bool loaded) {
     for (int k = 0; k < 3; ++k) {
         const float a = 6.2831853f * float(k) / 3.0f;
         const V3 at{r * std::cos(a), r * std::sin(a), 0};
-        if (loaded) out = merged(out, placed(missile(400.0f, trim(3, red)), place_at(V3{at.x, at.y, 300.0f}), 0.55f));
+        if (loaded) {
+            const int phase = flame_phase;
+            flame_phase = -1;  // strapped in: no flame
+            out = merged(out, placed(missile(400.0f, trim(3, red)), place_at(V3{at.x, at.y, 300.0f}), 0.55f));
+            flame_phase = phase;
+        }
         // A clamp arm from the column out to the missile, front and back.
         for (const float z : {-900.0f, 500.0f}) {
             Place arm = turned(0, 0, a * 57.29578f);
@@ -383,7 +403,13 @@ std::vector<Part> launcher(bool loaded) {
 }
 
 std::vector<Part> missile_family(int level) {
-    if (level == 1) return placed(missile(700.0f), Place{}, 0.9f);                 // Missile
+    if (level == 1) {  // Missile (its fire in flight is the game's own)
+        const int phase = flame_phase;
+        flame_phase = -1;
+        auto out = placed(missile(700.0f), Place{}, 0.9f);
+        flame_phase = phase;
+        return out;
+    }
     if (level == 2) return placed(missile(1300.0f, trim(2, red)), Place{}, 1.15f); // Big Missile
     // Missile Barrage: the launcher, loaded with three (the owner, 2026-11-22).
     return launcher(true);
@@ -561,7 +587,10 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
     }
     cmd(0xB6000000u, 0x00003000u);  // no culling
     for (const auto& part : parts) {
-        lights(part.rgb, 0.65f);  // (0.45 left the models dim in the effect)
+        // (0.45 left the models dim in the effect.) A missile's flame glows:
+        // its colour in full, whatever the light.
+        const bool glowing = part.rgb == flame || part.rgb == flame_core;
+        lights(part.rgb, glowing ? 1.0f : 0.65f);
         draw(part, 0.0f);
     }
     store32(rdram, at, 0xB8000000u), store32(rdram, at + 4u, 0);  // G_ENDDL
@@ -572,17 +601,20 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
 
 namespace {
 struct Built { std::uint32_t at = 0, marker = 0, light_dir = 0; };
-Built built[last_kind + 1][4];
+Built built[last_kind + 1][4][5];  // kind, level, flame phase + 1
 std::uint32_t next_free = model_memory;
 }  // namespace
 
-std::uint32_t model_list(std::uint8_t* rdram, int draw_kind, int level, std::uint32_t light_dir) {
+std::uint32_t model_list(std::uint8_t* rdram, int draw_kind, int level, std::uint32_t light_dir, int phase) {
     if (rdram == nullptr || draw_kind < 0 || draw_kind > last_kind || level < 1 || level > 3) return 0;
+    if (phase < -1 || phase > 3) phase = -1;
     const int kind = draw_kind;
-    Built& b = built[draw_kind][level];
-    const std::uint32_t marker = 0xB10C0000u | std::uint32_t(draw_kind) << 8 | std::uint32_t(level);
+    Built& b = built[draw_kind][level][phase + 1];
+    const std::uint32_t marker = 0xB10C0000u | std::uint32_t(phase + 1) << 12 | std::uint32_t(draw_kind) << 8 | std::uint32_t(level);
     if (b.at == 0 || load32(rdram, b.at) != marker) {  // (the light's direction as first seen)
+        flame_phase = phase;
         const auto parts = model(draw_kind, level);
+        flame_phase = -1;
         if (parts.empty()) return 0;
         std::size_t tris = 0;
         for (const auto& part : parts) tris += part.tris.size();
@@ -594,7 +626,8 @@ std::uint32_t model_list(std::uint8_t* rdram, int draw_kind, int level, std::uin
             // Full: start again (every model is built again when next drawn).
             next_free = model_memory;
             for (auto& k : built)
-                for (auto& l : k) l = Built{};
+                for (auto& l : k)
+                    for (auto& f : l) f = Built{};
         }
         const std::uint32_t at = next_free;
         store32(rdram, at, marker), store32(rdram, at + 4u, 0);
@@ -606,6 +639,11 @@ std::uint32_t model_list(std::uint8_t* rdram, int draw_kind, int level, std::uin
         std::fflush(stdout);
     }
     return b.at + 8u;
+}
+
+int flame_frame() {
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    return int((ms / 70) % 4);
 }
 
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole,
@@ -663,7 +701,11 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     }
     const std::uint32_t vtx_source = load32(rdram, first_vtx + 4u);
     if (source != nullptr) *source = vtx_source;
-    const std::uint32_t list = model_list(rdram, draw_kind, level, light_dir);
+    // In flight (not held), a missile's flame flickers: a new frame of it
+    // every 70 ms.
+    const bool missile_kind = draw_kind == 0 || draw_kind == 4 || draw_kind == dive_kind || draw_kind == barrage_missile_kind;
+    const int phase = (!held && missile_kind) ? flame_frame() : -1;
+    const std::uint32_t list = model_list(rdram, draw_kind, level, light_dir, phase);
     if (list == 0) return false;
     // The game's body blanked (each load and the triangles drawn from it, up
     // to the next load); a call to the model in place of the first load.

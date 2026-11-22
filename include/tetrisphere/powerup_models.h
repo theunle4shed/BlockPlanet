@@ -27,7 +27,9 @@ constexpr float launcher_missile_radius = 820.0f;
 constexpr int last_kind = 9;
 // The display list of BlockPlanet's model of `kind` at `level` (built into
 // model memory when first asked for), or 0.
-std::uint32_t model_list(std::uint8_t* rdram, int kind, int level, std::uint32_t light_dir = 0x5A33C500u);
+// `phase`: a missile's flame, -1 none, 0 to 3 a frame of its flicker (flame_frame()).
+std::uint32_t model_list(std::uint8_t* rdram, int kind, int level, std::uint32_t light_dir = 0x5A33C500u, int phase = -1);
+int flame_frame();
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source = 0, std::uint32_t* source = nullptr,
              bool whole = false, int draw_kind = -1, double turn_degrees = 0.0);  // draw_kind: the model drawn, if not kind's
 
