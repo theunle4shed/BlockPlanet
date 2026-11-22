@@ -345,11 +345,32 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
             // and curves round to its strike point, turned along its path.
             const double u = t * (0.35 + 0.65 * t);  // slow out of the tube, faster on
             const double reach = length(launcher_at - base);
-            for (int n = 0; n < 3; ++n) {
+            // Which missile goes where (the owner, 2026-11-22: the left one
+            // crossed the right one's path): each to the strike on its own side,
+            // the pairing whose directions on screen (from the launcher's axis,
+            // from the strikes' middle; across the view) agree best.
+            V targets[3], normals[3], middle;
+            for (int m = 0; m < 3; ++m) {
                 double dx, dy;
-                strike_offset(n, dx, dy);
-                V normal;
-                const V target = surface(cx + dx, cy + dy, 0.0, normal);
+                strike_offset(m, dx, dy);
+                targets[m] = surface(cx + dx, cy + dy, 0.0, normals[m]);
+                middle = middle + targets[m] * (1.0 / 3.0);
+            }
+            const auto flat = [&](V v) { return unit(v - up * dot(v, up)); };
+            static const int pairings[6][3] = {{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
+            int best = 0;
+            double best_score = -1e9;
+            for (int q = 0; q < 6; ++q) {
+                double score = 0;
+                for (int n = 0; n < 3; ++n) {
+                    const double a = 6.2831853 * double(n) / 3.0;
+                    score += dot(flat(lx * std::cos(a) + ly * std::sin(a)), flat(targets[pairings[q][n]] - middle));
+                }
+                if (score > best_score) best_score = score, best = q;
+            }
+            for (int n = 0; n < 3; ++n) {
+                const V normal = normals[pairings[best][n]];
+                const V target = targets[pairings[best][n]];
                 const double a = 6.2831853 * double(n) / 3.0;
                 const V across = (lx * std::cos(a) + ly * std::sin(a)) * (double(powerup_models::launcher_missile_radius) * launcher_scale);
                 const V p0 = launcher_at + across + lz * (300.0 * launcher_scale);  // where it sat in the launcher
