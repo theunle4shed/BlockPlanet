@@ -84,10 +84,34 @@ extern "C" bool tetrisphere_rt64_ui_tag_record(std::uint8_t* rdram,
         static_cast<tetrisphere::DlUiAnchor>(anchor), rdram, 9437184);
 }
 
+// The command being run and its callers (for the bad-matrix log below).
+static std::uint32_t dl_command_now = 0, dl_parents_now[8] = {};
+static std::size_t dl_parent_count_now = 0;
+static std::uint8_t* dl_rdram = nullptr;
 extern "C" void tetrisphere_rt64_ui_tag_update(
     std::uint32_t command, const std::uint32_t* parents, std::size_t count) {
+    dl_command_now = command, dl_parent_count_now = std::min<std::size_t>(count, 8);
+    for (std::size_t i = 0; i < dl_parent_count_now; ++i) dl_parents_now[i] = parents[i];
     ui_current_tag = static_cast<std::uint32_t>(
         ui_active_batch.lookup(command, parents, count));
+}
+
+// From RT64's matrix load (patched): a matrix outside the game's memory was
+// skipped; where the display list was (the command, then its callers).
+extern "C" void tetrisphere_rt64_bad_matrix_where() {
+    std::fprintf(stdout, "{\"event\":\"rsp_matrix_where\",\"command\":\"%08x\",\"callers\":[", dl_command_now);
+    for (std::size_t i = 0; i < dl_parent_count_now; ++i) std::fprintf(stdout, "%s\"%08x\"", i ? "," : "", dl_parents_now[i]);
+    std::fprintf(stdout, "],\"before_caller\":[");
+    // The commands before the innermost caller's return point (as now in memory).
+    if (dl_rdram != nullptr && dl_parent_count_now > 0) {
+        const std::uint32_t back = dl_parents_now[dl_parent_count_now - 1];
+        for (std::uint32_t a = back >= 48u ? back - 48u : 0u, n = 0; a < back + 16u && a + 8u < 0x800000u; a += 8u, ++n) {
+            std::uint32_t w0, w1;
+            std::memcpy(&w0, dl_rdram + a, 4), std::memcpy(&w1, dl_rdram + a + 4u, 4);
+            std::fprintf(stdout, "%s\"%08x:%08x %08x\"", n ? "," : "", a, w0, w1);
+        }
+    }
+    std::fprintf(stdout, "]}\n");
 }
 
 extern "C" std::uint32_t tetrisphere_rt64_ui_tag_current() {
@@ -242,6 +266,7 @@ public:
         core.HEADER = rom_header.data();
         core.RDRAM = rdram;
         research_rdram_ = rdram;
+        dl_rdram = rdram;
         core.DMEM = dmem.data();
         core.IMEM = imem.data();
         core.MI_INTR_REG = &mi_intr;

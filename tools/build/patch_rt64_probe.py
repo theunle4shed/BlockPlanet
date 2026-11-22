@@ -584,7 +584,33 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
         return patch_application(raw)
     if name == "rt64_state.cpp":
         return patch_state(raw)
-    if name in ("rt64_interpreter.cpp", "rt64_rdp.cpp", "rt64_rsp.cpp"):
+    if name == "rt64_rsp.cpp":
+        source = patch_ui_tag_source(name, source)
+        # A matrix outside the game's 8 MB (the owner's crashes, 2026-11-22:
+        # Windows stopped in FixedMatrix::toMatrix4x4 after a second Missile
+        # Barrage, and after a third Atom): skipped, and logged, not read.
+        source = replace_once(source, """    void RSP::matrix(uint32_t address, uint8_t params) {
+        const uint32_t rdramAddress = fromSegmentedMasked(address);
+        const FixedMatrix *fixedMatrix = reinterpret_cast<FixedMatrix *>(state->fromRDRAM(rdramAddress));""",
+            """    void RSP::matrix(uint32_t address, uint8_t params) {
+        const uint32_t rdramAddress = fromSegmentedMasked(address);
+        if (rdramAddress + sizeof(FixedMatrix) > RDRAMSize + 1u) {
+            static int logged = 0;
+            if (logged < 20) {
+                ++logged;
+                std::fprintf(stdout, "{\\"event\\":\\"rsp_matrix_outside\\",\\"address\\":\\"%08x\\",\\"physical\\":\\"%08x\\",\\"segment\\":\\"%08x\\"}\\n",
+                    address, rdramAddress, segments[(address >> 24) & 0x0F]);
+                tetrisphere_rt64_bad_matrix_where();
+                std::fflush(stdout);
+            }
+            return;
+        }
+        const FixedMatrix *fixedMatrix = reinterpret_cast<FixedMatrix *>(state->fromRDRAM(rdramAddress));""")
+        if "#include <cstdio>" not in source:
+            source = source.replace("#include <cassert>\n", "#include <cassert>\n#include <cstdio>\n", 1)
+        source = replace_once(source, "namespace RT64 {", 'extern "C" void tetrisphere_rt64_bad_matrix_where();\nnamespace RT64 {')
+        return source.encode("utf-8")
+    if name in ("rt64_interpreter.cpp", "rt64_rdp.cpp"):
         return patch_ui_tag_source(name, source).encode("utf-8")
     if name in ("rt64_projection_processor.cpp", "rt64_framebuffer_renderer.cpp"):
         vs_namespace_anchor = ("namespace RT64 {\n    // Helper functions.\n"
