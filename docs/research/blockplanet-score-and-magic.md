@@ -158,3 +158,9 @@ The owner's idea: a sphere whose layers alternate in colour, so a magic's damage
 3. Now: squares alternating with **lying bars** (ten bars a row, with a two-column strip of squares round the back of the sphere, opposite the cursor, to make up the 32 columns).
 
 **Result (2026-11-20):** squares alternating with lying bars works. Six layers on Casual 1:1, each magic once at the cursor: the **Ray Gun** drilled a tunnel through all six layers to the core (24, 24, 20, 21, 20, 14 cells, layer 6 to 1, and 12 core cells), its stripes plain to see down the sides; the **Bomb** took the top layer (140 cells, the yellow layer beneath showing) and a second layer in its middle (51, blue again); the **Firecracker** took the top layer only (68). The rings of colour make each magic's depth readable at a glance: the board for the magic lessons.
+
+## Points from a stage cleared by magic alone (checked 2026-11-22, the owner's report)
+
+The owner cleared a stage with only the Atom and saw no points. In the harness (Casual 1:1, `BLOCKPLANET_SCORE_LOG=1`, the Atom fired once): the score stayed at 0 while the Atom worked (the magic itself scores nothing, as read in the code above), then rose to 256,000 and 257,000 in the game's units (2,560,000 and 2,570,000 shown) during the stage-end scene, the same as a clear by `research_win` (the pop-up number over the opened core). So a clear by magic alone does score, through the stage's clear bonus only. Until 2026-11-22 BlockPlanet's grid came in 1.8 s after a single stage's clear, before that bonus showed (now it waits for the friend's escape).
+
+So in the original, magic earns points only indirectly: the combos and gravity it sets off, and the clear bonus when it opens the core. Whether BlockPlanet's power-ups should score their own breaks (for example 10 a brick, as an ordinary combo's bricks, paid when the power-up finishes) is a design choice; the levels' bigger effects would make that matter more.
