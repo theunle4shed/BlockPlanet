@@ -639,3 +639,98 @@ extern "C" int blockplanet_magic_earn(std::uint8_t* rdram, int before) {
     std::fflush(stdout);
     return kinds[family][level - 1];
 }
+
+// The Missile at level 3, the barrage (the owner, 2026-11-22): three strikes,
+// each 5 cells from the cursor at 0, 120 and 240 degrees, each the
+// Firecracker's blast (radius 4, 49 columns); for now all three at once (see
+// below why not one after another yet). In the power-up test,
+// where the level-3 Missile is the game's Bomb: its first blast (kind 2, at
+// the cursor) is replaced by the first strike, its second (kind 0) is dropped,
+// and the next strikes follow as each blast goes off (the owner: "launch the
+// next missile as the previous explosion triggers"), about 1.2 s apart. They
+// stop once the core is open (+0x2B5C, the stage's end).
+extern "C" void func_800C6474(std::uint8_t* rdram, recomp_context* ctx);
+namespace {
+constexpr std::uint32_t player = 0x80110220u;
+int barrage_next = 0;                // 1 to 2: the next strike to fire; 0 none
+Clock::time_point barrage_due{};
+std::int16_t barrage_x = 0, barrage_y = 0, barrage_a2 = 0;  // the cursor's blast centre (1/256 cell)
+std::uint32_t barrage_arg5 = 0;  // the routine's fifth argument (on the stack; it divides by it)
+bool barrage_firing = false;          // our own call (not intercepted)
+bool barrage_dropping = false;        // the Bomb's second blast to drop
+constexpr std::int16_t strike_kind = 1;  // the Firecracker's radius (4)
+
+void strike_offset(int n, std::int16_t& x, std::int16_t& y) {
+    const double a = 2.0 * 3.14159265358979 * double(n) / 3.0;
+    x = std::int16_t(barrage_x + std::lround(5.0 * 256.0 * std::cos(a)));
+    y = std::int16_t(barrage_y + std::lround(5.0 * 256.0 * std::sin(a)));
+}
+bool stage_ending(const std::uint8_t* rdram) { return std::int16_t(load32_at(rdram, player + 0x2B5Cu) >> 16) == 1; }
+}  // namespace
+
+extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* ctx) {
+    static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
+    if (!test || barrage_firing) return false;
+    const int kind = int(ctx->r7 & 0xFF);
+    if (barrage_dropping && kind == 0) {
+        barrage_dropping = false;
+        return true;
+    }
+    if (kind != 2 || blockplanet::powerup_family() != 0 || blockplanet::powerup_level() != 3) return false;
+    barrage_x = std::int16_t(ctx->r4), barrage_y = std::int16_t(ctx->r5), barrage_a2 = std::int16_t(ctx->r6);
+    barrage_arg5 = load32_at(rdram, std::uint32_t(ctx->r29) + 0x14u);
+    std::int16_t x, y;
+    strike_offset(0, x, y);
+    ctx->r4 = std::uint64_t(std::int64_t(x)), ctx->r5 = std::uint64_t(std::int64_t(y)), ctx->r7 = strike_kind;
+    barrage_dropping = true;
+    barrage_next = 1, barrage_due = Clock::now() + std::chrono::milliseconds(1200);
+    // The other two strikes go off in the same moment, while the magic is
+    // active. One after another (BLOCKPLANET_BARRAGE_SEQUENCE=1, research)
+    // leaves the later strikes' bricks white and unbroken: the game runs one
+    // magic blast at a time from shared state (the timer at 0x80160C80, the
+    // kind at 0x8015F5B8), and only while its magic is working.
+    static const bool together = std::getenv("BLOCKPLANET_BARRAGE_SEQUENCE") == nullptr;
+    if (together) {
+        for (int n = 1; n <= 2; ++n) {
+            std::int16_t sx, sy;
+            strike_offset(n, sx, sy);
+            const recomp_context saved = *ctx;
+            ctx->r4 = std::uint64_t(std::int64_t(sx)), ctx->r5 = std::uint64_t(std::int64_t(sy)), ctx->r7 = strike_kind;
+            barrage_firing = true;
+            func_800C6474(rdram, ctx);
+            barrage_firing = false;
+            *ctx = saved;
+        }
+        barrage_next = 0;
+    }
+    std::fprintf(stdout, "{\"event\":\"barrage_strike\",\"n\":0,\"x\":%d,\"y\":%d,\"arg5\":\"%08X\"}\n", x, y, barrage_arg5);
+    std::fflush(stdout);
+    return false;  // the game's call goes on, as the first strike
+}
+
+extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
+    if (barrage_next == 0 || Clock::now() < barrage_due) return;
+    if (stage_ending(rdram)) {  // the core is open: no need for the rest
+        barrage_next = 0;
+        return;
+    }
+    std::int16_t x, y;
+    strike_offset(barrage_next, x, y);
+    const recomp_context saved = *ctx;
+    ctx->r4 = std::uint64_t(std::int64_t(x)), ctx->r5 = std::uint64_t(std::int64_t(y)), ctx->r6 = std::uint64_t(std::int64_t(barrage_a2)),
+    ctx->r7 = strike_kind;
+    // Its own stack frame below ours, with the fifth argument in place.
+    ctx->r29 = std::uint64_t(std::int64_t(std::int32_t(std::uint32_t(ctx->r29) - 0x40u)));
+    {
+        const std::uint32_t a = std::uint32_t(ctx->r29) + 0x14u;
+        std::memcpy(rdram + (a & 0x007FFFFCu), &barrage_arg5, 4);
+    }
+    barrage_firing = true;
+    func_800C6474(rdram, ctx);
+    barrage_firing = false;
+    *ctx = saved;
+    std::fprintf(stdout, "{\"event\":\"barrage_strike\",\"n\":%d,\"x\":%d,\"y\":%d}\n", barrage_next, x, y);
+    std::fflush(stdout);
+    barrage_next = barrage_next == 2 ? 0 : barrage_next + 1;
+    barrage_due = Clock::now() + std::chrono::milliseconds(1200);
+}

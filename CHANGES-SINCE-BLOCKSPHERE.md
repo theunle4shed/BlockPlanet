@@ -754,3 +754,8 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 
 - The Bomb (our Missile at levels 2 and 3) turns over late in its dive, so our missile went into the sphere tail first (the owner). Measured from the draw's matrices, its nose swings from up, to into the screen, to facing the camera; ours is now drawn turned round whenever its nose would face the camera, so it flies in nose first and dives nose first.
 - The Bomb's second model (after the impact's first blast, the bomb in the crater, then its own blast) showed as our missile floating in front of the sphere. After impact the missile is gone (the owner): that model is not drawn, and the blast is the game's.
+
+## 2026-11-22: The Missile at level 3 strikes three places (power-up test)
+
+- In the power-up test, the level-3 Missile (the game's Bomb) no longer blasts at the cursor: three strikes, each the Firecracker's blast (radius 4), 5 cells from the cursor at 0, 120 and 240 degrees (the owner's layout), all at the moment the Bomb would blast. The blast routine (`func_800C6474`) is called for the other two, with its fifth argument (on the stack) as the game passed it.
+- One strike after another (the owner's launcher idea) is not on yet: a blast fired after the magic has finished turns its bricks white but never breaks them, because the game runs one magic blast at a time from shared state, and only while its magic is working. Research switch: `BLOCKPLANET_BARRAGE_SEQUENCE=1`.

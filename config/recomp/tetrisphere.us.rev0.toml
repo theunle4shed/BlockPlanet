@@ -1052,9 +1052,17 @@ text = "blockplanet_stage_record_edit(rdram, ctx);"
 
 # Research (2026-11-20, where each magic blast lands): the blast routine's
 # arguments, logged with BLOCKPLANET_BLAST_LOG=1.
+# The Missile at level 3 (the barrage, the owner 2026-11-22) replaces the
+# Bomb's two blasts with three strikes round the cursor
+# (blockplanet_barrage_blast in src/graphics/magic_hooks.cpp).
 [[patches.hook]]
 func = "func_800C6474"
-text = "blockplanet_blast_log(rdram, ctx);"
+text = "blockplanet_blast_log(rdram, ctx); if (blockplanet_barrage_blast(rdram, ctx)) return;"
+
+# Each frame (the held magic's routine): the barrage's next strike, when due.
+[[patches.hook]]
+func = "func_800C78A0"
+text = "blockplanet_barrage_tick(rdram, ctx);"
 
 # Research (2026-11-20, which bricks raise the combo's steps): each broken
 # brick's record as it scores, logged with BLOCKPLANET_BRICK_SCORE_LOG=1.
