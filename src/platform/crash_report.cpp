@@ -13,6 +13,12 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+// After windows.h: function names and source lines for the report, from the
+// program's .pdb beside it (when there is one).
+#include <dbghelp.h>
+#ifdef _MSC_VER
+#pragma comment(lib, "dbghelp.lib")
+#endif
 #else
 #include <csignal>
 #include <execinfo.h>
@@ -40,7 +46,52 @@ void write_all(HANDLE file, const char* text) {
     WriteFile(file, text, DWORD(length(text)), &written, nullptr);
 }
 
-void write_report(const char* what, const void* address) {
+#if defined(_M_X64) || defined(__x86_64__)
+// The stack from the crash itself (the exception's registers), each frame
+// with its module, function and source line where the .pdb gives them.
+void write_named_stack(HANDLE file, const CONTEXT* crash) {
+    write_all(file, "\r\nStack at the crash (names):\r\n");
+    HANDLE process = GetCurrentProcess(), thread = GetCurrentThread();
+    CONTEXT context = *crash;
+    STACKFRAME64 frame{};
+    frame.AddrPC.Offset = context.Rip;
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrFrame.Offset = context.Rbp;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrStack.Offset = context.Rsp;
+    frame.AddrStack.Mode = AddrModeFlat;
+    char line[768];
+    for (int i = 0; i < 40; ++i) {
+        if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread, &frame, &context, nullptr, SymFunctionTableAccess64,
+                         SymGetModuleBase64, nullptr))
+            break;
+        const DWORD64 pc = frame.AddrPC.Offset;
+        if (pc == 0) break;
+        HMODULE module = nullptr;
+        char module_name[MAX_PATH] = "?";
+        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCSTR>(pc), &module))
+            GetModuleFileNameA(module, module_name, MAX_PATH);
+        const char* base = std::strrchr(module_name, '\\');
+        alignas(SYMBOL_INFO) char symbol_space[sizeof(SYMBOL_INFO) + 256] = {};
+        auto* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_space);
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = 255;
+        DWORD64 displacement = 0;
+        const bool named = SymFromAddr(process, pc, &displacement, symbol) != FALSE;
+        IMAGEHLP_LINE64 source{};
+        source.SizeOfStruct = sizeof source;
+        DWORD column = 0;
+        const bool lined = SymGetLineFromAddr64(process, pc, &column, &source) != FALSE;
+        std::snprintf(line, sizeof line, "  %s+0x%llx  %s%s%s:%lu\r\n", base ? base + 1 : module_name,
+                      static_cast<unsigned long long>(pc - reinterpret_cast<DWORD64>(module)), named ? symbol->Name : "?",
+                      lined ? "  " : "", lined ? source.FileName : "", lined ? static_cast<unsigned long>(source.LineNumber) : 0ul);
+        write_all(file, line);
+    }
+}
+#endif
+
+void write_report(const char* what, const void* address, const CONTEXT* crash = nullptr) {
     HANDLE file = CreateFileA(report_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return;
     char line[256];
@@ -65,13 +116,16 @@ void write_report(const char* what, const void* address) {
                       static_cast<unsigned long long>(static_cast<const char*>(frames[i]) - reinterpret_cast<const char*>(module)));
         write_all(file, line);
     }
+#if defined(_M_X64) || defined(__x86_64__)
+    if (crash != nullptr) write_named_stack(file, crash);
+#endif
     CloseHandle(file);
 }
 
 LONG WINAPI on_exception(EXCEPTION_POINTERS* info) {
     char what[64];
     std::snprintf(what, sizeof what, "exception 0x%08lX", info ? info->ExceptionRecord->ExceptionCode : 0ul);
-    write_report(what, info ? info->ExceptionRecord->ExceptionAddress : nullptr);
+    write_report(what, info ? info->ExceptionRecord->ExceptionAddress : nullptr, info ? info->ContextRecord : nullptr);
     return EXCEPTION_CONTINUE_SEARCH;
 }
 #else
@@ -221,6 +275,8 @@ void install_crash_handler(const std::filesystem::path& directory, const std::st
                   build_id.c_str(), run_id.c_str());
     std::snprintf(context_a, sizeof context_a, "starting up");
 #ifdef _WIN32
+    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
+    SymInitialize(GetCurrentProcess(), nullptr, TRUE);
     SetUnhandledExceptionFilter(on_exception);
 #else
     struct sigaction action {};

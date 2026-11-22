@@ -726,3 +726,8 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - `BLOCKPLANET_CORE_BOWL=1`: the dark ball that shows behind the rescued friend when the core is opened is drawn flat black, keeping its round edge and fade, so nothing behind it shows and the friend stands out in front. BlockPlanet.bat's test option turns it on.
 - Research: `BLOCKPLANET_DL_DUMP` with the `research_dl_dump` command saves a frame's display list, and `BLOCKPLANET_DL_MUTE` blanks chosen vertex loads (`src/graphics/dl_research.cpp`).
+
+## 2026-11-22: Power-up test keys; named crash reports on Windows
+
+- The power-up test no longer gives power-ups by itself. Instead, in a game, number pad 1 gives the Missile, 2 Dynamite, 3 the Magnet and 4 the Atom; pressing the same key again raises the level (1, 2, 3, then 1 again). Only with `BLOCKPLANET_POWERUP_TEST=1` (BlockPlanet.bat's test option).
+- Windows crash reports now also list the stack from the crash itself with function names and source lines, read from the program's `.pdb` beside it (DbgHelp), so a report says where the crash was.
