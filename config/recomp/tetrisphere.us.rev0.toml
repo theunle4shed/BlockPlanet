@@ -28,6 +28,13 @@ ignored = [
 ]
 renamed = []
 
+# A frame's display list in a larger buffer (sphere_hooks.cpp,
+# blockplanet_frame_list_buffer): the game's overflowed with BlockPlanet's
+# additions and overwrote the other frame's list.
+[[patches.hook]]
+func = "func_800CCB78"
+text = "blockplanet_frame_list_buffer(rdram, ctx);"
+
 # BlockPlanet sphere renderer, stage 1: the mesh table builder.
 [[patches.hook]]
 func = "func_800ADD6C"

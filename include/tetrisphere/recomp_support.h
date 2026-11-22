@@ -44,6 +44,7 @@ void tetrisphere_training_record(std::uint8_t* rdram, recomp_context* ctx,
                                  uint32_t destination);
 void tetrisphere_training_render(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_sphere_mesh_begin(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_frame_list_buffer(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_sphere_mesh_end(std::uint8_t* rdram, recomp_context* ctx);
 bool blockplanet_sphere_cell_begin(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_sphere_cell_end(std::uint8_t* rdram, recomp_context* ctx);

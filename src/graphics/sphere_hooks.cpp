@@ -623,6 +623,30 @@ extern "C" bool blockplanet_sphere_face_begin(std::uint8_t* rdram, recomp_contex
         rdram, [face](GuestMemory& memory) { draw_face(memory, static_cast<Face>(face)); });
 }
 
+// The frame's display list, moved to larger buffers (2026-11-22). The game
+// keeps two of 0x1C000 bytes, one per frame, back to back below 0x8029A000
+// (func_8006EAD8 sizes them; func_800CCB78 starts a frame's list from its
+// frame record's +0x18E8, a0). BlockPlanet's additions (the extended sphere,
+// 3D power-ups, the barrage) made a busy frame's list longer: it ran into the
+// other frame's buffer and overwrote that list's first commands, its segment
+// settings among them, so a later call through segment 1 went to address 0 and
+// the renderer read the game's code as commands (the owner's crashes after a
+// second Missile Barrage, Windows, and a third Atom; reproduced on 2:9). Here
+// each frame's list starts in a buffer of 256 KB above 4 MB, which the game
+// never uses (the extended sphere's vertices are at 0x80400000 and 0x80600000,
+// about 32 KB each in use). BLOCKPLANET_GAME_LIST_BUFFERS=1 keeps the game's.
+extern "C" void blockplanet_frame_list_buffer(std::uint8_t* rdram, recomp_context* ctx) {
+    static const bool keep = std::getenv("BLOCKPLANET_GAME_LIST_BUFFERS") != nullptr;
+    if (keep || rdram == nullptr) return;
+    const std::uint32_t record = static_cast<std::uint32_t>(ctx->r4);
+    constexpr std::uint32_t first_record = 0x800FACC0u, second_record = 0x800FACC0u + 0x1918u;
+    if (record != first_record && record != second_record) return;
+    const std::uint32_t at = record + 0x18E8u;
+    const std::uint32_t list = load32(rdram, at);
+    if (list < 0x80000000u || list >= 0x80400000u) return;  // already moved, or not the game's
+    store32(rdram, at, record == first_record ? 0x80500000u : 0x80540000u);
+}
+
 extern "C" void blockplanet_sphere_face_end(std::uint8_t* rdram, recomp_context* ctx, int face) {
     (void)ctx;
     face_checks[static_cast<std::size_t>(face)].end(rdram);
