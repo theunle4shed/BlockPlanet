@@ -300,49 +300,58 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
     // (Declared before the launcher's position uses it.)
 
     if (running) {
-        // The launcher: loaded while hovering, then empty; after the blasts it
-        // rises away.
-        const double launcher_scale = 0.95 * cell / 3600.0;  // (smaller: it filled the view, the owner)
+        // The launcher (the owner, 2026-11-22: with the level 2 rocket's
+        // presence): it flies in big from off the bottom-left corner, holds
+        // there, near the camera, aimed at the strikes, fires, and leaves the
+        // way it came. Screen directions on the sphere: moving right lowers
+        // the board's x, up raises its y.
+        V n0;
+        const V base = surface(cx, cy, 0.0, n0);
+        const V right = unit(base - surface(cx + 1.0, cy, 0.0, n0)), screen_up = unit(surface(cx, cy + 1.0, 0.0, n0) - base);
+        static const double hold_h = [] { const char* v = std::getenv("BLOCKPLANET_LAUNCHER_H"); return v ? std::atof(v) : 5.0; }();
+        static const double hold_a = [] { const char* v = std::getenv("BLOCKPLANET_LAUNCHER_A"); return v ? std::atof(v) : 3.4; }();
+        static const double hold_b = [] { const char* v = std::getenv("BLOCKPLANET_LAUNCHER_B"); return v ? std::atof(v) : 1.2; }();
+        static const double size = [] { const char* v = std::getenv("BLOCKPLANET_LAUNCHER_SIZE"); return v ? std::atof(v) : 2.4; }();
+        const V hold = base + up * (hold_h * cell) - right * (hold_a * cell) - screen_up * (hold_b * cell);
+        const V away = (right * -1.0 + screen_up * -0.7 + up * 0.4) * (16.0 * cell);
+        const double launcher_scale = size * cell / 3600.0;
         const double leave = went_off ? std::clamp(after_hit / leave_seconds, 0.0, 1.0) : 0.0;
         const double arrive = std::clamp(t_now / arrive_seconds, 0.0, 1.0), coming = 1.0 - arrive;
-        // It comes in from one side and leaves by the other (straight out along
-        // the surface normal is straight at the camera).
-        const V launcher_at = hover + (side * -1.0 + up * 0.3) * (coming * coming * coming * 14.0 * cell) +
-                              (side + up * 0.3) * (leave * leave * 14.0 * cell);
-        place(t_now < release_seconds ? 4 : powerup_models::empty_launcher_kind, side, side2, up, launcher_scale, launcher_at);
+        const V launcher_at = hold + away * (coming * coming * coming + leave * leave);
+        // Aimed at the strikes' middle: its tubes' open ends (-z) towards it.
+        const V lz = unit(launcher_at - base);
+        const V lx = unit(cross(screen_up, lz)), ly = cross(lz, lx);
+        place(t_now < release_seconds ? 4 : powerup_models::empty_launcher_kind, lx, ly, lz, launcher_scale, launcher_at);
         // (Level 3's held model is the loaded launcher: kind 4 at level 3.)
 
         // The missiles: from the launcher's tubes to their strike points; gone
         // once the blasts go off.
         if (t_now >= release_seconds && !went_off) {
-            const double t = std::clamp((t_now - release_seconds) / (land_seconds - release_seconds), 0.0, 1.0), eased = t * t;
-            // Each leaves its tube nose down, as it sat in the launcher, and
-            // curves round to its strike point, turned along its path (the
-            // owner, 2026-11-22: they turned all at once as they left).
-            (void)eased;
-            const double u = t * (0.35 + 0.65 * t);  // slow out of the tube, faster down
+            const double t = std::clamp((t_now - release_seconds) / (land_seconds - release_seconds), 0.0, 1.0);
+            // Each leaves its tube along the tube, as it sat in the launcher,
+            // and curves round to its strike point, turned along its path.
+            const double u = t * (0.35 + 0.65 * t);  // slow out of the tube, faster on
+            const double reach = length(launcher_at - base);
             for (int n = 0; n < 3; ++n) {
                 double dx, dy;
                 strike_offset(n, dx, dy);
                 V normal;
                 const V target = surface(cx + dx, cy + dy, 0.0, normal);
                 const double a = 6.2831853 * double(n) / 3.0;
-                const V across = (side * std::cos(a) + side2 * std::sin(a)) * (1150.0 * launcher_scale);
-                const V p0 = launcher_at + across + up * (300.0 * launcher_scale);  // where it sat in the launcher
-                // Out of the tube a little way, over the surface, and down onto
-                // the target nose first (a cubic curve; its control points stay
-                // above the bricks).
-                V base_normal;
-                const double height = length(launcher_at - surface(cx, cy, 0.0, base_normal));
-                const V p1 = p0 - up * (0.35 * height);
-                const V p2 = target + normal * (0.9 * height);
+                const V across = (lx * std::cos(a) + ly * std::sin(a)) * (1150.0 * launcher_scale);
+                const V p0 = launcher_at + across + lz * (300.0 * launcher_scale);  // where it sat in the launcher
+                // Out of the tube, then down onto the target nose first (a
+                // cubic curve).
+                const V p1 = p0 - lz * (0.35 * reach);
+                const V p2 = target + normal * (0.25 * reach);
                 const V p3 = target;
                 const double w = 1 - u;
                 const V at = p0 * (w * w * w) + p1 * (3 * w * w * u) + p2 * (3 * w * u * u) + p3 * (u * u * u);
                 const V tangent = (p1 - p0) * (3 * w * w) + (p2 - p1) * (6 * w * u) + (p3 - p2) * (3 * u * u);
                 const V z = unit(tangent) * -1.0;  // our models' nose is -z
                 const V x = unit(cross(z, std::abs(z.x) < 0.9 ? V{1, 0, 0} : V{0, 1, 0})), y = cross(z, x);
-                place(powerup_models::barrage_missile_kind, x, y, z, 0.55 * launcher_scale, at);
+                // From the launcher's size down to a size that suits the sphere.
+                place(powerup_models::barrage_missile_kind, x, y, z, 0.55 * launcher_scale * (1.0 - 0.45 * u), at);
             }
         }
 

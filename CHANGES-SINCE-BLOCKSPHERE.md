@@ -783,3 +783,7 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 ## 2026-11-22: The Missile flies in from off screen and rolls over smoothly (3D models)
 
 - From the owner's recording (Missile level 2, frames 38 and 75): the flight started beside the Magic box; it now comes in from off the screen's left edge. The rocket turned round in one frame for its dive; it now rolls half a turn about its own axis in step with the game's own turn (its nose going from into the screen to facing the camera), drawn through a short list that multiplies a rotation onto the game's matrix (`replace(..., turn_degrees)`), so it dives nose first with no jump.
+
+## 2026-11-22: The Missile Barrage's launcher flies in big, bottom left
+
+- The owner (with a sketch): the launcher should come on screen with the presence of the level 2 rocket, held at the bottom-left corner by the HUD. It now flies in from off the screen's bottom-left corner, close to the camera and about two and a half cells wide, holds there with its three tubes aimed at the strikes, fires the missiles from its tubes (each curves round onto its strike point, shrinking as it goes), and slides back out the way it came. Screen directions come from the sphere at the cursor (screen right: the board's x going down; screen up: its y going up). Its hold point can be moved for research with `BLOCKPLANET_LAUNCHER_H` (height over the sphere, cells; default 5), `_A` (left, 3.4), `_B` (down, 1.2) and `_SIZE` (2.4).
