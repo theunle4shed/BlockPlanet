@@ -569,6 +569,10 @@ On the title (the box art), in full screen on a very wide display (about 32:9), 
 
 **Clearing a stage with power-ups alone scores no points (the owner, 2026-11-22).** Checked the same day: in the original a magic scores nothing itself, but the stage's clear bonus is paid (2,560,000 shown for an Atom clear of Casual 1:1); BlockPlanet's grid used to hide it (fixed). To decide: whether power-ups score their own breaks. Originally to find out: how the game scores bricks broken by magic (the brick-score routine `func_800C7E5C`, `BLOCKPLANET_BRICK_SCORE_LOG`), whether the original gives points for magic at all, and the stage-clear bonus when the core is opened by magic. Needed anyway for the power-up levels' effects to score like normal breaks.
 
+**Missile Barrage, one at a time (the owner, 2026-11-22).** Level 3's three missiles are seen waiting, then each fires down on its own, with its own blast. Needs the levels' own effects (the game's Bomb has one flight and one blast): three strikes one after another, our missiles drawn at the waiting positions until each goes.
+
+**The Atom may be too strong (the owner, 2026-11-22):** keep the plan for now; to look at with the balance measurements.
+
 **A crash after the third Atom (the owner, 2026-11-22, Windows).** In Casual 5:3, with the power-up test giving power-ups in turn (3D models on), the game crashed after the third Atom (level 3): access violation in BlockPlanet's own code, report addresses only. Not reproduced in the test setup (two runs firing the Atom at levels 1 to 3 twice in 5:3). Windows reports now name functions and source lines (DbgHelp with the build's `.pdb`); the next report should show where.
 
 **The test harness's occasional stall (seen 2026-11-21).** In 2 of about 12 harness runs the game stopped advancing about 20 seconds in, near the title (`game_fps` 0 in every later `perf_window`, the window still updating, no crash). Not reproduced in 4 runs watched for it, so no thread dump yet. It happened with and without the power-up test switched on. Next time it shows, take a backtrace of all threads (gdb `thread apply all bt`) to see whether it is lavapipe again.

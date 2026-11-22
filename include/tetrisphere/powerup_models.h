@@ -15,7 +15,10 @@ namespace tetrisphere::powerup_models {
 // `source`, if given, receives the draw's first vertex source.
 // Kind 6: one Dynamite stick, as each flies once the bundle splits.
 constexpr int stick_kind = 6;
+// Kind 7: the Missile turned round, for the Bomb's dive into the sphere (its
+// own model leads with the other end, 2026-11-22).
+constexpr int dive_kind = 7;
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source = 0, std::uint32_t* source = nullptr,
-             bool whole = false);
+             bool whole = false, int draw_kind = -1);  // draw_kind: the model drawn, if not kind's
 
 }  // namespace tetrisphere::powerup_models

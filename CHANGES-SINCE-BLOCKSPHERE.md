@@ -749,3 +749,8 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 - The Magnet's last second, drawn another way, showed the original model. After use, every model draw is checked for the held model's vertices, through the flight's matrix or not.
 - The Bomb's second phase (our Missile at levels 2 and 3) is its own large model, which showed the original. It is now our missile.
 - Dynamite splits into five sticks, each its own blast; they showed the game's sticks. Each is now one of ours (its band in the level's colour, a fuse), and the bundle has five sticks at every level to match.
+
+## 2026-11-22: The Missile at levels 2 and 3 lands nose first
+
+- The Bomb (our Missile at levels 2 and 3) lands with its other end first, so our missile fell upside down (the owner). After use it is now drawn turned round, nose onto the target, fins up, as the original's; in the box it stays as before.
+- At impact the Bomb's model changes shape (2,452 to 2,620 vertices) and grows into the blast; that was drawn as a missile close to the camera. Only the shape it falls as is ours now; the blast is the game's.

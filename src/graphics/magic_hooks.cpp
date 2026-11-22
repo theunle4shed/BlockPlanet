@@ -512,20 +512,45 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
         std::uint32_t seen = 0;
         bool done;
         if (model3d_after_use) {
-            done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen);
+            // The Bomb lands its other end first (the owner, 2026-11-22: ours
+            // fell upside down): our missile turned round for its flight.
+            done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen, false,
+                                                        model3d_kind == 4 ? tetrisphere::powerup_models::dive_kind : -1);
             // Dynamite splits into five sticks, each its own model of one
             // vertex load of 32 (2026-11-22): each drawn as one of ours.
             // The Bomb's second phase (our Missile at levels 2 and 3) is its
             // own large model (about 2,500 vertices) that falls into the
             // sphere: drawn as our missile.
+            // Only the falling bomb: the first such model's first vertex
+            // source; after impact the same object draws a fireball from
+            // other vertices, which stays the game's (the owner, 2026-11-22:
+            // it showed as a missile flying at the camera). Ours is turned
+            // round, as the game's leads with its other end.
             if (!done && model3d_kind == 4 && model3d_through) {
+                static std::uint32_t dive_source = 0, dive_verts = 0;
+                static Clock::time_point dive_use{};
+                if (dive_use != used_time) dive_use = used_time, dive_source = 0, dive_verts = 0;
                 const std::uint32_t end = load32_at(rdram, 0x800F22B4u);
-                std::uint32_t verts = 0;
+                std::uint32_t verts = 0, first = 0;
                 for (std::uint32_t a = model3d_start; a < end && a < model3d_start + 8u * 8000u; a += 8u) {
                     const std::uint32_t w0 = load32_at(rdram, a);
-                    if ((w0 >> 24) == 0x04u) verts += ((w0 >> 20) & 0xFu) + 1u;
+                    if ((w0 >> 24) != 0x04u) continue;
+                    if (first == 0) first = load32_at(rdram, a + 4u);
+                    verts += ((w0 >> 20) & 0xFu) + 1u;
                 }
-                if (verts >= 1000) done = tetrisphere::powerup_models::replace(rdram, model3d_start, 4, level, 0, nullptr, true);
+                // (At impact the same model changes shape, 2,452 to 2,620
+                // vertices, and grows into the blast: the shape it fell as only.)
+                if (dive_source == 0 && verts >= 1000) dive_source = first, dive_verts = verts;
+                if (first != 0 && first == dive_source && verts == dive_verts)
+                    done = tetrisphere::powerup_models::replace(rdram, model3d_start, tetrisphere::powerup_models::dive_kind, level, 0,
+                                                                nullptr, true);
+                static const bool dlog = std::getenv("BLOCKPLANET_MODELS3D_LOG") != nullptr;  // research
+                if (dlog) {
+                    std::fprintf(stdout, "{\"event\":\"bomb_dive\",\"ms\":%lld,\"verts\":%u,\"first\":\"0x%08X\",\"dive\":\"0x%08X\",\"done\":%d}\n",
+                                 (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - used_time).count(), verts, first,
+                                 dive_source, int(done));
+                    std::fflush(stdout);
+                }
             }
             if (!done && model3d_kind == 1 && model3d_through) {
                 const std::uint32_t end = load32_at(rdram, 0x800F22B4u);

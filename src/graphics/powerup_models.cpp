@@ -433,6 +433,7 @@ std::vector<Part> model(int kind, int level) {
     case 2: case 5: return magnet_family(level);
     case 3: return atom_family(level);
     case stick_kind: return dynamite_stick(level);
+    case dive_kind: return placed(missile_family(level), turned(180, 0, 0), 1.0f);
     default: return {};
     }
 }
@@ -547,12 +548,14 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
 
 namespace {
 struct Built { std::uint32_t at = 0, marker = 0, light_dir = 0; };
-Built built[stick_kind + 1][4];
+Built built[dive_kind + 1][4];
 std::uint32_t next_free = model_memory;
 }  // namespace
 
-bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole) {
-    if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > stick_kind || level < 1 || level > 3) return false;
+bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole,
+             int draw_kind) {
+    if (draw_kind < 0) draw_kind = kind;
+    if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > dive_kind || draw_kind > dive_kind || level < 1 || level > 3) return false;
     const std::uint32_t end = load32(rdram, display_list_pointer);
     if (end <= start || end - start > 0x10000u) return false;
     // The game's body: its vertex loads. While held (only_source 0) every
@@ -561,7 +564,7 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     // only loads from those sources are the body, and everything else in the
     // draw (the flight's swirl, flame and smoke rings) is kept. The light's
     // direction is the game's (its white light, G_MV_L0).
-    static std::array<std::vector<std::uint32_t>, stick_kind + 1> body_sources;
+    static std::array<std::vector<std::uint32_t>, dive_kind + 1> body_sources;
     std::uint32_t first_vtx = 0, light_dir = 0x5A33C500u;
     std::vector<std::uint32_t> body_loads;
     // `whole`: the whole draw is the body, and the held model's sources are
@@ -582,10 +585,10 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     if (first_vtx == 0) return false;
     const std::uint32_t vtx_source = load32(rdram, first_vtx + 4u);
     if (source != nullptr) *source = vtx_source;
-    Built& b = built[kind][level];
-    const std::uint32_t marker = 0xB10C0000u | std::uint32_t(kind) << 8 | std::uint32_t(level);
+    Built& b = built[draw_kind][level];
+    const std::uint32_t marker = 0xB10C0000u | std::uint32_t(draw_kind) << 8 | std::uint32_t(level);
     if (b.at == 0 || load32(rdram, b.at) != marker) {  // (the light's direction as first seen)
-        const auto parts = model(kind, level);
+        const auto parts = model(draw_kind, level);
         if (parts.empty()) return false;
         std::size_t tris = 0;
         for (const auto& part : parts) tris += part.tris.size();
