@@ -738,14 +738,23 @@ void view_cell(const std::uint8_t* rdram, int& cx, int& cy) {
 // blasts' centres): one crosshair per strike, at the normal target's size;
 // a bigger blast (the Bomb) is red and yellow with arrows pointing out.
 namespace {
-int power_targets(std::uint8_t* rdram, int held, tetrisphere::barrage::Target* t) {
+int power_targets(std::uint8_t* rdram, int held, tetrisphere::barrage::Target* t, bool smooth = false) {
     using tetrisphere::barrage::Target;
     // Not the cursor itself: the view, which eases towards it (+0x2B42,
     // +0x2B46: 128 + 256 x the cursor's offset), rounded to a cell; the blast
     // is a cell before it (measured 2026-11-22: launched with the view at
     // 8.86, 8 the blast fell at 8 x 256, 7 x 256).
-    int cx, cy;
-    view_cell(rdram, cx, cy);
+    // `smooth`: while aiming, the view's own position (gliding with the
+    // sphere as it turns, rather than stepping a cell at a time).
+    double cx, cy;
+    if (smooth) {
+        cx = 8.0 + (int(std::int16_t(load32_at(rdram, player + 0x2B40u) & 0xFFFF)) - 128) / 256.0;
+        cy = 8.0 + (int(std::int16_t(load32_at(rdram, player + 0x2B44u) & 0xFFFF)) - 128) / 256.0;
+    } else {
+        int ix, iy;
+        view_cell(rdram, ix, iy);
+        cx = ix, cy = iy;
+    }
     constexpr std::uint32_t red = 0xFF3A3A, orange = 0xFF9A2E;
     constexpr double size = 1.6;  // cells: the game's own target's size
     static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
@@ -775,6 +784,13 @@ bool models_on() {
     static const bool on = std::getenv("BLOCKPLANET_MODELS3D") != nullptr;
     return on;
 }
+// BlockPlanet's crosshairs in place of the game's target: set aside for now
+// (the owner, 2026-11-22: "leave the target as it was with the original game
+// and come back to this"); BLOCKPLANET_CROSSHAIRS=1 turns them on.
+bool crosshairs_on() {
+    static const bool on = models_on() && std::getenv("BLOCKPLANET_CROSSHAIRS") != nullptr;
+    return on;
+}
 }  // namespace
 
 // The power-up's button press (func_800C719C, the use; the game's own target
@@ -792,9 +808,16 @@ extern "C" void blockplanet_magic_use(std::uint8_t* rdram) {
                      8 + int(std::int16_t(load32_at(rdram, player + 0x2B28u) & 0xFFFF)), 8 + int(std::int16_t(load32_at(rdram, player + 0x2B2Cu) & 0xFFFF)));
         std::fflush(stdout);
     }
-    if (!models_on()) return;
+    if (!crosshairs_on()) return;
     tetrisphere::barrage::Target t[5];
-    if (power_targets(rdram, held, t) > 0) aiming = true;
+    const int n = power_targets(rdram, held, t, true);
+    if (n > 0) {
+        // At once, so the game's own target is not drawn first; any left from
+        // an earlier strike go.
+        aiming = true;
+        tetrisphere::barrage::clear_targets();
+        tetrisphere::barrage::set_aim(t, n);
+    }
 }
 
 extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
@@ -804,7 +827,7 @@ extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ct
     tetrisphere::barrage::frame();
     // From the press to the launch the crosshairs follow the cursor (the
     // owner, 2026-11-22: they showed only once it was fired).
-    if (models_on()) {
+    if (crosshairs_on()) {
         static int aim_kind = -1;
         static tetrisphere::barrage::Target last[5];
         static int last_n = 0;
@@ -820,8 +843,9 @@ extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ct
         prev_held = held;
         if (aiming && held >= 0) {
             aim_kind = held;
-            last_n = power_targets(rdram, held, last);
-            tetrisphere::barrage::set_aim(last, last_n);
+            tetrisphere::barrage::Target glide[5];
+            tetrisphere::barrage::set_aim(glide, power_targets(rdram, held, glide, true));
+            last_n = power_targets(rdram, held, last);  // where it would land now (whole cells)
         } else if (aiming) {  // launched: where it was fired
             aiming = false;
             tetrisphere::barrage::set_aim(nullptr, 0);

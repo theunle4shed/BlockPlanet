@@ -139,7 +139,7 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
         std::lock_guard lock(targets_mutex);
         if (!targets.empty() && since(targets_set) > target_seconds) targets.clear();
         rings = targets;
-        if (rings.empty()) rings = aim;  // (fired: the frozen ones, else the aim)
+        rings.insert(rings.end(), aim.begin(), aim.end());
     }
     if ((!running && rings.empty()) || rdram == nullptr) return;
     const double t_now = since(started);
@@ -302,7 +302,7 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
     if (running) {
         // The launcher: loaded while hovering, then empty; after the blasts it
         // rises away.
-        const double launcher_scale = 1.3 * cell / 3600.0;
+        const double launcher_scale = 0.95 * cell / 3600.0;  // (smaller: it filled the view, the owner)
         const double leave = went_off ? std::clamp(after_hit / leave_seconds, 0.0, 1.0) : 0.0;
         const double arrive = std::clamp(t_now / arrive_seconds, 0.0, 1.0), coming = 1.0 - arrive;
         // It comes in from one side and leaves by the other (straight out along
@@ -316,17 +316,33 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
         // once the blasts go off.
         if (t_now >= release_seconds && !went_off) {
             const double t = std::clamp((t_now - release_seconds) / (land_seconds - release_seconds), 0.0, 1.0), eased = t * t;
+            // Each leaves its tube nose down, as it sat in the launcher, and
+            // curves round to its strike point, turned along its path (the
+            // owner, 2026-11-22: they turned all at once as they left).
+            (void)eased;
+            const double u = t * (0.35 + 0.65 * t);  // slow out of the tube, faster down
             for (int n = 0; n < 3; ++n) {
                 double dx, dy;
                 strike_offset(n, dx, dy);
                 V normal;
                 const V target = surface(cx + dx, cy + dy, 0.0, normal);
                 const double a = 6.2831853 * double(n) / 3.0;
-                const V start = launcher_at + (side * std::cos(a) + side2 * std::sin(a)) * (1150.0 * launcher_scale) - up * (0.5 * cell);
-                const V travel = target - start;
-                const V z = unit(travel) * -1.0;  // our models' nose is -z
+                const V across = (side * std::cos(a) + side2 * std::sin(a)) * (1150.0 * launcher_scale);
+                const V p0 = launcher_at + across + up * (300.0 * launcher_scale);  // where it sat in the launcher
+                // Out of the tube a little way, over the surface, and down onto
+                // the target nose first (a cubic curve; its control points stay
+                // above the bricks).
+                V base_normal;
+                const double height = length(launcher_at - surface(cx, cy, 0.0, base_normal));
+                const V p1 = p0 - up * (0.35 * height);
+                const V p2 = target + normal * (0.9 * height);
+                const V p3 = target;
+                const double w = 1 - u;
+                const V at = p0 * (w * w * w) + p1 * (3 * w * w * u) + p2 * (3 * w * u * u) + p3 * (u * u * u);
+                const V tangent = (p1 - p0) * (3 * w * w) + (p2 - p1) * (6 * w * u) + (p3 - p2) * (3 * u * u);
+                const V z = unit(tangent) * -1.0;  // our models' nose is -z
                 const V x = unit(cross(z, std::abs(z.x) < 0.9 ? V{1, 0, 0} : V{0, 1, 0})), y = cross(z, x);
-                place(powerup_models::barrage_missile_kind, x, y, z, 1.1 * cell / 5900.0, start + travel * eased);
+                place(powerup_models::barrage_missile_kind, x, y, z, 0.55 * launcher_scale, at);
             }
         }
 
