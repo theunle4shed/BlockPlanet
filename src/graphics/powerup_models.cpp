@@ -222,9 +222,10 @@ std::vector<Part> firecracker(int level) {
 std::vector<Part> dynamite(int level) {
     Part sticks{red, {}}, front{bright_red, {}}, band{trim(level, gold), {}}, fuse{fuse_tan, {}}, spark{electron, {}};
     std::vector<std::pair<float, float>> at;  // x, z of each stick
-    if (level == 1) at = {{-640, 0}, {0, 0}, {640, 0}};
-    else if (level == 2) at = {{-1280, 0}, {-640, 0}, {0, 0}, {640, 0}, {1280, 0}};
-    else at = {{-1280, -330}, {-640, -330}, {0, -330}, {640, -330}, {1280, -330}, {-320, 330}, {320, 330}};
+    // Five sticks at every level (the owner, 2026-11-22): in use the bundle
+    // splits into five sticks, each its own blast, so the bundle shows five.
+    // The level shows in the band's colour, the fuses and (level 3) bomblets.
+    at = {{-1280, 0}, {-640, 0}, {0, 0}, {640, 0}, {1280, 0}};
     const Place up = turned(-90, 0, 0);  // tubes along y
     float x0 = 0, x1 = 0;
     for (const auto& [x, z] : at) {
@@ -233,7 +234,7 @@ std::vector<Part> dynamite(int level) {
         tube(x == 0 ? front : sticks, pl, -1500.0f, 1500.0f, 310.0f, 310.0f);
         x0 = std::min(x0, x), x1 = std::max(x1, x);
     }
-    box(band, place_at(V3{(x0 + x1) / 2, 300, at.size() > 5 ? 0.0f : 0.0f}), (x1 - x0) / 2 + 360.0f, 260.0f, at.size() > 5 ? 720.0f : 380.0f);
+    box(band, place_at(V3{(x0 + x1) / 2, 300, 0.0f}), (x1 - x0) / 2 + 360.0f, 260.0f, 380.0f);
     const int fuses = level;
     for (int f = 0; f < fuses; ++f) {
         const float x = f == 0 ? 0.0f : f == 1 ? -640.0f : 640.0f;
@@ -385,6 +386,17 @@ std::vector<Part> dynamite_family(int level) {
     return out;
 }
 
+// One stick of the bundle, as it flies on its own once the bundle splits:
+// the stick, its band in the level's colour, a fuse and its spark.
+std::vector<Part> dynamite_stick(int level) {
+    Part stick{red, {}}, band{trim(level, gold), {}}, fuse{fuse_tan, {}}, spark{electron, {}};
+    tube(stick, turned(-90, 0, 0), -1500.0f, 1500.0f, 310.0f, 310.0f);
+    box(band, place_at(V3{0, 300, 0}), 360.0f, 260.0f, 360.0f);
+    chain(fuse, {V3{0, 1500, 0}, V3{150, 1850, 0}, V3{400, 2100, 0}}, 70.0f);
+    ball(spark, place_at(V3{430, 2160, 0}), 170.0f, 3, 6);
+    return {stick, band, fuse, spark};
+}
+
 std::vector<Part> magnet_family(int level) {
     if (level < 3) return magnet(level);  // Magnet, Power Magnet
     // Ray Gun: harder, faster, deeper; pulse rings round its beam.
@@ -420,6 +432,7 @@ std::vector<Part> model(int kind, int level) {
     case 1: return dynamite_family(level);
     case 2: case 5: return magnet_family(level);
     case 3: return atom_family(level);
+    case stick_kind: return dynamite_stick(level);
     default: return {};
     }
 }
@@ -450,6 +463,10 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
     cmd(0xBA001402u, 0x00000000u);           // one cycle
     cmd(0xFCFFFFFFu, 0xFFFE793Cu);           // G_CC_SHADE
     cmd(0xB7000000u, 0x00020000u);           // lighting on
+    // One light and the ambient (G_MW_NUMLIGHT): the game sets two for some
+    // of its effects (the Magnet in use), which turned our ambient into a
+    // second light and left the game's dark ambient, so the model drew black.
+    cmd(0xBC000002u, 0x80000040u);
     const auto lights = [&](std::uint32_t rgb, float ambient) {
         if (mem + 32u > model_memory_end) { full = true; return; }
         const std::uint8_t r = std::uint8_t(rgb >> 16), g = std::uint8_t(rgb >> 8), b = std::uint8_t(rgb);
@@ -530,29 +547,41 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
 
 namespace {
 struct Built { std::uint32_t at = 0, marker = 0, light_dir = 0; };
-Built built[6][4];
+Built built[stick_kind + 1][4];
 std::uint32_t next_free = model_memory;
 }  // namespace
 
-bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source) {
-    if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > 5 || level < 1 || level > 3) return false;
+bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole) {
+    if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > stick_kind || level < 1 || level > 3) return false;
     const std::uint32_t end = load32(rdram, display_list_pointer);
     if (end <= start || end - start > 0x10000u) return false;
-    // The geometry starts at the first vertex load; the light's direction
-    // is the game's (its white light, G_MV_L0).
+    // The game's body: its vertex loads. While held (only_source 0) every
+    // load in the draw is the body, and their sources are recorded for the
+    // kind; after use (the flight, only_source the held draw's first source)
+    // only loads from those sources are the body, and everything else in the
+    // draw (the flight's swirl, flame and smoke rings) is kept. The light's
+    // direction is the game's (its white light, G_MV_L0).
+    static std::array<std::vector<std::uint32_t>, stick_kind + 1> body_sources;
     std::uint32_t first_vtx = 0, light_dir = 0x5A33C500u;
+    std::vector<std::uint32_t> body_loads;
+    // `whole`: the whole draw is the body, and the held model's sources are
+    // left as they are (the Bomb's second model, a Dynamite stick).
+    const bool held = only_source == 0 && !whole;
+    if (held) body_sources[std::size_t(kind)].clear();
     for (std::uint32_t a = start; a < end; a += 8u) {
         const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
-        if ((w0 >> 24) == 0x03u && ((w0 >> 16) & 0xFFu) == 0x86u && w1 >= 0x80000000u) light_dir = load32(rdram, w1 + 8u);
-        if ((w0 >> 24) == 0x04u) {
-            first_vtx = a;
-            break;
-        }
+        if ((w0 >> 24) == 0x03u && ((w0 >> 16) & 0xFFu) == 0x86u && w1 >= 0x80000000u && first_vtx == 0) light_dir = load32(rdram, w1 + 8u);
+        if ((w0 >> 24) != 0x04u) continue;
+        auto& known = body_sources[std::size_t(kind)];
+        const bool body = held || whole || std::find(known.begin(), known.end(), w1) != known.end();
+        if (!body) continue;
+        if (held && known.size() < 64) known.push_back(w1);
+        if (first_vtx == 0) first_vtx = a;
+        body_loads.push_back(a);
     }
     if (first_vtx == 0) return false;
     const std::uint32_t vtx_source = load32(rdram, first_vtx + 4u);
     if (source != nullptr) *source = vtx_source;
-    if (only_source != 0 && vtx_source != only_source) return false;
     Built& b = built[kind][level];
     const std::uint32_t marker = 0xB10C0000u | std::uint32_t(kind) << 8 | std::uint32_t(level);
     if (b.at == 0 || load32(rdram, b.at) != marker) {  // (the light's direction as first seen)
@@ -579,9 +608,17 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
         std::fprintf(stdout, "{\"event\":\"powerup_model\",\"kind\":%d,\"level\":%d,\"triangles\":%zu,\"bytes\":%u}\n", kind, level, tris, used - at);
         std::fflush(stdout);
     }
-    // The game's geometry cut; a call to the model in its place.
+    // The game's body blanked (each load and the triangles drawn from it, up
+    // to the next load); a call to the model in place of the first load.
+    for (const std::uint32_t load : body_loads) {
+        store32(rdram, load, 0), store32(rdram, load + 4u, 0);
+        for (std::uint32_t a = load + 8u; a < end; a += 8u) {
+            const std::uint32_t op = load32(rdram, a) >> 24;
+            if (op == 0x04u || op == 0x06u || op == 0xB8u || op == 0x01u) break;
+            if (op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, a, 0), store32(rdram, a + 4u, 0);
+        }
+    }
     store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, b.at + 8u);
-    store32(rdram, display_list_pointer, first_vtx + 8u);
     return true;
 }
 

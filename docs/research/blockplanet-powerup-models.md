@@ -30,3 +30,16 @@ The owner's decision: keep the power-ups 3D, redrawn in the flat icons' style, w
 ## In flight and in the effect (2026-11-21)
 
 `BLOCKPLANET_MAGIC_FLIGHT_LOG=1` logs, after a power-up is used, each model drawn through its matrix. The **flying model draws its vertices from the same place as the held model** (the Firecracker's `0x801A61C0`, the Magnet's `0x801A3B50`), for about 3 seconds (the Firecracker) to 4 (the Magnet, as it pulls); the **core's character** is drawn through the same matrix throughout, from its own vertices (`0x801E5820`), and must be left alone; other objects drawn later (from other vertices) are the effect's own pieces. So: the held draw is marked by the hook just before it (`blockplanet_held_magic_draw`), its first vertex source recorded; after use, for 10 seconds, any draw through the matrix whose first vertices come from there is replaced. (Marking every draw through the matrix while held first recorded the core character's source and replaced the character.) The models are drawn from both sides (no culling): the effect can draw the model mirrored, which turned the front faces round and showed the dark outline shell; the outline is off by default (`BLOCKPLANET_MODEL_OUTLINE`). The ambient share raised from 45 % to 65 % (dim in the effect). `BLOCKPLANET_MODELS3D_LOG=1` logs each replacement. Checked: the Magnet flies out and pulls bricks as BlockPlanet's horseshoe, its tips towards the sphere as the game's claws, the core's character untouched.
+
+## Launch review (2026-11-22, the owner's request)
+
+Each use recorded at 30 frames a second in Casual 10:5, ours beside the original (`BLOCKPLANET_MAGIC_FLIGHT_LOG=1` lists each model drawn through the flight matrix after use: object, first vertex source, vertex count, time).
+
+| Power-up | The game's draws after use | Ours now |
+| --- | --- | --- |
+| Firecracker (Missile 1) | One model (its source while held), then the flame trail and smoke rings in the same draw | Our missile, nose first; the game's trail and rings kept. It vanishes at about 3.1 s where the original's rocket visibly dives into the sphere (to look at) |
+| Bomb (Missile 2, 3) | The held model to 2.3 s; then a second, large model (about 2,500 vertices, its own object) that dives into the sphere and shrinks; blast effects (76 and 84 vertices) | Our missile in both phases; the second phase's nozzle faces the camera as the original's |
+| Dynamite | The bundle to 1.9 s; then **five sticks**, each its own object of 32 vertices (1.7 to 3.7 s); then five blasts (76 and 84 vertices) | Our bundle (five sticks at every level), then five of our sticks |
+| Magnet | One model to about 4.2 s, its vertex count rising with its arcs; its last moments not through the flight matrix | Ours throughout, lit (the game sets two lights here) |
+| Ray Gun | One model to about 7 s | Ours throughout, aimed at the cursor as the original |
+| Atom | One model to about 3 s | Ours throughout; the original glows white in flight, ours does not (the glow may be part of the body draw) |

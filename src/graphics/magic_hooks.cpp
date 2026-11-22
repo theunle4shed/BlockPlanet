@@ -401,6 +401,7 @@ std::uint32_t held_source[6] = {};
 int used_kind = -1;
 Clock::time_point used_time{};
 bool model3d_after_use = false;
+bool model3d_through = false;
 // Research (BLOCKPLANET_MAGIC_FLIGHT_LOG): after a power-up is used, each model
 // drawn through its matrix: the object, its first vertices' source, the time.
 std::uint32_t flight_log_start = 0, flight_log_model = 0;
@@ -417,9 +418,14 @@ extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ct
         last_k = k;
         const bool through = static_cast<std::uint32_t>(ctx->r7) == translation_matrix;
         if (on && k >= 0 && through && held_draw_next) model3d_start = load32_at(rdram, 0x800F22B4u), model3d_kind = k, model3d_after_use = false;
-        else if (on && k < 0 && through && used_kind >= 0 && held_source[used_kind] != 0 &&
+        // After use: every model draw for 10 s, through the flight's matrix
+        // or not (the Magnet's last second is drawn another way, 2026-11-22);
+        // only draws of the held model's own vertices are replaced, so other
+        // models (the core's character) are left alone.
+        else if (on && k < 0 && used_kind >= 0 && held_source[used_kind] != 0 &&
                  std::chrono::duration<double>(Clock::now() - used_time).count() < 10.0)
-            model3d_start = load32_at(rdram, 0x800F22B4u), model3d_kind = used_kind, model3d_after_use = true;
+            model3d_start = load32_at(rdram, 0x800F22B4u), model3d_kind = used_kind, model3d_after_use = true,
+            model3d_through = through;
         static const bool flog = std::getenv("BLOCKPLANET_MAGIC_FLIGHT_LOG") != nullptr;
         static int prev = -1;
         if (flog && prev >= 0 && k < 0) flight_log_used = Clock::now();
@@ -505,9 +511,33 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
         const int level = poked >= 1 && poked <= 3 ? poked : 1;
         std::uint32_t seen = 0;
         bool done;
-        if (model3d_after_use)
+        if (model3d_after_use) {
             done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen);
-        else
+            // Dynamite splits into five sticks, each its own model of one
+            // vertex load of 32 (2026-11-22): each drawn as one of ours.
+            // The Bomb's second phase (our Missile at levels 2 and 3) is its
+            // own large model (about 2,500 vertices) that falls into the
+            // sphere: drawn as our missile.
+            if (!done && model3d_kind == 4 && model3d_through) {
+                const std::uint32_t end = load32_at(rdram, 0x800F22B4u);
+                std::uint32_t verts = 0;
+                for (std::uint32_t a = model3d_start; a < end && a < model3d_start + 8u * 8000u; a += 8u) {
+                    const std::uint32_t w0 = load32_at(rdram, a);
+                    if ((w0 >> 24) == 0x04u) verts += ((w0 >> 20) & 0xFu) + 1u;
+                }
+                if (verts >= 1000) done = tetrisphere::powerup_models::replace(rdram, model3d_start, 4, level, 0, nullptr, true);
+            }
+            if (!done && model3d_kind == 1 && model3d_through) {
+                const std::uint32_t end = load32_at(rdram, 0x800F22B4u);
+                std::uint32_t loads = 0, verts = 0;
+                for (std::uint32_t a = model3d_start; a < end && a < model3d_start + 8u * 4000u; a += 8u) {
+                    const std::uint32_t w0 = load32_at(rdram, a);
+                    if ((w0 >> 24) == 0x04u) ++loads, verts += ((w0 >> 20) & 0xFu) + 1u;
+                }
+                if (loads >= 2 && verts == 32)
+                    done = tetrisphere::powerup_models::replace(rdram, model3d_start, tetrisphere::powerup_models::stick_kind, level, 0, nullptr, true);
+            }
+        } else
             done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, 0, &held_source[model3d_kind]);
         static const bool log = std::getenv("BLOCKPLANET_MODELS3D_LOG") != nullptr;  // research
         if (log) {

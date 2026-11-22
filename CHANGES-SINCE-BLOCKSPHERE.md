@@ -739,3 +739,13 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-22: Earning a power-up raises its level (power-up test)
 
 - The game gives a power-up in three places (the magic meter, `func_800941B8`; a mystery block, `func_8008E0B8`; a combo of 20 or more, `func_800CD3B8`), each by adding 1 to the held slot, so a second one turned the Firecracker into Dynamite and so on. In the power-up test (`BLOCKPLANET_POWERUP_TEST=1`), BlockPlanet now chooses instead: with nothing held, one of the four power-ups at random (equal odds) at level 1; with one held, its level goes up, to 3 at most. Checked with three mystery blocks in a row: Dynamite at level 1, 2, then 3. The levels' effects are not built yet.
+
+## 2026-11-22: Power-up launches reviewed (3D models)
+
+Each power-up's use was recorded beside the original's and stepped through (`docs/research/blockplanet-powerup-models.md`). Fixed:
+
+- The game's effects drawn with a power-up (the Firecracker's flame trail and smoke rings, the Magnet's arcs) were cut along with its body. Now only the game's body is replaced (the vertex loads seen while it was held); the rest of the draw stays.
+- The Magnet drew almost black in use: the game sets two lights for it, which turned our ambient into a second light. Our models now set one light.
+- The Magnet's last second, drawn another way, showed the original model. After use, every model draw is checked for the held model's vertices, through the flight's matrix or not.
+- The Bomb's second phase (our Missile at levels 2 and 3) is its own large model, which showed the original. It is now our missile.
+- Dynamite splits into five sticks, each its own blast; they showed the game's sticks. Each is now one of ours (its band in the level's colour, a fuse), and the bundle has five sticks at every level to match.
