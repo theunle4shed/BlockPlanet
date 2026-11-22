@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <mutex>
+#include <vector>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -24,6 +26,8 @@ constexpr std::uint32_t active_context = 0x8013DD00u;
 constexpr std::uint32_t board_pointer = 0x800E44DCu;  // one byte per cell, height << 4 | kind
 // Our matrices, two frames' worth (the previous frame's list may still be read).
 constexpr std::uint32_t matrix_memory = 0x8073C000u;
+// The crosshairs' vertices, two frames' worth.
+constexpr std::uint32_t ring_memory = 0x80760000u;
 
 // Timing in seconds from the use: the game's logic runs in real time, and the
 // blasts go off about 2.27 s after the use (measured 2026-11-22, two runs).
@@ -39,6 +43,11 @@ std::atomic<bool> running{false};
 std::atomic<int> cursor_x{0}, cursor_y{0};
 Clock::time_point started{}, hit_at{};
 std::atomic<bool> hit{false};
+// Crosshairs.
+std::mutex targets_mutex;
+std::vector<Target> targets;
+Clock::time_point targets_set{};
+constexpr double target_seconds = 8.0;  // at most
 double since(Clock::time_point t) { return std::chrono::duration<double>(Clock::now() - t).count(); }
 std::uint32_t draw_count = 0;
 
@@ -95,8 +104,37 @@ void frame() {
 }
 bool active() { return running; }
 
+void set_targets(const Target* t, int count) {
+    std::lock_guard lock(targets_mutex);
+    targets.assign(t, t + count);
+    targets_set = Clock::now();
+}
+void blast_at(int a0, int a1) {
+    std::lock_guard lock(targets_mutex);
+    const double x = a0 / 256.0 + 0.5, y = a1 / 256.0 + 0.5;
+    for (auto it = targets.begin(); it != targets.end(); ++it)
+        if (std::hypot(it->x - x, it->y - y) < 1.6) {
+            targets.erase(it);
+            return;
+        }
+}
+void clear_targets() {
+    std::lock_guard lock(targets_mutex);
+    targets.clear();
+}
+bool hide_game_target() {
+    std::lock_guard lock(targets_mutex);
+    return !targets.empty() && since(targets_set) < target_seconds;
+}
+
 void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
-    if (!running || rdram == nullptr) return;
+    std::vector<Target> rings;
+    {
+        std::lock_guard lock(targets_mutex);
+        if (!targets.empty() && since(targets_set) > target_seconds) targets.clear();
+        rings = targets;
+    }
+    if ((!running && rings.empty()) || rdram == nullptr) return;
     const double t_now = since(started);
     const bool went_off = hit.load();
     const double after_hit = went_off ? since(hit_at) : 0.0;
@@ -143,6 +181,8 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
     V up2;
     const double cell = length(surface(cx + 1.0, cy, hover_layers, up2) - hover);
     if (cell <= 1.0) return;
+    // (While only crosshairs show, the cursor above is not the barrage's;
+    // the launcher and its missiles are drawn only while it runs.)
 
     // Back up the sphere's lights and modes, to put back after.
     std::uint32_t lights[6][2] = {}, numlight = 0;
@@ -154,6 +194,65 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
             if (k < 12u && (k & 1u) == 0 && lights[k / 2][0] == 0) lights[k / 2][0] = w0, lights[k / 2][1] = load32(rdram, at + 4u);
         }
         if (numlight != 0 && lights[0][0] != 0) break;
+    }
+
+    // The crosshairs: quads on the bricks' tops (a little above), unlit, in
+    // their colour, pulsing.
+    if (!rings.empty()) {
+        const std::uint32_t vbuf = ring_memory + (draw_count & 1u) * 0x8000u;
+        std::uint32_t v = vbuf;
+        const double pulse = 0.75 + 0.25 * std::sin(since(targets_set) * 9.0);
+        append(rdram, 0xE7000000u, 0);
+        append(rdram, 0xB6000000u, 0x00023000u);           // no lighting, no culling
+        append(rdram, 0xFCFFFFFFu, 0xFFFE793Cu);           // G_CC_SHADE
+        append(rdram, 0xBB000000u, 0);                     // texture off
+        const auto vertex = [&](V p, std::uint32_t rgb) {
+            store16(rdram, v, std::int16_t(std::lround(std::clamp(p.x, -32000.0, 32000.0))));
+            store16(rdram, v + 2, std::int16_t(std::lround(std::clamp(p.y, -32000.0, 32000.0))));
+            store16(rdram, v + 4, std::int16_t(std::lround(std::clamp(p.z, -32000.0, 32000.0))));
+            store16(rdram, v + 6, 0);
+            store32(rdram, v + 8, 0);
+            const auto c = [&](int sh) { return std::uint32_t(std::lround(double((rgb >> sh) & 0xFF) * pulse)) & 0xFF; };
+            store32(rdram, v + 12, c(16) << 24 | c(8) << 16 | c(0) << 8 | 0xFF);
+            v += 16;
+        };
+        const auto quad = [&](V a, V b, V c, V d, std::uint32_t rgb) {
+            if (v + 64 > vbuf + 0x8000u) return;
+            const std::uint32_t at = v;
+            vertex(a, rgb), vertex(b, rgb), vertex(c, rgb), vertex(d, rgb);
+            append(rdram, 0x04300040u, at);
+            append(rdram, 0xBF000000u, (0u << 16) | (10u << 8) | 20u);
+            append(rdram, 0xBF000000u, (0u << 16) | (20u << 8) | 30u);
+        };
+        constexpr double lift = 0.25;  // layers above the bricks
+        for (const Target& t : rings) {
+            // The ring: its inner and outer edge on the surface.
+            const double width = 0.28;
+            constexpr int steps = 40;
+            for (int k = 0; k < steps; ++k) {
+                const double a0 = 6.283185307 * k / steps, a1 = 6.283185307 * (k + 1) / steps;
+                V n;
+                const V p0 = surface(t.x + (t.radius - width) * std::cos(a0), t.y + (t.radius - width) * std::sin(a0), lift, n);
+                const V p1 = surface(t.x + t.radius * std::cos(a0), t.y + t.radius * std::sin(a0), lift, n);
+                const V p2 = surface(t.x + t.radius * std::cos(a1), t.y + t.radius * std::sin(a1), lift, n);
+                const V p3 = surface(t.x + (t.radius - width) * std::cos(a1), t.y + (t.radius - width) * std::sin(a1), lift, n);
+                quad(p0, p1, p2, p3, t.rgb);
+            }
+            // Four ticks across the ring, and a small cross at the centre.
+            const auto bar = [&](double x0, double y0, double x1, double y1, double half) {
+                const double dx = x1 - x0, dy = y1 - y0, l = std::hypot(dx, dy);
+                const double px = -dy / l * half, py = dx / l * half;
+                V n;
+                quad(surface(x0 + px, y0 + py, lift, n), surface(x1 + px, y1 + py, lift, n), surface(x1 - px, y1 - py, lift, n),
+                     surface(x0 - px, y0 - py, lift, n), t.rgb);
+            };
+            for (int k = 0; k < 4; ++k) {
+                const double a = 1.5707963 * k, c = std::cos(a), sn = std::sin(a);
+                bar(t.x + c * (t.radius - 0.9), t.y + sn * (t.radius - 0.9), t.x + c * (t.radius + 0.7), t.y + sn * (t.radius + 0.7), 0.12);
+            }
+            bar(t.x - 0.45, t.y, t.x + 0.45, t.y, 0.1);
+            bar(t.x, t.y - 0.45, t.x, t.y + 0.45, 0.1);
+        }
     }
 
     const std::uint32_t buffer = matrix_memory + (draw_count++ & 1u) * 0x800u;
@@ -170,49 +269,52 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
     const V side = unit(cross(up, std::abs(up.x) < 0.9 ? V{1, 0, 0} : V{0, 1, 0})), side2 = cross(up, side);
     // (Declared before the launcher's position uses it.)
 
-    // The launcher: loaded while hovering, then empty; after the blasts it
-    // rises away.
-    const double launcher_scale = 1.3 * cell / 3600.0;
-    const double leave = went_off ? std::clamp(after_hit / leave_seconds, 0.0, 1.0) : 0.0;
-    const double arrive = std::clamp(t_now / arrive_seconds, 0.0, 1.0), coming = 1.0 - arrive;
-    // It comes in from one side and leaves by the other (straight out along
-    // the surface normal is straight at the camera).
-    const V launcher_at = hover + (side * -1.0 + up * 0.3) * (coming * coming * coming * 14.0 * cell) +
-                          (side + up * 0.3) * (leave * leave * 14.0 * cell);
-    place(t_now < release_seconds ? 4 : powerup_models::empty_launcher_kind, side, side2, up, launcher_scale, launcher_at);
-    // (Level 3's held model is the loaded launcher: kind 4 at level 3.)
+    if (running) {
+        // The launcher: loaded while hovering, then empty; after the blasts it
+        // rises away.
+        const double launcher_scale = 1.3 * cell / 3600.0;
+        const double leave = went_off ? std::clamp(after_hit / leave_seconds, 0.0, 1.0) : 0.0;
+        const double arrive = std::clamp(t_now / arrive_seconds, 0.0, 1.0), coming = 1.0 - arrive;
+        // It comes in from one side and leaves by the other (straight out along
+        // the surface normal is straight at the camera).
+        const V launcher_at = hover + (side * -1.0 + up * 0.3) * (coming * coming * coming * 14.0 * cell) +
+                              (side + up * 0.3) * (leave * leave * 14.0 * cell);
+        place(t_now < release_seconds ? 4 : powerup_models::empty_launcher_kind, side, side2, up, launcher_scale, launcher_at);
+        // (Level 3's held model is the loaded launcher: kind 4 at level 3.)
 
-    // The missiles: from the launcher's tubes to their strike points; gone
-    // once the blasts go off.
-    if (t_now >= release_seconds && !went_off) {
-        const double t = std::clamp((t_now - release_seconds) / (land_seconds - release_seconds), 0.0, 1.0), eased = t * t;
-        for (int n = 0; n < 3; ++n) {
-            double dx, dy;
-            strike_offset(n, dx, dy);
-            V normal;
-            const V target = surface(cx + dx, cy + dy, 0.0, normal);
-            const double a = 6.2831853 * double(n) / 3.0;
-            const V start = launcher_at + (side * std::cos(a) + side2 * std::sin(a)) * (1150.0 * launcher_scale) - up * (0.5 * cell);
-            const V travel = target - start;
-            const V z = unit(travel) * -1.0;  // our models' nose is -z
-            const V x = unit(cross(z, std::abs(z.x) < 0.9 ? V{1, 0, 0} : V{0, 1, 0})), y = cross(z, x);
-            place(powerup_models::barrage_missile_kind, x, y, z, 1.1 * cell / 5900.0, start + travel * eased);
+        // The missiles: from the launcher's tubes to their strike points; gone
+        // once the blasts go off.
+        if (t_now >= release_seconds && !went_off) {
+            const double t = std::clamp((t_now - release_seconds) / (land_seconds - release_seconds), 0.0, 1.0), eased = t * t;
+            for (int n = 0; n < 3; ++n) {
+                double dx, dy;
+                strike_offset(n, dx, dy);
+                V normal;
+                const V target = surface(cx + dx, cy + dy, 0.0, normal);
+                const double a = 6.2831853 * double(n) / 3.0;
+                const V start = launcher_at + (side * std::cos(a) + side2 * std::sin(a)) * (1150.0 * launcher_scale) - up * (0.5 * cell);
+                const V travel = target - start;
+                const V z = unit(travel) * -1.0;  // our models' nose is -z
+                const V x = unit(cross(z, std::abs(z.x) < 0.9 ? V{1, 0, 0} : V{0, 1, 0})), y = cross(z, x);
+                place(powerup_models::barrage_missile_kind, x, y, z, 1.1 * cell / 5900.0, start + travel * eased);
+            }
         }
+
+        // Research: BLOCKPLANET_BARRAGE_MARKERS=1 stands a missile on each strike
+        // point throughout, to check them against the blasts.
+        static const bool markers = std::getenv("BLOCKPLANET_BARRAGE_MARKERS") != nullptr;
+        if (markers)
+            for (int n = 0; n < 3; ++n) {
+                double dx, dy;
+                strike_offset(n, dx, dy);
+                V normal;
+                const V target = surface(cx + dx, cy + dy, 1.0, normal);
+                const V z = normal * -1.0;
+                const V x = unit(cross(z, std::abs(z.x) < 0.9 ? V{1, 0, 0} : V{0, 1, 0})), y = cross(z, x);
+                place(powerup_models::barrage_missile_kind, x, y, z, 1.1 * cell / 5900.0, target);
+            }
+
     }
-
-    // Research: BLOCKPLANET_BARRAGE_MARKERS=1 stands a missile on each strike
-    // point throughout, to check them against the blasts.
-    static const bool markers = std::getenv("BLOCKPLANET_BARRAGE_MARKERS") != nullptr;
-    if (markers)
-        for (int n = 0; n < 3; ++n) {
-            double dx, dy;
-            strike_offset(n, dx, dy);
-            V normal;
-            const V target = surface(cx + dx, cy + dy, 1.0, normal);
-            const V z = normal * -1.0;
-            const V x = unit(cross(z, std::abs(z.x) < 0.9 ? V{1, 0, 0} : V{0, 1, 0})), y = cross(z, x);
-            place(powerup_models::barrage_missile_kind, x, y, z, 1.1 * cell / 5900.0, target);
-        }
 
     // The sphere's state back for the passes that follow.
     if (numlight != 0) append(rdram, 0xBC000002u, numlight);

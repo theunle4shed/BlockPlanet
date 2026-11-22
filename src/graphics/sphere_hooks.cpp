@@ -836,6 +836,9 @@ extern "C" bool blockplanet_sphere_pass_begin(std::uint8_t* rdram, recomp_contex
                 if (*p >= '0' && *p <= '9') bits |= 1u << (*p - '0');
         return bits;
     }();
+    // 5 (func_8009AB60, the cursor) also draws the game's target while a
+    // power-up counts down: not while BlockPlanet's crosshairs show.
+    if (pass == 5 && tetrisphere::barrage::hide_game_target()) return true;
     // See-through core: 1 (func_800A0ED8) draws the core.
     // BLOCKPLANET_SEE_THROUGH_KEEP_CORE=1 keeps it (research: is the core
     // see-through itself?).

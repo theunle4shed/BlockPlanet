@@ -697,6 +697,7 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
     ctx->r4 = std::uint64_t(std::int64_t(x)), ctx->r5 = std::uint64_t(std::int64_t(y)), ctx->r7 = strike_kind;
     barrage_dropping = true;
     tetrisphere::barrage::impact();
+    tetrisphere::barrage::clear_targets();
     std::fprintf(stdout, "{\"event\":\"barrage_timing\",\"frames_from_use\":%d,\"seconds\":%.2f}\n", barrage_game_frame - barrage_use_frame,
                  std::chrono::duration<double>(Clock::now() - barrage_use_time).count());
     barrage_next = 1, barrage_due = Clock::now() + std::chrono::milliseconds(1200);
@@ -724,6 +725,45 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
     return false;  // the game's call goes on, as the first strike
 }
 
+// The power-up's button press (func_800C719C, the use; the game's own target
+// shows from here until the blast): BlockPlanet's crosshairs instead.
+extern "C" void blockplanet_magic_use(std::uint8_t* rdram) {
+    const int last_held = std::int8_t(rdram[((player + 0x702u) ^ 3u) & 0x7FFFFFu]);
+    {
+        // Crosshairs where the strikes will land (with BlockPlanet's models),
+        // set as the power-up is fired: the blasts' centres in board cells.
+        static const bool models = std::getenv("BLOCKPLANET_MODELS3D") != nullptr;
+        if (models && last_held >= 0) {
+            const int cx = 8 + int(std::int16_t(load32_at(rdram, player + 0x2B28u) & 0xFFFF));
+            const int cy = 8 + int(std::int16_t(load32_at(rdram, player + 0x2B2Cu) & 0xFFFF));
+            using tetrisphere::barrage::Target;
+            const bool barrage = last_held == 4 && blockplanet::powerup_family() == 0 && blockplanet::powerup_level() == 3 &&
+                                 std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
+            constexpr std::uint32_t red = 0xFF3A3A, orange = 0xFF9A2E;
+            if (barrage) {
+                Target t[3];
+                for (int n = 0; n < 3; ++n) {
+                    double dx, dy;
+                    tetrisphere::barrage::strike_offset(n, dx, dy);
+                    t[n] = Target{cx - 0.5 + dx, cy - 0.5 + dy, 4.0, red};
+                }
+                tetrisphere::barrage::set_targets(t, 3);
+            } else if (last_held == 0 || last_held == 4) {
+                // The Firecracker (radius 4) and the Bomb (radius 6), at the cursor.
+                const Target t{cx - 0.5, cy - 0.5, last_held == 0 ? 4.0 : 6.0, red};
+                tetrisphere::barrage::set_targets(&t, 1);
+            } else if (last_held == 1) {
+                // Dynamite's five sticks (measured 2026-11-20: offsets from the
+                // cursor, docs/research/blockplanet-score-and-magic.md), radius 2.
+                static constexpr double off[5][2] = {{0, -3.1}, {-3.8, -1.8}, {4.6, -2.2}, {-2.7, 2.7}, {3.3, 3.3}};
+                Target t[5];
+                for (int n = 0; n < 5; ++n) t[n] = Target{cx + off[n][0] + 0.5, cy + off[n][1] + 0.5, 2.0, orange};
+                tetrisphere::barrage::set_targets(t, 5);
+            }
+        }
+    }
+}
+
 extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
     // The scene: begins once the launcher's flight has ended (no draw of it
     // for a few frames), over the cursor's cell.
@@ -735,6 +775,7 @@ extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ct
     {
         static int last_held = -1;
         const int held_now = std::int8_t(rdram[((player + 0x702u) ^ 3u) & 0x7FFFFFu]);
+
         static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
         if (test && last_held == 4 && held_now < 0 && blockplanet::powerup_family() == 0 && blockplanet::powerup_level() == 3) {
             barrage_use_frame = barrage_game_frame, barrage_use_time = Clock::now();

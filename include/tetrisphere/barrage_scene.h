@@ -29,4 +29,20 @@ bool active();
 // From the sphere's drawing, after its bricks (sphere_hooks.cpp).
 void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere);
 
+// Crosshairs (the owner, 2026-11-22: the game's target is a bitmap that
+// pixelates, and one target for several strikes): rings drawn on the sphere's
+// surface, each the size of its blast, from the power-up's use until its
+// blast. Centres in board cells (fractional: a blast's a0 / 256 + 0.5).
+struct Target {
+    double x, y, radius;
+    std::uint32_t rgb;
+};
+void set_targets(const Target* targets, int count);
+// A blast went off at (a0, a1) (1/256 of a cell): the crosshair there goes.
+void blast_at(int a0, int a1);
+void clear_targets();
+// While crosshairs show, the game's own target (drawn with the cursor,
+// func_8009AB60) is not drawn.
+bool hide_game_target();
+
 } // namespace tetrisphere::barrage

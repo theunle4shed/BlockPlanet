@@ -146,7 +146,6 @@ text = "if (blockplanet_sphere_pass_begin(rdram, ctx, 3)) return;"
 func = "func_800A2E88"
 text = "if (blockplanet_sphere_pass_begin(rdram, ctx, 4)) return;"
 
-
 # Stage 1: the four quadrant passes, which walk the cells and draw the faces.
 [[patches.hook]]
 func = "func_8009E630"
@@ -778,7 +777,7 @@ text = "if (blockplanet_draw_filter(rdram, ctx, 0x800382B4u)) return;"
 # play; the cell under the cursor shows it instead.
 [[patches.hook]]
 func = "func_8009AB60"
-text = "if (blockplanet_minefield_hide_marker(rdram, ctx)) return;"
+text = "if (blockplanet_minefield_hide_marker(rdram, ctx) || blockplanet_sphere_pass_begin(rdram, ctx, 5)) return;"
 
 # Minefield on the sphere: the view's angles (the copy the drawing reads,
 # +0x2B48/+0x2B4C, set from +0x2B40/+0x2B44 just before) are moved on half a
@@ -1058,6 +1057,12 @@ text = "blockplanet_stage_record_edit(rdram, ctx);"
 [[patches.hook]]
 func = "func_800C6474"
 text = "blockplanet_blast_log(rdram, ctx); if (blockplanet_barrage_blast(rdram, ctx)) return;"
+
+# The power-up's use (the button press): BlockPlanet's crosshairs
+# (blockplanet_magic_use in src/graphics/magic_hooks.cpp).
+[[patches.hook]]
+func = "func_800C719C"
+text = "blockplanet_magic_use(rdram);"
 
 # Each frame (the held magic's routine): the barrage's next strike, when due.
 [[patches.hook]]

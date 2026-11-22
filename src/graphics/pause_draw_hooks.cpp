@@ -27,6 +27,7 @@
 // Recompiled calls do not keep return addresses, so draws are told apart by
 // their arguments.
 
+#include "tetrisphere/barrage_scene.h"
 #include "tetrisphere/game_over_shell.h"
 #include "tetrisphere/guest_memory.h"
 #include "tetrisphere/pause_draw.h"
@@ -722,6 +723,7 @@ extern "C" bool blockplanet_skip_orb_effects(std::uint8_t*, recomp_context*) {
 // func_800C6474's arguments (a0, a1, a2 as s16, a3 the kind), with player 1's
 // cursor cell, to see where each Dynamite stick lands.
 extern "C" void blockplanet_blast_log(std::uint8_t* rdram, recomp_context* ctx) {
+    tetrisphere::barrage::blast_at(int(std::int16_t(ctx->r4)), int(std::int16_t(ctx->r5)));  // its crosshair goes
     static const bool log = std::getenv("BLOCKPLANET_BLAST_LOG") != nullptr;
     if (!log) return;
     using namespace tetrisphere::guest;
