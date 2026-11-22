@@ -111,6 +111,22 @@ extern "C" void tetrisphere_rt64_bad_matrix_where() {
             std::fprintf(stdout, "%s\"%08x:%08x %08x\"", n ? "," : "", a, w0, w1);
         }
     }
+    // The segment and sub-list commands before it (back up to 64 KB).
+    std::fprintf(stdout, "],\"earlier\":[");
+    if (dl_rdram != nullptr && dl_parent_count_now > 0) {
+        const std::uint32_t back = dl_parents_now[dl_parent_count_now - 1];
+        std::uint32_t found[24], n = 0;
+        for (std::uint32_t a = back - 16u; a + 0x10000u > back && a >= 8u && n < 24; a -= 8u) {
+            std::uint32_t w0;
+            std::memcpy(&w0, dl_rdram + a, 4);
+            if ((w0 >> 24) == 0xBCu || (w0 >> 24) == 0x06u) found[n++] = a;
+        }
+        for (std::uint32_t i = 0; i < n; ++i) {
+            std::uint32_t w0, w1;
+            std::memcpy(&w0, dl_rdram + found[i], 4), std::memcpy(&w1, dl_rdram + found[i] + 4u, 4);
+            std::fprintf(stdout, "%s\"%08x:%08x %08x\"", i ? "," : "", found[i], w0, w1);
+        }
+    }
     std::fprintf(stdout, "]}\n");
 }
 
