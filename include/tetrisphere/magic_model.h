@@ -28,6 +28,11 @@ void set_magic_box_plain(bool plain);
 // spinning model in the box is drawn at no size, and no tint behind it; the
 // HUD shows the icon instead. (The model's flight when fired is kept.)
 void set_magic_models_hidden(bool hidden);
+// Power-up levels: the held power-up's family (0 to 3, -1 none) and level
+// (1 to 3, 0 none), as last given (magic_hooks.cpp).
+int powerup_family();
+int powerup_level();
+void set_powerup(int family, int level);
 
 // True while the held magic's model is being drawn in the item box.
 bool magic_box_active();

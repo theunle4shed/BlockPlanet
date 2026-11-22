@@ -735,3 +735,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 ## 2026-11-22: The grid comes in as the friend escapes
 
 - A single stage's end: BlockPlanet's grid now comes in when the rescued friend escapes (with NICE JOB), not a fixed 1.8 s after the clear. A clear whose core opened round the far side (the Atom) has a longer win scene, which the grid used to cover. Markers: `+0x2B5C` is 1 through the stage end, `0x80109D92` turns non-zero at the escape (checked in 1:1, 5:3 and 10:1); a fallback after 12 s.
+
+## 2026-11-22: Earning a power-up raises its level (power-up test)
+
+- The game gives a power-up in three places (the magic meter, `func_800941B8`; a mystery block, `func_8008E0B8`; a combo of 20 or more, `func_800CD3B8`), each by adding 1 to the held slot, so a second one turned the Firecracker into Dynamite and so on. In the power-up test (`BLOCKPLANET_POWERUP_TEST=1`), BlockPlanet now chooses instead: with nothing held, one of the four power-ups at random (equal odds) at level 1; with one held, its level goes up, to 3 at most. Checked with three mystery blocks in a row: Dynamite at level 1, 2, then 3. The levels' effects are not built yet.

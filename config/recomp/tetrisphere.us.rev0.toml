@@ -103,6 +103,26 @@ func = "func_8009D570"
 before_vram = 0x8009D904
 text = "blockplanet_sphere_face_end(rdram, ctx, 5);"
 
+# Power-up levels (the owner, 2026-11-22): the game gives a power-up by adding
+# 1 to the held slot (+0x702): the magic meter (func_800941B8), a mystery
+# block (func_8008E0B8) and a combo of 20 or more (func_800CD3B8). Just
+# before each store, BlockPlanet may choose the value instead
+# (blockplanet_magic_earn in src/platform/linux_main.cpp).
+[[patches.hook]]
+func = "func_800941B8"
+before_vram = 0x80094228
+text = "ctx->r11 = blockplanet_magic_earn(rdram, (int)(int8_t)ctx->r10);"
+
+[[patches.hook]]
+func = "func_8008E0B8"
+before_vram = 0x8008E140
+text = "ctx->r12 = blockplanet_magic_earn(rdram, (int)(int8_t)ctx->r11);"
+
+[[patches.hook]]
+func = "func_800CD3B8"
+before_vram = 0x800CE0F0
+text = "ctx->r15 = blockplanet_magic_earn(rdram, (int)(int8_t)ctx->r24);"
+
 # Research: the sphere's other drawing passes, each skippable
 # (BLOCKPLANET_SKIP_PASS), to find which draws what; the see-through core
 # skips the core's.

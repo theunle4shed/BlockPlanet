@@ -37,6 +37,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <random>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -527,4 +528,43 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
     if (!span_open) return;
     span_open = false;
     tetrisphere_ui_span_end(rdram, ctx, 0x8002D93Cu);
+}
+
+// Power-up levels (the owner, 2026-11-22): the held power-up's family (0 the
+// Missile, 1 Dynamite, 2 the Magnet, 3 the Atom) and level (1 to 3), as last
+// given by BlockPlanet (the earn rule below, or the test keys).
+namespace {
+int current_family = -1, current_level = 0;
+}
+namespace blockplanet {
+int powerup_family() { return current_family; }
+int powerup_level() { return current_level; }
+void set_powerup(int family, int level) { current_family = family, current_level = level; }
+}
+
+// Earning a power-up (the owner, 2026-11-22): with nothing held, one of the
+// four at random (equal odds) at level 1; with one held, its level goes up
+// (to 3 at most) instead of the game's next kind. Called by the game's three
+// ways of giving one (the magic meter, a mystery block, a 20+ combo; see the
+// patch notes in config/recomp), with the slot's value before; returns the
+// value to store. In the power-up test only for now (the levels' effects are
+// not built yet); otherwise the game's own rule (one more).
+extern "C" int blockplanet_magic_earn(std::uint8_t* rdram, int before) {
+    static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
+    if (!test) return before + 1;
+    static std::mt19937 random{std::random_device{}()};
+    static constexpr int kinds[4][3] = {{0, 4, 4}, {1, 1, 1}, {2, 2, 5}, {3, 3, 3}};
+    static constexpr int family_of[6] = {0, 1, 2, 3, 0, 2};
+    int family, level;
+    if (before < 0 || before > 5) {
+        family = std::uniform_int_distribution<int>(0, 3)(random), level = 1;
+    } else {
+        family = family_of[before];
+        level = family == current_family && current_level >= 1 ? std::min(3, current_level + 1) : 2;
+    }
+    rdram[(0x807FFF00u ^ 3u) & 0x007FFFFFu] = std::uint8_t(level);
+    current_family = family, current_level = level;
+    std::fprintf(stdout, "{\"event\":\"magic_earned\",\"before\":%d,\"kind\":%d,\"level\":%d}\n", before, kinds[family][level - 1], level);
+    std::fflush(stdout);
+    return kinds[family][level - 1];
 }

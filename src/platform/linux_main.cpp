@@ -136,8 +136,7 @@ bool unlock_all_testing = false;
 // magic_hooks.cpp); the effects are still the game's six (the Missile is the
 // Firecracker at level 1 and the Bomb at 2 and 3, the Magnet the Magnet at 1
 // and 2 and the Ray Gun at 3).
-int powerup_test_shown_level = 0, powerup_test_family = -1;
-int powerup_test_level() { return powerup_test_shown_level; }
+int powerup_test_level() { return blockplanet::powerup_level(); }
 bool powerup_test_key(std::uint8_t* rdram, int family) {
     static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
     if (!test || rdram == nullptr) return false;
@@ -146,16 +145,17 @@ bool powerup_test_key(std::uint8_t* rdram, int family) {
                          std::int16_t(guest::load16(rdram, 0x80112F9E)) != -1 && !blockplanet::ui::menus_open();
     if (!playing) return false;
     const bool held = std::int8_t(guest::load8(rdram, 0x80110220u + 0x702)) >= 0;
-    const int level = held && family == powerup_test_family ? powerup_test_shown_level % 3 + 1 : 1;
+    const int level = held && family == blockplanet::powerup_family() ? blockplanet::powerup_level() % 3 + 1 : 1;
     static constexpr int kinds[4][3] = {{0, 4, 4}, {1, 1, 1}, {2, 2, 5}, {3, 3, 3}};
     const int kind = kinds[family][level - 1];
     guest::store8(rdram, 0x807FFF00u, std::uint8_t(level));
     guest::store8(rdram, 0x80110220u + 0x702, std::uint8_t(kind));
-    powerup_test_family = family, powerup_test_shown_level = level;
+    blockplanet::set_powerup(family, level);
     std::fprintf(stdout, "{\"event\":\"powerup_test\",\"kind\":%d,\"level\":%d}\n", kind, level);
     std::fflush(stdout);
     return true;
 }
+
 // Start-up screens (the owner's choice, 2026-11-08): title, then who is
 // playing (P1), then the main menu; Back goes back through them.
 bool profile_picked = false;  // P1 chosen this session (or given on the command line)
