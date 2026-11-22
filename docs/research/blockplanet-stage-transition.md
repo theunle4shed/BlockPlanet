@@ -41,3 +41,11 @@ The owner asked what follows the last episode. The game's message table has nine
 ## The same state after any episode in the attack modes
 
 Winning 2:10 in Time Attack or Score Attack leads to the same state as after 10:10: the pause row at 0, no menu text, a dim sphere. Story and Casual are told an episode's end is coming and get the game's end menu under BlockPlanet's panel; the attack modes were not, and nothing left play. Since 2026-11-19 BlockPlanet leaves play 1.5 s into that state (parking the game, then its direct quit) and shows the episode's results over the menus.
+
+## Markers for the stage end (2026-11-22)
+
+Found from memory dumps every 0.3 s across a win (`BLOCKPLANET_DUMP_DIR` and F2) in Casual 1:1, 5:3 and 10:1:
+
+- Context `+0x2B5C` (`0x80112D7C`) is 1 from the clear until the fade ends and the next stage is built, 0 in play.
+- `0x80109D92` is 0 in play and turns non-zero (rising) when the friend escapes and NICE JOB appears, as does `0x800F6344` (a float, rising). `0x80109C82` sits at 228 in play and rises from then too.
+- The win scene runs longer when the core opens out of view (the camera turns to it first), so a fixed delay is not enough; BlockPlanet's grid for a single stage's end waits for the escape.

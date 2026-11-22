@@ -731,3 +731,7 @@ Internal names (the `tetrisphere` executable, CMake targets, and data paths) are
 
 - The power-up test no longer gives power-ups by itself. Instead, in a game, number pad 1 gives the Missile, 2 Dynamite, 3 the Magnet and 4 the Atom; pressing the same key again raises the level (1, 2, 3, then 1 again). Only with `BLOCKPLANET_POWERUP_TEST=1` (BlockPlanet.bat's test option).
 - Windows crash reports now also list the stack from the crash itself with function names and source lines, read from the program's `.pdb` beside it (DbgHelp), so a report says where the crash was.
+
+## 2026-11-22: The grid comes in as the friend escapes
+
+- A single stage's end: BlockPlanet's grid now comes in when the rescued friend escapes (with NICE JOB), not a fixed 1.8 s after the clear. A clear whose core opened round the far side (the Atom) has a longer win scene, which the grid used to cover. Markers: `+0x2B5C` is 1 through the stage end, `0x80109D92` turns non-zero at the escape (checked in 1:1, 5:3 and 10:1); a fallback after 12 s.

@@ -1635,16 +1635,21 @@ void update_hud() {
         }
     }
     const bool single = single_stage && state.mode == 1 && state.chapter == single_stage->first;
-    // A single stage cleared: the game plays its stage end, then builds the
-    // next stage. The grid comes in over the stage end (after a moment of it),
-    // so the next stage is never seen (the owner's report in Score Attack);
-    // play is left as soon as the next stage begins.
+    // A single stage cleared: the game plays its stage end (the core and the
+    // friend, the friend's escape with NICE JOB, a fade), then builds the next
+    // stage. The grid comes in as the friend escapes (the owner, 2026-11-22:
+    // after a fixed 1.8 s it covered the win scene, which runs longer when
+    // the core opens round the far side), so the next stage is never seen;
+    // play is left as soon as the next stage begins. Markers (found
+    // 2026-11-22 in 1:1, 5:3 and 10:1): +0x2B5C is 1 through the stage end,
+    // and 0x80109D92 turns non-zero at the escape. A fallback after 12 s.
     {
         static std::optional<std::chrono::steady_clock::time_point> cleared_at;
         const bool cleared_now = single && state.level == single_stage->second && state.progress >= 1.0f;
+        const bool escaping = guest::load16(guest_rdram, 0x80110220u + 0x2B5C) == 1 && guest::load16(guest_rdram, 0x80109D92u) != 0;
         if (!cleared_now) cleared_at.reset();
         else if (!cleared_at) cleared_at = std::chrono::steady_clock::now();
-        else if (std::chrono::steady_clock::now() - *cleared_at > std::chrono::milliseconds(1800) && !grid_quit_at)
+        else if ((escaping || std::chrono::steady_clock::now() - *cleared_at > std::chrono::seconds(12)) && !grid_quit_at)
             grid_quit_at = std::chrono::steady_clock::now(), grid_quit_red = false;
     }
     // A whole episode in an attack mode is done when its last stage is
