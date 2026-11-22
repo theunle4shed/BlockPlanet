@@ -36,8 +36,12 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere);
 struct Target {
     double x, y, radius;
     std::uint32_t rgb;
+    bool big = false;  // a bigger blast: a yellow outer ring and arrows pointing out
 };
 void set_targets(const Target* targets, int count);
+// While a power-up is held: where it would land, following the cursor (set
+// each frame; count 0 clears).
+void set_aim(const Target* targets, int count);
 // A blast went off at (a0, a1) (1/256 of a cell): the crosshair there goes.
 void blast_at(int a0, int a1);
 void clear_targets();

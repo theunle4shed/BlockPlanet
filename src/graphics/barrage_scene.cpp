@@ -45,7 +45,7 @@ Clock::time_point started{}, hit_at{};
 std::atomic<bool> hit{false};
 // Crosshairs.
 std::mutex targets_mutex;
-std::vector<Target> targets;
+std::vector<Target> targets, aim;
 Clock::time_point targets_set{};
 constexpr double target_seconds = 8.0;  // at most
 double since(Clock::time_point t) { return std::chrono::duration<double>(Clock::now() - t).count(); }
@@ -118,13 +118,19 @@ void blast_at(int a0, int a1) {
             return;
         }
 }
+void set_aim(const Target* t, int count) {
+    std::lock_guard lock(targets_mutex);
+    if (count > 0 && aim.empty()) targets_set = Clock::now();  // (the pulse)
+    if (count > 0) aim.assign(t, t + count);
+    else aim.clear();
+}
 void clear_targets() {
     std::lock_guard lock(targets_mutex);
     targets.clear();
 }
 bool hide_game_target() {
     std::lock_guard lock(targets_mutex);
-    return !targets.empty() && since(targets_set) < target_seconds;
+    return !aim.empty() || (!targets.empty() && since(targets_set) < target_seconds);
 }
 
 void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
@@ -133,6 +139,7 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
         std::lock_guard lock(targets_mutex);
         if (!targets.empty() && since(targets_set) > target_seconds) targets.clear();
         rings = targets;
+        if (rings.empty()) rings = aim;  // (fired: the frozen ones, else the aim)
     }
     if ((!running && rings.empty()) || rdram == nullptr) return;
     const double t_now = since(started);
@@ -227,7 +234,7 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
         constexpr double lift = 0.25;  // layers above the bricks
         for (const Target& t : rings) {
             // The ring: its inner and outer edge on the surface.
-            const double width = 0.28;
+            const double width = 0.2;
             constexpr int steps = 40;
             for (int k = 0; k < steps; ++k) {
                 const double a0 = 6.283185307 * k / steps, a1 = 6.283185307 * (k + 1) / steps;
@@ -248,10 +255,33 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
             };
             for (int k = 0; k < 4; ++k) {
                 const double a = 1.5707963 * k, c = std::cos(a), sn = std::sin(a);
-                bar(t.x + c * (t.radius - 0.9), t.y + sn * (t.radius - 0.9), t.x + c * (t.radius + 0.7), t.y + sn * (t.radius + 0.7), 0.12);
+                bar(t.x + c * (t.radius - 0.55), t.y + sn * (t.radius - 0.55), t.x + c * (t.radius + 0.35), t.y + sn * (t.radius + 0.35), 0.09);
             }
-            bar(t.x - 0.45, t.y, t.x + 0.45, t.y, 0.1);
-            bar(t.x, t.y - 0.45, t.x, t.y + 0.45, 0.1);
+            bar(t.x - 0.3, t.y, t.x + 0.3, t.y, 0.07);
+            bar(t.x, t.y - 0.3, t.x, t.y + 0.3, 0.07);
+            if (t.big) {
+                // A second, yellow ring outside, and four arrows pointing out
+                // between the ticks: this one reaches further.
+                constexpr std::uint32_t yellow = 0xFFD23A;
+                const double r2 = t.radius + 0.55;
+                for (int k = 0; k < steps; ++k) {
+                    const double a0 = 6.283185307 * k / steps, a1 = 6.283185307 * (k + 1) / steps;
+                    V n;
+                    quad(surface(t.x + (r2 - 0.2) * std::cos(a0), t.y + (r2 - 0.2) * std::sin(a0), lift, n),
+                         surface(t.x + r2 * std::cos(a0), t.y + r2 * std::sin(a0), lift, n),
+                         surface(t.x + r2 * std::cos(a1), t.y + r2 * std::sin(a1), lift, n),
+                         surface(t.x + (r2 - 0.2) * std::cos(a1), t.y + (r2 - 0.2) * std::sin(a1), lift, n), yellow);
+                }
+                for (int k = 0; k < 4; ++k) {
+                    const double a = 0.785398 + 1.5707963 * k, c = std::cos(a), sn = std::sin(a);
+                    const double pc = -sn, ps = c;  // across
+                    const double r_in = r2 + 0.2, r_tip = r2 + 1.0;
+                    bar(t.x + c * r_in, t.y + sn * r_in, t.x + c * (r_tip - 0.25), t.y + sn * (r_tip - 0.25), 0.09);
+                    // the head: two short strokes back from the tip
+                    bar(t.x + c * r_tip, t.y + sn * r_tip, t.x + c * (r_tip - 0.4) + pc * 0.35, t.y + sn * (r_tip - 0.4) + ps * 0.35, 0.08);
+                    bar(t.x + c * r_tip, t.y + sn * r_tip, t.x + c * (r_tip - 0.4) - pc * 0.35, t.y + sn * (r_tip - 0.4) - ps * 0.35, 0.08);
+                }
+            }
         }
     }
 

@@ -769,3 +769,8 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 ## 2026-11-22: Crosshairs for the power-ups' strikes (3D models)
 
 - The game's target (a red bitmap that pixelates at PC resolutions, drawn by the cursor routine `func_8009AB60` from the power-up's use until its blast) is replaced, with `BLOCKPLANET_MODELS3D`, by BlockPlanet's crosshairs: a ring drawn on the bricks' tops the size of the blast, four ticks across it and a small cross at its centre, pulsing. One for the Missile (red; radius 4, or 6 for the Bomb), three for the Missile Barrage, five for Dynamite (orange, radius 2, at its sticks' measured landing points). Each goes as its blast goes off (the blast routine's centre within 1.6 cells). Set at the button press (`func_800C719C`, hooked).
+
+## 2026-11-22: Crosshairs follow the aim; normal size
+
+- As in the original (the owner): after the button press the target can be steered during the countdown, and the strike lands where the view is at the launch. The crosshairs now show from the press, follow until the launch (the held slot empties), then stay. They follow the view, not the cursor: the game aims at the view, which eases towards the cursor (`+0x2B42`/`+0x2B46`, 128 + 256 x the cursor's offset), rounded to a cell, the blast a cell before it (measured: launched with the view at 8.86, 8, the blast fell at cell 8, 7; at 8.12, 8 at 7, 7). The barrage's strikes and scene use the same.
+- All crosshairs are the game's target size (the owner: the blast-sized rings reached the sphere's edge). A bigger blast (the Bomb, Missile level 2) is red with a yellow outer ring and four arrows pointing out; Dynamite's five are smaller and orange.
