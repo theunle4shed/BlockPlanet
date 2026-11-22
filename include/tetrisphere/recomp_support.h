@@ -54,6 +54,7 @@ bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_context* ctx,
 bool blockplanet_sphere_pass_begin(std::uint8_t* rdram, recomp_context* ctx, int pass);
 int blockplanet_magic_earn(std::uint8_t* rdram, int before);
 bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* ctx);
+void blockplanet_blast_table_reset(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx);
 void blockplanet_magic_use(std::uint8_t* rdram);
 bool blockplanet_minefield_hide_marker(std::uint8_t* rdram, recomp_context* ctx);

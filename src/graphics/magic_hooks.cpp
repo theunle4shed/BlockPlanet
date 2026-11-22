@@ -226,6 +226,9 @@ std::uint32_t load32_at(const std::uint8_t* rdram, std::uint32_t a) {
     std::memcpy(&v, rdram + (a & 0x007FFFFCu), 4);
     return v;
 }
+// Guest bytes (memory holds the guest's words byte-swapped: a byte's address ^ 3).
+std::uint8_t rdram_byte(const std::uint8_t* rdram, std::uint32_t a) { return rdram[(a & 0x007FFFFFu) ^ 3u]; }
+void rdram_set_byte(std::uint8_t* rdram, std::uint32_t a, std::uint8_t v) { rdram[(a & 0x007FFFFFu) ^ 3u] = v; }
 void dl_dump(const std::uint8_t* rdram, std::uint32_t from, std::uint32_t to, int depth) {
     for (std::uint32_t a = from; a + 8u <= to && a < from + 8u * 400u; a += 8u) {
         const std::uint32_t w0 = load32_at(rdram, a), w1 = load32_at(rdram, a + 4u);
@@ -692,6 +695,21 @@ std::uint32_t barrage_arg5 = 0;  // the routine's fifth argument (on the stack; 
 bool barrage_firing = false;          // our own call (not intercepted)
 bool barrage_dropping = false;        // the Bomb's second blast to drop
 constexpr std::int16_t strike_kind = 1;  // the Firecracker's radius (4)
+// The blast routine's per-cell table (the board context +0x1280, 1,024
+// bytes): 1 a cell that may still be hit, 0 one already scheduled. Each call
+// resets it to 1 before marking its own circle, so a later strike scheduled
+// again, with its own (longer) delay, the cells of a piece an earlier strike
+// had already scheduled: the white and the break spread from the last strike
+// (the owner, 2026-11-22). While the barrage's strikes go off, the cells
+// earlier strikes scheduled are put back to 0 after each reset
+// (blockplanet_blast_table_reset, a hook just after the reset loop).
+bool barrage_keep_table = false;
+std::array<std::uint8_t, 1024> barrage_table{};
+std::uint32_t blast_table(const std::uint8_t* rdram) { return load32_at(rdram, 0x8013DD00u) + 0x1280u; }
+void save_blast_table(const std::uint8_t* rdram) {
+    const std::uint32_t t = blast_table(rdram);
+    for (std::uint32_t i = 0; i < 1024u; ++i) barrage_table[i] = std::min<std::uint8_t>(barrage_table[i], rdram_byte(rdram, t + i));
+}
 
 void strike_offset(int n, std::int16_t& x, std::int16_t& y) {
     const double a = 2.0 * 3.14159265358979 * double(n) / 3.0;
@@ -728,6 +746,8 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
     // kind at 0x8015F5B8), and only while its magic is working.
     static const bool together = std::getenv("BLOCKPLANET_BARRAGE_SEQUENCE") == nullptr;
     if (together) {
+        barrage_table.fill(1);
+        barrage_keep_table = true;
         for (int n = 1; n <= 2; ++n) {
             std::int16_t sx, sy;
             strike_offset(n, sx, sy);
@@ -736,6 +756,7 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
             barrage_firing = true;
             func_800C6474(rdram, ctx);
             barrage_firing = false;
+            save_blast_table(rdram);
             *ctx = saved;
         }
         barrage_next = 0;
@@ -840,7 +861,17 @@ extern "C" void blockplanet_magic_use(std::uint8_t* rdram) {
     }
 }
 
+extern "C" void blockplanet_blast_table_reset(std::uint8_t* rdram, recomp_context* ctx) {
+    (void)ctx;
+    static const bool off = std::getenv("BLOCKPLANET_BARRAGE_SHARED_TABLE") != nullptr;  // research: the old way
+    if (!barrage_keep_table || off) return;
+    const std::uint32_t t = blast_table(rdram);
+    for (std::uint32_t i = 0; i < 1024u; ++i)
+        if (barrage_table[i] == 0) rdram_set_byte(rdram, t + i, 0);
+}
+
 extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
+    barrage_keep_table = false;  // (the strikes all went off in one call, before this frame's tick)
     // The scene: begins once the launcher's flight has ended (no draw of it
     // for a few frames), over the cursor's cell.
     ++barrage_game_frame;

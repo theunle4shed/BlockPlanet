@@ -1065,6 +1065,13 @@ text = "blockplanet_stage_record_edit(rdram, ctx);"
 func = "func_800C6474"
 text = "blockplanet_blast_log(rdram, ctx); if (blockplanet_barrage_blast(rdram, ctx)) return;"
 
+# The barrage: after the blast routine resets its per-cell table, the cells
+# earlier strikes scheduled are put back (each keeps its own strike's timing).
+[[patches.hook]]
+func = "func_800C6474"
+before_vram = 0x800C6654
+text = "blockplanet_blast_table_reset(rdram, ctx);"
+
 # The power-up's use (the button press): BlockPlanet's crosshairs
 # (blockplanet_magic_use in src/graphics/magic_hooks.cpp).
 [[patches.hook]]
