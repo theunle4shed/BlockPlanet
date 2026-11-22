@@ -585,11 +585,32 @@ public:
                 out << "{\"configuration\": {\"configurationVersion\": 3, \"hashVersion\": 5}, \"textures\": []}\n";
             }
             bricks_ready_ = !error && app_->textureCache->loadReplacementDirectory(RT64::ReplacementDirectory(bricks_dir_));
+            if (bricks_ready_) sharp_bricks_preload();
         }
         std::fprintf(stdout, "{\"event\":\"brick_style\",\"style\":\"%s\",\"ready\":%s}\n", style.c_str(), bricks_ready_ ? "true" : "false");
         std::fflush(stdout);
     }
     void sharp_bricks_init() { sharp_bricks_apply("crafted"); }
+    int bricks_version() const {
+        static const bool mark = std::getenv("BLOCKPLANET_BRICK_MARK") != nullptr;  // research
+        return bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? (mark ? 99 : 11) : 1;
+    }
+    // The textures made in earlier sessions for this style's version, added at
+    // once: one not yet added showed as the original until the walk below found
+    // it (the owner, 2026-11-22: the game's white crystal for a frame or so).
+    void sharp_bricks_preload() {
+        std::error_code error;
+        int count = 0;
+        for (const auto& entry : std::filesystem::directory_iterator(bricks_dir_, error)) {
+            unsigned long long hash = 0;
+            int version = 0;
+            const std::string name = entry.path().filename().string();
+            if (std::sscanf(name.c_str(), "%16llx-v%d.dds", &hash, &version) != 2 || version != bricks_version() || name.size() != 16 + 2 + std::to_string(version).size() + 4)
+                continue;
+            if (bricks_done_.insert(hash).second && app_->textureCache->addReplacement(hash, name, RT64::ReplacementShift::Auto)) ++count;
+        }
+        std::fprintf(stdout, "{\"event\":\"brick_preload\",\"count\":%d}\n", count);
+    }
     void sharp_bricks_frame(const OSTask* task) {
         {
             std::optional<std::string> style;
@@ -625,11 +646,12 @@ public:
                 ++it;
             }
         }
-        // Every 15th frame: new brick colours come with a stage or a new
-        // piece, and are sharpened within a quarter of a second. Walking every
+        // Every 5th frame (it was every 15th; the owner saw the game's own
+        // white crystal for a frame or so before ours): new brick colours come
+        // with a stage, a new piece or a block turning white. Walking every
         // frame cost 0.46 ms a frame on the test machine (Rescue 1:1).
         static unsigned frame = 0;
-        if (frame++ % 15u != 0u) return;
+        if (frame++ % 5u != 0u) return;
         const std::uint8_t* m = research_rdram_;
         const auto read32 = [m](std::uint32_t at) { std::uint32_t v; std::memcpy(&v, m + (at & 0x007FFFFCu), 4); return v; };
         const auto add = [&](const ::tetrisphere::bricks::Draw& d) {
@@ -646,9 +668,8 @@ public:
             // the crystal drawn as a block with circles; 4: the circles without rims; 5: outlines from the
             // palette indices, so palettes without a darker outline get one; 6: the highlight sheet left as the original;
             // 7: the crystal tile (first called rubble) drawn as a cut gem with shards; 8: in fixed colours;
-            // 9: with its sparkle frames; 10: a larger, whiter sparkle).
-            static const bool mark = std::getenv("BLOCKPLANET_BRICK_MARK") != nullptr;  // research
-            const int version = bricks_style_ == ::tetrisphere::bricks::Style::Crafted ? (mark ? 99 : 10) : 1;
+            // 9: with its sparkle frames; 10: a larger, whiter sparkle; 11: white when the game whitens it).
+            const int version = bricks_version();
             char name[48];
             std::snprintf(name, sizeof name, "%016llx-v%d.dds", static_cast<unsigned long long>(hash), version);
             const auto path = bricks_dir_ / name;

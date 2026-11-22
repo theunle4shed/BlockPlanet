@@ -21,6 +21,9 @@ constexpr int dive_kind = 7;
 // Kinds 8 and 9: one of the barrage's missiles, and its launcher once empty.
 constexpr int barrage_missile_kind = 8;
 constexpr int empty_launcher_kind = 9;
+// The launcher's missiles sit this far from its column's axis (model units),
+// at 0, 120 and 240 degrees, 300 back along z (barrage_scene.cpp starts them there).
+constexpr float launcher_missile_radius = 820.0f;
 constexpr int last_kind = 9;
 // The display list of BlockPlanet's model of `kind` at `level` (built into
 // model memory when first asked for), or 0.

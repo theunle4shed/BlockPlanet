@@ -305,9 +305,21 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
         // there, near the camera, aimed at the strikes, fires, and leaves the
         // way it came. Screen directions on the sphere: moving right lowers
         // the board's x, up raises its y.
-        V n0;
-        const V base = surface(cx, cy, 0.0, n0);
-        const V right = unit(base - surface(cx + 1.0, cy, 0.0, n0)), screen_up = unit(surface(cx, cy + 1.0, 0.0, n0) - base);
+        // Worked out once as the scene starts and kept (the owner's
+        // recording, frames 115-117: on a blast's frame the mesh read here
+        // briefly went wrong and the launcher jumped to the screen's middle).
+        static Clock::time_point frame_of{};
+        static V base, right, screen_up, held_up;
+        static double held_cell = 0.0;
+        if (frame_of != started) {
+            V n0;
+            base = surface(cx, cy, 0.0, n0);
+            right = unit(base - surface(cx + 1.0, cy, 0.0, n0));
+            screen_up = unit(surface(cx, cy + 1.0, 0.0, n0) - base);
+            held_up = up, held_cell = cell, frame_of = started;
+        }
+        const V& up = held_up;
+        const double cell = held_cell;
         static const double hold_h = [] { const char* v = std::getenv("BLOCKPLANET_LAUNCHER_H"); return v ? std::atof(v) : 5.0; }();
         static const double hold_a = [] { const char* v = std::getenv("BLOCKPLANET_LAUNCHER_A"); return v ? std::atof(v) : 3.4; }();
         static const double hold_b = [] { const char* v = std::getenv("BLOCKPLANET_LAUNCHER_B"); return v ? std::atof(v) : 1.2; }();
@@ -338,7 +350,7 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
                 V normal;
                 const V target = surface(cx + dx, cy + dy, 0.0, normal);
                 const double a = 6.2831853 * double(n) / 3.0;
-                const V across = (lx * std::cos(a) + ly * std::sin(a)) * (1150.0 * launcher_scale);
+                const V across = (lx * std::cos(a) + ly * std::sin(a)) * (double(powerup_models::launcher_missile_radius) * launcher_scale);
                 const V p0 = launcher_at + across + lz * (300.0 * launcher_scale);  // where it sat in the launcher
                 // Out of the tube, then down onto the target nose first (a
                 // cubic curve).

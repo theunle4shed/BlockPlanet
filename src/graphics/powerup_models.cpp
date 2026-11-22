@@ -354,30 +354,31 @@ std::vector<Part> raygun(int level) {
 // Missile (the game's Firecracker and Bomb), Dynamite, the Magnet (the game's
 // Magnet and Ray Gun; level 3 is the Ray Gun) and the Atom. Each level its own
 // form, blue trim at level 2, gold at level 3 with its power surge.
-// The barrage's launcher (the owner, 2026-11-22): three tubes round a hub,
-// open towards -z (the missiles' noses), with or without their missiles.
+// The barrage's launcher (the owner, 2026-11-22, second design: no
+// cannons): three missiles strapped round a central column, noses to -z, held
+// by two sets of clamps; empty, the column and its clamps.
 std::vector<Part> launcher(bool loaded) {
-    Part tubes{0x4A5060, {}}, hub{0x2E333D, {}}, band{0xFFC53D, {}};
+    Part column{0x4A5060, {}}, cap{0x2E333D, {}}, clamps{0xFFC53D, {}};
     std::vector<Part> out;
+    const float r = launcher_missile_radius;
+    tube(column, Place{}, -1500.0f, 1300.0f, 420.0f, 420.0f, 10, false);
+    tube(cap, Place{}, -1500.0f, -2300.0f, 420.0f, 0.0f, 10, true);   // its nose
+    tube(cap, Place{}, 1300.0f, 1600.0f, 420.0f, 300.0f, 10, true);   // its tail
     for (int k = 0; k < 3; ++k) {
         const float a = 6.2831853f * float(k) / 3.0f;
-        const V3 at{1150.0f * std::cos(a), 1150.0f * std::sin(a), 0};
-        Place pl = place_at(at);
-        tube(tubes, pl, -2300.0f, 1500.0f, 600.0f, 600.0f, 10, false);
-        ring(band, place_at(V3{at.x, at.y, -2300.0f}), 600.0f, 90.0f, 12, 3);
-        if (loaded) out = merged(out, placed(missile(900.0f, trim(3, red)), place_at(V3{at.x, at.y, 300.0f}), 0.55f));
+        const V3 at{r * std::cos(a), r * std::sin(a), 0};
+        if (loaded) out = merged(out, placed(missile(400.0f, trim(3, red)), place_at(V3{at.x, at.y, 300.0f}), 0.55f));
+        // A clamp arm from the column out to the missile, front and back.
+        for (const float z : {-900.0f, 500.0f}) {
+            Place arm = turned(0, 0, a * 57.29578f);
+            arm.at = V3{0.5f * at.x, 0.5f * at.y, z};
+            box(clamps, arm, 0.5f * r, 110.0f, 120.0f);
+        }
     }
-    // A small triangular cap joining the tubes (a big plate hid the sphere).
-    for (int k = 0; k < 3; ++k) {
-        const float a = 6.2831853f * float(k) / 3.0f;
-        Place pl = turned(0, 0, a * 57.29578f + 90.0f);
-        pl.at = V3{575.0f * std::cos(a), 575.0f * std::sin(a), 1300.0f};
-        box(hub, pl, 650.0f, 180.0f, 200.0f);
-    }
-    tube(hub, place_at(V3{0, 0, 0}), -1800.0f, 1300.0f, 380.0f, 380.0f, 8, true);
-    out.push_back(tubes);
-    out.push_back(hub);
-    out.push_back(band);
+    for (const float z : {-900.0f, 500.0f}) ring(clamps, place_at(V3{0, 0, z}), 450.0f, 80.0f, 12, 3);
+    out.push_back(column);
+    out.push_back(cap);
+    out.push_back(clamps);
     return out;
 }
 

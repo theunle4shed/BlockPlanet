@@ -338,8 +338,29 @@ std::vector<std::uint8_t> crafted(const Draw& d) {
             // with teal-green facets), whatever palette the stage gives it. Only
             // looks: the game tells blocks apart by their cell values, not colours.
             // (So stages whose crystal palette cycles no longer shimmer.)
-            const std::uint32_t dark = 0xFF022A2Au, light = 0xFF12DCE2u;  // (ABGR) #2a2a02, #e2dc12
-            common = 0xFF22222Au;                                          // #2a2222
+            std::uint32_t dark = 0xFF022A2Au, light = 0xFF12DCE2u;  // (ABGR) #2a2a02, #e2dc12
+            // Except when the game turns it white (a block about to break, or
+            // a full clear: its palette all near-grey, its lightest light; the
+            // owner, 2026-11-22: it stayed dark with the bricks round it white):
+            // then the same crystal in whites and greys.
+            const auto grey = [](std::uint32_t c) {
+                const int r = int(c & 0xFFu), g = int((c >> 8) & 0xFFu), b = int((c >> 16) & 0xFFu);
+                return std::max({r, g, b}) - std::min({r, g, b}) < 28;
+            };
+            // (Measured 2026-11-22: the white sheet's crystal palette runs grey from
+            // black to #c6c6de, its commonest colour a dark grey; every stage's own
+            // crystal palette is clearly coloured.)
+            const bool whitened = tone(colours.back()) > 150.0 && std::all_of(colours.begin(), colours.end(), grey);
+            if (static const bool log = std::getenv("BLOCKPLANET_CRYSTAL_LOG") != nullptr; log) {
+                std::fprintf(stdout, "{\"event\":\"crystal_colours\",\"common\":\"%08x\",\"whitened\":%d,\"colours\":[", common, int(whitened));
+                for (std::size_t i = 0; i < colours.size(); ++i) std::fprintf(stdout, "%s\"%08x\"", i ? "," : "", colours[i]);
+                std::fprintf(stdout, "]}\n");
+            }
+            if (whitened) {
+                dark = 0xFF8C8C8Cu, light = 0xFFFFFFFFu, common = 0xFFE4E4E4u;
+            } else {
+                common = 0xFF22222Au;  // #2a2222
+            }
             // The sparkle (the owner, 2026-11-21: a glimmer every few seconds):
             // the frame is marked in palette slot 8's lowest blue bits
             // (crystal_phase); 0 none, 1 a small star on the gem, 2 a larger one
