@@ -29,6 +29,7 @@
 
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/powerup_models.h"
+#include "tetrisphere/barrage_scene.h"
 #include "tetrisphere/recomp_support.h"
 
 #include <algorithm>
@@ -409,6 +410,13 @@ bool flight_log_pending = false;
 Clock::time_point flight_log_used{};
 }  // namespace
 
+namespace {
+// The barrage's scene (barrage_scene.cpp): game frames, and the last frame
+// the launcher's flight was drawn.
+int barrage_game_frame = 0, barrage_flight_seen = -1, barrage_use_frame = -1;
+Clock::time_point barrage_use_time{};
+}  // namespace
+
 extern "C" void blockplanet_magic_flight(std::uint8_t* rdram, recomp_context* ctx) {
     {
         static const bool on = std::getenv("BLOCKPLANET_MODELS3D") != nullptr;
@@ -531,8 +539,13 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                 flight = used_time;
                 if (tetrisphere::powerup_models::nose_backwards(rdram, model3d_start, restart)) draw_kind = tetrisphere::powerup_models::dive_kind;
             }
-            done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen, false,
-                                                        draw_kind);
+            // Level 3: the scene draws the launcher (barrage_scene.cpp), so
+            // the game's flight is not drawn.
+            if (model3d_kind == 4 && level == 3 && first_source == held_source[4])
+                done = tetrisphere::powerup_models::hide(rdram, model3d_start);
+            else
+                done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen, false,
+                                                            draw_kind);
             // Dynamite splits into five sticks, each its own model of one
             // vertex load of 32 (2026-11-22): each drawn as one of ours.
             // The Bomb's second model (our Missile at levels 2 and 3, about
@@ -683,6 +696,9 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
     strike_offset(0, x, y);
     ctx->r4 = std::uint64_t(std::int64_t(x)), ctx->r5 = std::uint64_t(std::int64_t(y)), ctx->r7 = strike_kind;
     barrage_dropping = true;
+    tetrisphere::barrage::impact();
+    std::fprintf(stdout, "{\"event\":\"barrage_timing\",\"frames_from_use\":%d,\"seconds\":%.2f}\n", barrage_game_frame - barrage_use_frame,
+                 std::chrono::duration<double>(Clock::now() - barrage_use_time).count());
     barrage_next = 1, barrage_due = Clock::now() + std::chrono::milliseconds(1200);
     // The other two strikes go off in the same moment, while the magic is
     // active. One after another (BLOCKPLANET_BARRAGE_SEQUENCE=1, research)
@@ -709,6 +725,24 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
 }
 
 extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
+    // The scene: begins once the launcher's flight has ended (no draw of it
+    // for a few frames), over the cursor's cell.
+    ++barrage_game_frame;
+    tetrisphere::barrage::frame();
+    // Begins as the level-3 Missile is fired (the held slot goes from the
+    // Bomb to empty), over the cursor's cell; the game's own flight is not
+    // drawn (blockplanet_model_draw_end).
+    {
+        static int last_held = -1;
+        const int held_now = std::int8_t(rdram[((player + 0x702u) ^ 3u) & 0x7FFFFFu]);
+        static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
+        if (test && last_held == 4 && held_now < 0 && blockplanet::powerup_family() == 0 && blockplanet::powerup_level() == 3) {
+            barrage_use_frame = barrage_game_frame, barrage_use_time = Clock::now();
+            tetrisphere::barrage::begin(8 + int(std::int16_t(load32_at(rdram, player + 0x2B28u) & 0xFFFF)),
+                                        8 + int(std::int16_t(load32_at(rdram, player + 0x2B2Cu) & 0xFFFF)));
+        }
+        last_held = held_now;
+    }
     if (barrage_next == 0 || Clock::now() < barrage_due) return;
     if (stage_ending(rdram)) {  // the core is open: no need for the rest
         barrage_next = 0;

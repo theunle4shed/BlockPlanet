@@ -354,20 +354,38 @@ std::vector<Part> raygun(int level) {
 // Missile (the game's Firecracker and Bomb), Dynamite, the Magnet (the game's
 // Magnet and Ray Gun; level 3 is the Ray Gun) and the Atom. Each level its own
 // form, blue trim at level 2, gold at level 3 with its power surge.
+// The barrage's launcher (the owner, 2026-11-22): three tubes round a hub,
+// open towards -z (the missiles' noses), with or without their missiles.
+std::vector<Part> launcher(bool loaded) {
+    Part tubes{0x4A5060, {}}, hub{0x2E333D, {}}, band{0xFFC53D, {}};
+    std::vector<Part> out;
+    for (int k = 0; k < 3; ++k) {
+        const float a = 6.2831853f * float(k) / 3.0f;
+        const V3 at{1150.0f * std::cos(a), 1150.0f * std::sin(a), 0};
+        Place pl = place_at(at);
+        tube(tubes, pl, -2300.0f, 1500.0f, 600.0f, 600.0f, 10, false);
+        ring(band, place_at(V3{at.x, at.y, -2300.0f}), 600.0f, 90.0f, 12, 3);
+        if (loaded) out = merged(out, placed(missile(900.0f, trim(3, red)), place_at(V3{at.x, at.y, 300.0f}), 0.55f));
+    }
+    // A small triangular cap joining the tubes (a big plate hid the sphere).
+    for (int k = 0; k < 3; ++k) {
+        const float a = 6.2831853f * float(k) / 3.0f;
+        Place pl = turned(0, 0, a * 57.29578f + 90.0f);
+        pl.at = V3{575.0f * std::cos(a), 575.0f * std::sin(a), 1300.0f};
+        box(hub, pl, 650.0f, 180.0f, 200.0f);
+    }
+    tube(hub, place_at(V3{0, 0, 0}), -1800.0f, 1300.0f, 380.0f, 380.0f, 8, true);
+    out.push_back(tubes);
+    out.push_back(hub);
+    out.push_back(band);
+    return out;
+}
+
 std::vector<Part> missile_family(int level) {
     if (level == 1) return placed(missile(700.0f), Place{}, 0.9f);                 // Missile
     if (level == 2) return placed(missile(1300.0f, trim(2, red)), Place{}, 1.15f); // Big Missile
-    // Missile Barrage: three, each with a gold shockwave ring at its tail.
-    std::vector<Part> out;
-    const V3 at[3] = {{-1500, 0, 300}, {1500, 0, 300}, {0, 0, -300}};
-    for (int k = 0; k < 3; ++k) {
-        auto one = missile(900.0f, trim(3, red));
-        Part wave{0xFFC53D, {}};
-        ring(wave, place_at(V3{0, 0, 1700}), 900.0f, 90.0f, 14, 3);
-        one.push_back(wave);
-        out = merged(out, placed(one, place_at(at[k]), k == 2 ? 0.7f : 0.6f));
-    }
-    return out;
+    // Missile Barrage: the launcher, loaded with three (the owner, 2026-11-22).
+    return launcher(true);
 }
 
 std::vector<Part> dynamite_family(int level) {
@@ -437,6 +455,8 @@ std::vector<Part> model(int kind, int level) {
     case 3: return atom_family(level);
     case stick_kind: return dynamite_stick(level);
     case dive_kind: return placed(missile_family(level), turned(180, 0, 0), 1.0f);
+    case barrage_missile_kind: return placed(missile(900.0f, trim(3, red)), Place{}, 1.0f);
+    case empty_launcher_kind: return launcher(false);
     default: return {};
     }
 }
@@ -551,14 +571,46 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
 
 namespace {
 struct Built { std::uint32_t at = 0, marker = 0, light_dir = 0; };
-Built built[dive_kind + 1][4];
+Built built[last_kind + 1][4];
 std::uint32_t next_free = model_memory;
 }  // namespace
+
+std::uint32_t model_list(std::uint8_t* rdram, int draw_kind, int level, std::uint32_t light_dir) {
+    if (rdram == nullptr || draw_kind < 0 || draw_kind > last_kind || level < 1 || level > 3) return 0;
+    const int kind = draw_kind;
+    Built& b = built[draw_kind][level];
+    const std::uint32_t marker = 0xB10C0000u | std::uint32_t(draw_kind) << 8 | std::uint32_t(level);
+    if (b.at == 0 || load32(rdram, b.at) != marker) {  // (the light's direction as first seen)
+        const auto parts = model(draw_kind, level);
+        if (parts.empty()) return 0;
+        std::size_t tris = 0;
+        for (const auto& part : parts) tris += part.tris.size();
+        // Commands: two passes, a vertex load each five triangles, the lights.
+        const std::uint32_t dl_room = std::uint32_t(tris * 2u * 8u + tris * 2u / 5u * 8u + 64u * parts.size() + 256u);
+        const std::uint32_t need = 8u + dl_room + std::uint32_t(tris * 2u * 48u) + 32u * std::uint32_t(parts.size() + 1u) + 64u;
+        if (need > model_memory_end - model_memory) return 0;
+        if (next_free + need > model_memory_end) {
+            // Full: start again (every model is built again when next drawn).
+            next_free = model_memory;
+            for (auto& k : built)
+                for (auto& l : k) l = Built{};
+        }
+        const std::uint32_t at = next_free;
+        store32(rdram, at, marker), store32(rdram, at + 4u, 0);
+        const std::uint32_t used = write_parts(rdram, at + 8u, dl_room, at + need, parts, light_dir);
+        if (used == 0) return 0;
+        next_free = (used + 15u) & ~15u;
+        b = Built{at, marker, light_dir};
+        std::fprintf(stdout, "{\"event\":\"powerup_model\",\"kind\":%d,\"level\":%d,\"triangles\":%zu,\"bytes\":%u}\n", kind, level, tris, used - at);
+        std::fflush(stdout);
+    }
+    return b.at + 8u;
+}
 
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole,
              int draw_kind) {
     if (draw_kind < 0) draw_kind = kind;
-    if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > dive_kind || draw_kind > dive_kind || level < 1 || level > 3) return false;
+    if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > last_kind || draw_kind > last_kind || level < 1 || level > 3) return false;
     const std::uint32_t end = load32(rdram, display_list_pointer);
     if (end <= start || end - start > 0x10000u) return false;
     // The game's body: its vertex loads. While held (only_source 0) every
@@ -567,7 +619,7 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     // only loads from those sources are the body, and everything else in the
     // draw (the flight's swirl, flame and smoke rings) is kept. The light's
     // direction is the game's (its white light, G_MV_L0).
-    static std::array<std::vector<std::uint32_t>, dive_kind + 1> body_sources;
+    static std::array<std::vector<std::uint32_t>, last_kind + 1> body_sources;
     std::uint32_t first_vtx = 0, light_dir = 0x5A33C500u;
     std::vector<std::uint32_t> body_loads;
     // `whole`: the whole draw is the body, and the held model's sources are
@@ -588,7 +640,7 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     if (first_vtx == 0) return false;
     {   // Research (BLOCKPLANET_MODELS3D_LOG): the game's body's extent, once a kind.
         static const bool log = std::getenv("BLOCKPLANET_MODELS3D_LOG") != nullptr;
-        static bool logged[dive_kind + 1] = {};
+        static bool logged[last_kind + 1] = {};
         if (log && !logged[kind]) {
             logged[kind] = true;
             int lo[3] = {32767, 32767, 32767}, hi[3] = {-32768, -32768, -32768};
@@ -610,32 +662,8 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     }
     const std::uint32_t vtx_source = load32(rdram, first_vtx + 4u);
     if (source != nullptr) *source = vtx_source;
-    Built& b = built[draw_kind][level];
-    const std::uint32_t marker = 0xB10C0000u | std::uint32_t(draw_kind) << 8 | std::uint32_t(level);
-    if (b.at == 0 || load32(rdram, b.at) != marker) {  // (the light's direction as first seen)
-        const auto parts = model(draw_kind, level);
-        if (parts.empty()) return false;
-        std::size_t tris = 0;
-        for (const auto& part : parts) tris += part.tris.size();
-        // Commands: two passes, a vertex load each five triangles, the lights.
-        const std::uint32_t dl_room = std::uint32_t(tris * 2u * 8u + tris * 2u / 5u * 8u + 64u * parts.size() + 256u);
-        const std::uint32_t need = 8u + dl_room + std::uint32_t(tris * 2u * 48u) + 32u * std::uint32_t(parts.size() + 1u) + 64u;
-        if (need > model_memory_end - model_memory) return false;
-        if (next_free + need > model_memory_end) {
-            // Full: start again (every model is built again when next drawn).
-            next_free = model_memory;
-            for (auto& k : built)
-                for (auto& l : k) l = Built{};
-        }
-        const std::uint32_t at = next_free;
-        store32(rdram, at, marker), store32(rdram, at + 4u, 0);
-        const std::uint32_t used = write_parts(rdram, at + 8u, dl_room, at + need, parts, light_dir);
-        if (used == 0) return false;
-        next_free = (used + 15u) & ~15u;
-        b = Built{at, marker, light_dir};
-        std::fprintf(stdout, "{\"event\":\"powerup_model\",\"kind\":%d,\"level\":%d,\"triangles\":%zu,\"bytes\":%u}\n", kind, level, tris, used - at);
-        std::fflush(stdout);
-    }
+    const std::uint32_t list = model_list(rdram, draw_kind, level, light_dir);
+    if (list == 0) return false;
     // The game's body blanked (each load and the triangles drawn from it, up
     // to the next load); a call to the model in place of the first load.
     for (const std::uint32_t load : body_loads) {
@@ -646,7 +674,7 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
             if (op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, a, 0), store32(rdram, a + 4u, 0);
         }
     }
-    store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, b.at + 8u);
+    store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, list);
     return true;
 }
 

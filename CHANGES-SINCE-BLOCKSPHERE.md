@@ -759,3 +759,9 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 
 - In the power-up test, the level-3 Missile (the game's Bomb) no longer blasts at the cursor: three strikes, each the Firecracker's blast (radius 4), 5 cells from the cursor at 0, 120 and 240 degrees (the owner's layout), all at the moment the Bomb would blast. The blast routine (`func_800C6474`) is called for the other two, with its fifth argument (on the stack) as the game passed it.
 - One strike after another (the owner's launcher idea) is not on yet: a blast fired after the magic has finished turns its bricks white but never breaks them, because the game runs one magic blast at a time from shared state, and only while its magic is working. Research switch: `BLOCKPLANET_BARRAGE_SEQUENCE=1`.
+
+## 2026-11-22: The Missile Barrage's launcher (power-up test)
+
+- The level-3 Missile is a launcher holding three missiles (its icon in the Magic box too). Fired, the game's flight is hidden and BlockPlanet draws its own scene on the sphere (`src/graphics/barrage_scene.cpp`): the loaded launcher comes in from the side and hovers over the cursor, the three missiles leave it and fly to their strike points (5 cells out at 0, 120 and 240 degrees), the three blasts go off as they land (about 2.27 s after the use, the game's own timing), and the empty launcher leaves by the other side.
+- Placed with the extended sphere's mesh: a board cell to the mesh (row the board's x, column its y, less the board's scroll), the column's top layer from the column map, and the mesh's components reordered (the game's vertices take them as 1, 0, 2). The blasts' centre is a cell before the cursor on both axes (measured: the cursor at 11, 9 cleared cells centred on 10, 8).
+- Research: `BLOCKPLANET_BARRAGE_MARKERS=1` stands a missile on each strike point throughout; `research_columns` logs the column map.

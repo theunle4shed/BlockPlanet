@@ -18,6 +18,13 @@ constexpr int stick_kind = 6;
 // Kind 7: the Missile turned round, for the Bomb's dive into the sphere (its
 // own model leads with the other end, 2026-11-22).
 constexpr int dive_kind = 7;
+// Kinds 8 and 9: one of the barrage's missiles, and its launcher once empty.
+constexpr int barrage_missile_kind = 8;
+constexpr int empty_launcher_kind = 9;
+constexpr int last_kind = 9;
+// The display list of BlockPlanet's model of `kind` at `level` (built into
+// model memory when first asked for), or 0.
+std::uint32_t model_list(std::uint8_t* rdram, int kind, int level, std::uint32_t light_dir = 0x5A33C500u);
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source = 0, std::uint32_t* source = nullptr,
              bool whole = false, int draw_kind = -1);  // draw_kind: the model drawn, if not kind's
 

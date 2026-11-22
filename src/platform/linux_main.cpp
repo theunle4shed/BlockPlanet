@@ -7405,6 +7405,19 @@ bool handle_profile_command(const std::string& command) {
                 std::fflush(stdout);
                 continue;
             }
+            if (*command == "research_columns" && guest_rdram != nullptr) {
+                // Research: the column map (one height byte per board cell, x fastest), as hex.
+                const std::uint32_t map = guest::load32(guest_rdram, 0x800E44DCu);
+                std::string out = "{\"event\":\"research_columns\",\"cursor\":[" +
+                                  std::to_string(8 + std::int16_t(guest::load16(guest_rdram, 0x80110220u + 0x2B2A))) + "," +
+                                  std::to_string(8 + std::int16_t(guest::load16(guest_rdram, 0x80110220u + 0x2B2E))) + "],\"map\":\"";
+                char hex[4];
+                for (int c = 0; c < 1024; ++c) std::snprintf(hex, sizeof hex, "%02X", guest::load8(guest_rdram, map + std::uint32_t(c))), out += hex;
+                out += "\"}";
+                std::fprintf(stdout, "%s\n", out.c_str());
+                std::fflush(stdout);
+                continue;
+            }
             if (*command == "research_board" && guest_rdram != nullptr) {
                 // Filled cells per layer (0 the core), with the count of each value on the top layers.
                 const std::uint32_t values = guest::load32(guest_rdram, 0x800E44D0u);

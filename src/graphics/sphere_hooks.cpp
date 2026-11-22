@@ -52,6 +52,7 @@
 
 #include "tetrisphere/dl_research.h"
 #include "tetrisphere/core_bowl.h"
+#include "tetrisphere/barrage_scene.h"
 #include <memory>
 #include <vector>
 
@@ -786,6 +787,7 @@ extern "C" bool blockplanet_sphere_quadrant_begin(std::uint8_t* rdram, recomp_co
         draw_extended_quadrant(rdram, ctx, static_cast<Quadrant>(quadrant), extended_sphere);
         if (quadrant == 3) {
             draw_game_over_shell(rdram, extended_sphere);  // game_over_shell.cpp
+            tetrisphere::barrage::draw(rdram, extended_sphere);  // barrage_scene.cpp
             stats_sphere_end(rdram);
             end_extended_vertices(rdram);
         }
