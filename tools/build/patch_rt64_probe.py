@@ -600,7 +600,12 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
                 ++logged;
                 std::fprintf(stdout, "{\\"event\\":\\"rsp_matrix_outside\\",\\"address\\":\\"%08x\\",\\"physical\\":\\"%08x\\",\\"segment\\":\\"%08x\\"}\\n",
                     address, rdramAddress, segments[(address >> 24) & 0x0F]);
-                std::fprintf(stdout, "{\\"event\\":\\"rsp_task\\",\\"start\\":\\"%08x\\",\\"count\\":%u}\\n", state->displayListAddress, unsigned(state->displayListCounter));
+                std::fprintf(stdout, "{\\"event\\":\\"rsp_task\\",\\"start\\":\\"%08x\\",\\"count\\":%u,\\"head\\":[", state->displayListAddress, unsigned(state->displayListCounter));
+                for (uint32_t h = 0; h < 8; ++h) {
+                    const uint32_t *word = reinterpret_cast<const uint32_t *>(state->fromRDRAM((state->displayListAddress & 0x7FFFF8u) + 8u * h));
+                    std::fprintf(stdout, "%s\\"%08x %08x\\"", h ? "," : "", word[0], word[1]);
+                }
+                std::fprintf(stdout, "]}\\n");
                 std::fprintf(stdout, "{\\"event\\":\\"rsp_segments\\",\\"s\\":[");
                 for (int sg = 0; sg < 16; ++sg) std::fprintf(stdout, "%s\\"%08x\\"", sg ? "," : "", segments[sg]);
                 std::fprintf(stdout, "]}\\n");
