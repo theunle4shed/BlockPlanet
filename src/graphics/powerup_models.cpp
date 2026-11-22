@@ -46,6 +46,9 @@ std::uint32_t load32(const std::uint8_t* rdram, std::uint32_t a) {
 }
 void store32(std::uint8_t* rdram, std::uint32_t a, std::uint32_t v) { std::memcpy(rdram + (a & 0x007FFFFCu), &v, 4); }
 void store8(std::uint8_t* rdram, std::uint32_t a, std::uint8_t v) { rdram[(a ^ 3u) & 0x007FFFFFu] = v; }  // big-endian byte in host-order words
+std::int16_t load16(const std::uint8_t* rdram, std::uint32_t a) {
+    return std::int16_t(rdram[(a ^ 3u) & 0x007FFFFFu] << 8 | rdram[((a + 1u) ^ 3u) & 0x007FFFFFu]);
+}
 void store16(std::uint8_t* rdram, std::uint32_t a, std::uint16_t v) { store8(rdram, a, std::uint8_t(v >> 8)), store8(rdram, a + 1u, std::uint8_t(v)); }
 
 struct V3 { float x, y, z; };
@@ -583,6 +586,28 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
         body_loads.push_back(a);
     }
     if (first_vtx == 0) return false;
+    {   // Research (BLOCKPLANET_MODELS3D_LOG): the game's body's extent, once a kind.
+        static const bool log = std::getenv("BLOCKPLANET_MODELS3D_LOG") != nullptr;
+        static bool logged[dive_kind + 1] = {};
+        if (log && !logged[kind]) {
+            logged[kind] = true;
+            int lo[3] = {32767, 32767, 32767}, hi[3] = {-32768, -32768, -32768};
+            double sum[3] = {}, n = 0;
+            for (const std::uint32_t load : body_loads) {
+                const std::uint32_t w0 = load32(rdram, load), src = 0x80000000u | (load32(rdram, load + 4u) & 0x7FFFFFu);
+                const std::uint32_t count = ((w0 >> 20) & 0xFu) + 1u;
+                for (std::uint32_t i = 0; i < count; ++i)
+                    for (int ax = 0; ax < 3; ++ax) {
+                        const int v = load16(rdram, src + 16u * i + 2u * std::uint32_t(ax));
+                        lo[ax] = std::min(lo[ax], v), hi[ax] = std::max(hi[ax], v), sum[ax] += v;
+                    }
+                n += count;
+            }
+            std::fprintf(stdout, "{\"event\":\"model3d_extent\",\"kind\":%d,\"lo\":[%d,%d,%d],\"hi\":[%d,%d,%d],\"mean\":[%.0f,%.0f,%.0f]}\n", kind,
+                         lo[0], lo[1], lo[2], hi[0], hi[1], hi[2], sum[0] / n, sum[1] / n, sum[2] / n);
+            std::fflush(stdout);
+        }
+    }
     const std::uint32_t vtx_source = load32(rdram, first_vtx + 4u);
     if (source != nullptr) *source = vtx_source;
     Built& b = built[draw_kind][level];
@@ -623,6 +648,91 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     }
     store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, b.at + 8u);
     return true;
+}
+
+
+// Whether the power-up's nose (-z, our models' front) points back at the
+// camera, from the draw's matrices (the last modelview load before the
+// geometry, then the multiplies after it): the Bomb turns over late in its
+// dive (measured 2026-11-22: the nose swings from up, to into the screen,
+// to the camera), so ours would go into the sphere tail first. Kept as it
+// was while side-on.
+namespace {
+using Mat = std::array<std::array<double, 4>, 4>;
+Mat read_matrix(const std::uint8_t* rdram, std::uint32_t a) {
+    a = 0x80000000u | (a & 0x7FFFFFu);
+    Mat m{};
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j) {
+            const int k = i * 4 + j;
+            const std::int32_t whole = load16(rdram, a + std::uint32_t(2 * k));
+            const std::uint32_t fraction = static_cast<std::uint16_t>(load16(rdram, a + 32u + std::uint32_t(2 * k)));
+            m[i][j] = double((whole << 16) | std::int32_t(fraction)) / 65536.0;
+        }
+    return m;
+}
+Mat multiply(const Mat& a, const Mat& b) {
+    Mat r{};
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            for (int k = 0; k < 4; ++k) r[i][j] += a[i][k] * b[k][j];
+    return r;
+}
+}  // namespace
+
+bool nose_backwards(const std::uint8_t* rdram, std::uint32_t start, bool restart) {
+    static bool backwards = false, have = false;
+    if (restart) backwards = false, have = false;
+    const std::uint32_t end = load32(rdram, display_list_pointer);
+    if (end <= start || end - start > 0x10000u) return backwards;
+    Mat m{};
+    for (int i = 0; i < 4; ++i) m[i][i] = 1;
+    bool any = false;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+        if ((w0 >> 24) == 0x04u) break;
+        if ((w0 >> 24) != 0x01u) continue;
+        const std::uint32_t params = (w0 >> 16) & 0xFFu;
+        if (params & 1u) continue;  // projection
+        const Mat t = read_matrix(rdram, w1);
+        m = (params & 2u) ? t : multiply(t, m);  // a load, or a multiply (row vectors: new x current)
+        any = true;
+    }
+    if (!any) return backwards;
+    // The nose in eye space against its direction at the flight's start:
+    // turned round once the game has turned it more than halfway.
+    static double first[3] = {};
+    double nose[3] = {-m[2][0], -m[2][1], -m[2][2]};
+    const double nl = std::sqrt(nose[0] * nose[0] + nose[1] * nose[1] + nose[2] * nose[2]);
+    if (nl <= 0) return backwards;
+    for (double& c : nose) c /= nl;
+    if (!have) {
+        first[0] = nose[0], first[1] = nose[1], first[2] = nose[2], have = true;
+        return backwards = false;
+    }
+    {   // Research (BLOCKPLANET_MODELS3D_LOG): the nose and the origin each draw.
+        static const bool log = std::getenv("BLOCKPLANET_MODELS3D_LOG") != nullptr;
+        if (log) {
+            std::fprintf(stdout, "{\"event\":\"nose\",\"nose\":[%.2f,%.2f,%.2f],\"at\":[%.0f,%.0f,%.0f]}\n", nose[0], nose[1], nose[2], m[3][0], m[3][1], m[3][2]);
+            std::fflush(stdout);
+        }
+    }
+    // Facing the camera (eye +z) means flying tail first into the sphere.
+    (void)first;
+    if (nose[2] > 0.3) backwards = true;
+    else if (nose[2] < -0.3) backwards = false;
+    return backwards;
+}
+
+bool hide(std::uint8_t* rdram, std::uint32_t start) {
+    const std::uint32_t end = load32(rdram, display_list_pointer);
+    if (rdram == nullptr || end <= start || end - start > 0x10000u) return false;
+    bool any = false;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t op = load32(rdram, a) >> 24;
+        if (op == 0x04u || op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, a, 0), store32(rdram, a + 4u, 0), any = true;
+    }
+    return any;
 }
 
 }  // namespace tetrisphere::powerup_models

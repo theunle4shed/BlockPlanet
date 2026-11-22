@@ -512,20 +512,35 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
         std::uint32_t seen = 0;
         bool done;
         if (model3d_after_use) {
-            // The Bomb lands its other end first (the owner, 2026-11-22: ours
-            // fell upside down): our missile turned round for its flight.
+            // The Bomb turns over in flight (flies in fins first, lands red
+            // end first): ours is turned round whenever its nose would point
+            // against its movement, so it always flies nose first (the owner,
+            // 2026-11-22).
+            int draw_kind = -1;
+            // (Only for the flying bomb's own draws: other models drawn now,
+            // the core's character, have their own matrices.)
+            std::uint32_t first_source = 0;
+            for (std::uint32_t a = model3d_start, e = load32_at(rdram, 0x800F22B4u); a < e && a < model3d_start + 8u * 4000u; a += 8u)
+                if ((load32_at(rdram, a) >> 24) == 0x04u) {
+                    first_source = load32_at(rdram, a + 4u);
+                    break;
+                }
+            if (model3d_kind == 4 && first_source == held_source[4]) {
+                static Clock::time_point flight{};
+                const bool restart = flight != used_time;
+                flight = used_time;
+                if (tetrisphere::powerup_models::nose_backwards(rdram, model3d_start, restart)) draw_kind = tetrisphere::powerup_models::dive_kind;
+            }
             done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen, false,
-                                                        model3d_kind == 4 ? tetrisphere::powerup_models::dive_kind : -1);
+                                                        draw_kind);
             // Dynamite splits into five sticks, each its own model of one
             // vertex load of 32 (2026-11-22): each drawn as one of ours.
-            // The Bomb's second phase (our Missile at levels 2 and 3) is its
-            // own large model (about 2,500 vertices) that falls into the
-            // sphere: drawn as our missile.
-            // Only the falling bomb: the first such model's first vertex
-            // source; after impact the same object draws a fireball from
-            // other vertices, which stays the game's (the owner, 2026-11-22:
-            // it showed as a missile flying at the camera). Ours is turned
-            // round, as the game's leads with its other end.
+            // The Bomb's second model (our Missile at levels 2 and 3, about
+            // 2,500 vertices, its own object) shows the bomb in the crater
+            // after the first blast.
+            // Only the first such model's own shape (its first vertex source
+            // and vertex count); after it the same object draws a fireball,
+            // which stays the game's.
             if (!done && model3d_kind == 4 && model3d_through) {
                 static std::uint32_t dive_source = 0, dive_verts = 0;
                 static Clock::time_point dive_use{};
@@ -541,9 +556,10 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                 // (At impact the same model changes shape, 2,452 to 2,620
                 // vertices, and grows into the blast: the shape it fell as only.)
                 if (dive_source == 0 && verts >= 1000) dive_source = first, dive_verts = verts;
-                if (first != 0 && first == dive_source && verts == dive_verts)
-                    done = tetrisphere::powerup_models::replace(rdram, model3d_start, tetrisphere::powerup_models::dive_kind, level, 0,
-                                                                nullptr, true);
+                // It comes after the impact's first blast: the missile is gone
+                // by then (the owner, 2026-11-22: "it should just be despawned
+                // after impact"), so nothing is drawn in its place.
+                if (first != 0 && first == dive_source && verts == dive_verts) done = tetrisphere::powerup_models::hide(rdram, model3d_start);
                 static const bool dlog = std::getenv("BLOCKPLANET_MODELS3D_LOG") != nullptr;  // research
                 if (dlog) {
                     std::fprintf(stdout, "{\"event\":\"bomb_dive\",\"ms\":%lld,\"verts\":%u,\"first\":\"0x%08X\",\"dive\":\"0x%08X\",\"done\":%d}\n",

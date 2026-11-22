@@ -752,5 +752,5 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 
 ## 2026-11-22: The Missile at levels 2 and 3 lands nose first
 
-- The Bomb (our Missile at levels 2 and 3) lands with its other end first, so our missile fell upside down (the owner). After use it is now drawn turned round, nose onto the target, fins up, as the original's; in the box it stays as before.
-- At impact the Bomb's model changes shape (2,452 to 2,620 vertices) and grows into the blast; that was drawn as a missile close to the camera. Only the shape it falls as is ours now; the blast is the game's.
+- The Bomb (our Missile at levels 2 and 3) turns over late in its dive, so our missile went into the sphere tail first (the owner). Measured from the draw's matrices, its nose swings from up, to into the screen, to facing the camera; ours is now drawn turned round whenever its nose would face the camera, so it flies in nose first and dives nose first.
+- The Bomb's second model (after the impact's first blast, the bomb in the crater, then its own blast) showed as our missile floating in front of the sphere. After impact the missile is gone (the owner): that model is not drawn, and the blast is the game's.

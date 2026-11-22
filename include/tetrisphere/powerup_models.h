@@ -21,4 +21,11 @@ constexpr int dive_kind = 7;
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source = 0, std::uint32_t* source = nullptr,
              bool whole = false, int draw_kind = -1);  // draw_kind: the model drawn, if not kind's
 
+// Whether the power-up drawn from `start` flies nose backwards (our models'
+// front is -z), from its movement since the last call; `restart` for a new
+// flight.
+bool nose_backwards(const std::uint8_t* rdram, std::uint32_t start, bool restart);
+// The game's geometry in the draw from `start` blanked (nothing drawn).
+bool hide(std::uint8_t* rdram, std::uint32_t start);
+
 }  // namespace tetrisphere::powerup_models
