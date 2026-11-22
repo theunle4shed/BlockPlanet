@@ -600,6 +600,9 @@ def patch_source(name: str, raw: bytes, expected_sha256: str, probe: bool = True
                 ++logged;
                 std::fprintf(stdout, "{\\"event\\":\\"rsp_matrix_outside\\",\\"address\\":\\"%08x\\",\\"physical\\":\\"%08x\\",\\"segment\\":\\"%08x\\"}\\n",
                     address, rdramAddress, segments[(address >> 24) & 0x0F]);
+                std::fprintf(stdout, "{\\"event\\":\\"rsp_segments\\",\\"s\\":[");
+                for (int sg = 0; sg < 16; ++sg) std::fprintf(stdout, "%s\\"%08x\\"", sg ? "," : "", segments[sg]);
+                std::fprintf(stdout, "]}\\n");
                 tetrisphere_rt64_bad_matrix_where();
                 std::fflush(stdout);
             }
