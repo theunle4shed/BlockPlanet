@@ -31,7 +31,7 @@ rem worked on, update, quit. The others still work if typed: 4 try a branch,
 rem 5 back to main, 7 developer tools, 8 classic, 9 developer tools frozen,
 rem E the Escape prototype.
 echo   1  Play
-echo   2  Play with the new power-ups (test)
+echo   2  Play with the new power-up models (test)
 echo   3  Get the latest changes and rebuild
 if not "%CURRENT%"=="%MAIN%" echo   5  Back to the main build
 echo   6  Quit
@@ -55,8 +55,10 @@ call :run
 goto menu
 :powerups
 rem The power-ups as they are being worked on: BlockPlanet's own 3D models.
-rem In a game, number pad 1 to 4 gives the Missile, Dynamite, the Magnet or
-rem the Atom; pressing the same key again raises its level (1, 2, 3);
+rem The game's six power-ups as in the original, with BlockPlanet's models.
+rem In a game, number pad 1 to 6 gives the Firecracker, Dynamite, the
+rem Magnet, the Atom, the Bomb or the Ray Gun. Losing a life keeps the
+rem power-up. (The levels are research: BLOCKPLANET_POWERUP_LEVELS=1.)
 rem the dark ball in an opened core is drawn black (a test).
 set BLOCKPLANET_MODELS3D=1
 set BLOCKPLANET_POWERUP_TEST=1

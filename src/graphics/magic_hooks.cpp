@@ -729,8 +729,7 @@ extern "C" void blockplanet_powerup_new_stage(std::uint8_t* rdram) {
 extern "C" void blockplanet_powerup_sequence_log(std::uint8_t* rdram) { prepare_sequence(rdram); }
 
 extern "C" int blockplanet_magic_earn(std::uint8_t* rdram, int before) {
-    static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
-    if (!test) return before + 1;
+    if (!tetrisphere::powerup_models::levels_on()) return before + 1;  // the game's own rule
     static constexpr int kinds[4][3] = {{0, 4, 4}, {1, 1, 1}, {2, 2, 5}, {3, 3, 3}};
     static constexpr int family_of[6] = {0, 1, 2, 3, 0, 2};
     int family, level;
@@ -805,8 +804,7 @@ void view_cell(const std::uint8_t* rdram, int& cx, int& cy);
 bool dynamite_blast(std::uint8_t* rdram, recomp_context* ctx);
 
 extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* ctx) {
-    static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
-    if (!test || barrage_firing) return false;
+    if (!tetrisphere::powerup_models::levels_on() || barrage_firing) return false;
     static const bool dynamite_levels = std::getenv("BLOCKPLANET_DYNAMITE_LEVELS_OFF") == nullptr;  // research: the game's Dynamite at every level
     if (blockplanet::powerup_family() == 1) return dynamite_levels && dynamite_blast(rdram, ctx);
     const int kind = int(ctx->r7 & 0xFF);
@@ -973,8 +971,7 @@ int power_targets(std::uint8_t* rdram, int held, tetrisphere::barrage::Target* t
     }
     constexpr std::uint32_t red = 0xFF3A3A, orange = 0xFF9A2E;
     constexpr double size = 1.6;  // cells: the game's own target's size
-    static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
-    const bool barrage = held == 4 && test && blockplanet::powerup_family() == 0 && blockplanet::powerup_level() == 3;
+    const bool barrage = held == 4 && tetrisphere::powerup_models::levels_on() && blockplanet::powerup_family() == 0 && blockplanet::powerup_level() == 3;
     if (barrage) {
         for (int n = 0; n < 3; ++n) {
             double dx, dy;
@@ -1015,7 +1012,11 @@ bool crosshairs_on() {
 // the crosshairs follow the cursor until the launch (the held slot empties),
 // then stay where it was fired.
 bool aiming = false;
+namespace {
+Clock::time_point last_magic_press{};  // (the use's button, for keep_power_on_life_lost)
+}
 extern "C" void blockplanet_magic_use(std::uint8_t* rdram) {
+    last_magic_press = Clock::now();
     const int held = std::int8_t(rdram[((player + 0x702u) ^ 3u) & 0x7FFFFFu]);
     static const bool log = std::getenv("BLOCKPLANET_BLAST_LOG") != nullptr;  // research
     if (log) {
@@ -1045,7 +1046,33 @@ extern "C" void blockplanet_blast_table_reset(std::uint8_t* rdram, recomp_contex
         if (barrage_table[i] == 0) rdram_set_byte(rdram, t + i, 0);
 }
 
+// Losing a life keeps the held power-up (the owner, 2026-11-23: "it's already
+// punishing enough to lose a life without having to lose your power-up as
+// well"; checked the same day in Casual 1:1: a drop with no match took a heart,
+// 3 to 2, and emptied the slot in the same moment, no blast). Each frame: if
+// a heart has just gone and the held power-up with it, without its button (the
+// use, blockplanet_magic_use), it is put back. BLOCKPLANET_LIFE_LOSES_POWERUP=1
+// keeps the original rule.
+namespace {
+void keep_power_on_life_lost(std::uint8_t* rdram) {
+    static const bool original = std::getenv("BLOCKPLANET_LIFE_LOSES_POWERUP") != nullptr;
+    static int prev_hearts = -2, prev_held = -1;
+    const int hearts = int(std::int16_t(tetrisphere::guest::load16(rdram, player + 0x2D7Eu)));
+    const int held = int(std::int8_t(rdram_byte(rdram, player + 0x702u)));
+    const bool pressed = Clock::now() - last_magic_press < std::chrono::seconds(2);
+    if (!original && prev_held >= 0 && held < 0 && hearts >= 0 && prev_hearts > 0 && hearts < prev_hearts && !pressed) {
+        rdram_set_byte(rdram, player + 0x702u, std::uint8_t(prev_held));
+        std::fprintf(stdout, "{\"event\":\"life_lost_power_kept\",\"kind\":%d,\"hearts\":%d}\n", prev_held, hearts);
+        std::fflush(stdout);
+        prev_hearts = hearts;
+        return;  // (prev_held stays)
+    }
+    prev_hearts = hearts, prev_held = held;
+}
+}  // namespace
+
 extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
+    keep_power_on_life_lost(rdram);
     if (static int wide_logged = 0; barrage_wide_until != Clock::time_point{} && wide_logged++ < 1)
         std::fprintf(stdout, "{\"event\":\"barrage_breaking\",\"wide\":1,\"count\":%d}\n", breaking_count(rdram));
     if (barrage_keep_table)
@@ -1092,8 +1119,7 @@ extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ct
         static int last_held = -1;
         const int held_now = std::int8_t(rdram[((player + 0x702u) ^ 3u) & 0x7FFFFFu]);
 
-        static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
-        if (test && last_held == 4 && held_now < 0 && blockplanet::powerup_family() == 0 && blockplanet::powerup_level() == 3) {
+        if (tetrisphere::powerup_models::levels_on() && last_held == 4 && held_now < 0 && blockplanet::powerup_family() == 0 && blockplanet::powerup_level() == 3) {
             barrage_use_frame = barrage_game_frame, barrage_use_time = Clock::now();
             int vx, vy;
             view_cell(rdram, vx, vy);
@@ -1146,3 +1172,4 @@ extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ct
     barrage_next = barrage_next == 2 ? 0 : barrage_next + 1;
     barrage_due = Clock::now() + std::chrono::milliseconds(1200);
 }
+

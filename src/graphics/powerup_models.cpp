@@ -472,8 +472,22 @@ std::vector<Part> atom_family(int level) {
     return out;
 }
 
+}  // namespace
+bool levels_on();
+namespace {
 std::vector<Part> model(int kind, int level) {
-    // The game's six, shown as the four (until the merges are built): the
+    // The game's six as in the original (the owner, 2026-11-23: the levels kept
+    // as research for later): each its own model, as its icon.
+    if (!levels_on()) switch (kind) {
+        case 0: return firecracker(1);
+        case 1: return dynamite(1);
+        case 2: return magnet(1);
+        case 3: return atom(1);
+        case 4: return bomb(1);
+        case 5: return raygun(1);
+        default: break;
+        }
+    // With the levels (research): the game's six shown as the four, the
     // Firecracker and Bomb as the Missile, the Magnet and Ray Gun as the Magnet.
     switch (kind) {
     case 0: case 4: return missile_family(level);
@@ -639,6 +653,11 @@ std::uint32_t model_list(std::uint8_t* rdram, int draw_kind, int level, std::uin
         std::fflush(stdout);
     }
     return b.at + 8u;
+}
+
+bool levels_on() {
+    static const bool on = std::getenv("BLOCKPLANET_POWERUP_LEVELS") != nullptr;
+    return on;
 }
 
 int flame_frame() {

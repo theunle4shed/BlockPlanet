@@ -30,6 +30,12 @@ constexpr int last_kind = 9;
 // `phase`: a missile's flame, -1 none, 0 to 3 a frame of its flicker (flame_frame()).
 std::uint32_t model_list(std::uint8_t* rdram, int kind, int level, std::uint32_t light_dir = 0x5A33C500u, int phase = -1);
 int flame_frame();
+// BlockPlanet's power-up levels (the Missile and the Magnet merged, levels 1
+// to 3, the barrage, Dynamite's rings, a set order per stage): research for
+// later upgrades, on with BLOCKPLANET_POWERUP_LEVELS=1 (the owner,
+// 2026-11-23). Off: the game's six power-ups as in the original, each with
+// BlockPlanet's own model and icon.
+bool levels_on();
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source = 0, std::uint32_t* source = nullptr,
              bool whole = false, int draw_kind = -1, double turn_degrees = 0.0);  // draw_kind: the model drawn, if not kind's
 

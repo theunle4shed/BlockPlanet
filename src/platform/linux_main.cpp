@@ -36,6 +36,7 @@
 #include "tetrisphere/developer_records.h"
 #include "tetrisphere/frame_step.h"
 #include "tetrisphere/magic_model.h"
+#include "tetrisphere/powerup_models.h"
 #include "tetrisphere/audio_settings.h"
 #include "tetrisphere/jukebox.h"
 #include "tetrisphere/vortex_backdrop.h"
@@ -136,10 +137,25 @@ bool unlock_all_testing = false;
 // magic_hooks.cpp); the effects are still the game's six (the Missile is the
 // Firecracker at level 1 and the Bomb at 2 and 3, the Magnet the Magnet at 1
 // and 2 and the Ray Gun at 3).
-int powerup_test_level() { return blockplanet::powerup_level(); }
+// Since 2026-11-23 (the owner: the original's power-ups for now, the levels
+// kept as research): without BLOCKPLANET_POWERUP_LEVELS the number pad gives
+// the game's six directly, 1 the Firecracker, 2 Dynamite, 3 the Magnet, 4 the
+// Atom, 5 the Bomb, 6 the Ray Gun; with it, as above (1 to 4, levels).
+int powerup_test_level() { return tetrisphere::powerup_models::levels_on() ? blockplanet::powerup_level() : 0; }
 bool powerup_test_key(std::uint8_t* rdram, int family) {
     static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
     if (!test || rdram == nullptr) return false;
+    if (!tetrisphere::powerup_models::levels_on()) {
+        const bool playing = guest::load16(rdram, 0x800E44A8) != 10 && guest::load16(rdram, 0x800E121C) == -1 &&
+                             std::int16_t(guest::load16(rdram, 0x800E1228)) < 0 &&
+                             std::int16_t(guest::load16(rdram, 0x80112F9E)) != -1 && !blockplanet::ui::menus_open();
+        if (!playing || family < 0 || family > 5) return false;
+        guest::store8(rdram, 0x80110220u + 0x702, std::uint8_t(family));
+        std::fprintf(stdout, "{\"event\":\"powerup_test\",\"kind\":%d}\n", family);
+        std::fflush(stdout);
+        return true;
+    }
+    if (family > 3) return false;
     const bool playing = guest::load16(rdram, 0x800E44A8) != 10 && guest::load16(rdram, 0x800E121C) == -1 &&
                          std::int16_t(guest::load16(rdram, 0x800E1228)) < 0 &&
                          std::int16_t(guest::load16(rdram, 0x80112F9E)) != -1 && !blockplanet::ui::menus_open();
@@ -6322,7 +6338,7 @@ bool handle_profile_command(const std::string& command) {
             }
             // The power-up test: number pad 1 to 4 (see powerup_test_key).
             if (event.type == SDL_KEYDOWN && !event.key.repeat && event.key.keysym.scancode >= SDL_SCANCODE_KP_1 &&
-                event.key.keysym.scancode <= SDL_SCANCODE_KP_4 &&
+                event.key.keysym.scancode <= SDL_SCANCODE_KP_6 &&
                 powerup_test_key(const_cast<std::uint8_t*>(guest_rdram), event.key.keysym.scancode - SDL_SCANCODE_KP_1))
                 continue;
             // The finale after 10:10: any key or button skips to the credits.
