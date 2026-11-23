@@ -4,6 +4,15 @@ A living plan. Each item lists what it involves, what it depends on, and how big
 
 The longer-term design direction (visual identity, camera, story, modes, junk rules, media player, accessibility) is in [REDESIGN.md](REDESIGN.md). This roadmap covers what to build and in what order.
 
+## Minimal viable build (the owner's call, 2026-11-23)
+
+The order to reach a first complete, playable build:
+1. **Rescue from start to finish:** the intro, the title, the menus and Rescue's options make sense; every stage clear and change of stage; the animations and scenes after each episode, and the final ending. For each scene: decide with the owner whether it stays, and make each one kept work correctly. Begins with an audit: every screen and scene on the path recorded and listed (what plays, does it work, keep or drop). Known: nothing shown after the final episode (10:10); some Casual stages would not open (details to get from the owner).
+2. **Time Attack and Score Attack:** the same path checked in each, once Rescue is right.
+3. **Lines:** the same process once Rescue is complete.
+
+Everything else waits (power-up upgrades, bonus modes, cosmetics), noted here as ideas come up.
+
 ## Current priorities (the owner's call, 2026-11-13)
 
 **First: the core game.**
