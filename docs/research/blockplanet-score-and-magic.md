@@ -164,3 +164,16 @@ The owner's idea: a sphere whose layers alternate in colour, so a magic's damage
 The owner cleared a stage with only the Atom and saw no points. In the harness (Casual 1:1, `BLOCKPLANET_SCORE_LOG=1`, the Atom fired once): the score stayed at 0 while the Atom worked (the magic itself scores nothing, as read in the code above), then rose to 256,000 and 257,000 in the game's units (2,560,000 and 2,570,000 shown) during the stage-end scene, the same as a clear by `research_win` (the pop-up number over the opened core). So a clear by magic alone does score, through the stage's clear bonus only. Until 2026-11-22 BlockPlanet's grid came in 1.8 s after a single stage's clear, before that bonus showed (now it waits for the friend's escape).
 
 So in the original, magic earns points only indirectly: the combos and gravity it sets off, and the clear bonus when it opens the core. Whether BlockPlanet's power-ups should score their own breaks (for example 10 a brick, as an ordinary combo's bricks, paid when the power-up finishes) is a design choice; the levels' bigger effects would make that matter more.
+
+## What each power-up removes, by level (measured 2026-11-23, a fixed sphere)
+
+Casual 10:5 with the sphere and piece seeds fixed (`BLOCKPLANET_SPHERE_SEED=4242 BLOCKPLANET_PIECE_SEED=777`; the build's hash 1721812933 in every run), the cursor in the middle, the power-up given with the number pad (pressed once per level) and fired; the bricks emptied counted with `research_snap` / `research_diff`, layer by layer from `research_board` (layer 6 the top, 0 the core). Missile level 1 run twice: 60 both times. The harness script is in the session's scratchpad (`measure.sh`); the method is what matters: same seed, same cursor, snap, fire, diff after 18 s.
+
+| Power-up | Level 1 | Level 2 | Level 3 |
+| --- | --- | --- | --- |
+| Missile | 60 (top layer) | 178 from 135 columns (135 top, 43 next) | 208 from 171 columns (171 top, 37 next), the barrage's wide blast, radius 7 |
+| Dynamite | 90 (top layer) | 90 (no level effect yet) | 90 (no level effect yet) |
+| Magnet | 65 from 21 columns, six layers deep | 71 from 23 columns | 98 from 26 columns, all seven layers down to the core (the Ray Gun) |
+| Atom | 1,021: the whole top layer | 1,021 (no level effect yet) | 1,021 (no level effect yet) |
+
+What it shows: the Atom takes eleven times the Missile's level 3 at level 1, the owner's "maybe too strong" in numbers. Dynamite and the Atom have no level effects yet; the Magnet's level 2 is its own (a Power Magnet, little more than level 1 here), its level 3 the game's Ray Gun.
