@@ -1121,6 +1121,7 @@ void update_puzzle_hud() {
 }
 
 bool update_title_overlay();
+extern "C" void blockplanet_powerup_sequence_log(std::uint8_t* rdram);  // magic_hooks.cpp
 extern "C" bool blockplanet_title_recent(std::uint32_t* image);
 extern "C" float blockplanet_title_notice_opacity();
 
@@ -7403,6 +7404,11 @@ bool handle_profile_command(const std::string& command) {
                 }
                 std::fprintf(stdout, "{\"event\":\"research_lab\",\"lab\":\"stripes\",\"top\":%d,\"materials\":[%d,%d]}\n", top, mat[0], mat[1]);
                 std::fflush(stdout);
+                continue;
+            }
+            if (*command == "research_powerups" && guest_rdram != nullptr) {
+                // Research: this stage's order of power-ups (magic_hooks.cpp).
+                blockplanet_powerup_sequence_log(const_cast<std::uint8_t*>(guest_rdram));
                 continue;
             }
             if (*command == "research_columns" && guest_rdram != nullptr) {

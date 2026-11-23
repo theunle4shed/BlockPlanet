@@ -40,6 +40,8 @@
 #include <cmath>
 #include <cstdint>
 #include <random>
+#include <vector>
+#include <string>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -657,15 +659,84 @@ void set_powerup(int family, int level) { current_family = family, current_level
 // patch notes in config/recomp), with the slot's value before; returns the
 // value to store. In the power-up test only for now (the levels' effects are
 // not built yet); otherwise the game's own rule (one more).
+// The order of new power-ups (the owner, 2026-11-23: every game should feel
+// consistent, no player luckier than another, records fair; the sphere's
+// bricks stay random, but each stage has a set order of power-ups). Not a
+// fresh random pick each time: a sequence seeded by the episode and stage, the
+// same for every player who plays that stage. Which power-ups it holds depends
+// on the sphere's depth (the owner: the rarer ones on the deeper spheres; no
+// Atom on a sphere two or three layers thick): 3 layers or fewer, the Missile
+// and Dynamite; 4 or 5, the Magnet too; 6 or more, the Atom too. Drawn from
+// shuffled bags of those (each bag one of each), so no player waits long for
+// one or gets the same twice running. Levelling up a held one takes nothing
+// from the sequence. BLOCKPLANET_POWERUP_SEED=random gives a fresh random
+// order each stage (research, or a later "surprise" option).
+namespace {
+int sequence_index = 0;  // new picks so far this stage
+bool sequence_ready = false;
+std::uint32_t sequence_seed = 0;
+std::vector<int> sequence_kinds;  // the families allowed on this stage
+std::uint32_t stage_seed(int chapter, int level) {
+    std::uint32_t h = 0x9E3779B9u ^ std::uint32_t(chapter + 1) * 0x85EBCA6Bu ^ std::uint32_t(level + 1) * 0xC2B2AE35u;
+    h ^= h >> 16, h *= 0x7FEB352Du, h ^= h >> 15, h *= 0x846CA68Bu, h ^= h >> 16;
+    return h;
+}
+int sequence_family(int n) {
+    std::vector<int> bag = sequence_kinds;
+    const int size = int(bag.size());
+    std::mt19937 shuffle{sequence_seed ^ (std::uint32_t(n / size) * 0x27D4EB2Fu)};
+    for (int i = size - 1; i > 0; --i) std::swap(bag[std::size_t(i)], bag[std::size_t(std::uniform_int_distribution<int>(0, i)(shuffle))]);
+    return bag[std::size_t(n % size)];
+}
+// The sphere's depth: the layers above the core (layer 0) holding any brick.
+int sphere_layers(const std::uint8_t* rdram) {
+    const std::uint32_t values = tetrisphere::guest::load32(rdram, 0x800E44D0u);
+    int top = 0;
+    for (int layer = 1; layer < 9; ++layer)
+        for (int c = 0; c < 1024; ++c)
+            if (std::int16_t(tetrisphere::guest::load16(rdram, values + 2u * std::uint32_t(layer * 1024 + c))) > 0) {
+                top = layer;
+                break;
+            }
+    return top;
+}
+void prepare_sequence(const std::uint8_t* rdram) {
+    const int chapter = int(std::int16_t(tetrisphere::guest::load16(rdram, 0x800E44A0u)));
+    const int level = int(std::int16_t(tetrisphere::guest::load16(rdram, 0x80110220u + 0x23BAu)));
+    static const bool fresh = [] { const char* v = std::getenv("BLOCKPLANET_POWERUP_SEED"); return v && std::string(v) == "random"; }();
+    sequence_seed = fresh ? std::random_device{}() : stage_seed(chapter, level);
+    const int layers = sphere_layers(rdram);
+    sequence_kinds = layers <= 3 ? std::vector<int>{0, 1} : layers <= 5 ? std::vector<int>{0, 1, 2} : std::vector<int>{0, 1, 2, 3};
+    sequence_ready = true;
+    static const char* names[4] = {"Missile", "Dynamite", "Magnet", "Atom"};
+    std::string order;
+    for (int n = 0; n < 8; ++n) order += std::string(n ? "," : "") + "\"" + names[sequence_family(n)] + "\"";
+    std::fprintf(stdout, "{\"event\":\"powerup_sequence\",\"stage\":\"%d:%d\",\"layers\":%d,\"seed\":\"%08X\",\"first\":[%s]}\n", chapter + 1,
+                 level + 1, layers, sequence_seed, order.c_str());
+    std::fflush(stdout);
+}
+}  // namespace
+
+// A stage begins (its sphere about to be built; sphere_build_research.cpp):
+// the order starts again, worked out at the first pick (the sphere built).
+extern "C" void blockplanet_powerup_new_stage(std::uint8_t* rdram) {
+    (void)rdram;
+    sequence_ready = false;
+    sequence_index = 0;
+}
+
+// Research (the harness): the stage's order, without earning.
+extern "C" void blockplanet_powerup_sequence_log(std::uint8_t* rdram) { prepare_sequence(rdram); }
+
 extern "C" int blockplanet_magic_earn(std::uint8_t* rdram, int before) {
     static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
     if (!test) return before + 1;
-    static std::mt19937 random{std::random_device{}()};
     static constexpr int kinds[4][3] = {{0, 4, 4}, {1, 1, 1}, {2, 2, 5}, {3, 3, 3}};
     static constexpr int family_of[6] = {0, 1, 2, 3, 0, 2};
     int family, level;
     if (before < 0 || before > 5) {
-        family = std::uniform_int_distribution<int>(0, 3)(random), level = 1;
+        if (!sequence_ready) prepare_sequence(rdram);
+        family = sequence_family(sequence_index++), level = 1;
     } else {
         family = family_of[before];
         level = family == current_family && current_level >= 1 ? std::min(3, current_level + 1) : 2;

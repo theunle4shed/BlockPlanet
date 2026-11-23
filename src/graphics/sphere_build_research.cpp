@@ -191,8 +191,11 @@ extern "C" void blockplanet_sphere_seed(std::uint8_t* rdram, recomp_context* ctx
     std::fflush(stdout);
 }
 
+extern "C" void blockplanet_powerup_new_stage(std::uint8_t* rdram);  // magic_hooks.cpp
+
 extern "C" void blockplanet_level_build_begin(std::uint8_t* rdram, recomp_context* ctx) {
     (void)ctx;
+    blockplanet_powerup_new_stage(rdram);  // the power-up order starts again with each stage
     if (!enabled()) return;
     building = true;
     draws = 0;
