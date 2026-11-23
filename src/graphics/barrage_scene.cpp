@@ -179,6 +179,23 @@ void draw(std::uint8_t* rdram, const sphere::ExtendedSphere& sphere) {
         out = unit(s);
         return o + s * (layers_at(bx, by) - 1.0 + extra);
     };
+    // Research (BLOCKPLANET_BARRAGE_LOG=1): each strike's board cell against
+    // the mesh patch (a target outside it is drawn at the patch's edge).
+    if (static const bool log = std::getenv("BLOCKPLANET_BARRAGE_LOG") != nullptr; log && running) {
+        static Clock::time_point logged{};
+        if (logged != started) {
+            logged = started;
+            for (int n = 0; n < 3; ++n) {
+                double dx, dy;
+                strike_offset(n, dx, dy);
+                const double bx = cursor_x - 0.5 + dx, by = cursor_y - 0.5 + dy;
+                double pr = bx - off_row, pc = by - off_column;
+                pr -= 32.0 * std::round((pr - 7.5) / 32.0), pc -= 32.0 * std::round((pc - 7.5) / 32.0);
+                std::fprintf(stdout, "{\"event\":\"barrage_strike_mesh\",\"n\":%d,\"board\":[%.1f,%.1f],\"mesh\":[%.1f,%.1f],\"patch\":[%d,%d]}\n", n, bx, by, pr, pc, lo, hi);
+            }
+            std::fflush(stdout);
+        }
+    }
     // The blasts' centre: a cell before the cursor's on both axes (measured
     // 2026-11-22: the cursor at board 11, 9 gave a blast at 10 x 256, 8 x 256
     // and cleared cells centred on 10, 8), its first coordinate the board's x.
