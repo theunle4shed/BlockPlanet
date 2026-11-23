@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Draws the HUD's heart pictures (BlockPlanet's own art; the owner's design,
-2026-11-18: simple heart-shaped containers, white border, red inside, like the
-square tiles they replace). Writes assets/ui/hearts/heart.png and
-heart-lost.png. Run from the repository root: python3 tools/art/hearts.py
+"""Draws the HUD's heart pictures (BlockPlanet's own art). The owner's design,
+2026-11-23 (was red with a white border, 2026-11-18): flat like the blocks, no
+outline; a heart held is solid green (the drop bar's green, #4cc860), a lost
+one an empty heart, only its green outline (as in Zelda). Writes
+assets/ui/hearts/heart.png and heart-lost.png. Run from the repository root:
+python3 tools/art/hearts.py
 """
 import math
 from pathlib import Path
@@ -44,6 +46,7 @@ def draw(fill, border, path):
 if __name__ == "__main__":
     out = Path("assets/ui/hearts")
     out.mkdir(parents=True, exist_ok=True)
-    draw((0xE0, 0x28, 0x38, 255), (0xF8, 0xF8, 0xF8, 255), out / "heart.png")
-    draw((0x20, 0x20, 0x28, 0x80), (0x80, 0x80, 0x80, 255), out / "heart-lost.png")
+    green = (0x4C, 0xC8, 0x60, 255)
+    draw(green, green, out / "heart.png")
+    draw((0, 0, 0, 0), green, out / "heart-lost.png")
     print("wrote", out / "heart.png", "and", out / "heart-lost.png")

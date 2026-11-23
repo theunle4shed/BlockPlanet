@@ -88,9 +88,9 @@ div { display: block; }
 .rule { padding: 10dp 24dp; }
 .rule .line { height: 2dp; background-color: #3a4260; }
 
-/* Hearts: three red hearts with a white border, a lost one dark (the owner,
-   2026-11-18: hearts like the original's, in place of square tiles; drawn by
-   tools/art/hearts.py). */
+/* Hearts: three solid green hearts, flat like the blocks; a lost one only its
+   green outline (the owner, 2026-11-23, as in Zelda; was red with a white
+   border, 2026-11-18). Drawn by tools/art/hearts.py. */
 #hearts, .hearts { height: 48dp; }
 .heart {
     display: inline-block;
