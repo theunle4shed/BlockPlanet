@@ -736,7 +736,7 @@ bool dynamite_blast(std::uint8_t* rdram, recomp_context* ctx);
 extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* ctx) {
     static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
     if (!test || barrage_firing) return false;
-    static const bool dynamite_levels = std::getenv("BLOCKPLANET_DYNAMITE_LEVELS") != nullptr;  // (being tested)
+    static const bool dynamite_levels = std::getenv("BLOCKPLANET_DYNAMITE_LEVELS_OFF") == nullptr;  // research: the game's Dynamite at every level
     if (blockplanet::powerup_family() == 1) return dynamite_levels && dynamite_blast(rdram, ctx);
     const int kind = int(ctx->r7 & 0xFF);
     if (barrage_dropping && kind == 0) {
@@ -835,7 +835,16 @@ bool dynamite_blast(std::uint8_t* rdram, recomp_context* ctx) {
     const int waiting = breaking_count(rdram);
     static const int wide = [] { const char* v = std::getenv("BLOCKPLANET_DYNAMITE_RADIUS"); return v ? std::atoi(v) : 3; }();
     int outer_fired = 0;
-    if (level >= 3 && waiting < 120) {
+    // At most three outer blasts a throw: each blast takes one of the game's
+    // explosion effects, and with five sticks and a fourth outer blast the
+    // fifth stick never went off (measured 2026-11-23: eight blasts went off,
+    // the ninth did not).
+    static Clock::time_point last_stick{};
+    static int outers = 0;
+    if (Clock::now() - last_stick > std::chrono::seconds(3)) outers = 0;  // a new throw
+    last_stick = Clock::now();
+    if (level >= 3 && waiting < 170 && outers < 3) {
+        ++outers;
         // The cursor's blast centre (as the barrage's: the view's cell, a cell
         // before it), in 1/256 of a cell.
         int cx, cy;
@@ -854,7 +863,7 @@ bool dynamite_blast(std::uint8_t* rdram, recomp_context* ctx) {
         *ctx = saved;
         outer_fired = 1;
     }
-    if (breaking_count(rdram) < 150) tetrisphere::guest::store32(rdram, sp + 0x14u, std::uint32_t(wide));
+    if (breaking_count(rdram) < 200) tetrisphere::guest::store32(rdram, sp + 0x14u, std::uint32_t(wide));
     std::fprintf(stdout, "{\"event\":\"dynamite_level\",\"level\":%d,\"radius\":%u,\"outer\":%d,\"waiting_before\":%d,\"waiting_after_outer\":%d}\n",
                  level, load32_at(rdram, sp + 0x14u), outer_fired, waiting, breaking_count(rdram));
     std::fflush(stdout);

@@ -172,8 +172,12 @@ Casual 10:5 with the sphere and piece seeds fixed (`BLOCKPLANET_SPHERE_SEED=4242
 | Power-up | Level 1 | Level 2 | Level 3 |
 | --- | --- | --- | --- |
 | Missile | 60 (top layer) | 178 from 135 columns (135 top, 43 next) | 208 from 171 columns (171 top, 37 next), the barrage's wide blast, radius 7 |
-| Dynamite | 90 (top layer) | 90 (no level effect yet) | 90 (no level effect yet) |
+| Dynamite | 90 (top layer) | 155 (each stick radius 3) | 185 (radius 3, and three outer blasts) |
 | Magnet | 65 from 21 columns, six layers deep | 71 from 23 columns | 98 from 26 columns, all seven layers down to the core (the Ray Gun) |
 | Atom | 1,021: the whole top layer | 1,021 (no level effect yet) | 1,021 (no level effect yet) |
 
-What it shows: the Atom takes eleven times the Missile's level 3 at level 1, the owner's "maybe too strong" in numbers. Dynamite and the Atom have no level effects yet; the Magnet's level 2 is its own (a Power Magnet, little more than level 1 here), its level 3 the game's Ray Gun.
+What it shows: the Atom takes eleven times the Missile's level 3 at level 1, the owner's "maybe too strong" in numbers. The Atom has no level effects yet (Dynamite's were added the same night: 90 before at every level); the Magnet's level 2 is its own (a Power Magnet, little more than level 1 here), its level 3 the game's Ray Gun.
+
+**Dynamite's levels, measured as they were built (2026-11-23).** Each stick is a blast of radius 2, one after another as they land (the blast log, `BLOCKPLANET_BLAST_LOG=1`, now shows each blast's radius and the bricks waiting to break). The waiting count after each stick: 0, 41, 69, 96, 118 at level 2 (radius 3), never near the list's 255. **The game has room for eight explosions at a time:** with an outer blast on four sticks the fifth stick never went off (eight blasts went off, the ninth did not), so level 3 adds at most three. Level 3 on two runs: 185 and 185.
+
+**A third layer for the barrage's crater does not work (tried 2026-11-23).** The magic has ended about 0.6 s after the game's second blast (its flag `+0x1269` 0): a blast fired then schedules nothing (the waiting count unchanged, 120 before and after). Fired earlier it would only find the second layer's bricks not yet broken. Keeping the magic running longer is the change that left bricks white and unbroken before; set aside. `BLOCKPLANET_BARRAGE_THIRD_MS` (research) fires it.
