@@ -232,6 +232,8 @@ bool end_menu_cleared = false;  // the end menu is an episode's end (not a game 
 // 2026-11-19: after Episode 10 the game went on to its credits with nothing
 // seen; "we need to kill the original credits").
 bool final_stage_cleared = false;
+int finale_chapter = 10;  // the episode whose ending is playing (5, 8 or 10)
+bool finale_panel_open = false;  // after Episode 5's or 8's curtain call: the Episode Cleared panel
 bool final_credits_open = false;
 bool final_stage_cleared_seen = false;  // research (BLOCKPLANET_FINAL_RAW)
 // Rescue's finale after 10:10 (the owner, 2026-11-19: "it would be a shame to
@@ -1673,7 +1675,12 @@ void update_hud() {
     // cleared (the core opened; the final episode has no next one to start).
     // Rescue's episode-end menu follows the last stage of a whole-episode
     // run (Story and Casual; the attack modes leave by themselves).
-    final_stage_cleared = state.mode == 1 && !single_stage && !variant_competes(play_variant) && state.chapter == 10 && state.level >= 10 && state.progress >= 1.0f;
+    // (The game plays its ending, a curtain call then its credits, after
+    // Episodes 5 and 8 as well as 10: found in the MVP audit, 2026-11-23,
+    // where both showed only BlockPlanet's empty grid for minutes.)
+    final_stage_cleared = state.mode == 1 && !single_stage && !variant_competes(play_variant) &&
+                          (state.chapter == 5 || state.chapter == 8 || state.chapter == 10) && state.level >= 10 && state.progress >= 1.0f;
+    if (final_stage_cleared) finale_chapter = state.chapter;
     if (state.mode == 1 && !single_stage && (play_variant == PlayVariant::Story || play_variant == PlayVariant::Casual)) {
         static bool last_cleared = false;  // told once, as it becomes so
         const bool last_cleared_now = state.level >= 10 && state.progress >= 1.0f;
@@ -6632,6 +6639,27 @@ bool handle_profile_command(const std::string& command) {
                 blockplanet::ui::request_show("howto");
                 continue;
             }
+            if ((*command == "finale_carry_on" || *command == "finale_exit") && finale_panel_open) {
+                // After Episode 5's or 8's ending (see finale_panel): leave play
+                // for the menus; Carry on then starts the next episode there.
+                finale_panel_open = false;
+                if (*command == "finale_carry_on") {
+                    continue_mode = PendingLaunch{LaunchMode::Rescue, std::pair{finale_chapter + 1, 1}};
+                    loading_title = std::string(variant_title(play_variant)) + " \u00B7 Episode " + std::to_string(finale_chapter + 1);
+                    loading_since = std::chrono::steady_clock::now();
+                    loading_active = true;
+                } else {
+                    if (launch_path.empty()) launch_path = {{"main", 0}, {"solo", 0}, {"story", 0}}, campaign_source.clear();
+                    return_to_menu_chapter = 0;
+                }
+                blockplanet::ui::request_close();
+                end_track_override(), grid_quit_at = std::chrono::steady_clock::now();
+                blockplanet::request_direct_quit(false);
+                blockplanet::set_end_park(false);
+                std::fprintf(stdout, "{\"event\":\"finale_choice\",\"choice\":\"%s\"}\n", command->c_str());
+                std::fflush(stdout);
+                continue;
+            }
             if (command->rfind("end_choose:", 0) == 0) {
                 // The end screen: the game's row for that item. Exit goes back
                 // to the menus the game was started from, as Quit to menu does.
@@ -9196,9 +9224,39 @@ bool handle_profile_command(const std::string& command) {
                 if (final_finale && (final_skip || guest::load16(guest_rdram, 0x800E1228) == 1 ||
                                      std::chrono::steady_clock::now() - *finale_at > std::chrono::seconds(180))) {
                     final_finale = false;
-                    std::fprintf(stdout, "{\"event\":\"final_finale\",\"on\":false,\"skipped\":%d}\n", final_skip);
+                    std::fprintf(stdout, "{\"event\":\"final_finale\",\"on\":false,\"skipped\":%d,\"episode\":%d}\n", final_skip, finale_chapter);
                     std::fflush(stdout);
                     final_skip = false;
+                    if (finale_chapter != 10) {
+                        // After Episode 5's or 8's curtain call: not the game's
+                        // credits, but BlockPlanet's Episode Cleared panel (the
+                        // game parked under it). Carry on leaves play and starts
+                        // the next episode from the menus' side; Exit goes back
+                        // to the Rescue menu.
+                        final_stage_cleared = false;
+                        if (profile_save && play_variant == PlayVariant::Story) {
+                            auto& progress = profile_data.progress;
+                            if (progress.chapters_completed["rescue"].insert(finale_chapter).second) {
+                                progress.levels_completed["rescue"][finale_chapter].insert(10);
+                                profile_dirty = true;
+                                save_profile();
+                            }
+                        }
+                        blockplanet::set_end_park(true);
+                        show_hud(std::nullopt);
+                        blockplanet::ui::set_text("end_title", "Episode " + std::to_string(finale_chapter) + " Cleared");
+                        blockplanet::ui::set_text("end_where", std::string(variant_title(play_variant)) + " \u00B7 Episode " + std::to_string(finale_chapter));
+                        blockplanet::ui::set_text("end_line", "Congratulations, you passed Episode " + std::to_string(finale_chapter) + ".");
+                        std::vector<blockplanet::ui::ListItem> items(2);
+                        items[0].id = "continue", items[0].label = "Carry on to Episode " + std::to_string(finale_chapter + 1);
+                        items[0].action = "command:finale_carry_on", items[0].focus = true;
+                        items[1].id = "exit", items[1].label = exit_label(), items[1].action = "command:finale_exit";
+                        blockplanet::ui::set_list("end", items);
+                        blockplanet::ui::request_open("episode_end");
+                        finale_panel_open = true;
+                        std::fprintf(stdout, "{\"event\":\"finale_panel\",\"episode\":%d}\n", finale_chapter);
+                        std::fflush(stdout);
+                    } else {
                     final_credits_open = true;
                     final_stage_cleared = false;
                     blockplanet::play_track(20);  // Sappy (the owner's choice), for the credits
@@ -9215,6 +9273,7 @@ bool handle_profile_command(const std::string& command) {
                     blockplanet::ui::send_command("credits");
                     std::fprintf(stdout, "{\"event\":\"final_credits\",\"open\":true}\n");
                     std::fflush(stdout);
+                    }
                 }
                 // An attack mode's whole episode: the same state after its last
                 // stage (the game waits with no menu); play is left at once for
