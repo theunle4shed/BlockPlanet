@@ -63,7 +63,9 @@ def stick(x, y, h=34, colour='#d93636'):
 
 def dynamite(level):
     if level == 1:
-        xs = [(13, '#d93636'), (40, '#d93636'), (26.5, '#ef4a4a')]
+        # Five sticks at every level (the owner, 2026-11-23: the icon should
+        # match what is thrown; the game's Dynamite throws five).
+        xs = [(6, '#c92f2f'), (47, '#c92f2f'), (17, '#d93636'), (36, '#d93636'), (26.5, '#ef4a4a')]
         fuses = fuse("M32 22 C32 14 38 12 42 8") + spark(45, 7, 7)
     elif level == 2:
         xs = [(6, '#c92f2f'), (47, '#c92f2f'), (17, '#d93636'), (36, '#d93636'), (26.5, '#ef4a4a')]
