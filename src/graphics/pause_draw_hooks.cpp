@@ -727,8 +727,12 @@ extern "C" void blockplanet_blast_log(std::uint8_t* rdram, recomp_context* ctx) 
     static const bool log = std::getenv("BLOCKPLANET_BLAST_LOG") != nullptr;
     if (!log) return;
     using namespace tetrisphere::guest;
-    std::fprintf(stdout, "{\"event\":\"magic_blast\",\"a0\":%d,\"a1\":%d,\"a2\":%d,\"kind\":%u,\"cursor\":[%d,%d]}\n",
-                 int(std::int16_t(ctx->r4)), int(std::int16_t(ctx->r5)), int(std::int16_t(ctx->r6)), unsigned(ctx->r7 & 0xFF),
+    // The radius (the sixth argument, the stack word at sp+0x14) and the
+    // count of bricks waiting to break (one byte at the board context +0x21BA).
+    const std::uint32_t radius = load32(rdram, std::uint32_t(ctx->r29) + 0x14u);
+    const unsigned waiting = load8(rdram, load32(rdram, 0x8013DD00u) + 0x21BAu);
+    std::fprintf(stdout, "{\"event\":\"magic_blast\",\"a0\":%d,\"a1\":%d,\"a2\":%d,\"kind\":%u,\"radius\":%u,\"waiting\":%u,\"cursor\":[%d,%d]}\n",
+                 int(std::int16_t(ctx->r4)), int(std::int16_t(ctx->r5)), int(std::int16_t(ctx->r6)), unsigned(ctx->r7 & 0xFF), radius, waiting,
                  8 + int(std::int16_t(load16(rdram, 0x80110220u + 0x2B2A))), 8 + int(std::int16_t(load16(rdram, 0x80110220u + 0x2B2E))));
     std::fflush(stdout);
 }

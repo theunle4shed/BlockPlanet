@@ -706,6 +706,11 @@ constexpr std::int16_t strike_kind = 1;  // the Firecracker's radius (4)
 // (blockplanet_blast_table_reset, a hook just after the reset loop).
 bool barrage_keep_table = false;
 Clock::time_point barrage_wide_until{};
+// A third layer for the barrage's crater (2026-11-23, the owner: "or deeper.. craters?"):
+// a blast at the same centre, smaller, a while after the game's second.
+Clock::time_point barrage_third_due{};
+std::int16_t barrage_third_x = 0, barrage_third_y = 0, barrage_third_a2 = 0;
+std::uint32_t barrage_third_arg5 = 0;  // the second blast's fifth argument (sp+0x10), copied
 std::array<std::uint8_t, 1024> barrage_table{};
 std::uint32_t blast_table(const std::uint8_t* rdram) { return load32_at(rdram, 0x8013DD00u) + 0x1280u; }
 void save_blast_table(const std::uint8_t* rdram) {
@@ -725,9 +730,14 @@ int breaking_count(const std::uint8_t* rdram) { return rdram_byte(rdram, load32_
 bool stage_ending(const std::uint8_t* rdram) { return std::int16_t(load32_at(rdram, player + 0x2B5Cu) >> 16) == 1; }
 }  // namespace
 
+void view_cell(const std::uint8_t* rdram, int& cx, int& cy);
+bool dynamite_blast(std::uint8_t* rdram, recomp_context* ctx);
+
 extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* ctx) {
     static const bool test = std::getenv("BLOCKPLANET_POWERUP_TEST") != nullptr;
     if (!test || barrage_firing) return false;
+    static const bool dynamite_levels = std::getenv("BLOCKPLANET_DYNAMITE_LEVELS") != nullptr;  // (being tested)
+    if (blockplanet::powerup_family() == 1) return dynamite_levels && dynamite_blast(rdram, ctx);
     const int kind = int(ctx->r7 & 0xFF);
     if (barrage_dropping && kind == 0) {
         barrage_dropping = false;
@@ -738,8 +748,14 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
         static const int radius = [] { const char* v = std::getenv("BLOCKPLANET_BARRAGE_RADIUS"); return v ? std::atoi(v) : 7; }();
         const std::uint32_t was = load32_at(rdram, std::uint32_t(ctx->r29) + 0x14u);
         tetrisphere::guest::store32(rdram, std::uint32_t(ctx->r29) + 0x14u, std::uint32_t(radius));
-        std::fprintf(stdout, "{\"event\":\"barrage_wide_second\",\"radius\":%d,\"was\":%u}\n", radius, was);
+        std::fprintf(stdout, "{\"event\":\"barrage_wide_second\",\"radius\":%d,\"was\":%u,\"waiting\":%d}\n", radius, was, breaking_count(rdram));
         std::fflush(stdout);
+        static const int third_ms = [] { const char* v = std::getenv("BLOCKPLANET_BARRAGE_THIRD_MS"); return v ? std::atoi(v) : 0; }();
+        if (third_ms > 0) {
+            barrage_third_due = Clock::now() + std::chrono::milliseconds(third_ms);
+            barrage_third_x = std::int16_t(ctx->r4), barrage_third_y = std::int16_t(ctx->r5), barrage_third_a2 = std::int16_t(ctx->r6);
+            barrage_third_arg5 = load32_at(rdram, std::uint32_t(ctx->r29) + 0x10u);
+        }
         return false;
     }
     if (kind != 2 || blockplanet::powerup_family() != 0 || blockplanet::powerup_level() != 3) return false;
@@ -797,6 +813,52 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
     std::fprintf(stdout, "{\"event\":\"barrage_strike\",\"n\":0,\"x\":%d,\"y\":%d,\"arg5\":\"%08X\"}\n", x, y, barrage_arg5);
     std::fflush(stdout);
     return false;  // the game's call goes on, as the first strike
+}
+
+// Dynamite's levels (2026-11-23; the owner's plan: level 2 bigger holes,
+// level 3 a second, wider ring). The game's Dynamite is five sticks landing in
+// a ring round the cursor, one after another, each a blast of radius 2 (the
+// blast routine's sixth argument, the stack word at sp+0x14). Level 2 gives
+// each radius 3; level 3 radius 3 and, with each stick, a second blast of
+// radius 2 further out along the stick's direction from the cursor (1.8 times
+// as far), the outer ring. Learnt from the barrage: the bricks waiting to break
+// are counted in one byte (the board context +0x21BA), so a blast is only
+// widened, and the outer one only added, while that count leaves room; and the
+// outer blast's cells are kept scheduled across the stick's own call (the
+// blast table, as for the barrage).
+bool dynamite_blast(std::uint8_t* rdram, recomp_context* ctx) {
+    const int level = blockplanet::powerup_level();
+    if (level < 2) return false;
+    const std::uint32_t sp = std::uint32_t(ctx->r29);
+    const std::uint32_t radius = load32_at(rdram, sp + 0x14u);
+    if (radius != 2u) return false;  // not a stick (or already changed)
+    const int waiting = breaking_count(rdram);
+    static const int wide = [] { const char* v = std::getenv("BLOCKPLANET_DYNAMITE_RADIUS"); return v ? std::atoi(v) : 3; }();
+    int outer_fired = 0;
+    if (level >= 3 && waiting < 120) {
+        // The cursor's blast centre (as the barrage's: the view's cell, a cell
+        // before it), in 1/256 of a cell.
+        int cx, cy;
+        view_cell(rdram, cx, cy);
+        const double c0 = (cx - 1) * 256.0 + 128.0, c1 = (cy - 1) * 256.0 + 128.0;
+        const double sx = double(std::int16_t(ctx->r4)), sy = double(std::int16_t(ctx->r5));
+        const std::int16_t ox = std::int16_t(std::lround(c0 + 1.8 * (sx - c0))), oy = std::int16_t(std::lround(c1 + 1.8 * (sy - c1)));
+        barrage_table.fill(1);
+        const recomp_context saved = *ctx;
+        ctx->r4 = std::uint64_t(std::int64_t(ox)), ctx->r5 = std::uint64_t(std::int64_t(oy));
+        barrage_firing = true;
+        func_800C6474(rdram, ctx);  // (the stack's radius word is the stick's: 2)
+        barrage_firing = false;
+        save_blast_table(rdram);
+        barrage_keep_table = true;  // the stick's own call keeps these cells (cleared next tick)
+        *ctx = saved;
+        outer_fired = 1;
+    }
+    if (breaking_count(rdram) < 150) tetrisphere::guest::store32(rdram, sp + 0x14u, std::uint32_t(wide));
+    std::fprintf(stdout, "{\"event\":\"dynamite_level\",\"level\":%d,\"radius\":%u,\"outer\":%d,\"waiting_before\":%d,\"waiting_after_outer\":%d}\n",
+                 level, load32_at(rdram, sp + 0x14u), outer_fired, waiting, breaking_count(rdram));
+    std::fflush(stdout);
+    return false;  // the stick's own blast goes on
 }
 
 // The power-up's button press (func_800C719C, the use; the game's own target
@@ -958,6 +1020,26 @@ extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ct
             tetrisphere::barrage::begin(vx, vy);
         }
         last_held = held_now;
+    }
+    if (barrage_third_due != Clock::time_point{} && Clock::now() >= barrage_third_due) {
+        barrage_third_due = {};
+        static const int third_radius = [] { const char* v = std::getenv("BLOCKPLANET_BARRAGE_THIRD_RADIUS"); return v ? std::atoi(v) : 3; }();
+        if (!stage_ending(rdram)) {
+            const int waiting = breaking_count(rdram);
+            const recomp_context saved = *ctx;
+            ctx->r4 = std::uint64_t(std::int64_t(barrage_third_x)), ctx->r5 = std::uint64_t(std::int64_t(barrage_third_y)),
+            ctx->r6 = std::uint64_t(std::int64_t(barrage_third_a2)), ctx->r7 = 0;
+            ctx->r29 = std::uint64_t(std::int64_t(std::int32_t(std::uint32_t(ctx->r29) - 0x40u)));
+            tetrisphere::guest::store32(rdram, std::uint32_t(ctx->r29) + 0x10u, barrage_third_arg5);
+            tetrisphere::guest::store32(rdram, std::uint32_t(ctx->r29) + 0x14u, std::uint32_t(third_radius));
+            barrage_firing = true;
+            func_800C6474(rdram, ctx);
+            barrage_firing = false;
+            *ctx = saved;
+            std::fprintf(stdout, "{\"event\":\"barrage_third\",\"radius\":%d,\"waiting_before\":%d,\"waiting_after\":%d,\"magic\":%d}\n", third_radius,
+                         waiting, breaking_count(rdram), int(rdram_byte(rdram, player + 0x1269u)));
+            std::fflush(stdout);
+        }
     }
     if (barrage_next == 0 || Clock::now() < barrage_due) return;
     if (stage_ending(rdram)) {  // the core is open: no need for the rest
