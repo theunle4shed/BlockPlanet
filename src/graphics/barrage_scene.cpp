@@ -87,8 +87,16 @@ void write_matrix(std::uint8_t* rdram, std::uint32_t at, V x, V y, V z, double s
 } // namespace
 
 void strike_offset(int n, double& dx, double& dy) {
+    // 3.5 cells out (2026-11-23; it was 5): the game's list of bricks waiting
+    // to break counts in one byte, and three strikes 5 cells apart scheduled
+    // about 330 cells: the count went past 255, started again and wrote over
+    // the first strike's entries, so half its circle never broke (the owner:
+    // the top-right strike). Closer, the circles share cells (about 270
+    // scheduled, nearly all breaking), and stay on the side of the sphere in
+    // view (5 cells out was at its edge). BLOCKPLANET_BARRAGE_DISTANCE, research.
+    static const double distance = [] { const char* v = std::getenv("BLOCKPLANET_BARRAGE_DISTANCE"); return v ? std::atof(v) : 3.5; }();
     const double a = 2.0 * 3.14159265358979 * double(n) / 3.0;
-    dx = 5.0 * std::cos(a), dy = 5.0 * std::sin(a);
+    dx = distance * std::cos(a), dy = distance * std::sin(a);
 }
 
 void begin(int x, int y) {

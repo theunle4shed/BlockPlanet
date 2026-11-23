@@ -712,10 +712,14 @@ void save_blast_table(const std::uint8_t* rdram) {
 }
 
 void strike_offset(int n, std::int16_t& x, std::int16_t& y) {
-    const double a = 2.0 * 3.14159265358979 * double(n) / 3.0;
-    x = std::int16_t(barrage_x + std::lround(5.0 * 256.0 * std::cos(a)));
-    y = std::int16_t(barrage_y + std::lround(5.0 * 256.0 * std::sin(a)));
+    double dx, dy;
+    tetrisphere::barrage::strike_offset(n, dx, dy);  // the scene's, so the missiles land where the blasts go off
+    x = std::int16_t(barrage_x + std::lround(256.0 * dx));
+    y = std::int16_t(barrage_y + std::lround(256.0 * dy));
 }
+// The game's list of bricks waiting to break: its count, one byte at the board
+// context +0x21BA (slots at +0x20B6, entries at +0x168E).
+int breaking_count(const std::uint8_t* rdram) { return rdram_byte(rdram, load32_at(rdram, 0x8013DD00u) + 0x21BAu); }
 bool stage_ending(const std::uint8_t* rdram) { return std::int16_t(load32_at(rdram, player + 0x2B5Cu) >> 16) == 1; }
 }  // namespace
 
@@ -748,7 +752,9 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
     if (together) {
         barrage_table.fill(1);
         barrage_keep_table = true;
-        for (int n = 1; n <= 2; ++n) {
+        static const bool reversed = std::getenv("BLOCKPLANET_BARRAGE_REVERSED") != nullptr;  // research: strike 2 first
+        for (int k = 1; k <= 2; ++k) {
+            const int n = reversed ? 3 - k : k;
             std::int16_t sx, sy;
             strike_offset(n, sx, sy);
             const recomp_context saved = *ctx;
@@ -757,6 +763,7 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
             func_800C6474(rdram, ctx);
             barrage_firing = false;
             save_blast_table(rdram);
+            std::fprintf(stdout, "{\"event\":\"barrage_breaking\",\"after_strike\":%d,\"count\":%d}\n", n, breaking_count(rdram));
             *ctx = saved;
         }
         barrage_next = 0;
@@ -871,6 +878,8 @@ extern "C" void blockplanet_blast_table_reset(std::uint8_t* rdram, recomp_contex
 }
 
 extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
+    if (barrage_keep_table)
+        std::fprintf(stdout, "{\"event\":\"barrage_breaking\",\"after_strike\":0,\"count\":%d}\n", breaking_count(rdram));
     barrage_keep_table = false;  // (the strikes all went off in one call, before this frame's tick)
     // The scene: begins once the launcher's flight has ended (no draw of it
     // for a few frames), over the cursor's cell.
