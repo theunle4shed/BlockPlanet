@@ -94,7 +94,13 @@ void strike_offset(int n, double& dx, double& dy) {
     // the top-right strike). Closer, the circles share cells (about 270
     // scheduled, nearly all breaking), and stay on the side of the sphere in
     // view (5 cells out was at its edge). BLOCKPLANET_BARRAGE_DISTANCE, research.
-    static const double distance = [] { const char* v = std::getenv("BLOCKPLANET_BARRAGE_DISTANCE"); return v ? std::atof(v) : 3.5; }();
+    // Since 2026-11-23 (the owner chose one big blast): the three missiles
+    // converge on the blast at the cursor, landing 1.5 cells round it; with the
+    // three strikes (BLOCKPLANET_BARRAGE_STRIKES=1, research) 3.5 cells out.
+    static const double distance = [] {
+        if (const char* v = std::getenv("BLOCKPLANET_BARRAGE_DISTANCE")) return std::atof(v);
+        return std::getenv("BLOCKPLANET_BARRAGE_STRIKES") != nullptr ? 3.5 : 1.5;
+    }();
     const double a = 2.0 * 3.14159265358979 * double(n) / 3.0;
     dx = distance * std::cos(a), dy = distance * std::sin(a);
 }

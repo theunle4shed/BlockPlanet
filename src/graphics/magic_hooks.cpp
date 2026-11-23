@@ -30,6 +30,7 @@
 #include "tetrisphere/magic_model.h"
 #include "tetrisphere/powerup_models.h"
 #include "tetrisphere/barrage_scene.h"
+#include "tetrisphere/guest_memory.h"
 #include "tetrisphere/recomp_support.h"
 
 #include <algorithm>
@@ -704,6 +705,7 @@ constexpr std::int16_t strike_kind = 1;  // the Firecracker's radius (4)
 // earlier strikes scheduled are put back to 0 after each reset
 // (blockplanet_blast_table_reset, a hook just after the reset loop).
 bool barrage_keep_table = false;
+Clock::time_point barrage_wide_until{};
 std::array<std::uint8_t, 1024> barrage_table{};
 std::uint32_t blast_table(const std::uint8_t* rdram) { return load32_at(rdram, 0x8013DD00u) + 0x1280u; }
 void save_blast_table(const std::uint8_t* rdram) {
@@ -731,9 +733,33 @@ extern "C" bool blockplanet_barrage_blast(std::uint8_t* rdram, recomp_context* c
         barrage_dropping = false;
         return true;
     }
+    if (kind == 0 && Clock::now() < barrage_wide_until) {  // the wide blast's second layer, as wide
+        barrage_wide_until = {};
+        static const int radius = [] { const char* v = std::getenv("BLOCKPLANET_BARRAGE_RADIUS"); return v ? std::atoi(v) : 7; }();
+        const std::uint32_t was = load32_at(rdram, std::uint32_t(ctx->r29) + 0x14u);
+        tetrisphere::guest::store32(rdram, std::uint32_t(ctx->r29) + 0x14u, std::uint32_t(radius));
+        std::fprintf(stdout, "{\"event\":\"barrage_wide_second\",\"radius\":%d,\"was\":%u}\n", radius, was);
+        std::fflush(stdout);
+        return false;
+    }
     if (kind != 2 || blockplanet::powerup_family() != 0 || blockplanet::powerup_level() != 3) return false;
     barrage_x = std::int16_t(ctx->r4), barrage_y = std::int16_t(ctx->r5), barrage_a2 = std::int16_t(ctx->r6);
     barrage_arg5 = load32_at(rdram, std::uint32_t(ctx->r29) + 0x14u);
+    // One big blast (the owner, 2026-11-23, after the three strikes ran into
+    // the game's limits): the game's own level 2 blast at the cursor, wider.
+    // Its radius is its sixth argument (the stack word at sp+0x14; the Bomb
+    // passes 6). The three missiles converge on it (barrage_scene.cpp).
+    static const bool strikes = std::getenv("BLOCKPLANET_BARRAGE_STRIKES") != nullptr;  // research: the three strikes
+    if (!strikes) {
+        static const int radius = [] { const char* v = std::getenv("BLOCKPLANET_BARRAGE_RADIUS"); return v ? std::atoi(v) : 7; }();
+        tetrisphere::guest::store32(rdram, std::uint32_t(ctx->r29) + 0x14u, std::uint32_t(radius));
+        barrage_wide_until = Clock::now() + std::chrono::seconds(3);  // its second blast (the next layer) as wide
+        tetrisphere::barrage::impact();
+        tetrisphere::barrage::clear_targets();
+        std::fprintf(stdout, "{\"event\":\"barrage_wide\",\"radius\":%d,\"was\":%u}\n", radius, barrage_arg5);
+        std::fflush(stdout);
+        return false;
+    }
     std::int16_t x, y;
     strike_offset(0, x, y);
     ctx->r4 = std::uint64_t(std::int64_t(x)), ctx->r5 = std::uint64_t(std::int64_t(y)), ctx->r7 = strike_kind;
@@ -878,6 +904,8 @@ extern "C" void blockplanet_blast_table_reset(std::uint8_t* rdram, recomp_contex
 }
 
 extern "C" void blockplanet_barrage_tick(std::uint8_t* rdram, recomp_context* ctx) {
+    if (static int wide_logged = 0; barrage_wide_until != Clock::time_point{} && wide_logged++ < 1)
+        std::fprintf(stdout, "{\"event\":\"barrage_breaking\",\"wide\":1,\"count\":%d}\n", breaking_count(rdram));
     if (barrage_keep_table)
         std::fprintf(stdout, "{\"event\":\"barrage_breaking\",\"after_strike\":0,\"count\":%d}\n", breaking_count(rdram));
     barrage_keep_table = false;  // (the strikes all went off in one call, before this frame's tick)
