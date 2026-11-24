@@ -1,0 +1,60 @@
+#!/bin/bash
+# Drives the game from a script while it runs (run.sh), for screenshots,
+# recordings and research. Usage: nav.sh <outdir> <script> [game args...]
+# Script lines:
+#   wait S            sleep S seconds
+#   rewin S           wait S, then pick up the game window again (after boot)
+#   key NAME          press a key (xdotool names: Return, Escape, F1, F2 ...)
+#   type TEXT         type text
+#   pad BUTTON        press a virtual controller button (south, east, west,
+#                     north, start, back, up, down, left, right, ...);
+#                     padd / padu: hold / release
+#   size W H          resize the window
+#   mouse X Y         move the mouse to (X, Y) in the game window
+#   click X Y         move there and press the left button; rclick: the right
+#   wheel up|down|left|right  turn the mouse wheel one step
+#   drag B X1 Y1 X2 Y2  hold mouse button B (1 left, 3 right) from one point to another
+#   mclick            press the middle button
+#   shot NAME         screenshot of the whole display -> NAME.png
+#   wshot NAME        screenshot of the game window -> NAME.png
+#   rec S             record the display for S seconds -> rec.mp4 (ffmpeg)
+#   poke LINE         write one line to the poke file (BLOCKPLANET_POKE_FILE):
+#                     "0xADDR:SIZE=VALUE" stores into guest memory,
+#                     "cmd:NAME" runs a menu command (e.g. cmd:chapter:1)
+#   pokefile PATH     copy a whole poke file
+# Run with: TETRISPHERE_QA_CONTROLLERS=<out>/data/qa.jsonl BLOCKPLANET_POKE_FILE=<out>/poke.txt
+# (and an empty qa.jsonl created first). F2 saves guest memory when
+# BLOCKPLANET_DUMP_DIR is set. Research switches: docs/research/*.md.
+here=$(cd "$(dirname "$0")" && pwd)
+out=$1; script=$2; shift 2; seq=0
+${BP_HARNESS:-/tmp/bp-harness}/run_gdb.sh 170 "$out" "$@" &
+sleep 4; export DISPLAY=:99
+win=$(xdotool search --name Tetrisphere | head -1)
+press() { seq=$((seq+1)); echo "{\"seq\":$seq,\"port\":0,\"button\":\"$1\",\"pressed\":$2}" >> "$out/data/qa.jsonl"; }
+while read -r cmd arg; do
+  case $cmd in
+    wait) sleep "$arg";;
+    rewin) sleep "$arg"; win=$(xdotool search --name Tetrisphere | tail -1);;
+    key) xdotool windowfocus --sync "$win" 2>/dev/null; xdotool keydown --window "$win" "$arg"; sleep 0.15; xdotool keyup --window "$win" "$arg";;
+    type) xdotool windowfocus --sync "$win" 2>/dev/null; xdotool type --window "$win" --delay 120 "$arg";;
+    size) xdotool windowsize "$win" $arg; sleep 1.5;;
+    mouse) xdotool mousemove --window "$win" $arg;;
+    click) xdotool mousemove --window "$win" $arg; sleep 0.2; xdotool click 1;;
+    rclick) xdotool mousemove --window "$win" $arg; sleep 0.2; xdotool click 3;;
+    wheel) case $arg in up) xdotool click 4;; down) xdotool click 5;; left) xdotool click 6;; right) xdotool click 7;; esac;;
+    drag) set -- $arg; xdotool mousemove --window "$win" "$2" "$3"; sleep 0.1; xdotool mousedown "$1"
+          for i in 1 2 3 4 5 6 7 8 9 10; do xdotool mousemove --window "$win" $(( $2 + ($4 - $2) * i / 10 )) $(( $3 + ($5 - $3) * i / 10 )); sleep 0.03; done
+          sleep 0.1; xdotool mouseup "$1";;
+    mclick) xdotool click 2;;
+    pad) press "$arg" true; sleep 0.15; press "$arg" false;;
+    padd) press "$arg" true;;
+    padu) press "$arg" false;;
+    poke) echo "$arg" > "$out/poke.txt.tmp" && mv "$out/poke.txt.tmp" "$out/poke.txt"; sleep 0.3;;
+    pokefile) cp "$arg" "$out/poke.txt.tmp" && mv "$out/poke.txt.tmp" "$out/poke.txt"; sleep 0.3;;
+    rec) (ffmpeg -loglevel error -y -f x11grab -framerate 30 -video_size 1280x960 -i :99 -t "$arg" "$out/rec.mp4" &);;
+    shot) import -window root "$out/$arg.png";;
+    wshot) import -window "$win" "$out/$arg.png";;
+  esac
+  echo "$(date +%s%3N) $cmd $arg" >> "$out/nav.log"
+done < "$script"
+pkill -INT -x tetrisphere-m1; wait
