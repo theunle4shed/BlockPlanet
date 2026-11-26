@@ -37,7 +37,10 @@ int flame_frame();
 // BlockPlanet's own model and icon.
 bool levels_on();
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source = 0, std::uint32_t* source = nullptr,
-             bool whole = false, int draw_kind = -1, double turn_degrees = 0.0);  // draw_kind: the model drawn, if not kind's
+             bool whole = false, int draw_kind = -1, double turn_degrees = 0.0, double roll_degrees = 0.0);
+// The roll about a model's own z (its barrel) that turns its -y (a handle) to
+// the screen's down, from the draw's matrices (degrees; 0 if none).
+double roll_handle_down(const std::uint8_t* rdram, std::uint32_t start);  // draw_kind: the model drawn, if not kind's
 
 // Whether the power-up drawn from `start` flies nose backwards (our models'
 // front is -z), from its movement since the last call; `restart` for a new

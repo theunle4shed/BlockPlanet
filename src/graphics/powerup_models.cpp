@@ -694,7 +694,7 @@ int flame_frame() {
 }
 
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole,
-             int draw_kind, double turn_degrees) {
+             int draw_kind, double turn_degrees, double roll_degrees) {
     if (draw_kind < 0) draw_kind = kind;
     if (rdram == nullptr || start < 0x80000000u || kind < 0 || kind > last_kind || draw_kind > last_kind || level < 1 || level > 3) return false;
     const std::uint32_t end = load32(rdram, display_list_pointer);
@@ -768,13 +768,19 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     // onto the game's matrix, calls the model and pops it (one per draw, in
     // a ring of slots so a frame still being drawn keeps its own).
     std::uint32_t call = list;
-    if (std::abs(turn_degrees) > 0.01) {
+    if (std::abs(turn_degrees) > 0.01 || std::abs(roll_degrees) > 0.01) {
         static std::uint32_t slot = 0;
         constexpr std::uint32_t turn_memory = 0x80770000u, slot_bytes = 0x60u, slots = 64u;
         const std::uint32_t at = turn_memory + (slot++ % slots) * slot_bytes;
         const double a = turn_degrees * 3.14159265358979 / 180.0, c = std::cos(a), sn = std::sin(a);
-        // Row vectors: x stays; y' = (0, c, s), z' = (0, -s, c).
-        const double m[4][4] = {{1, 0, 0, 0}, {0, c, sn, 0}, {0, -sn, c, 0}, {0, 0, 0, 1}};
+        const double b = roll_degrees * 3.14159265358979 / 180.0, cb = std::cos(b), sb = std::sin(b);
+        // Row vectors: the roll about the model's z first (x' = (cb, sb, 0),
+        // y' = (-sb, cb, 0)), then the turn about x (y' = (0, c, s), z' = (0, -s, c)).
+        const double rz[3][3] = {{cb, sb, 0}, {-sb, cb, 0}, {0, 0, 1}}, rx[3][3] = {{1, 0, 0}, {0, c, sn}, {0, -sn, c}};
+        double m[4][4] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 1}};
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                for (int k = 0; k < 3; ++k) m[i][j] += rz[i][k] * rx[k][j];
         const std::uint32_t mtx = at + 0x20u;
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j) {
@@ -843,6 +849,33 @@ double nose_towards_camera(const std::uint8_t* rdram, std::uint32_t start) {
     const double nose[3] = {-m[2][0], -m[2][1], -m[2][2]};
     const double l = std::sqrt(nose[0] * nose[0] + nose[1] * nose[1] + nose[2] * nose[2]);
     return l > 0 ? nose[2] / l : -2.0;
+}
+
+double roll_handle_down(const std::uint8_t* rdram, std::uint32_t start) {
+    const std::uint32_t end = load32(rdram, display_list_pointer);
+    if (end <= start || end - start > 0x10000u) return 0.0;
+    Mat m{};
+    for (int i = 0; i < 4; ++i) m[i][i] = 1;
+    bool any = false;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+        if ((w0 >> 24) == 0x04u) break;
+        if ((w0 >> 24) != 0x01u) continue;
+        const std::uint32_t params = (w0 >> 16) & 0xFFu;
+        if (params & 1u) continue;
+        const Mat t = read_matrix(rdram, w1);
+        m = (params & 2u) ? t : multiply(t, m);
+        any = true;
+    }
+    if (!any) return 0.0;
+    // The screen's down (eye -y) in the model's x and y (its rows are the
+    // model's axes in eye space); the roll that turns the handle (model -y) to it.
+    const double lx = std::sqrt(m[0][0] * m[0][0] + m[0][1] * m[0][1] + m[0][2] * m[0][2]);
+    const double ly = std::sqrt(m[1][0] * m[1][0] + m[1][1] * m[1][1] + m[1][2] * m[1][2]);
+    if (lx <= 0 || ly <= 0) return 0.0;
+    const double dx = -m[0][1] / lx, dy = -m[1][1] / ly;
+    if (std::abs(dx) + std::abs(dy) < 1e-3) return 0.0;  // looking straight along the barrel
+    return std::atan2(dy, dx) * 180.0 / 3.14159265358979 + 90.0;
 }
 
 bool nose_backwards(const std::uint8_t* rdram, std::uint32_t start, bool restart) {

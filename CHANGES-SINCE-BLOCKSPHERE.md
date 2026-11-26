@@ -866,3 +866,8 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 ## 2026-11-26: The magnet's curve is one smooth tube
 
 - The owner: the magnet's U looked like several tubes with bumps. It was a chain of short straight tubes, each with its own end caps, its own twist and six sides (the arms ten). Curved parts (`chain()` in `src/graphics/powerup_models.cpp`) are now one tube swept along the path: a ring at each point square to the path, the frame carried along so it does not twist, rings joined to the next, caps only at the ends. The magnet's U has sixteen steps, ten sides and no caps, square to the arms at both ends, so it meets them seamlessly; the magnet's claws (level 3) and the fuses are smoother too. Checked in a recording of the Magnet in flight.
+
+## 2026-11-26: The Ray Gun's handle stays down
+
+- The owner asked whether the original's gun spun round its body. It does: the game spins its Ray Gun about the barrel as it flies (a green bulb with gold fins, the same all round, so the spin does not show); ours has a handle, which swung round with it. Now each frame the screen's down is worked out from the draw's matrices and our model is rolled about its barrel so the handle (its -y) points that way, as if held (`roll_handle_down`, a roll added to `replace()` beside the turn the Bomb uses). Checked in a recording: the handle points down in every frame while the game flies and aims the gun.
+- Looked at for the owner's next request: the original's electric effect is flat pictures, a jagged white bolt from the muzzle to the target, white swirl rings round the muzzle, and a burst where it hits. To replace with a flickering 3D bolt (as the missile's flame): roadmap.

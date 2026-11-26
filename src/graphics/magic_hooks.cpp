@@ -571,7 +571,10 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                 done = tetrisphere::powerup_models::hide(rdram, model3d_start);
             else
                 done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen, false,
-                                                            draw_kind, turn);
+                                                            draw_kind, turn,
+                                                            // The Ray Gun's handle kept pointing down, as if held (the
+                                                            // owner, 2026-11-26: the game spins its gun about the barrel).
+                                                            model3d_kind == 5 ? tetrisphere::powerup_models::roll_handle_down(rdram, model3d_start) : 0.0);
             // Dynamite splits into five sticks, each its own model of one
             // vertex load of 32 (2026-11-22): each drawn as one of ours.
             // The Bomb's second model (our Missile at levels 2 and 3, about
