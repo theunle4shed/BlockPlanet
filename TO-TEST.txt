@@ -1,11 +1,3 @@
-  To check in this version (2026-11-26), with 2 (the power-up test):
-   - Bomb (number pad 5): it now always flies nose first, turning
-     smoothly. Does it still flip anywhere?
-   - Atom (number pad 4): where it lands, the soft double pulse is now
-     two crisp rings, and the ring of orbs is small glowing balls.
-     Are they right? Too bright, too thick?
-   - The ring as a power-up sets off is now a crisp ring too.
-   - Atom glitch (old bricks flash up for one frame after the orbs):
-     not seen on the test machine. Does it happen every time? And with
-     1 (Play, the game's own models)? A clip of each helps.
-  Already checked by you: Firecracker rings, Magnet buzz, Dynamite bundle.
+  What to check in this build is on the Test Sheet in Claude:
+  https://claude.ai/artifact/UqxLJcTRRByJqrzpc4Wuwx
+  Answer there (Looks good / Problem / Didn't check, plus notes).

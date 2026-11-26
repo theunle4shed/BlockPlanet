@@ -897,3 +897,7 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 
 - The owner (their recording, frames 164 to 165): the Bomb flipped upside down between two frames as it came in. Logged: the game swings its model's nose round to the camera in about half a second, and the half turn ours made to dive nose first (2026-11-22) added to it. Now our Bomb ignores the game's turn: each frame its nose is pointed the way it has been moving (from the draw's own place matrix, frame to frame, smoothed), so it leads with the nose and turns gradually (`aim_along_path()` in `src/graphics/powerup_models.cpp`, used for the Bomb's flight in `magic_hooks.cpp` in place of the roll). Checked in a recording: nose first throughout, no flip.
 - The launch puff (the ring the game shows as a power-up sets off, now 3D) one stage thinner: it read as a heavy white hoop.
+
+## 2026-11-26: The Test Sheet in Claude
+
+- The owner couldn't see the launcher's list while the game ran. What to check in each build is now a page in Claude they can answer as they play (Looks good / Problem / Didn't check, and notes), saved for Claude to read; Claude updates the checks with each new version. `TO-TEST.txt` (shown by BlockPlanet.bat) now points to it. How it works: docs/HANDOVER-2026-11-24.md.
