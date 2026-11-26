@@ -40,6 +40,7 @@
 #include "tetrisphere/minefield_sphere.h"
 #include "tetrisphere/sphere_mesh.h"
 #include "tetrisphere/sphere_quadrants.h"
+#include "tetrisphere/powerup_models.h"
 
 #include <algorithm>
 #include <array>
@@ -733,9 +734,10 @@ void record_gfx_task(const std::uint8_t* rdram) {
 // Registers with the runtime when the statistics are turned on.
 [[maybe_unused]] const bool stats_registered = [] {
     if (stats.enabled) tetrisphere::set_gfx_task_observer(record_gfx_task);
-    else if (tetrisphere::dl_research::enabled() || tetrisphere::core_bowl::enabled())
+    else if (tetrisphere::dl_research::enabled() || tetrisphere::core_bowl::enabled() || tetrisphere::powerup_models::frame_effects_on())
         tetrisphere::set_gfx_task_observer([](const std::uint8_t* rdram) {
             if (tetrisphere::core_bowl::enabled()) tetrisphere::core_bowl::observe(rdram);
+            if (tetrisphere::powerup_models::frame_effects_on()) tetrisphere::powerup_models::frame_effects(const_cast<std::uint8_t*>(rdram));
             if (tetrisphere::dl_research::enabled()) tetrisphere::dl_research::observe(rdram);
         });
     return stats.enabled;

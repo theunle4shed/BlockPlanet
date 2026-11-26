@@ -36,6 +36,12 @@ echo   3  Get the latest changes and rebuild
 if not "%CURRENT%"=="%MAIN%" echo   5  Back to the main build
 echo   6  Quit
 echo.
+rem What to check in this version (the owner, 2026-11-26): TO-TEST.txt,
+rem updated by Claude with each new version.
+if exist TO-TEST.txt (
+  type TO-TEST.txt
+  echo.
+)
 set CHOICE=
 set /p CHOICE=Choose 1, 2, 3 or 6: 
 if "%CHOICE%"=="1" goto play

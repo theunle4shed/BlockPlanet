@@ -30,7 +30,9 @@ constexpr int electron_kind = 10;
 constexpr int smoke_ring_kind = 11;
 // Kind 12: the Magnet's sparks (replace() draws them after it, buzzing).
 constexpr int magnet_sparks_kind = 12;
-constexpr int last_kind = 12;
+// Kind 13: one of the Atom's orbs (frame_effects()).
+constexpr int effect_orb_kind = 13;
+constexpr int last_kind = 13;
 // The display list of BlockPlanet's model of `kind` at `level` (built into
 // model memory when first asked for), or 0.
 // `phase`: a missile's flame, -1 none, 0 to 3 a frame of its flicker (flame_frame()).
@@ -57,5 +59,10 @@ bool nose_backwards(const std::uint8_t* rdram, std::uint32_t start, bool restart
 double nose_towards_camera(const std::uint8_t* rdram, std::uint32_t start);
 // The game's geometry in the draw from `start` blanked (nothing drawn).
 bool hide(std::uint8_t* rdram, std::uint32_t start);
+
+// Each frame, just before it is sent (the graphics task observer): the game's
+// flat effect pictures the power-ups give off, drawn again in 3D.
+bool frame_effects_on();
+void frame_effects(std::uint8_t* rdram);
 
 }  // namespace tetrisphere::powerup_models

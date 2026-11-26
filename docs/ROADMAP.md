@@ -590,7 +590,7 @@ On the title (the box art), in full screen on a very wide display (about 32:9), 
 
 **The Firecracker's smoke rings (the owner, 2026-11-26).** Done 2026-11-26: the game's flat rings hidden, our own 3D rings left at the rocket's tail (CHANGES-SINCE-BLOCKSPHERE.md).
 
-**The Atom's pulse and orbs (the owner, 2026-11-26; their clip 2_Atom: the first circle at frame 4, the double circles at 65, the orbs from the sphere's back at 70, out until 91, then back in).** As it lands, the Atom gives off two soft circles (flat, blurred pictures) and then a ring of small white orbs round the sphere, which fall back into it. Wanted: both redrawn, as vectors or 3D, to match the models. How: find their textures in the draws after use (as the smoke rings), hide them, draw rings of light and our own orbs in their places.
+**The Atom's pulse and orbs (the owner, 2026-11-26; their clip 2_Atom).** Done 2026-11-26: its launch ring, pulse and orbs drawn in 3D (CHANGES-SINCE-BLOCKSPHERE.md).
 
 **A glitch after the Atom (the owner, 2026-11-26; their clip 2_Atom, frame 126).** Right after the white orbs fall back in, something is drawn under the sphere's first layer, or the sphere's far side shows: to look at in their recording, then on the test machine.
 

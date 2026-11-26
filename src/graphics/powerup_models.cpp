@@ -19,6 +19,8 @@
 #include <chrono>
 #include <array>
 #include <cmath>
+#include <map>
+#include <string>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -348,6 +350,12 @@ std::vector<Part> atom(int level) {
     for (int o = 0; o < atom_orbits(level); ++o) ring(orbits, atom_ring(o, level), atom_orbit, 60.0f, 20, 3);
     return {nucleus, orbits};
 }
+// One of the Atom's orbs (frame_effects()): a small white ball, glowing.
+std::vector<Part> effect_orb() {
+    Part glow{smoke, {}};
+    ball(glow, Place{}, 180.0f, 3, 6);
+    return {glow};
+}
 std::vector<Part> atom_electron() {
     Part electrons{electron, {}};
     ball(electrons, Place{}, 180.0f, 3, 6);
@@ -556,6 +564,7 @@ std::vector<Part> model(int kind, int level) {
         case electron_kind: return atom_electron();
     case smoke_ring_kind: return smoke_ring();
     case magnet_sparks_kind: return magnet_sparks();
+    case effect_orb_kind: return effect_orb();
         default: break;
         }
     // With the levels (research): the game's six shown as the four, the
@@ -569,6 +578,7 @@ std::vector<Part> model(int kind, int level) {
     case electron_kind: return atom_electron();
     case smoke_ring_kind: return smoke_ring();
     case magnet_sparks_kind: return magnet_sparks();
+    case effect_orb_kind: return effect_orb();
     case dive_kind: return placed(missile_family(level), turned(180, 0, 0), 1.0f);
     case barrage_missile_kind: return placed(missile(900.0f, trim(3, red)), Place{}, 1.0f);
     case empty_launcher_kind: return launcher(false);
@@ -1144,6 +1154,127 @@ bool hide(std::uint8_t* rdram, std::uint32_t start) {
         if (op == 0x04u || op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, a, 0), store32(rdram, a + 4u, 0), any = true;
     }
     return any;
+}
+
+
+// ---- The power-ups' effects in 3D, each frame --------------------------------
+//
+// The Atom gives off flat pictures (the owner, 2026-11-26: make them vectors or
+// 3D): a soft ring round it as it sets off, a double ring (a pulse) where it
+// lands, and a ring of small orbs that push out round the sphere and fall back.
+// Each is a load of four vertices in the frame's list (found 2026-11-26 with
+// BLOCKPLANET_EFFECT_LOG=1): the rings one square of 1,700 (corners at ±850 on
+// x and z) that the game scales, the launch ring lilac (primitive colour
+// C0AFFF), the pulse pink (FFB1FF), both fading by the primitive's alpha; the
+// orbs squares of 128, white (vertex colour FFFFFF80) under primitive colour
+// 008899FF. Just before the frame is sent each is replaced by a 3D one in its
+// place, at its size, through its own matrix: so they move and fade as the
+// game's: a crisp ring (two for the pulse) thinner as it fades, a small
+// glowing ball for each orb.
+bool frame_effects_on() {
+    static const bool on = std::getenv("BLOCKPLANET_MODELS3D") != nullptr;
+    return on;
+}
+
+void frame_effects(std::uint8_t* rdram) {
+    const std::uint32_t start = load32(rdram, 0x800F22B8u), end = load32(rdram, display_list_pointer);
+    if ((start & 0xFF000000u) != 0x80000000u || end <= start || end - start > 0x80000u) return;
+    static const bool log = std::getenv("BLOCKPLANET_EFFECT_LOG") != nullptr;
+    // Our calls and matrices: two frames' worth (the last may still be read),
+    // in the title scenes' memory (unused in play).
+    static int frame = 0;
+    constexpr std::uint32_t effect_memory = 0x80780000u, effect_bytes = 0x8000u;
+    const std::uint32_t base = effect_memory + std::uint32_t(frame++ & 1) * effect_bytes;
+    std::uint32_t used = base;
+    std::uint32_t prim = 0;
+    int replaced = 0;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u), op = w0 >> 24;
+        if (op == 0xFAu) prim = w1;
+        if (op != 0x04u || ((w0 >> 20) & 0xFu) + 1u != 4u || w1 < 0x80000000u || w1 >= 0x80800000u) continue;
+        double v[4][3];
+        for (std::uint32_t i = 0; i < 4; ++i)
+            for (std::uint32_t c = 0; c < 3; ++c) v[i][c] = load16(rdram, w1 + 16u * i + 2u * c);
+        const std::uint32_t shade = load32(rdram, w1 + 12u);
+        // Which effect, by its square and colours.
+        bool ring_square = true;
+        for (int i = 0; i < 4 && ring_square; ++i)
+            ring_square = v[i][1] == 0 && std::abs(std::abs(v[i][0]) - 850) <= 2 && std::abs(std::abs(v[i][2]) - 850) <= 2;
+        const std::uint32_t rgb = prim >> 8;
+        enum { none, launch, pulse, orb } what = none;
+        if (ring_square && rgb == 0xC0AFFFu) what = launch;
+        else if (ring_square && rgb == 0xFFB1FFu) what = pulse;
+        else if (prim == 0x008899FFu && (shade >> 8) == 0xFFFFFFu) {
+            // (Any square up to 300 across: the orbs' alpha may change.)
+            const double side = std::abs(v[1][0] - v[0][0]) + std::abs(v[1][1] - v[0][1]) + std::abs(v[1][2] - v[0][2]);
+            if (side > 0 && side <= 300) what = orb;
+        }
+        if (what == none) continue;
+        if (used + 3u * 88u + 16u > base + effect_bytes) break;
+        // Its middle, size and facing.
+        double c[3] = {}, h = 0;
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 3; ++j) c[j] += v[i][j] / 4.0;
+        for (int i = 0; i < 4; ++i)
+            h = std::max(h, std::sqrt((v[i][0] - c[0]) * (v[i][0] - c[0]) + (v[i][1] - c[1]) * (v[i][1] - c[1]) + (v[i][2] - c[2]) * (v[i][2] - c[2])) / std::sqrt(2.0));
+        const double e1[3] = {v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]}, e2[3] = {v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]};
+        double n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};
+        double nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        if (nl <= 0 || h <= 0) continue;
+        for (double& x : n) x /= nl;
+        double x[3] = {n[1], -n[0], 0};
+        if (std::abs(n[2]) > 0.9) x[0] = 0, x[1] = n[2], x[2] = -n[1];
+        const double xl = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+        for (double& q : x) q /= xl;
+        const double y[3] = {n[1] * x[2] - n[2] * x[1], n[2] * x[0] - n[0] * x[2], n[0] * x[1] - n[1] * x[0]};
+        // The parts: (model, its size against the square's half width).
+        const int alpha = int(prim & 0xFFu);
+        // (The pulse grows wide: its rings two stages thinner, so they stay fine lines.)
+        const int faded = alpha >= 0xA0 ? 0 : alpha >= 0x70 ? 1 : alpha >= 0x40 ? 2 : 3;
+        const int stage = what == orb ? -1 : what == pulse ? std::min(3, faded + 2) : faded;
+        std::pair<std::uint32_t, double> parts[2] = {};
+        int count = 0;
+        const std::uint32_t light = 0x5A33C500u;
+        if (what == orb) parts[count++] = {model_list(rdram, effect_orb_kind, 1, light, -1), 0.5 * h / 180.0};
+        else {
+            const std::uint32_t ring_list = model_list(rdram, smoke_ring_kind, 1, light, stage);
+            parts[count++] = {ring_list, (what == pulse ? 0.85 : 0.8) * h / 1000.0};
+            if (what == pulse) parts[count++] = {ring_list, 0.55 * h / 1000.0};
+        }
+        // The square's load becomes calls to ours, each through a matrix
+        // multiplied onto the game's and popped; its triangles blanked.
+        const std::uint32_t list_at = used;
+        std::uint32_t cmd = used, mtx = used + 8u * std::uint32_t(3 * count + 1);
+        for (int p = 0; p < count; ++p) {
+            if (parts[p].first == 0) continue;
+            const double sc = parts[p].second;
+            const double m[4][4] = {{x[0] * sc, x[1] * sc, x[2] * sc, 0}, {y[0] * sc, y[1] * sc, y[2] * sc, 0}, {n[0] * sc, n[1] * sc, n[2] * sc, 0}, {c[0], c[1], c[2], 1}};
+            for (int r = 0; r < 4; ++r)
+                for (int q = 0; q < 4; ++q) {
+                    const std::int32_t fixed = std::int32_t(std::lround(m[r][q] * 65536.0));
+                    const std::uint32_t k = std::uint32_t(r * 4 + q);
+                    store16(rdram, mtx + 2u * k, std::uint16_t(fixed >> 16));
+                    store16(rdram, mtx + 32u + 2u * k, std::uint16_t(fixed & 0xFFFF));
+                }
+            store32(rdram, cmd, 0x01040040u), store32(rdram, cmd + 4u, mtx);  // G_MTX: modelview, multiply, push
+            store32(rdram, cmd + 8u, 0x06000000u), store32(rdram, cmd + 12u, parts[p].first);
+            store32(rdram, cmd + 16u, 0xBD000000u), store32(rdram, cmd + 20u, 0);  // G_POPMTX
+            cmd += 24u, mtx += 64u;
+        }
+        store32(rdram, cmd, 0xB8000000u), store32(rdram, cmd + 4u, 0);
+        used = mtx;
+        store32(rdram, a, 0x06000000u), store32(rdram, a + 4u, list_at);
+        for (std::uint32_t b = a + 8u; b < end; b += 8u) {
+            const std::uint32_t o = load32(rdram, b) >> 24;
+            if (o == 0x04u || o == 0x06u || o == 0xB8u || o == 0x01u) break;
+            if (o == 0xBFu || o == 0xB1u || o == 0xB5u) store32(rdram, b, 0), store32(rdram, b + 4u, 0);
+        }
+        ++replaced;
+    }
+    if (log && replaced > 0) {
+        std::fprintf(stdout, "{\"event\":\"effects_3d\",\"replaced\":%d,\"bytes\":%u}\n", replaced, used - base);
+        std::fflush(stdout);
+    }
 }
 
 }  // namespace tetrisphere::powerup_models
