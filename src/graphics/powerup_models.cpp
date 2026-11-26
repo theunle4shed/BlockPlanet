@@ -221,7 +221,7 @@ std::vector<Part> merged(std::vector<Part> a, const std::vector<Part>& b) {
 // The colours (the flat icons', tools/art/powerups.py).
 constexpr std::uint32_t purple = 0x8A3DF0, lilac = 0xC9A2FF, orange = 0xF28A2E, fuse_tan = 0xF3DC9C, red = 0xD93636, bright_red = 0xEF4A4A,
                         gold = 0xF2C53D, pink_tip = 0xF0D0F0, ring_green = 0x2FCF4A, atom_purple = 0xA24BFF, orbit = 0xB78CFF, electron = 0xFFD23F,
-                        white = 0xF4F1EA, flame = 0xFF8A1F, flame_core = 0xFFF07A, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF;
+                        white = 0xF4F1EA, flame = 0xFF8A1F, flame_core = 0xFFF07A, smoke = 0xE9E0FA, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF;
 
 // The level's trim (the owner, 2026-11-21: one rule for levelling up): each
 // power-up's trim (stripes, band, tips, orbits, rings) is its own colour at
@@ -313,7 +313,7 @@ std::vector<Part> magnet(int level) {
     Part base{ring_green, {}};
     if (level == 1) {
         ring(base, place_at(V3{0, 0, 1350}), 950.0f, 180.0f);
-        return merged(horseshoe(1.0f, pink_tip, true), {base});
+        return merged(horseshoe(1.0f, pink_tip, false), {base});  // (its sparks drawn by replace(), buzzing: magnet_sparks)
     }
     if (level == 2) {
         ring(base, place_at(V3{0, 0, 1350}), 1500.0f, 200.0f);
@@ -360,6 +360,36 @@ std::vector<Part> atom_electron() {
 // none (held in the Magic box, strapped in the launcher, or level 1, whose
 // fire is the game's), 0 to 3 a frame of the flicker, each its own model.
 int flame_phase = -1;
+// The Magnet's sparks, beside each claw (the owner, 2026-11-26: make them buzz
+// like electricity): a zigzag of six points, a different one at each phase
+// (0 to 3), so they flicker as the flame does; replace() calls them after the
+// magnet, through its matrix.
+std::vector<Part> magnet_sparks() {
+    static const float jitter[4][6] = {{0.0f, 1.0f, -0.6f, 0.9f, -1.0f, 0.4f},
+                                       {0.3f, -0.8f, 1.0f, -0.5f, 0.7f, -0.9f},
+                                       {-0.4f, 0.6f, -1.0f, 1.0f, -0.3f, 0.8f},
+                                       {0.8f, -1.0f, 0.5f, -0.7f, 1.0f, -0.2f}};
+    const int ph = std::clamp(flame_phase, 0, 3);
+    Part sparks{spark_blue, {}};
+    for (int side = -1; side <= 1; side += 2) {
+        std::vector<V3> zig;
+        for (int i = 0; i < 6; ++i) {
+            const float out = 1450.0f + 250.0f * jitter[ph][i] * (i % 2 ? 1.0f : -1.0f);
+            zig.push_back(V3{side * out, 120.0f * jitter[(ph + 1) % 4][i], -2000.0f + 230.0f * float(i)});
+        }
+        chain(sparks, zig, ph % 2 ? 45.0f : 60.0f, 4);
+    }
+    return {sparks};
+}
+// One of the Firecracker's smoke rings (replace() leaves them behind it): a
+// ring 1,000 across its middle, square to z, thinner at each stage of its life
+// (the flame's phase, 0 to 3).
+std::vector<Part> smoke_ring() {
+    static const float thick[4] = {110.0f, 80.0f, 55.0f, 30.0f};
+    Part puff{smoke, {}};
+    ring(puff, Place{}, 1000.0f, thick[std::clamp(flame_phase, 0, 3)], 20, 4);
+    return {puff};
+}
 std::vector<Part> missile(float flame_len, std::uint32_t band_colour = red) {
     Part body{white, {}}, reds{red, {}}, band{band_colour, {}}, fire{flame, {}}, core{flame_core, {}};
     tube(body, 1100.0f, -2400.0f, 700.0f);
@@ -524,6 +554,8 @@ std::vector<Part> model(int kind, int level) {
         case 4: return bomb(1);
         case 5: return raygun(1);
         case electron_kind: return atom_electron();
+    case smoke_ring_kind: return smoke_ring();
+    case magnet_sparks_kind: return magnet_sparks();
         default: break;
         }
     // With the levels (research): the game's six shown as the four, the
@@ -535,6 +567,8 @@ std::vector<Part> model(int kind, int level) {
     case 3: return atom_family(level);
     case stick_kind: return dynamite_stick(level);
     case electron_kind: return atom_electron();
+    case smoke_ring_kind: return smoke_ring();
+    case magnet_sparks_kind: return magnet_sparks();
     case dive_kind: return placed(missile_family(level), turned(180, 0, 0), 1.0f);
     case barrage_missile_kind: return placed(missile(900.0f, trim(3, red)), Place{}, 1.0f);
     case empty_launcher_kind: return launcher(false);
@@ -643,7 +677,7 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
     for (const auto& part : parts) {
         // (0.45 left the models dim in the effect.) A missile's flame glows:
         // its colour in full, whatever the light.
-        const bool glowing = part.rgb == flame || part.rgb == flame_core;
+        const bool glowing = part.rgb == flame || part.rgb == flame_core || part.rgb == smoke || part.rgb == spark_blue;
         lights(part.rgb, glowing ? 1.0f : 0.65f);
         draw(part, 0.0f);
     }
@@ -704,6 +738,10 @@ int flame_frame() {
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     return int((ms / 70) % 4);
 }
+
+namespace {
+std::uint32_t smoke_rings(std::uint8_t* rdram, std::uint32_t start, std::uint32_t call, std::uint32_t light_dir);
+}  // namespace
 
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole,
              int draw_kind, double turn_degrees, double roll_degrees) {
@@ -807,6 +845,36 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
         store32(rdram, at + 24u, 0xB8000000u), store32(rdram, at + 28u, 0);  // end
         call = at;
     }
+    // The Magnet's sparks, buzzing (a new zigzag every 70 ms), after it.
+    if (draw_kind == 2 && (!levels_on() || level == 1)) {
+        const std::uint32_t sparks = model_list(rdram, magnet_sparks_kind, 1, light_dir, flame_frame());
+        if (sparks != 0) {
+            static std::uint32_t slot = 0;
+            constexpr std::uint32_t spark_memory = 0x80779000u, slot_bytes = 0x20u, slots = 32u;
+            const std::uint32_t at = spark_memory + (slot++ % slots) * slot_bytes;
+            store32(rdram, at, 0x06000000u), store32(rdram, at + 4u, call);
+            store32(rdram, at + 8u, 0x06000000u), store32(rdram, at + 12u, sparks);
+            store32(rdram, at + 16u, 0xB8000000u), store32(rdram, at + 20u, 0);
+            call = at;
+        }
+    }
+    // The Firecracker in flight: the game's smoke rings (flat pictures, each a
+    // load of four vertices after the rocket, its flame fifteen) hidden, and
+    // ours left behind it (the owner, 2026-11-26).
+    if (draw_kind == 0 && !held && !whole) {
+        for (std::uint32_t a = start; a < end; a += 8u) {
+            const std::uint32_t w0 = load32(rdram, a);
+            if ((w0 >> 24) != 0x04u || ((w0 >> 20) & 0xFu) + 1u != 4u) continue;
+            if (std::find(body_loads.begin(), body_loads.end(), a) != body_loads.end()) continue;
+            store32(rdram, a, 0), store32(rdram, a + 4u, 0);
+            for (std::uint32_t b = a + 8u; b < end; b += 8u) {
+                const std::uint32_t op = load32(rdram, b) >> 24;
+                if (op == 0x04u || op == 0x06u || op == 0xB8u || op == 0x01u) break;
+                if (op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, b, 0), store32(rdram, b + 4u, 0);
+            }
+        }
+        if (const std::uint32_t with_rings = smoke_rings(rdram, start, call, light_dir)) call = with_rings;
+    }
     // The Atom: one electron on each ring, going round it (the owner,
     // 2026-11-26), each a call to the electron through a matrix that moves it
     // to its place this frame (in a ring of slots, as the turn above).
@@ -876,6 +944,101 @@ Mat multiply(const Mat& a, const Mat& b) {
         for (int j = 0; j < 4; ++j)
             for (int k = 0; k < 4; ++k) r[i][j] += a[i][k] * b[k][j];
     return r;
+}
+
+// The Firecracker's smoke rings (the owner, 2026-11-26: the game's came a
+// frame or two after the rocket had passed and always faced the camera). One
+// is left at the rocket's tail as it moves on, square to the rocket, fixed in
+// the world; each grows to 1.8 times its size and thins over 0.9 s.
+// The draw's matrices give the camera (the last load) and the rocket's place
+// (the multiplies after it); each ring is drawn through its own place times
+// the camera, loaded and popped, after the rocket. Returns a list calling
+// `call` and then the rings, or 0.
+std::uint32_t smoke_rings(std::uint8_t* rdram, std::uint32_t start, std::uint32_t call, std::uint32_t light_dir) {
+    const std::uint32_t end = load32(rdram, display_list_pointer);
+    Mat view{}, place{};
+    for (int i = 0; i < 4; ++i) view[i][i] = place[i][i] = 1;
+    bool have_view = false;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+        if ((w0 >> 24) == 0x04u || (w0 >> 24) == 0x06u) break;
+        if ((w0 >> 24) != 0x01u) continue;
+        const std::uint32_t params = (w0 >> 16) & 0xFFu;
+        if (params & 1u) continue;  // projection
+        const Mat t = read_matrix(rdram, w1);
+        if (params & 2u) {
+            view = t, have_view = true;
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j) place[i][j] = i == j;
+        } else {
+            place = multiply(t, place);
+        }
+    }
+    if (!have_view) return 0;
+    struct Ring { double at[3], n[3], size; std::chrono::steady_clock::time_point born; };
+    static std::vector<Ring> rings;
+    static std::chrono::steady_clock::time_point last_drawn{}, last_left{};
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last_drawn > std::chrono::milliseconds(500)) rings.clear(), last_left = {};  // a new flight
+    last_drawn = now;
+    constexpr double life = 0.9;
+    rings.erase(std::remove_if(rings.begin(), rings.end(),
+                               [&](const Ring& r) { return std::chrono::duration<double>(now - r.born).count() > life; }),
+                rings.end());
+    // The rocket's tail (z +300, between its body and fuse) and its axis.
+    const double tail[4] = {0, 0, 300, 1};
+    double at[3] = {}, n[3] = {place[2][0], place[2][1], place[2][2]};
+    for (int j = 0; j < 3; ++j)
+        for (int k = 0; k < 4; ++k) at[j] += tail[k] * place[k][j];
+    const double scale = std::sqrt(place[0][0] * place[0][0] + place[0][1] * place[0][1] + place[0][2] * place[0][2]);
+    const double nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+    if (nl <= 0 || scale <= 0) return 0;
+    for (double& c : n) c /= nl;
+    // A new ring once the rocket has moved on a ring's width from the last
+    // (as it sets off it hangs near the camera: rings piled up there, huge).
+    static double last_at[3] = {};
+    const double moved = std::sqrt((at[0] - last_at[0]) * (at[0] - last_at[0]) + (at[1] - last_at[1]) * (at[1] - last_at[1]) +
+                                   (at[2] - last_at[2]) * (at[2] - last_at[2]));
+    const bool first = last_left == std::chrono::steady_clock::time_point{};
+    if (rings.size() < 16 && now - last_left >= std::chrono::milliseconds(60) && (first || moved >= scale * 1600.0)) {
+        rings.push_back(Ring{{at[0], at[1], at[2]}, {n[0], n[1], n[2]}, scale * 0.75, now});
+        last_left = now, last_at[0] = at[0], last_at[1] = at[1], last_at[2] = at[2];
+    }
+    static std::uint32_t slot = 0;
+    constexpr std::uint32_t ring_memory_at = 0x80776000u, slot_bytes = 0x600u, slots = 8u;
+    const std::uint32_t at_list = ring_memory_at + (slot++ % slots) * slot_bytes;
+    std::uint32_t cmd = at_list, mtx = at_list + 0x200u;
+    store32(rdram, cmd, 0x06000000u), store32(rdram, cmd + 4u, call), cmd += 8u;
+    for (const Ring& r : rings) {
+        const double age = std::chrono::duration<double>(now - r.born).count() / life;
+        const std::uint32_t list = model_list(rdram, smoke_ring_kind, 1, light_dir, std::min(3, int(age * 4.0)));
+        if (list == 0) continue;
+        // Square to the rocket: the ring's z along its axis.
+        const double* z = r.n;
+        double x[3] = {z[1], -z[0], 0};
+        if (std::abs(z[2]) > 0.9) x[0] = 0, x[1] = z[2], x[2] = -z[1];
+        const double xl = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+        for (double& c : x) c /= xl;
+        const double y[3] = {z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]};
+        const double s = r.size * (1.0 + 0.8 * age);
+        Mat ring_place{};
+        for (int j = 0; j < 3; ++j) ring_place[0][j] = x[j] * s, ring_place[1][j] = y[j] * s, ring_place[2][j] = z[j] * s, ring_place[3][j] = r.at[j];
+        ring_place[3][3] = 1;
+        const Mat m = multiply(ring_place, view);
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j) {
+                const std::int32_t fixed = std::int32_t(std::lround(std::clamp(m[i][j], -32767.0, 32767.0) * 65536.0));
+                const std::uint32_t k = std::uint32_t(i * 4 + j);
+                store16(rdram, mtx + 2u * k, std::uint16_t(fixed >> 16));
+                store16(rdram, mtx + 32u + 2u * k, std::uint16_t(fixed & 0xFFFF));
+            }
+        store32(rdram, cmd, 0x01060040u), store32(rdram, cmd + 4u, mtx);  // G_MTX: modelview, load, push
+        store32(rdram, cmd + 8u, 0x06000000u), store32(rdram, cmd + 12u, list);
+        store32(rdram, cmd + 16u, 0xBD000000u), store32(rdram, cmd + 20u, 0);  // G_POPMTX
+        cmd += 24u, mtx += 64u;
+    }
+    store32(rdram, cmd, 0xB8000000u), store32(rdram, cmd + 4u, 0);
+    return at_list;
 }
 }  // namespace
 

@@ -26,7 +26,11 @@ constexpr int empty_launcher_kind = 9;
 constexpr float launcher_missile_radius = 820.0f;
 // Kind 10: one of the Atom's electrons (replace() moves each round its ring).
 constexpr int electron_kind = 10;
-constexpr int last_kind = 10;
+// Kind 11: one of the Firecracker's smoke rings (replace() leaves them behind it).
+constexpr int smoke_ring_kind = 11;
+// Kind 12: the Magnet's sparks (replace() draws them after it, buzzing).
+constexpr int magnet_sparks_kind = 12;
+constexpr int last_kind = 12;
 // The display list of BlockPlanet's model of `kind` at `level` (built into
 // model memory when first asked for), or 0.
 // `phase`: a missile's flame, -1 none, 0 to 3 a frame of its flicker (flame_frame()).
