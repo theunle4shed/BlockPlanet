@@ -32,7 +32,9 @@ constexpr int smoke_ring_kind = 11;
 constexpr int magnet_sparks_kind = 12;
 // Kind 13: one of the Atom's orbs (frame_effects()).
 constexpr int effect_orb_kind = 13;
-constexpr int last_kind = 13;
+// Kind 14: the blasts' starburst (replace_blast()).
+constexpr int blast_star_kind = 14;
+constexpr int last_kind = 14;
 // The display list of BlockPlanet's model of `kind` at `level` (built into
 // model memory when first asked for), or 0.
 // `phase`: a missile's flame, -1 none, 0 to 3 a frame of its flicker (flame_frame()).
@@ -66,6 +68,9 @@ bool hide(std::uint8_t* rdram, std::uint32_t start);
 // draw has been moving (from its matrices frame to frame, smoothed); `restart`
 // at a new flight. Until it has moved, the game's own way.
 void aim_along_path(const std::uint8_t* rdram, std::uint32_t start, bool restart);
+// A blast the game draws after use (`which` 0: its starburst, 1: the rings at
+// its centre) drawn instead as BlockPlanet's, in its place and at its size.
+bool replace_blast(std::uint8_t* rdram, std::uint32_t start, int which);
 bool frame_effects_on();
 void frame_effects(std::uint8_t* rdram);
 

@@ -368,6 +368,29 @@ std::vector<Part> atom_electron() {
 // none (held in the Magic box, strapped in the launcher, or level 1, whose
 // fire is the game's), 0 to 3 a frame of the flicker, each its own model.
 int flame_phase = -1;
+// The blasts' starburst (replace_blast()): ten spikes round a glowing core in
+// the xy plane, long and short in turn, the spikes shorter at each stage as
+// the game's fades (the flame's phase, 0 to 3). Radius about 1,000.
+std::vector<Part> blast_star() {
+    static const float reach[4] = {1.0f, 0.85f, 0.65f, 0.45f};
+    const float k = reach[std::clamp(flame_phase, 0, 3)];
+    Part spikes{flame, {}}, core{flame_core, {}};
+    ball(core, Place{}, 260.0f * (0.6f + 0.4f * k), 3, 8);
+    for (int i = 0; i < 10; ++i) {
+        const float a = 6.2831853f * float(i) / 10.0f, w = 0.16f;
+        const float len = (i % 2 ? 620.0f : 1000.0f) * k;
+        const V3 tip{len * std::cos(a), len * std::sin(a), 0};
+        const V3 l{200.0f * std::cos(a - w), 200.0f * std::sin(a - w), 0}, r{200.0f * std::cos(a + w), 200.0f * std::sin(a + w), 0};
+        const V3 up{0, 0, 70.0f}, mid = (l + r) * 0.5f;
+        const V3 c = (mid + tip) * 0.5f;
+        add(spikes, Place{}, l, r, tip + V3{0, 0, 0}, c);
+        add(spikes, Place{}, l, mid + up, tip, c);
+        add(spikes, Place{}, mid + up, r, tip, c);
+        add(spikes, Place{}, l, mid - up, tip, c);
+        add(spikes, Place{}, mid - up, r, tip, c);
+    }
+    return {spikes, core};
+}
 // The Magnet's sparks, beside each claw (the owner, 2026-11-26: make them buzz
 // like electricity): a zigzag of six points, a different one at each phase
 // (0 to 3), so they flicker as the flame does; replace() calls them after the
@@ -565,6 +588,7 @@ std::vector<Part> model(int kind, int level) {
     case smoke_ring_kind: return smoke_ring();
     case magnet_sparks_kind: return magnet_sparks();
     case effect_orb_kind: return effect_orb();
+    case blast_star_kind: return blast_star();
         default: break;
         }
     // With the levels (research): the game's six shown as the four, the
@@ -579,6 +603,7 @@ std::vector<Part> model(int kind, int level) {
     case smoke_ring_kind: return smoke_ring();
     case magnet_sparks_kind: return magnet_sparks();
     case effect_orb_kind: return effect_orb();
+    case blast_star_kind: return blast_star();
     case dive_kind: return placed(missile_family(level), turned(180, 0, 0), 1.0f);
     case barrage_missile_kind: return placed(missile(900.0f, trim(3, red)), Place{}, 1.0f);
     case empty_launcher_kind: return launcher(false);
@@ -1271,6 +1296,91 @@ bool hide(std::uint8_t* rdram, std::uint32_t start) {
 }
 
 
+// The blasts (the owner, 2026-11-26: the Firecracker's, Dynamite's and Bomb's
+// explosions are flat pictures). Each is a small model the game draws after
+// use through its own matrix (found by hiding them one at a time): from vertex
+// source 801B1E50 the yellow and orange starburst, from 801A7A10 the rings at
+// its centre. Its vertices give its middle, size and facing each frame (the
+// game grows them by moving vertices), its primitive colour's alpha how far it
+// has faded: drawn instead as BlockPlanet's starburst or two crisp rings.
+bool replace_blast(std::uint8_t* rdram, std::uint32_t start, int which) {
+    const std::uint32_t end = load32(rdram, display_list_pointer);
+    if (rdram == nullptr || end <= start || end - start > 0x10000u) return false;
+    std::vector<std::array<double, 3>> pts;
+    std::uint32_t first_vtx = 0, prim = 0xFFFFFFFFu;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u), op = w0 >> 24;
+        if (op == 0xFAu && prim == 0xFFFFFFFFu) prim = w1;
+        if (op != 0x04u || w1 < 0x80000000u || w1 >= 0x80800000u) continue;
+        if (first_vtx == 0) first_vtx = a;
+        const std::uint32_t n = ((w0 >> 20) & 0xFu) + 1u;
+        for (std::uint32_t i = 0; i < n && pts.size() < 512; ++i)
+            pts.push_back({double(load16(rdram, w1 + 16u * i)), double(load16(rdram, w1 + 16u * i + 2u)), double(load16(rdram, w1 + 16u * i + 4u))});
+    }
+    if (first_vtx == 0 || pts.size() < 3) return false;
+    double c[3] = {};
+    for (const auto& q : pts)
+        for (int j = 0; j < 3; ++j) c[j] += q[j] / double(pts.size());
+    // Its facing: the spread's thinnest direction (the normal of the plane it
+    // lies in), from the cross products of its points about the middle.
+    double n[3] = {}, r = 0;
+    for (std::size_t i = 0; i + 1 < pts.size(); ++i) {
+        const double a0[3] = {pts[i][0] - c[0], pts[i][1] - c[1], pts[i][2] - c[2]};
+        const double a1[3] = {pts[i + 1][0] - c[0], pts[i + 1][1] - c[1], pts[i + 1][2] - c[2]};
+        double x[3] = {a0[1] * a1[2] - a0[2] * a1[1], a0[2] * a1[0] - a0[0] * a1[2], a0[0] * a1[1] - a0[1] * a1[0]};
+        if (x[0] * n[0] + x[1] * n[1] + x[2] * n[2] < 0) for (double& v : x) v = -v;
+        for (int j = 0; j < 3; ++j) n[j] += x[j];
+        r = std::max(r, std::sqrt(a0[0] * a0[0] + a0[1] * a0[1] + a0[2] * a0[2]));
+    }
+    double nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+    if (nl <= 0 || r <= 0) return false;
+    for (double& v : n) v /= nl;
+    double x[3] = {n[1], -n[0], 0};
+    if (std::abs(n[2]) > 0.9) x[0] = 0, x[1] = n[2], x[2] = -n[1];
+    const double xl = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+    for (double& v : x) v /= xl;
+    const double y[3] = {n[1] * x[2] - n[2] * x[1], n[2] * x[0] - n[0] * x[2], n[0] * x[1] - n[1] * x[0]};
+    const int alpha = int(prim & 0xFFu);
+    const int faded = alpha >= 0xC0 ? 0 : alpha >= 0x90 ? 1 : alpha >= 0x60 ? 2 : 3;
+    const std::uint32_t light = 0x5A33C500u;
+    std::pair<std::uint32_t, double> parts[2] = {};
+    int count = 0;
+    if (which == 0) parts[count++] = {model_list(rdram, blast_star_kind, 1, light, faded), 0.9 * r / 1000.0};
+    else {
+        const std::uint32_t ring_list = model_list(rdram, smoke_ring_kind, 1, light, std::min(3, faded + 1));
+        parts[count++] = {ring_list, 0.8 * r / 1000.0};
+        parts[count++] = {ring_list, 0.5 * r / 1000.0};
+    }
+    // Blank the game's, call ours through a matrix multiplied on and popped.
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t op = load32(rdram, a) >> 24;
+        if (op == 0x04u || op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, a, 0), store32(rdram, a + 4u, 0);
+    }
+    static std::uint32_t slot = 0;
+    constexpr std::uint32_t blast_memory = 0x8077A000u, slot_bytes = 0x100u, slots = 32u;
+    const std::uint32_t at = blast_memory + (slot++ % slots) * slot_bytes;
+    std::uint32_t cmd = at, mtx = at + 0x40u;
+    for (int p = 0; p < count; ++p) {
+        if (parts[p].first == 0) continue;
+        const double sc = parts[p].second;
+        const double m[4][4] = {{x[0] * sc, x[1] * sc, x[2] * sc, 0}, {y[0] * sc, y[1] * sc, y[2] * sc, 0}, {n[0] * sc, n[1] * sc, n[2] * sc, 0}, {c[0], c[1], c[2], 1}};
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j) {
+                const std::int32_t fixed = std::int32_t(std::lround(m[i][j] * 65536.0));
+                const std::uint32_t k = std::uint32_t(i * 4 + j);
+                store16(rdram, mtx + 2u * k, std::uint16_t(fixed >> 16));
+                store16(rdram, mtx + 32u + 2u * k, std::uint16_t(fixed & 0xFFFF));
+            }
+        store32(rdram, cmd, 0x01040040u), store32(rdram, cmd + 4u, mtx);
+        store32(rdram, cmd + 8u, 0x06000000u), store32(rdram, cmd + 12u, parts[p].first);
+        store32(rdram, cmd + 16u, 0xBD000000u), store32(rdram, cmd + 20u, 0);
+        cmd += 24u, mtx += 64u;
+    }
+    store32(rdram, cmd, 0xB8000000u), store32(rdram, cmd + 4u, 0);
+    store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, at);
+    return true;
+}
+
 // ---- The power-ups' effects in 3D, each frame --------------------------------
 //
 // The Atom gives off flat pictures (the owner, 2026-11-26: make them vectors or
@@ -1300,11 +1410,12 @@ void frame_effects(std::uint8_t* rdram) {
     constexpr std::uint32_t effect_memory = 0x80780000u, effect_bytes = 0x8000u;
     const std::uint32_t base = effect_memory + std::uint32_t(frame++ & 1) * effect_bytes;
     std::uint32_t used = base;
-    std::uint32_t prim = 0;
+    std::uint32_t prim = 0, tex = 0;
     int replaced = 0;
     for (std::uint32_t a = start; a < end; a += 8u) {
         const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u), op = w0 >> 24;
         if (op == 0xFAu) prim = w1;
+        if (op == 0xFDu) tex = w1;
         if (op != 0x04u || ((w0 >> 20) & 0xFu) + 1u != 4u || w1 < 0x80000000u || w1 >= 0x80800000u) continue;
         double v[4][3];
         for (std::uint32_t i = 0; i < 4; ++i)
@@ -1345,8 +1456,8 @@ void frame_effects(std::uint8_t* rdram) {
             static const bool all = [] { const char* e = std::getenv("BLOCKPLANET_EFFECT_LOG"); return e && e[0] == '2'; }();
             if (all) {
                 const double side = std::abs(v[1][0] - v[0][0]) + std::abs(v[1][1] - v[0][1]) + std::abs(v[1][2] - v[0][2]);
-                std::fprintf(stdout, "{\"event\":\"pic\",\"f\":%d,\"prim\":\"%08X\",\"shade\":\"%08X\",\"side\":%.0f,\"v0\":[%.0f,%.0f,%.0f],\"src\":\"%08X\"}\n",
-                             frame, prim, shade, side, v[0][0], v[0][1], v[0][2], w1);
+                std::fprintf(stdout, "{\"event\":\"pic\",\"f\":%d,\"tex\":\"%08X\",\"prim\":\"%08X\",\"shade\":\"%08X\",\"side\":%.0f,\"v0\":[%.0f,%.0f,%.0f],\"src\":\"%08X\"}\n",
+                             frame, tex, prim, shade, side, v[0][0], v[0][1], v[0][2], w1);
             }
             continue;
         }

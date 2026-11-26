@@ -555,9 +555,39 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                 flight = used_time;
                 tetrisphere::powerup_models::aim_along_path(rdram, model3d_start, restart);
             }
+            {   // Research (BLOCKPLANET_BLAST_HIDE=76,84 / BLOCKPLANET_BLAST_LOG2): draws by vertex count.
+                static const char* hide_list = std::getenv("BLOCKPLANET_BLAST_HIDE");
+                static const bool blog = std::getenv("BLOCKPLANET_BLAST_LOG2") != nullptr;
+                if (hide_list || blog) {
+                    const std::uint32_t e = load32_at(rdram, 0x800F22B4u);
+                    std::uint32_t verts = 0, firstsrc = 0, tex = 0, prim = 0;
+                    for (std::uint32_t a2 = model3d_start; a2 < e && a2 < model3d_start + 8u * 4000u; a2 += 8u) {
+                        const std::uint32_t w0 = load32_at(rdram, a2), w1 = load32_at(rdram, a2 + 4u);
+                        if ((w0 >> 24) == 0x04u) { if (!firstsrc) firstsrc = w1; verts += ((w0 >> 20) & 0xFu) + 1u; }
+                        if ((w0 >> 24) == 0xFDu && !tex) tex = w1;
+                        if ((w0 >> 24) == 0xFAu && !prim) prim = w1;
+                    }
+                    if (blog) std::fprintf(stdout, "{\"event\":\"blastdraw\",\"kind\":%d,\"ms\":%lld,\"verts\":%u,\"src\":\"%08X\",\"tex\":\"%08X\",\"prim\":\"%08X\"}\n", model3d_kind,
+                                           (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - used_time).count(), verts, firstsrc, tex, prim), std::fflush(stdout);
+                    char key[16];
+                    std::snprintf(key, sizeof key, "%08X", firstsrc);
+                    if (hide_list && verts > 0 && std::strstr(hide_list, key)) tetrisphere::powerup_models::hide(rdram, model3d_start);
+                }
+            }
+            bool blast_done = false;
+            {   // The blasts in 3D (replace_blast()): the starburst and the rings
+                // at its centre, told by their first vertices' source.
+                std::uint32_t firstsrc = 0;
+                for (std::uint32_t a2 = model3d_start, e = load32_at(rdram, 0x800F22B4u); a2 < e && a2 < model3d_start + 8u * 4000u; a2 += 8u)
+                    if ((load32_at(rdram, a2) >> 24) == 0x04u) { firstsrc = load32_at(rdram, a2 + 4u); break; }
+                if (firstsrc == 0x801B1E50u || firstsrc == 0x801A7A10u)
+                    blast_done = tetrisphere::powerup_models::replace_blast(rdram, model3d_start, firstsrc == 0x801B1E50u ? 0 : 1);
+            }
             // Level 3: the scene draws the launcher (barrage_scene.cpp), so
             // the game's flight is not drawn.
-            if (model3d_kind == 4 && level == 3 && first_source == held_source[4])
+            if (blast_done)
+                done = true;
+            else if (model3d_kind == 4 && level == 3 && first_source == held_source[4])
                 done = tetrisphere::powerup_models::hide(rdram, model3d_start);
             else
                 done = tetrisphere::powerup_models::replace(rdram, model3d_start, model3d_kind, level, held_source[model3d_kind], &seen, false,
