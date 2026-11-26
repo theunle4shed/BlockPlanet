@@ -5,5 +5,7 @@
      two crisp rings, and the ring of orbs is small glowing balls.
      Are they right? Too bright, too thick?
    - The ring as a power-up sets off is now a crisp ring too.
-   - Atom: the glitch after the orbs (your clip, frame 126): still there?
+   - Atom glitch (old bricks flash up for one frame after the orbs):
+     not seen on the test machine. Does it happen every time? And with
+     1 (Play, the game's own models)? A clip of each helps.
   Already checked by you: Firecracker rings, Magnet buzz, Dynamite bundle.
