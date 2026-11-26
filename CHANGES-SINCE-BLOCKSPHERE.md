@@ -871,3 +871,7 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 
 - The owner asked whether the original's gun spun round its body. It does: the game spins its Ray Gun about the barrel as it flies (a green bulb with gold fins, the same all round, so the spin does not show); ours has a handle, which swung round with it. Now each frame the screen's down is worked out from the draw's matrices and our model is rolled about its barrel so the handle (its -y) points that way, as if held (`roll_handle_down`, a roll added to `replace()` beside the turn the Bomb uses). Checked in a recording: the handle points down in every frame while the game flies and aims the gun.
 - Looked at for the owner's next request: the original's electric effect is flat pictures, a jagged white bolt from the muzzle to the target, white swirl rings round the muzzle, and a burst where it hits. To replace with a flickering 3D bolt (as the missile's flame): roadmap.
+
+## 2026-11-26: The Rescue audit's checklist
+
+- `docs/MVP_AUDIT_RESCUE.md`: each screen and scene on the way through Rescue (boot, title, attract demo, profile, Rescue menu, stage start, stage clear and the next stage, losing a heart, game over, every episode's ending), what plays, whether it works, and a column for the owner's keep, drop or change. Recorded in the harness: the change from 1:1 to 1:2 (core, friend, score, the next stage) and game over (the shell, the grid, the Game Over panel) work.
