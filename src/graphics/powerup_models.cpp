@@ -751,6 +751,9 @@ int flame_frame() {
 
 namespace {
 std::uint32_t smoke_rings(std::uint8_t* rdram, std::uint32_t start, std::uint32_t call, std::uint32_t light_dir);
+// aim_along_path()'s turn for the next replace(), multiplied onto the game's matrix.
+double pending_aim[3][3] = {};
+bool pending_aim_set = false;
 }  // namespace
 
 bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std::uint32_t only_source, std::uint32_t* source, bool whole,
@@ -828,7 +831,9 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
     // onto the game's matrix, calls the model and pops it (one per draw, in
     // a ring of slots so a frame still being drawn keeps its own).
     std::uint32_t call = list;
-    if (std::abs(turn_degrees) > 0.01 || std::abs(roll_degrees) > 0.01) {
+    const bool aimed = pending_aim_set;
+    pending_aim_set = false;
+    if (aimed || std::abs(turn_degrees) > 0.01 || std::abs(roll_degrees) > 0.01) {
         static std::uint32_t slot = 0;
         constexpr std::uint32_t turn_memory = 0x80770000u, slot_bytes = 0x60u, slots = 64u;
         const std::uint32_t at = turn_memory + (slot++ % slots) * slot_bytes;
@@ -841,6 +846,9 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j)
                 for (int k = 0; k < 3; ++k) m[i][j] += rz[i][k] * rx[k][j];
+        if (aimed)
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j) m[i][j] = pending_aim[i][j];
         const std::uint32_t mtx = at + 0x20u;
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j) {
@@ -1050,6 +1058,82 @@ std::uint32_t smoke_rings(std::uint8_t* rdram, std::uint32_t start, std::uint32_
     store32(rdram, cmd, 0xB8000000u), store32(rdram, cmd + 4u, 0);
     return at_list;
 }
+
+// The draw's camera (its last modelview load) and its own place (the
+// multiplies after it), as smoke_rings() reads them.
+bool camera_and_place(const std::uint8_t* rdram, std::uint32_t start, Mat& view, Mat& place) {
+    const std::uint32_t end = load32(rdram, display_list_pointer);
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j) view[i][j] = place[i][j] = i == j;
+    bool have = false;
+    for (std::uint32_t a = start; a < end; a += 8u) {
+        const std::uint32_t w0 = load32(rdram, a), w1 = load32(rdram, a + 4u);
+        if ((w0 >> 24) == 0x04u || (w0 >> 24) == 0x06u) break;
+        if ((w0 >> 24) != 0x01u) continue;
+        const std::uint32_t params = (w0 >> 16) & 0xFFu;
+        if (params & 1u) continue;
+        const Mat t = read_matrix(rdram, w1);
+        if (params & 2u) {
+            view = t, have = true;
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j) place[i][j] = i == j;
+        } else {
+            place = multiply(t, place);
+        }
+    }
+    return have;
+}
+}  // namespace
+
+void aim_along_path(const std::uint8_t* rdram, std::uint32_t start, bool restart) {
+    static double last[3] = {}, dir[3] = {};
+    static bool have_last = false, have_dir = false;
+    if (restart) have_last = have_dir = false;
+    Mat view{}, place{};
+    if (!camera_and_place(rdram, start, view, place)) return;
+    const double at[3] = {place[3][0], place[3][1], place[3][2]};
+    const double s = std::sqrt(place[0][0] * place[0][0] + place[0][1] * place[0][1] + place[0][2] * place[0][2]);
+    if (s <= 0) return;
+    if (have_last) {
+        double v[3] = {at[0] - last[0], at[1] - last[1], at[2] - last[2]};
+        const double vl = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        if (vl > s * 20.0) {  // (moved more than a hair: a model unit is s)
+            for (double& c : v) c /= vl;
+            if (!have_dir) for (int k = 0; k < 3; ++k) dir[k] = v[k];
+            else for (int k = 0; k < 3; ++k) dir[k] = 0.65 * dir[k] + 0.35 * v[k];
+            const double dl = std::sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+            if (dl > 0) for (double& c : dir) c /= dl;
+            have_dir = true;
+        }
+    }
+    last[0] = at[0], last[1] = at[1], last[2] = at[2], have_last = true;
+    if (!have_dir) return;
+    // Wanted (rows: the model's axes in the world, at the game's scale): the
+    // nose (-z) along the movement. (Measured 2026-11-26: with z against the
+    // movement the nose trailed; the game's world as these matrices give it
+    // is mirrored to ours.) x level where it can be.
+    const double z[3] = {dir[0], dir[1], dir[2]};
+    double x[3] = {z[2], 0, -z[0]};  // (world up) x z
+    double xl = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+    if (xl < 1e-3) x[0] = 1, x[1] = 0, x[2] = 0, xl = 1;
+    for (double& c : x) c /= xl;
+    const double y[3] = {z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]};
+    // The game's own turn (its place's rows, without the scale): ours is
+    // wanted x the inverse of it (a turn: its transpose), multiplied in first.
+    double g[3][3];
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j) g[i][j] = place[i][j] / s;
+    const double w[3][3] = {{x[0], x[1], x[2]}, {y[0], y[1], y[2]}, {z[0], z[1], z[2]}};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j) {
+            double sum = 0;
+            for (int k = 0; k < 3; ++k) sum += w[i][k] * g[j][k];
+            pending_aim[i][j] = sum;
+        }
+    pending_aim_set = true;
+}
+
+namespace {
 }  // namespace
 
 double nose_towards_camera(const std::uint8_t* rdram, std::uint32_t start) {
@@ -1229,9 +1313,10 @@ void frame_effects(std::uint8_t* rdram) {
         const double y[3] = {n[1] * x[2] - n[2] * x[1], n[2] * x[0] - n[0] * x[2], n[0] * x[1] - n[1] * x[0]};
         // The parts: (model, its size against the square's half width).
         const int alpha = int(prim & 0xFFu);
-        // (The pulse grows wide: its rings two stages thinner, so they stay fine lines.)
+        // (The rings grow wide: the launch ring one stage thinner, the pulse's two,
+    // so they stay fine lines.)
         const int faded = alpha >= 0xA0 ? 0 : alpha >= 0x70 ? 1 : alpha >= 0x40 ? 2 : 3;
-        const int stage = what == orb ? -1 : what == pulse ? std::min(3, faded + 2) : faded;
+        const int stage = what == orb ? -1 : what == pulse ? std::min(3, faded + 2) : std::min(3, faded + 1);
         std::pair<std::uint32_t, double> parts[2] = {};
         int count = 0;
         const std::uint32_t light = 0x5A33C500u;

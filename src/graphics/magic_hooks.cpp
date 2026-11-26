@@ -545,25 +545,15 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                     break;
                 }
             if (model3d_kind == 4 && first_source == held_source[4]) {
-                // Rolled over in step with the game's own turn: as the game
-                // swings its nose round towards the camera (from into the screen,
-                // about -0.3, to facing it, about 0.4), ours rolls half a turn
-                // about its own axis, so it never flips in one frame (the owner,
-                // 2026-11-22) and always dives nose first. Never rolls back.
+                // Pointed along its path (the owner, 2026-11-26: it flipped over
+                // between two frames as it came in; the game swings its own
+                // nose round to the camera in about half a second, and the
+                // half turn ours made to dive nose first made it worse): its
+                // nose always leads the way it is moving, smoothed.
                 static Clock::time_point flight{};
-                // (It flies in nose up, side on to the camera, so the roll waits
-                // until it has first pointed into the screen.)
-                static double rolled = 0.0;
-                static bool into_screen = false;
-                if (flight != used_time) rolled = 0.0, into_screen = false;
+                const bool restart = flight != used_time;
                 flight = used_time;
-                const double nz = tetrisphere::powerup_models::nose_towards_camera(rdram, model3d_start);
-                if (nz > -1.5 && nz < -0.5) into_screen = true;
-                if (nz > -1.5 && into_screen) {
-                    const double u = std::clamp((nz + 0.3) / 0.7, 0.0, 1.0);
-                    rolled = std::max(rolled, 180.0 * u * u * (3.0 - 2.0 * u));
-                }
-                turn = rolled;
+                tetrisphere::powerup_models::aim_along_path(rdram, model3d_start, restart);
             }
             // Level 3: the scene draws the launcher (barrage_scene.cpp), so
             // the game's flight is not drawn.

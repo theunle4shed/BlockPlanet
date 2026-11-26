@@ -62,6 +62,10 @@ bool hide(std::uint8_t* rdram, std::uint32_t start);
 
 // Each frame, just before it is sent (the graphics task observer): the game's
 // flat effect pictures the power-ups give off, drawn again in 3D.
+// For the next replace(): the model turned so its nose (-z) points the way the
+// draw has been moving (from its matrices frame to frame, smoothed); `restart`
+// at a new flight. Until it has moved, the game's own way.
+void aim_along_path(const std::uint8_t* rdram, std::uint32_t start, bool restart);
 bool frame_effects_on();
 void frame_effects(std::uint8_t* rdram);
 

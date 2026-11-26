@@ -1,8 +1,9 @@
   To check in this version (2026-11-26), with 2 (the power-up test):
+   - Bomb (number pad 5): it now always flies nose first, turning
+     smoothly. Does it still flip anywhere?
    - Atom (number pad 4): where it lands, the soft double pulse is now
      two crisp rings, and the ring of orbs is small glowing balls.
      Are they right? Too bright, too thick?
-   - Atom: a single soft ring round it as it sets off, now a crisp ring.
+   - The ring as a power-up sets off is now a crisp ring too.
    - Atom: the glitch after the orbs (your clip, frame 126): still there?
-   - Bomb (number pad 5): a longer flame. Right size?
   Already checked by you: Firecracker rings, Magnet buzz, Dynamite bundle.
