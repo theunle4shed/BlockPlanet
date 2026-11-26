@@ -155,21 +155,49 @@ void ring(Part& part, const Place& pl, float R, float r, int sides = 16, int rou
         }
     }
 }
-// A curved claw: a chain of tubes through the points.
-void chain(Part& part, const std::vector<V3>& pts, float r) {
-    for (std::size_t i = 0; i + 1 < pts.size(); ++i) {
-        const V3 d = pts[i + 1] - pts[i];
-        const float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
-        const V3 z = unit(d);
-        const V3 x = unit(std::abs(z.x) < 0.9f ? cross(V3{1, 0, 0}, z) : cross(V3{0, 1, 0}, z));
-        const V3 y = cross(z, x);
-        Place pl;
-        pl.m[0][0] = x.x, pl.m[0][1] = y.x, pl.m[0][2] = z.x;
-        pl.m[1][0] = x.y, pl.m[1][1] = y.y, pl.m[1][2] = z.y;
-        pl.m[2][0] = x.z, pl.m[2][1] = y.z, pl.m[2][2] = z.z;
-        pl.at = pts[i];
-        tube(part, pl, 0.0f, len, r, r, 6, true);
+// A curved claw: one tube swept along the points (the owner, 2026-11-26: the
+// magnet's U, then a chain of separate short tubes each with its own caps,
+// twist and six sides, showed ridges and bumps at every joint). A ring of
+// `sides` points at each point, square to the path there (the frame carried
+// along the path, so it does not twist), joined to the next ring; caps only at
+// the two ends (`caps`). The first ring starts along x when the path starts
+// along z (as the arms' tubes do, so a U meets them seamlessly).
+void chain(Part& part, const std::vector<V3>& pts, float r, int sides = 6, bool caps = true, V3 start_dir = {}, V3 end_dir = {}) {
+    const std::size_t n = pts.size();
+    if (n < 2) return;
+    std::vector<V3> tangent(n), xs(n), ys(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        const V3 a = i > 0 ? unit(pts[i] - pts[i - 1]) : V3{0, 0, 0};
+        const V3 b = i + 1 < n ? unit(pts[i + 1] - pts[i]) : V3{0, 0, 0};
+        tangent[i] = unit(a + b);
     }
+    // The ends' directions, when given (a U meeting straight arms: square to them).
+    if (start_dir.x != 0 || start_dir.y != 0 || start_dir.z != 0) tangent[0] = unit(start_dir);
+    if (end_dir.x != 0 || end_dir.y != 0 || end_dir.z != 0) tangent[n - 1] = unit(end_dir);
+    xs[0] = unit(std::abs(tangent[0].x) < 0.9f ? cross(V3{0, 1, 0}, tangent[0]) : cross(V3{0, 0, 1}, tangent[0]));
+    ys[0] = cross(tangent[0], xs[0]);
+    for (std::size_t i = 1; i < n; ++i) {
+        // Carried along: the last x made square to the new direction.
+        const V3 x = xs[i - 1] - tangent[i] * (xs[i - 1].x * tangent[i].x + xs[i - 1].y * tangent[i].y + xs[i - 1].z * tangent[i].z);
+        xs[i] = unit(x), ys[i] = cross(tangent[i], xs[i]);
+    }
+    const auto at = [&](std::size_t i, int k) {
+        const float a = 6.2831853f * float(k) / float(sides);
+        return pts[i] + xs[i] * (r * std::cos(a)) + ys[i] * (r * std::sin(a));
+    };
+    const Place none{};
+    for (std::size_t i = 0; i + 1 < n; ++i) {
+        const V3 mid = (pts[i] + pts[i + 1]) * 0.5f;
+        for (int k = 0; k < sides; ++k) {
+            add(part, none, at(i, k), at(i, k + 1), at(i + 1, k + 1), mid);
+            add(part, none, at(i, k), at(i + 1, k + 1), at(i + 1, k), mid);
+        }
+    }
+    if (caps)
+        for (int k = 0; k < sides; ++k) {
+            add(part, none, pts[0], at(0, k + 1), at(0, k), pts[1]);
+            add(part, none, pts[n - 1], at(n - 1, k), at(n - 1, k + 1), pts[n - 2]);
+        }
 }
 // Every triangle of a model moved and scaled (a level's bigger or extra form).
 std::vector<Part> placed(std::vector<Part> parts, const Place& pl, float scale) {
@@ -260,11 +288,11 @@ std::vector<Part> horseshoe(float s, std::uint32_t tip, bool sparks_on) {
         tube(tips, place_at(V3{side * half, 0, 0}), -1700 * s, -2300 * s, r * 1.04f, r * 1.04f, 10, true);
     }
     std::vector<V3> u;
-    for (int i = 0; i <= 10; ++i) {
-        const float t = 3.14159265f * float(i) / 10.0f;
+    for (int i = 0; i <= 16; ++i) {
+        const float t = 3.14159265f * float(i) / 16.0f;
         u.push_back(V3{half * std::cos(t), 0, bend + half * std::sin(t)});
     }
-    chain(arms, u, r);
+    chain(arms, u, r, 10, false, V3{0, 0, 1}, V3{0, 0, -1});  // (the arms' ten sides, no caps, square to them at both ends)
     if (sparks_on)
         for (int side = -1; side <= 1; side += 2)
             chain(sparks, {V3{side * 1300 * s, 0, -1800 * s}, V3{side * 1600 * s, 0, -1500 * s}, V3{side * 1350 * s, 0, -1200 * s}, V3{side * 1650 * s, 0, -900 * s}}, 55 * s);
