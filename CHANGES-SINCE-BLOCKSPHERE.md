@@ -875,3 +875,10 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 ## 2026-11-26: The Rescue audit's checklist
 
 - `docs/MVP_AUDIT_RESCUE.md`: each screen and scene on the way through Rescue (boot, title, attract demo, profile, Rescue menu, stage start, stage clear and the next stage, losing a heart, game over, every episode's ending), what plays, whether it works, and a column for the owner's keep, drop or change. Recorded in the harness: the change from 1:1 to 1:2 (core, friend, score, the next stage) and game over (the shell, the grid, the Game Over panel) work.
+
+## 2026-11-26: The Dynamite as a round bundle, the Atom's electrons going round, the Bomb's flame
+
+- **Dynamite:** the bundle was five sticks in a row. Now they sit in a ring, side by side and wrapped in two bands of tape, before the five fly apart (the owner: clumped together and wrapped, like real dynamite). The HUD icon stays a row of five, so the count still shows.
+- **Atom:** its electrons were fixed in place, so the model looked still. Now there is one on each ring, each going round its ring once every 1.6 seconds, alternate rings in opposite directions; this shows in the Magic box and in flight. The rings and nucleus stay one built model; each electron is its own small model, moved by a matrix each frame (a ring of 32 slots at 0x80772000, in the title scenes' memory, as the turn slots at 0x80770000).
+- **Bomb:** it flew with a short flame (700 units). The owner: a flame like the Firecracker's, bigger. Now it is 1,800 long, still flickering. Checked in recordings of all three in flight.
+- On the roadmap: our own smoke rings for the Firecracker (square to its path, starting at its tail), the Atom's pulse and orbs redrawn, and a glitch the owner saw after the Atom.

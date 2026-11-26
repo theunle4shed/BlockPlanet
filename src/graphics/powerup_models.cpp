@@ -253,25 +253,33 @@ std::vector<Part> firecracker(int level) {
 // across x and z about ±770.
 std::vector<Part> dynamite(int level) {
     Part sticks{red, {}}, front{bright_red, {}}, band{trim(level, gold), {}}, fuse{fuse_tan, {}}, spark{electron, {}};
-    std::vector<std::pair<float, float>> at;  // x, z of each stick
     // Five sticks at every level (the owner, 2026-11-22): in use the bundle
     // splits into five sticks, each its own blast, so the bundle shows five.
     // The level shows in the band's colour, the fuses and (level 3) bomblets.
-    at = {{-1280, 0}, {-640, 0}, {0, 0}, {640, 0}, {1280, 0}};
+    // A round bundle (the owner, 2026-11-26: clumped together and wrapped,
+    // as it starts, before the five fly apart): five sticks in a ring, side
+    // by side, the front one bright, two wraps of tape round them.
+    const float r = 310.0f, ring_r = 540.0f;  // touching: 2 * 540 * sin 36° ≈ 2 * 310
     const Place up = turned(-90, 0, 0);  // tubes along y
-    float x0 = 0, x1 = 0;
-    for (const auto& [x, z] : at) {
+    for (int k = 0; k < 5; ++k) {
+        const float a = 6.2831853f * float(k) / 5.0f;  // k 0 faces the front (+z)
         Place pl = up;
-        pl.at = V3{x, 0, z};
-        tube(x == 0 ? front : sticks, pl, -1500.0f, 1500.0f, 310.0f, 310.0f);
-        x0 = std::min(x0, x), x1 = std::max(x1, x);
+        pl.at = V3{ring_r * std::sin(a), 0, ring_r * std::cos(a)};
+        tube(k == 0 ? front : sticks, pl, -1500.0f, 1500.0f, r, r);
     }
-    box(band, place_at(V3{(x0 + x1) / 2, 300, 0.0f}), (x1 - x0) / 2 + 360.0f, 260.0f, 380.0f);
+    for (const float y : {-700.0f, 700.0f}) {
+        Place pl = up;
+        pl.at = V3{0, y, 0};
+        tube(band, pl, -170.0f, 170.0f, ring_r + r + 40.0f, ring_r + r + 40.0f, 20, false);
+    }
+    // The fuses from the top of the bundle, one per level, from the middle
+    // sticks of the ring's front.
     const int fuses = level;
     for (int f = 0; f < fuses; ++f) {
-        const float x = f == 0 ? 0.0f : f == 1 ? -640.0f : 640.0f;
-        chain(fuse, {V3{x, 1500, 0}, V3{x + 150, 1850, 0}, V3{x + 400, 2100, 0}}, 70.0f);
-        ball(spark, place_at(V3{x + 430, 2160, 0}), 170.0f, 3, 6);
+        const float a = 6.2831853f * float(f == 0 ? 0 : f == 1 ? 1 : 4) / 5.0f;
+        const float x = ring_r * std::sin(a), z = ring_r * std::cos(a);
+        chain(fuse, {V3{x, 1500, z}, V3{x + 150, 1850, z}, V3{x + 400, 2100, z}}, 70.0f);
+        ball(spark, place_at(V3{x + 430, 2160, z}), 170.0f, 3, 6);
     }
     return {sticks, front, band, fuse, spark};
 }
@@ -328,20 +336,22 @@ std::vector<Part> magnet(int level) {
 
 // Atom: about its middle, the nucleus about 1,000 across, its electrons about
 // 1,400 out.
+// The Atom's rings: three (four at level 3), each tilted about the model's
+// z. Its electrons are not part of the model: replace() draws one on each
+// ring, going round it (the owner, 2026-11-26), through a matrix each frame.
+constexpr float atom_orbit = 1400.0f;
+int atom_orbits(int level) { return level < 3 ? 3 : 4; }
+Place atom_ring(int o, int level) { return turned(70, 0, 180.0f * float(o) / float(atom_orbits(level))); }
 std::vector<Part> atom(int level) {
-    Part nucleus{atom_purple, {}}, orbits{trim(level, orbit), {}}, electrons{electron, {}};
+    Part nucleus{atom_purple, {}}, orbits{trim(level, orbit), {}};
     ball(nucleus, Place{}, level == 1 ? 480.0f : 560.0f, 5, 10);
-    const int n_orbits = level < 3 ? 3 : 4, per = level == 1 ? 1 : 2;
-    for (int o = 0; o < n_orbits; ++o) {
-        const float tilt = 180.0f * float(o) / float(n_orbits);
-        const Place pl = turned(70, 0, tilt);
-        ring(orbits, pl, 1400.0f, 60.0f, 20, 3);
-        for (int e = 0; e < per; ++e) {
-            const float a = 6.2831853f * (float(e) / float(per) + 0.15f * float(o));
-            ball(electrons, place_at(pl.apply(V3{1400 * std::cos(a), 1400 * std::sin(a), 0})), 180.0f, 3, 6);
-        }
-    }
-    return {nucleus, orbits, electrons};
+    for (int o = 0; o < atom_orbits(level); ++o) ring(orbits, atom_ring(o, level), atom_orbit, 60.0f, 20, 3);
+    return {nucleus, orbits};
+}
+std::vector<Part> atom_electron() {
+    Part electrons{electron, {}};
+    ball(electrons, Place{}, 180.0f, 3, 6);
+    return {electrons};
 }
 
 // Bomb: a missile along z, its nose to -z (about -4,000), fins about ±1,500.
@@ -374,7 +384,7 @@ std::vector<Part> missile(float flame_len, std::uint32_t band_colour = red) {
     return {body, reds, band, core, fire};
 }
 std::vector<Part> bomb(int level) {
-    if (level == 1) return missile(700.0f);
+    if (level == 1) return missile(1800.0f);  // (a long flame, as the Firecracker's fire: the owner, 2026-11-26)
     if (level == 2) return placed(missile(1200.0f, trim(2, red)), Place{}, 1.15f);
     return merged(placed(missile(900.0f, trim(3, red)), place_at(V3{-1100, 0, 200}), 0.72f),
                   placed(missile(900.0f, trim(3, red)), place_at(V3{1100, 0, -200}), 0.72f));
@@ -513,6 +523,7 @@ std::vector<Part> model(int kind, int level) {
         case 3: return atom(1);
         case 4: return bomb(1);
         case 5: return raygun(1);
+        case electron_kind: return atom_electron();
         default: break;
         }
     // With the levels (research): the game's six shown as the four, the
@@ -523,6 +534,7 @@ std::vector<Part> model(int kind, int level) {
     case 2: case 5: return magnet_family(level);
     case 3: return atom_family(level);
     case stick_kind: return dynamite_stick(level);
+    case electron_kind: return atom_electron();
     case dive_kind: return placed(missile_family(level), turned(180, 0, 0), 1.0f);
     case barrage_missile_kind: return placed(missile(900.0f, trim(3, red)), Place{}, 1.0f);
     case empty_launcher_kind: return launcher(false);
@@ -794,6 +806,44 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
         store32(rdram, at + 16u, 0xBD000000u), store32(rdram, at + 20u, 0);  // G_POPMTX
         store32(rdram, at + 24u, 0xB8000000u), store32(rdram, at + 28u, 0);  // end
         call = at;
+    }
+    // The Atom: one electron on each ring, going round it (the owner,
+    // 2026-11-26), each a call to the electron through a matrix that moves it
+    // to its place this frame (in a ring of slots, as the turn above).
+    if (draw_kind == 3) {
+        const std::uint32_t electron_list = model_list(rdram, electron_kind, level, light_dir, -1);
+        if (electron_list != 0) {
+            static std::uint32_t slot = 0;
+            constexpr std::uint32_t electron_memory = 0x80772000u, slot_bytes = 0x200u, slots = 32u;
+            const std::uint32_t at = electron_memory + (slot++ % slots) * slot_bytes;
+            const int atom_level = levels_on() ? level : 1;  // (the original Atom is level 1's)
+            const int orbits = atom_orbits(atom_level);
+            const float scale = atom_level == 3 ? 0.85f : 1.0f;  // (level 3's atom is drawn smaller in its ring)
+            const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            constexpr double lap = 1.6;  // seconds round a ring
+            std::uint32_t cmd = at, mtx = at + 0x80u;
+            store32(rdram, cmd, 0x06000000u), store32(rdram, cmd + 4u, call), cmd += 8u;
+            for (int o = 0; o < orbits; ++o) {
+                // Spread round their rings, alternate rings the other way round.
+                const double turn = std::fmod(seconds / lap + double(o) / double(orbits), 1.0) * (o % 2 ? -1.0 : 1.0);
+                const float a = float(6.283185307179586 * turn);
+                const V3 p = atom_ring(o, atom_level).apply(V3{atom_orbit * std::cos(a), atom_orbit * std::sin(a), 0}) * scale;
+                const double m[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {p.x, p.y, p.z, 1}};  // row vectors: a move
+                for (int i = 0; i < 4; ++i)
+                    for (int j = 0; j < 4; ++j) {
+                        const std::int32_t fixed = std::int32_t(std::lround(m[i][j] * 65536.0));
+                        const std::uint32_t k = std::uint32_t(i * 4 + j);
+                        store16(rdram, mtx + 2u * k, std::uint16_t(fixed >> 16));
+                        store16(rdram, mtx + 32u + 2u * k, std::uint16_t(fixed & 0xFFFF));
+                    }
+                store32(rdram, cmd, 0x01040040u), store32(rdram, cmd + 4u, mtx);  // G_MTX: modelview, multiply, push
+                store32(rdram, cmd + 8u, 0x06000000u), store32(rdram, cmd + 12u, electron_list);
+                store32(rdram, cmd + 16u, 0xBD000000u), store32(rdram, cmd + 20u, 0);  // G_POPMTX
+                cmd += 24u, mtx += 64u;
+            }
+            store32(rdram, cmd, 0xB8000000u), store32(rdram, cmd + 4u, 0);
+            call = at;
+        }
     }
     store32(rdram, first_vtx, 0x06000000u), store32(rdram, first_vtx + 4u, call);
     return true;
