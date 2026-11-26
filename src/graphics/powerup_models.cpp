@@ -1324,12 +1324,29 @@ void frame_effects(std::uint8_t* rdram) {
             if (side > 0 && side <= 300) what = orb;
         }
         if (what == none) {
+            // Research (BLOCKPLANET_EFFECT_HIDE=RRGGBB[,RRGGBB]): hide pictures of these
+            // primitive colours whose alpha is below FF (fading effects).
+            static const std::string hide = [] { const char* e = std::getenv("BLOCKPLANET_EFFECT_HIDE"); return std::string(e ? e : ""); }();
+            if (!hide.empty()) {
+                char rgbs[8];
+                std::snprintf(rgbs, sizeof rgbs, "%06X", prim >> 8);
+                const bool big = std::abs(v[1][0] - v[0][0]) + std::abs(v[1][1] - v[0][1]) + std::abs(v[1][2] - v[0][2]) > 1500;
+                if (hide.find(rgbs) != std::string::npos && ((prim & 0xFFu) != 0xFFu || big)) {
+                    store32(rdram, a, 0), store32(rdram, a + 4u, 0);
+                    for (std::uint32_t b2 = a + 8u; b2 < end; b2 += 8u) {
+                        const std::uint32_t o = load32(rdram, b2) >> 24;
+                        if (o == 0x04u || o == 0x06u || o == 0xB8u || o == 0x01u) break;
+                        if (o == 0xBFu || o == 0xB1u || o == 0xB5u) store32(rdram, b2, 0), store32(rdram, b2 + 4u, 0);
+                    }
+                    continue;
+                }
+            }
             // Research (BLOCKPLANET_EFFECT_LOG=2): every other picture's colour and size.
             static const bool all = [] { const char* e = std::getenv("BLOCKPLANET_EFFECT_LOG"); return e && e[0] == '2'; }();
             if (all) {
                 const double side = std::abs(v[1][0] - v[0][0]) + std::abs(v[1][1] - v[0][1]) + std::abs(v[1][2] - v[0][2]);
-                std::fprintf(stdout, "{\"event\":\"pic\",\"prim\":\"%08X\",\"shade\":\"%08X\",\"side\":%.0f,\"v0\":[%.0f,%.0f,%.0f],\"src\":\"%08X\"}\n",
-                             prim, shade, side, v[0][0], v[0][1], v[0][2], w1);
+                std::fprintf(stdout, "{\"event\":\"pic\",\"f\":%d,\"prim\":\"%08X\",\"shade\":\"%08X\",\"side\":%.0f,\"v0\":[%.0f,%.0f,%.0f],\"src\":\"%08X\"}\n",
+                             frame, prim, shade, side, v[0][0], v[0][1], v[0][2], w1);
             }
             continue;
         }
