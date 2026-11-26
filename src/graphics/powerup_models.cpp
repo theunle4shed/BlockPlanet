@@ -1086,48 +1086,73 @@ bool camera_and_place(const std::uint8_t* rdram, std::uint32_t start, Mat& view,
 }  // namespace
 
 void aim_along_path(const std::uint8_t* rdram, std::uint32_t start, bool restart) {
-    static double last[3] = {}, dir[3] = {};
+    // Measured 2026-11-26 (BLOCKPLANET_AIM_LOG): the Bomb crosses the screen
+    // at a steady depth, then stops near the middle and the game SHRINKS it
+    // (its scale from about 0.1 to 0.007) to show the dive into the sphere.
+    // So its way is taken in the camera's space: across the screen from its
+    // movement there, into the screen from its shrinking (a shrink by a
+    // fraction f reads as moving away by f of its distance). Sampled at most
+    // every 50 ms, so it is the same at 15 or 60 frames a second, and smoothed.
+    using clock = std::chrono::steady_clock;
+    static double last[3] = {}, last_scale = 0, dir[3] = {};
     static bool have_last = false, have_dir = false;
+    static clock::time_point last_at{};
     if (restart) have_last = have_dir = false;
     Mat view{}, place{};
     if (!camera_and_place(rdram, start, view, place)) return;
-    const double at[3] = {place[3][0], place[3][1], place[3][2]};
-    const double s = std::sqrt(place[0][0] * place[0][0] + place[0][1] * place[0][1] + place[0][2] * place[0][2]);
+    const Mat mv = multiply(place, view);
+    const double s = std::sqrt(mv[0][0] * mv[0][0] + mv[0][1] * mv[0][1] + mv[0][2] * mv[0][2]);
     if (s <= 0) return;
-    if (have_last) {
-        double v[3] = {at[0] - last[0], at[1] - last[1], at[2] - last[2]};
+    const double at[3] = {mv[3][0], mv[3][1], mv[3][2]};
+    const auto now = clock::now();
+    if (!have_last) {
+        last[0] = at[0], last[1] = at[1], last[2] = at[2], last_scale = s, last_at = now, have_last = true;
+    } else if (now - last_at >= std::chrono::milliseconds(50)) {
+        const double depth = std::max(1.0, std::abs(at[2]));
+        double v[3] = {at[0] - last[0], at[1] - last[1], at[2] - last[2] + depth * (s - last_scale) / s};
         const double vl = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-        if (vl > s * 20.0) {  // (moved more than a hair: a model unit is s)
+        if (vl > 2.0) {
             for (double& c : v) c /= vl;
             if (!have_dir) for (int k = 0; k < 3; ++k) dir[k] = v[k];
-            else for (int k = 0; k < 3; ++k) dir[k] = 0.65 * dir[k] + 0.35 * v[k];
+            else for (int k = 0; k < 3; ++k) dir[k] = 0.6 * dir[k] + 0.4 * v[k];
             const double dl = std::sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
             if (dl > 0) for (double& c : dir) c /= dl;
             have_dir = true;
         }
+        last[0] = at[0], last[1] = at[1], last[2] = at[2], last_scale = s, last_at = now;
     }
-    last[0] = at[0], last[1] = at[1], last[2] = at[2], have_last = true;
+    if (std::getenv("BLOCKPLANET_AIM_LOG")) {
+        std::fprintf(stdout, "{\"event\":\"aim\",\"eye\":[%.0f,%.0f,%.0f],\"s\":%.4f,\"dir\":[%.2f,%.2f,%.2f],\"have\":%d}\n", at[0], at[1], at[2], s, dir[0], dir[1], dir[2], int(have_dir));
+        std::fflush(stdout);
+    }
     if (!have_dir) return;
-    // Wanted (rows: the model's axes in the world, at the game's scale): the
-    // nose (-z) along the movement. (Measured 2026-11-26: with z against the
-    // movement the nose trailed; the game's world as these matrices give it
-    // is mirrored to ours.) x level where it can be.
-    const double z[3] = {dir[0], dir[1], dir[2]};
-    double x[3] = {z[2], 0, -z[0]};  // (world up) x z
+    // Wanted, in the camera's space (rows: the model's axes): the nose (-z)
+    // along its way, x across the screen where it can be.
+    const double z[3] = {-dir[0], -dir[1], -dir[2]};
+    double x[3] = {z[2], 0, -z[0]};  // (screen up) x z
     double xl = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
     if (xl < 1e-3) x[0] = 1, x[1] = 0, x[2] = 0, xl = 1;
     for (double& c : x) c /= xl;
     const double y[3] = {z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]};
-    // The game's own turn (its place's rows, without the scale): ours is
-    // wanted x the inverse of it (a turn: its transpose), multiplied in first.
+    // The draw's own turn in the camera's space (without its scale); ours
+    // is wanted x its inverse, multiplied onto the game's matrix first.
     double g[3][3];
     for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j) g[i][j] = place[i][j] / s;
+        for (int k = 0; k < 3; ++k) g[i][k] = mv[i][k] / s;
+    const double det = g[0][0] * (g[1][1] * g[2][2] - g[1][2] * g[2][1]) - g[0][1] * (g[1][0] * g[2][2] - g[1][2] * g[2][0]) +
+                       g[0][2] * (g[1][0] * g[2][1] - g[1][1] * g[2][0]);
+    if (std::abs(det) < 1e-6) return;
+    double inv[3][3];
+    for (int i = 0; i < 3; ++i)
+        for (int k = 0; k < 3; ++k) {
+            const int a0 = (k + 1) % 3, a1 = (k + 2) % 3, b0 = (i + 1) % 3, b1 = (i + 2) % 3;
+            inv[i][k] = (g[a0][b0] * g[a1][b1] - g[a0][b1] * g[a1][b0]) / det;
+        }
     const double w[3][3] = {{x[0], x[1], x[2]}, {y[0], y[1], y[2]}, {z[0], z[1], z[2]}};
     for (int i = 0; i < 3; ++i)
         for (int j = 0; j < 3; ++j) {
             double sum = 0;
-            for (int k = 0; k < 3; ++k) sum += w[i][k] * g[j][k];
+            for (int k = 0; k < 3; ++k) sum += w[i][k] * inv[k][j];
             pending_aim[i][j] = sum;
         }
     pending_aim_set = true;
@@ -1321,7 +1346,9 @@ void frame_effects(std::uint8_t* rdram) {
         int count = 0;
         const std::uint32_t light = 0x5A33C500u;
         if (what == orb) parts[count++] = {model_list(rdram, effect_orb_kind, 1, light, -1), 0.5 * h / 180.0};
-        else {
+        else if (what == pulse && alpha < 0x50) {
+            // (Faded a touch sooner, the owner 2026-11-26: gone once the game's is half faded.)
+        } else {
             const std::uint32_t ring_list = model_list(rdram, smoke_ring_kind, 1, light, stage);
             parts[count++] = {ring_list, (what == pulse ? 0.85 : 0.8) * h / 1000.0};
             if (what == pulse) parts[count++] = {ring_list, 0.55 * h / 1000.0};

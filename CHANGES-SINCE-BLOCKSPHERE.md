@@ -901,3 +901,8 @@ Each power-up's use was recorded beside the original's and stepped through (`doc
 ## 2026-11-26: The Test Sheet in Claude
 
 - The owner couldn't see the launcher's list while the game ran. What to check in each build is now a page in Claude they can answer as they play (Looks good / Problem / Didn't check, and notes), saved for Claude to read; Claude updates the checks with each new version. `TO-TEST.txt` (shown by BlockPlanet.bat) now points to it. How it works: docs/HANDOVER-2026-11-24.md.
+
+## 2026-11-26: The Bomb aimed in the camera's space
+
+- The owner (Test Sheet, build 9a85f92): the Bomb's flight was "totally broken, weird and backwards". Logged (`BLOCKPLANET_AIM_LOG=1`): the matrices taken as its place before only spiral in a small flat circle; the Bomb crosses the screen at a steady depth, then stops near the middle while the game shrinks it (scale 0.1 to 0.007) to show the dive. It looked right on the test machine at 15 frames a second only by chance. Now its way is taken in the camera's space: across the screen from its movement, into the screen from its shrinking, sampled at most every 50 ms (the same at 15 or 60 frames a second) and smoothed; its nose (-z) is turned that way. Checked in a recording: in from the left nose first, a smooth turn, then nose first into the sphere (tail and flame to the camera as it shrinks away).
+- The Atom's pulse rings fade a touch sooner (the owner): gone once the game's own is half faded.
