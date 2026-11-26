@@ -1094,7 +1094,7 @@ void aim_along_path(const std::uint8_t* rdram, std::uint32_t start, bool restart
     // fraction f reads as moving away by f of its distance). Sampled at most
     // every 50 ms, so it is the same at 15 or 60 frames a second, and smoothed.
     using clock = std::chrono::steady_clock;
-    static double last[3] = {}, last_scale = 0, dir[3] = {};
+    static double last[3] = {}, last_scale = 0, dir[3] = {}, vel[3] = {};
     static bool have_last = false, have_dir = false;
     static clock::time_point last_at{};
     if (restart) have_last = have_dir = false;
@@ -1110,13 +1110,18 @@ void aim_along_path(const std::uint8_t* rdram, std::uint32_t start, bool restart
     } else if (now - last_at >= std::chrono::milliseconds(50)) {
         const double depth = std::max(1.0, std::abs(at[2]));
         double v[3] = {at[0] - last[0], at[1] - last[1], at[2] - last[2] + depth * (s - last_scale) / s};
-        const double vl = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        // Never toward the camera (the owner's clip, 2026-11-26, frames 27 to
+        // 29: as it stops the game grows it a little, and the nose swung to
+        // the camera): only across the screen or into it.
+        v[2] = std::min(v[2], 0.0);
+        // The movement itself is averaged, not its direction: a fast pass
+        // weighs far more than the small drift while it hovers (frame 30: a
+        // drift up the screen pointed the nose up), so it lines up for the
+        // dive in one smooth turn.
+        for (int k = 0; k < 3; ++k) vel[k] = have_dir ? 0.8 * vel[k] + 0.2 * v[k] : v[k];
+        const double vl = std::sqrt(vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]);
         if (vl > 2.0) {
-            for (double& c : v) c /= vl;
-            if (!have_dir) for (int k = 0; k < 3; ++k) dir[k] = v[k];
-            else for (int k = 0; k < 3; ++k) dir[k] = 0.6 * dir[k] + 0.4 * v[k];
-            const double dl = std::sqrt(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
-            if (dl > 0) for (double& c : dir) c /= dl;
+            for (int k = 0; k < 3; ++k) dir[k] = vel[k] / vl;
             have_dir = true;
         }
         last[0] = at[0], last[1] = at[1], last[2] = at[2], last_scale = s, last_at = now;
@@ -1318,7 +1323,16 @@ void frame_effects(std::uint8_t* rdram) {
             const double side = std::abs(v[1][0] - v[0][0]) + std::abs(v[1][1] - v[0][1]) + std::abs(v[1][2] - v[0][2]);
             if (side > 0 && side <= 300) what = orb;
         }
-        if (what == none) continue;
+        if (what == none) {
+            // Research (BLOCKPLANET_EFFECT_LOG=2): every other picture's colour and size.
+            static const bool all = [] { const char* e = std::getenv("BLOCKPLANET_EFFECT_LOG"); return e && e[0] == '2'; }();
+            if (all) {
+                const double side = std::abs(v[1][0] - v[0][0]) + std::abs(v[1][1] - v[0][1]) + std::abs(v[1][2] - v[0][2]);
+                std::fprintf(stdout, "{\"event\":\"pic\",\"prim\":\"%08X\",\"shade\":\"%08X\",\"side\":%.0f,\"v0\":[%.0f,%.0f,%.0f],\"src\":\"%08X\"}\n",
+                             prim, shade, side, v[0][0], v[0][1], v[0][2], w1);
+            }
+            continue;
+        }
         if (used + 3u * 88u + 16u > base + effect_bytes) break;
         // Its middle, size and facing.
         double c[3] = {}, h = 0;
