@@ -34,7 +34,9 @@ constexpr int magnet_sparks_kind = 12;
 constexpr int effect_orb_kind = 13;
 // Kind 14: the blasts' starburst (replace_blast()).
 constexpr int blast_star_kind = 14;
-constexpr int last_kind = 14;
+// Kind 15: the Ray Gun's bolt (replace()).
+constexpr int ray_bolt_kind = 15;
+constexpr int last_kind = 15;
 // The display list of BlockPlanet's model of `kind` at `level` (built into
 // model memory when first asked for), or 0.
 // `phase`: a missile's flame, -1 none, 0 to 3 a frame of its flicker (flame_frame()).

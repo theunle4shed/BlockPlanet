@@ -223,7 +223,7 @@ std::vector<Part> merged(std::vector<Part> a, const std::vector<Part>& b) {
 // The colours (the flat icons', tools/art/powerups.py).
 constexpr std::uint32_t purple = 0x8A3DF0, lilac = 0xC9A2FF, orange = 0xF28A2E, fuse_tan = 0xF3DC9C, red = 0xD93636, bright_red = 0xEF4A4A,
                         gold = 0xF2C53D, pink_tip = 0xF0D0F0, ring_green = 0x2FCF4A, atom_purple = 0xA24BFF, orbit = 0xB78CFF, electron = 0xFFD23F,
-                        white = 0xF4F1EA, flame = 0xFF8A1F, flame_core = 0xFFF07A, smoke = 0xE9E0FA, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF;
+                        white = 0xF4F1EA, flame = 0xFF8A1F, flame_core = 0xFFF07A, smoke = 0xE9E0FA, gun_green = 0x2FBF68, grip_green = 0x1F8A4C, beam = 0x6FFFB0, spark_blue = 0x6FD3FF, beam_white = 0xEAFBFF;
 
 // The level's trim (the owner, 2026-11-21: one rule for levelling up): each
 // power-up's trim (stripes, band, tips, orbits, rings) is its own colour at
@@ -368,6 +368,28 @@ std::vector<Part> atom_electron() {
 // none (held in the Magic box, strapped in the launcher, or level 1, whose
 // fire is the game's), 0 to 3 a frame of the flicker, each its own model.
 int flame_phase = -1;
+// The Ray Gun's bolt (replace()'s ray effects): a jagged line of light along
+// x from -1,000 to 1,000, a thinner second strand beside it, a new zigzag at
+// each phase (0 to 3) so it flickers like the missile's flame.
+std::vector<Part> ray_bolt() {
+    static const float jit[4][9] = {{0.0f, 0.9f, -0.7f, 1.0f, -0.4f, 0.8f, -1.0f, 0.5f, 0.0f},
+                                    {0.0f, -0.6f, 1.0f, -0.9f, 0.6f, -0.3f, 0.9f, -0.8f, 0.0f},
+                                    {0.0f, 0.5f, -1.0f, 0.3f, 1.0f, -0.7f, 0.4f, -0.5f, 0.0f},
+                                    {0.0f, -1.0f, 0.4f, 0.8f, -0.9f, 1.0f, -0.2f, 0.7f, 0.0f}};
+    const int ph = std::clamp(flame_phase, 0, 3);
+    Part core{beam_white, {}}, glow{spark_blue, {}};
+    for (int strand = 0; strand < 2; ++strand) {
+        std::vector<V3> pts;
+        const float amp = strand == 0 ? 120.0f : 190.0f;
+        for (int i = 0; i < 9; ++i) {
+            const float x = -1000.0f + 250.0f * float(i);
+            const float j1 = jit[(ph + strand * 2) % 4][i], j2 = jit[(ph + 1 + strand) % 4][8 - i];
+            pts.push_back(V3{x, amp * j1, amp * 0.6f * j2});
+        }
+        chain(strand == 0 ? core : glow, pts, strand == 0 ? 48.0f : 26.0f, 4);
+    }
+    return {core, glow};
+}
 // The blasts' starburst (replace_blast()): ten spikes round a glowing core in
 // the xy plane, long and short in turn, the spikes shorter at each stage as
 // the game's fades (the flame's phase, 0 to 3). Radius about 1,000.
@@ -589,6 +611,7 @@ std::vector<Part> model(int kind, int level) {
     case magnet_sparks_kind: return magnet_sparks();
     case effect_orb_kind: return effect_orb();
     case blast_star_kind: return blast_star();
+    case ray_bolt_kind: return ray_bolt();
         default: break;
         }
     // With the levels (research): the game's six shown as the four, the
@@ -604,6 +627,7 @@ std::vector<Part> model(int kind, int level) {
     case magnet_sparks_kind: return magnet_sparks();
     case effect_orb_kind: return effect_orb();
     case blast_star_kind: return blast_star();
+    case ray_bolt_kind: return ray_bolt();
     case dive_kind: return placed(missile_family(level), turned(180, 0, 0), 1.0f);
     case barrage_missile_kind: return placed(missile(900.0f, trim(3, red)), Place{}, 1.0f);
     case empty_launcher_kind: return launcher(false);
@@ -712,7 +736,7 @@ std::uint32_t write_parts(std::uint8_t* rdram, std::uint32_t at, std::uint32_t d
     for (const auto& part : parts) {
         // (0.45 left the models dim in the effect.) A missile's flame glows:
         // its colour in full, whatever the light.
-        const bool glowing = part.rgb == flame || part.rgb == flame_core || part.rgb == smoke || part.rgb == spark_blue;
+        const bool glowing = part.rgb == flame || part.rgb == flame_core || part.rgb == smoke || part.rgb == spark_blue || part.rgb == beam_white;
         lights(part.rgb, glowing ? 1.0f : 0.65f);
         draw(part, 0.0f);
     }
@@ -900,6 +924,108 @@ bool replace(std::uint8_t* rdram, std::uint32_t start, int kind, int level, std:
             store32(rdram, at + 16u, 0xB8000000u), store32(rdram, at + 20u, 0);
             call = at;
         }
+    }
+    // The Ray Gun firing (the owner, 2026-11-27: its beam is flat pictures):
+    // after the gun, the game draws a see-through strip (the jagged bolt) and
+    // squares (the swirl at the muzzle, the burst where it hits), each through
+    // its own matrix. Each group of loads between matrices is replaced in place:
+    // the strip by BlockPlanet's flickering 3D bolt laid along the strip's
+    // length, a square by a crisp ring.
+    if (draw_kind == 5 && !held && !whole) {
+        std::vector<std::uint32_t> group;
+        auto flush = [&]() {
+            if (group.empty()) return;
+            std::vector<std::array<double, 3>> pts;
+            std::uint32_t verts = 0;
+            for (const std::uint32_t ld : group) {
+                const std::uint32_t w0 = load32(rdram, ld), src = load32(rdram, ld + 4u), cnt = ((w0 >> 20) & 0xFu) + 1u;
+                verts += cnt;
+                for (std::uint32_t i = 0; i < cnt; ++i)
+                    pts.push_back({double(load16(rdram, src + 16u * i)), double(load16(rdram, src + 16u * i + 2u)), double(load16(rdram, src + 16u * i + 4u))});
+            }
+            double c[3] = {};
+            for (const auto& q : pts)
+                for (int j = 0; j < 3; ++j) c[j] += q[j] / double(pts.size());
+            auto far_from = [&](const double* o) {
+                std::size_t best = 0; double bd = -1;
+                for (std::size_t i = 0; i < pts.size(); ++i) {
+                    const double d = (pts[i][0] - o[0]) * (pts[i][0] - o[0]) + (pts[i][1] - o[1]) * (pts[i][1] - o[1]) + (pts[i][2] - o[2]) * (pts[i][2] - o[2]);
+                    if (d > bd) bd = d, best = i;
+                }
+                return best;
+            };
+            double m[4][4] = {};
+            std::uint32_t list = 0;
+            if (verts == 4) {  // a square: a ring in its plane
+                const auto& v0 = pts[0]; const auto& v1 = pts[1]; const auto& v2 = pts[2];
+                const double e1[3] = {v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]}, e2[3] = {v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]};
+                double n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};
+                const double nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+                double h = 0;
+                for (const auto& q : pts) h = std::max(h, std::sqrt((q[0] - c[0]) * (q[0] - c[0]) + (q[1] - c[1]) * (q[1] - c[1]) + (q[2] - c[2]) * (q[2] - c[2])) / std::sqrt(2.0));
+                if (nl <= 0 || h <= 0) { group.clear(); return; }
+                for (double& q : n) q /= nl;
+                double x[3] = {n[1], -n[0], 0};
+                if (std::abs(n[2]) > 0.9) x[0] = 0, x[1] = n[2], x[2] = -n[1];
+                const double xl = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+                for (double& q : x) q /= xl;
+                const double y[3] = {n[1] * x[2] - n[2] * x[1], n[2] * x[0] - n[0] * x[2], n[0] * x[1] - n[1] * x[0]};
+                const double sc = 0.55 * h / 1000.0;
+                for (int j = 0; j < 3; ++j) m[0][j] = x[j] * sc, m[1][j] = y[j] * sc, m[2][j] = n[j] * sc, m[3][j] = c[j];
+                list = model_list(rdram, smoke_ring_kind, 1, light_dir, 3);  // (fine: the bolt is the thing to see)
+            } else {  // the strip: the bolt from one end to the other
+                const auto& a0 = pts[far_from(c)];
+                const double a0d[3] = {a0[0], a0[1], a0[2]};
+                const auto& b0 = pts[far_from(a0d)];
+                double u[3] = {b0[0] - a0[0], b0[1] - a0[1], b0[2] - a0[2]};
+                const double L = std::sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
+                if (L <= 0) { group.clear(); return; }
+                for (double& q : u) q /= L;
+                double y[3] = {u[1], -u[0], 0};
+                if (std::abs(u[2]) > 0.9) y[0] = 0, y[1] = u[2], y[2] = -u[1];
+                const double yl = std::sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2]);
+                for (double& q : y) q /= yl;
+                const double z[3] = {u[1] * y[2] - u[2] * y[1], u[2] * y[0] - u[0] * y[2], u[0] * y[1] - u[1] * y[0]};
+                const double sc = L / 2000.0;
+                for (int j = 0; j < 3; ++j) m[0][j] = u[j] * sc, m[1][j] = y[j] * sc, m[2][j] = z[j] * sc, m[3][j] = (a0[j] + b0[j]) / 2.0;
+                list = model_list(rdram, ray_bolt_kind, 1, light_dir, flame_frame());
+            }
+            m[3][3] = 1;
+            if (list == 0) { group.clear(); return; }
+            static std::uint32_t slot = 0;
+            constexpr std::uint32_t ray_memory = 0x8077C000u, slot_bytes = 0x80u, slots = 64u;
+            const std::uint32_t at = ray_memory + (slot++ % slots) * slot_bytes, mtx = at + 0x20u;
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j) {
+                    const std::int32_t fixed = std::int32_t(std::lround(m[i][j] * 65536.0));
+                    const std::uint32_t k = std::uint32_t(i * 4 + j);
+                    store16(rdram, mtx + 2u * k, std::uint16_t(fixed >> 16));
+                    store16(rdram, mtx + 32u + 2u * k, std::uint16_t(fixed & 0xFFFF));
+                }
+            store32(rdram, at, 0x01040040u), store32(rdram, at + 4u, mtx);
+            store32(rdram, at + 8u, 0x06000000u), store32(rdram, at + 12u, list);
+            store32(rdram, at + 16u, 0xBD000000u), store32(rdram, at + 20u, 0);
+            store32(rdram, at + 24u, 0xB8000000u), store32(rdram, at + 28u, 0);
+            // The group's loads and triangles blanked; a call to ours in place of its first.
+            for (const std::uint32_t ld : group) {
+                store32(rdram, ld, 0), store32(rdram, ld + 4u, 0);
+                for (std::uint32_t b = ld + 8u; b < end; b += 8u) {
+                    const std::uint32_t op = load32(rdram, b) >> 24;
+                    if (op == 0x04u || op == 0x06u || op == 0xB8u || op == 0x01u) break;
+                    if (op == 0xBFu || op == 0xB1u || op == 0xB5u) store32(rdram, b, 0), store32(rdram, b + 4u, 0);
+                }
+            }
+            store32(rdram, group.front(), 0x06000000u), store32(rdram, group.front() + 4u, at);
+            group.clear();
+        };
+        for (std::uint32_t a = start; a < end; a += 8u) {
+            const std::uint32_t w0 = load32(rdram, a), op = w0 >> 24;
+            if (op == 0x01u) { flush(); continue; }
+            if (op != 0x04u) continue;
+            if (std::find(body_loads.begin(), body_loads.end(), a) != body_loads.end()) continue;
+            group.push_back(a);
+        }
+        flush();
     }
     // The Firecracker in flight: the game's smoke rings (flat pictures, each a
     // load of four vertices after the rocket, its flame fifteen) hidden, and
@@ -1156,9 +1282,27 @@ void aim_along_path(const std::uint8_t* rdram, std::uint32_t start, bool restart
         std::fflush(stdout);
     }
     if (!have_dir) return;
+    // Shown: eased towards that way every frame (the owner, 2026-11-26: it
+    // stepped, the way being worked out only every 50 ms), a little more the
+    // longer the frame, so the turn flows at any frame rate.
+    static double shown[3] = {};
+    static clock::time_point shown_at{};
+    static bool have_shown = false;
+    if (restart) have_shown = false;
+    if (!have_shown) {
+        shown[0] = dir[0], shown[1] = dir[1], shown[2] = dir[2], have_shown = true;
+    } else {
+        const double dt = std::min(0.1, std::chrono::duration<double>(now - shown_at).count());
+        const double k = 1.0 - std::exp(-dt / 0.12);  // about 0.12 s to come most of the way
+        for (int j = 0; j < 3; ++j) shown[j] += (dir[j] - shown[j]) * k;
+        const double sl = std::sqrt(shown[0] * shown[0] + shown[1] * shown[1] + shown[2] * shown[2]);
+        if (sl > 1e-6) for (double& v : shown) v /= sl;
+        else shown[0] = dir[0], shown[1] = dir[1], shown[2] = dir[2];
+    }
+    shown_at = now;
     // Wanted, in the camera's space (rows: the model's axes): the nose (-z)
     // along its way, x across the screen where it can be.
-    const double z[3] = {-dir[0], -dir[1], -dir[2]};
+    const double z[3] = {-shown[0], -shown[1], -shown[2]};
     double x[3] = {z[2], 0, -z[0]};  // (screen up) x z
     double xl = std::sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
     if (xl < 1e-3) x[0] = 1, x[1] = 0, x[2] = 0, xl = 1;

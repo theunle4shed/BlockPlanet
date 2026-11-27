@@ -583,6 +583,40 @@ extern "C" void blockplanet_model_draw_end(std::uint8_t* rdram, recomp_context* 
                 if (firstsrc == 0x801B1E50u || firstsrc == 0x801A7A10u)
                     blast_done = tetrisphere::powerup_models::replace_blast(rdram, model3d_start, firstsrc == 0x801B1E50u ? 0 : 1);
             }
+            {   // TEMP research: dump the Firecracker's flight draw.
+                static const bool dump = std::getenv("BLOCKPLANET_FLIGHT_DUMP") != nullptr;
+                if (dump && model3d_kind == 5) {
+                    const std::uint32_t e = load32_at(rdram, 0x800F22B4u);
+                    std::fprintf(stdout, "{\"event\":\"fdump\",\"ms\":%lld,\"cmds\":[",
+                                 (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - used_time).count());
+                    for (std::uint32_t a = model3d_start; a < e && a < model3d_start + 8u * 600u; a += 8u)
+                        std::fprintf(stdout, "%s\"%08X %08X\"", a == model3d_start ? "" : ",", load32_at(rdram, a), load32_at(rdram, a + 4u));
+                    std::fprintf(stdout, "]}\n");
+                    for (std::uint32_t a = model3d_start; a < e && a < model3d_start + 8u * 600u; a += 8u) {
+                        const std::uint32_t w0 = load32_at(rdram, a), w1 = load32_at(rdram, a + 4u);
+                        if ((w0 >> 24) == 0x01u && w1 >= 0x80000000u) {
+                            std::fprintf(stdout, "{\"event\":\"fmtx\",\"at\":\"%08X\",\"m\":[", w1);
+                            for (int i = 0; i < 16; ++i) {
+                                const std::uint32_t hi = load32_at(rdram, w1 + 4u * std::uint32_t(i / 2));
+                                const std::uint32_t lo = load32_at(rdram, w1 + 32u + 4u * std::uint32_t(i / 2));
+                                const std::int32_t v = std::int32_t(((i & 1) ? (hi << 16) : (hi & 0xFFFF0000u)) | ((i & 1) ? (lo & 0xFFFFu) : (lo >> 16)));
+                                std::fprintf(stdout, "%s%.3f", i ? "," : "", v / 65536.0);
+                            }
+                            std::fprintf(stdout, "]}\n");
+                        }
+                        if ((w0 >> 24) == 0x04u) {
+                            const std::uint32_t n = ((w0 >> 20) & 0xFu) + 1u, src = w1;
+                            std::fprintf(stdout, "{\"event\":\"fvtx\",\"src\":\"%08X\",\"v\":[", src);
+                            for (std::uint32_t i = 0; i < n && i < 16; ++i)
+                                std::fprintf(stdout, "%s[%d,%d,%d,%08X]", i ? "," : "", (int)(std::int16_t)(load32_at(rdram, src + 16u * i) >> 16),
+                                             (int)(std::int16_t)load32_at(rdram, src + 16u * i), (int)(std::int16_t)(load32_at(rdram, src + 16u * i + 4u) >> 16),
+                                             load32_at(rdram, src + 16u * i + 12u));
+                            std::fprintf(stdout, "]}\n");
+                        }
+                    }
+                    std::fflush(stdout);
+                }
+            }
             // Level 3: the scene draws the launcher (barrage_scene.cpp), so
             // the game's flight is not drawn.
             if (blast_done)
